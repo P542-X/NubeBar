@@ -347,10 +347,23 @@ static class Nativo
         return lista;
     }
 
+    // El orden importa, y es distinto en cada sentido. Al devolverlas, primero que
+    // se VEAN (ShowWindow es instantáneo) y después el "ocultar automáticamente",
+    // que tarda porque Explorer recalcula el área de trabajo y avisa a todas las
+    // ventanas: así, si alguien está mirando, la barra reaparece ya. Al esconderlas,
+    // al revés, para que no se vea el hueco saltar.
     public static void MostrarBarraWindows(bool mostrar)
     {
-        AppBar.AutoOcultarBarraWindows(!mostrar);
-        foreach (var b in BarrasDeWindows()) ShowWindow(b, mostrar ? 5 : 0);
+        if (mostrar)
+        {
+            foreach (var b in BarrasDeWindows()) ShowWindow(b, 5);
+            AppBar.AutoOcultarBarraWindows(false);
+        }
+        else
+        {
+            AppBar.AutoOcultarBarraWindows(true);
+            foreach (var b in BarrasDeWindows()) ShowWindow(b, 0);
+        }
     }
 
     // Solo esconder (sin tocar el auto-ocultar), para cuando Explorer las vuelve a mostrar

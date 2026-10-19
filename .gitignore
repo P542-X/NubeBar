@@ -9,3 +9,8 @@ dist/
 .vs/
 .idea/
 *.user
+
+# Cuadernos de trabajo de la sesión nocturna (no son del proyecto)
+PROGRESO.md
+INFORME.md
+PRUEBAS-PARA-PAULO.md

@@ -33,6 +33,7 @@ jobs:
           --self-contained true
           -p:PublishSingleFile=true
           -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true
           --no-restore
           -o dist
 
@@ -44,6 +45,7 @@ jobs:
           $mb = [math]::Round((Get-Item $exe).Length / 1MB, 1)
           Write-Host "NubeBar.exe generado: $mb MB"
           if ($mb -lt 20) { throw "el exe pesa $mb MB: no parece autónomo" }
+          if ($mb -gt 90) { throw "el exe pesa $mb MB: no se ha comprimido" }
 
       - name: Guardarlo también como artefacto
         uses: actions/upload-artifact@v4

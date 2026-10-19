@@ -121,6 +121,7 @@ public partial class MainWindow : Window
             {
                 if (_esJefa)
                 {
+                    Guardian.Lanzar();          // por si me matan: alguien tiene que devolver el shell
                     VigilarConfig();
                     Uso.Cargar();
                     _ = Fuentes.CargarApps();   // el índice del buscador se arma por detrás

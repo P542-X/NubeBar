@@ -20,10 +20,19 @@ static class Log
         Info("==== " + Version + " ====");
     }
 
+    // El guardián es otro proceso y escribe en este mismo archivo, así que de vez en
+    // cuando los dos lo abren a la vez. Se reintenta un par de veces en lugar de
+    // perder la línea: justo las del guardián son las que hacen falta para saber
+    // qué pasó cuando NubeBar murió.
     public static void Info(string mensaje)
     {
-        try { File.AppendAllText(Ruta, $"{DateTime.Now:HH:mm:ss.fff} {mensaje}{Environment.NewLine}"); }
-        catch { }
+        var linea = $"{DateTime.Now:HH:mm:ss.fff} {mensaje}{Environment.NewLine}";
+        for (int intento = 0; intento < 3; intento++)
+        {
+            try { File.AppendAllText(Ruta, linea); return; }
+            catch (IOException) { System.Threading.Thread.Sleep(15); }
+            catch { return; }
+        }
     }
 
     public static void Error(string donde, object error) => Info($"ERROR en {donde}: {error}");
