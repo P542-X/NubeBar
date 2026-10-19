@@ -1,0 +1,11 @@
+# Compilación
+bin/
+obj/
+
+# Publicación (se regenera con dotnet publish)
+dist/
+
+# Varios de Visual Studio / Rider
+.vs/
+.idea/
+*.user

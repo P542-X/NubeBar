@@ -1,0 +1,705 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Threading;
+
+namespace NubeBar;
+
+public partial class MainWindow : Window
+{
+    Config _cfg = Config.Cargar() ?? new Config();
+    IntPtr _self, _ultimaActiva;
+
+    // Pinceles fijos: cuando cambia el tema se anima su color, y todo lo que los usa cambia suave
+    readonly SolidColorBrush _fondo = new(Colors.Black), _texto = new(Colors.White),
+                             _acento = new(Colors.CornflowerBlue), _hover = new(Color.FromArgb(0x30, 255, 255, 255));
+    Color _cTexto = Colors.White, _cAcento = Colors.CornflowerBlue;
+
+    readonly List<Action> _actualizadores = new();
+    readonly DispatcherTimer _tick = new() { Interval = TimeSpan.FromSeconds(1) };
+    readonly DispatcherTimer _recarga = new() { Interval = TimeSpan.FromMilliseconds(250) };
+    readonly DispatcherTimer _wpTimer = new() { Interval = TimeSpan.FromSeconds(15) };
+    FileSystemWatcher? _watcher, _wpWatcher;
+    bool _expandida;
+    bool _aplicando;      // dentro de Aplicar(): no tocar el ancho, aún se está montando todo
+    bool _animandoAncho;  // hay una expansión o contracción en curso, no interrumpirla
+    bool _cerrando;       // ya se está cerrando: nadie puede volver a esconder la barra
+
+    // Las operaciones sobre la barra de Windows tardan ~0,7 s y van en un hilo aparte,
+    // así que se encolan en fila india: sin esto, un "esconder" lanzado antes podría
+    // ejecutarse después del "mostrar" del cierre y dejarte sin barra de tareas.
+    readonly object _candadoShell = new();
+    Task _colaShell = Task.CompletedTask;
+
+    // Estado de Wallpaper Engine
+    string? _wpRuta, _wpTitulo;
+    Paleta? _paleta;
+    bool _wpPausado, _wpMuteado, _iconosOcultos, _wpOcupado;
+    DateTime _wpUltimo;
+    string _ultimoColorEnviado = "";
+
+    const string FuenteIconos = "Segoe Fluent Icons, Segoe MDL2 Assets";
+
+    // Curvas: "Muelle" se pasa un pelín y vuelve (como la isla del iPhone), "Suave" frena sin rebote
+    static readonly IEasingFunction Muelle = new BackEase { Amplitude = 0.35, EasingMode = EasingMode.EaseOut };
+    static readonly IEasingFunction Suave = new CubicEase { EasingMode = EasingMode.EaseOut };
+    static Duration Ms(double ms) => new(TimeSpan.FromMilliseconds(ms));
+
+    bool EsIsla => _cfg.Barra.Modo.Equals("isla", StringComparison.OrdinalIgnoreCase);
+    bool Arriba => !_cfg.Barra.Posicion.Equals("abajo", StringComparison.OrdinalIgnoreCase);
+
+    public MainWindow()
+    {
+        Log.Nuevo();
+        // Ningún error tumba la app: se apunta en el log y se sigue
+        Application.Current.DispatcherUnhandledException += (_, e) => { Log.Error("interfaz", e.Exception); e.Handled = true; };
+        TaskScheduler.UnobservedTaskException += (_, e) => { Log.Error("tarea", e.Exception); e.SetObserved(); };
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            Log.Error("FATAL", e.ExceptionObject);
+            Nativo.MostrarBarraWindows(true);   // nunca dejarte sin barra de tareas
+        };
+
+        InitializeComponent();
+        Resources["Hover"] = _hover;
+        Isla.Background = _fondo;
+        Foreground = _texto;
+
+        Loaded += async (_, _) =>
+        {
+            try
+            {
+                _self = new WindowInteropHelper(this).Handle;
+                Nativo.NoActivable(_self);
+                Aplicar();
+            }
+            catch (Exception ex) { Log.Error("arranque", ex); }
+
+            // Fuera del try: la isla arranca invisible, así que pase lo que pase
+            // en Aplicar hay que hacerla aparecer o no se vería nada
+            AnimarAparicion();
+
+            try
+            {
+                VigilarConfig();
+                VigilarWallpaperEngine();
+                _tick.Tick += (_, _) => Tick();
+                _tick.Start();
+                await ActualizarWallpaper(true);
+            }
+            catch (Exception ex) { Log.Error("arranque", ex); }
+
+            await Task.Delay(2000);
+            Log.Info($"Ventana L={Left} T={Top} {ActualWidth}x{ActualHeight} visible={IsVisible} | " +
+                     $"Isla {Isla.ActualWidth:0}x{Isla.ActualHeight:0} opacidad={Isla.Opacity:0.##} | " +
+                     $"Pantalla {SystemParameters.PrimaryScreenWidth}x{SystemParameters.PrimaryScreenHeight} | " +
+                     $"Modo={_cfg.Barra.Modo} | Wallpaper Engine={WallpaperEngine.Exe ?? "no encontrado"}");
+        };
+        Closed += (_, _) =>
+        {
+            // Primero callar a todo lo que podría volver a esconder la barra
+            _cerrando = true;
+            _tick.Stop();
+            _recarga.Stop();
+            _wpTimer.Stop();
+            if (_watcher is { } w) w.EnableRaisingEvents = false;
+            if (_wpWatcher is { } ww) ww.EnableRaisingEvents = false;
+
+            AppBar.Quitar(_self);
+
+            // Se encola detrás de lo que hubiera pendiente y se espera: el proceso no
+            // puede terminar hasta que la barra de Windows esté de vuelta
+            if (!EncolarShell(() => Nativo.MostrarBarraWindows(true)).Wait(TimeSpan.FromSeconds(5)))
+            {
+                Log.Info("la cola del shell no terminó a tiempo: restaurando la barra aquí mismo");
+                Nativo.MostrarBarraWindows(true);
+            }
+            Log.Info($"cerrado. Barra de Windows visible={Nativo.BarraWindowsVisible()}");
+        };
+    }
+
+    // Encadena el trabajo con el shell para que se ejecute en orden y nunca a la vez
+    Task EncolarShell(Action accion)
+    {
+        lock (_candadoShell)
+            return _colaShell = _colaShell.ContinueWith(_ =>
+            {
+                try { accion(); }
+                catch (Exception ex) { Log.Error("barra de Windows", ex); }
+            }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+    }
+
+    void Tick()
+    {
+        // Explorer a veces vuelve a mostrar su barra: se vuelve a esconder
+        if (!_cerrando && _cfg.Barra.OcultarBarraWindows && Nativo.BarraWindowsVisible()) Nativo.EsconderBarraWindows();
+        foreach (var a in _actualizadores.ToArray()) a();
+        AjustarAncho();   // el texto de CPU/RAM/hora cambia de ancho: que se deslice
+        if (Environment.GetEnvironmentVariable("NUBEBAR_DIAG") == "1")
+            Log.Info($"DIAG tick isla={Isla.ActualWidth:0.00} exp={_expandida}");
+    }
+
+    // ================= Tema y posición =================
+    void Aplicar()
+    {
+        _aplicando = true;
+        var t = _cfg.Tema;
+        var b = _cfg.Barra;
+        WallpaperEngine.RutaManual = _cfg.Wallpaper.Ruta;
+
+        Color fondo = Hex(t.Fondo, Colors.Black), texto = Hex(t.Texto, Colors.White), acento = Hex(t.Acento, Colors.CornflowerBlue);
+        if (t.DesdeWallpaper && _paleta is { } p)
+        {
+            fondo = Color.FromArgb(fondo.A, p.Fondo.R, p.Fondo.G, p.Fondo.B);  // se respeta tu opacidad
+            texto = p.Texto;
+            acento = p.Acento;
+        }
+        else if (t.EnviarColorAlWallpaper) EnviarColor(acento);
+
+        _cTexto = texto; _cAcento = acento;
+        AnimarColor(_fondo, fondo);
+        AnimarColor(_texto, texto);
+        AnimarColor(_acento, acento);
+        AnimarColor(_hover, Color.FromArgb(0x30, texto.R, texto.G, texto.B));
+
+        Isla.CornerRadius = new CornerRadius(t.Radio);
+        FontFamily = new FontFamily(t.Fuente);
+        FontSize = t.TamanoFuente;
+
+        _actualizadores.Clear();
+        Llenar(Izq, _cfg.Modulos.Izquierda);
+        Llenar(Cen, _cfg.Modulos.Centro);
+        Llenar(Der, _cfg.Modulos.Derecha);
+
+        // Primero el diseño de la isla y después el tamaño de la ventana: asignar
+        // Window.Width/Height hace un SetWindowPos que bombea mensajes y provoca un
+        // layout intermedio. Si el diseño ya está puesto, ese layout ya es el definitivo
+        // y no se llega a dibujar la isla estirada de lado a lado.
+        // Recargar el config con un panel abierto lo cierra: sus medidas ya no valen
+        CerrarPanelAlRecargar();
+
+        Contenido.Height = b.Alto;          // la fila de los módulos no cambia aunque crezca el cajón
+        Isla.BeginAnimation(HeightProperty, null);
+        Isla.Height = b.Alto;
+        Isla.BeginAnimation(WidthProperty, null);
+        Isla.HorizontalAlignment = EsIsla ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
+        ColocarCajon();                     // alineación vertical, márgenes y orden de las filas
+
+        _expandida = false;
+        FijarLados(!EsIsla);
+        // En modo isla el ancho siempre va fijado a mano (ver AnimarAncho); en modo barra, automático
+        Isla.Width = EsIsla ? MedirAncho() : double.NaN;
+
+        // La ventana es una franja transparente de todo el ancho; dentro va la isla o la barra
+        double altoVentana = b.Alto + b.Margen * 2;
+        Left = 0;
+        Width = SystemParameters.PrimaryScreenWidth;
+        Height = altoVentana;
+        Top = Arriba ? 0 : SystemParameters.PrimaryScreenHeight - altoVentana;
+
+        _aplicando = false;
+
+        // Solo el modo barra reserva espacio; la isla flota encima de las ventanas, como en el iPhone.
+        // Esto va en el hilo de la ventana porque la AppBar se registra con nuestro propio hwnd.
+        if (!EsIsla && b.ReservarEspacio) AppBar.Registrar(_self, Arriba, Px(altoVentana));
+        else AppBar.Quitar(_self);
+
+        // Esconder la barra de Windows tarda ~0,7 s: Explorer recalcula el área de trabajo y
+        // se lo notifica a todas las ventanas. Si se hace aquí, el hilo de interfaz se queda
+        // clavado y la animación de entrada se congela a medias. Va en la cola del shell:
+        // en otro hilo, pero en orden y sin pisarse con el "mostrar" del cierre.
+        bool mostrar = !b.OcultarBarraWindows;
+        if (!_cerrando) EncolarShell(() => Nativo.MostrarBarraWindows(mostrar));
+    }
+
+    int Px(double dip) =>
+        (int)Math.Round(dip * (PresentationSource.FromVisual(this)?.CompositionTarget?.TransformToDevice.M22 ?? 1.0));
+
+    static Color Hex(string hex, Color porDefecto)
+    {
+        try { return (Color)ColorConverter.ConvertFromString(hex); }
+        catch { return porDefecto; }
+    }
+
+    // ================= Animaciones =================
+    // Regla: el valor "real" de cada propiedad es siempre el estado final, y la animación
+    // solo dibuja el camino hasta él. Si una animación fallase, todo se vería igual, sin saltos.
+
+    // Animación con espera inicial: se queda en "desde" durante "retardo" y luego va a "hasta"
+    static DoubleAnimationUsingKeyFrames Kf(double desde, double hasta, double ms, double retardo = 0, IEasingFunction? curva = null)
+    {
+        var a = new DoubleAnimationUsingKeyFrames();
+        a.KeyFrames.Add(new DiscreteDoubleKeyFrame(desde, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+        if (retardo > 0) a.KeyFrames.Add(new DiscreteDoubleKeyFrame(desde, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(retardo))));
+        a.KeyFrames.Add(new EasingDoubleKeyFrame(hasta, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(retardo + ms)), curva));
+        return a;
+    }
+
+    static void AnimarColor(SolidColorBrush pincel, Color destino, double ms = 700)
+    {
+        var actual = pincel.Color;                       // color que se ve ahora mismo
+        pincel.BeginAnimation(SolidColorBrush.ColorProperty, null);
+        pincel.Color = destino;                          // valor final real
+        pincel.BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(actual, destino, Ms(ms)) { EasingFunction = Suave });
+    }
+
+    // Al arrancar la isla cae desde fuera de la pantalla con rebote
+    void AnimarAparicion()
+    {
+        double distancia = _cfg.Barra.Alto + _cfg.Barra.Margen * 2;
+        var mover = new TranslateTransform();            // base Y = 0 (posición final)
+        Isla.RenderTransform = mover;
+        mover.BeginAnimation(TranslateTransform.YProperty, Kf(Arriba ? -distancia : distancia, 0, 700, 0, Muelle));
+        Isla.BeginAnimation(OpacityProperty, Kf(0, 1, 400));
+    }
+
+    // Ancho natural del contenido, medido sin límite para que las columnas "*" del
+    // Grid no se lleven todo el hueco disponible. Se deja el layout invalidado para
+    // que la pasada real vuelva a medir con su propia restricción.
+    double MedirAncho()
+    {
+        Contenido.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        double ancho = Contenido.DesiredSize.Width + Isla.Padding.Left + Isla.Padding.Right;
+        Contenido.InvalidateMeasure();
+        double maximo = ActualWidth > 0 ? ActualWidth : SystemParameters.PrimaryScreenWidth;
+        return Math.Clamp(ancho, Isla.MinWidth, Math.Max(Isla.MinWidth, maximo));
+    }
+
+    // El ancho real queda siempre fijado al valor final y la animación solo dibuja el
+    // camino: así nunca hay un salto al terminar (antes volvía a "auto" y pegaba un tirón).
+    void AnimarAncho(double hasta, double ms, IEasingFunction curva, Action? alTerminar = null)
+    {
+        double desde = Isla.ActualWidth > 0 ? Isla.ActualWidth : hasta;
+        Isla.BeginAnimation(WidthProperty, null);
+        Isla.Width = hasta;
+
+        if (Math.Abs(desde - hasta) < 0.5) { alTerminar?.Invoke(); return; }
+
+        var ancho = Kf(desde, hasta, ms, 0, curva);
+        if (alTerminar != null) ancho.Completed += (_, _) => alTerminar();
+        Isla.BeginAnimation(WidthProperty, ancho);
+    }
+
+    // El contenido cambia solo (minuto, CPU, RAM, apps que abres o cierras): la isla
+    // se adapta deslizándose en vez de dar el salto de un fotograma
+    void AjustarAncho()
+    {
+        if (!EsIsla || _aplicando || _animandoAncho) return;
+        double hasta = Math.Max(MedirAncho(), _panelAncho);   // con panel abierto manda el panel
+        if (Math.Abs(hasta - Isla.ActualWidth) < 0.5) return;
+        AnimarAncho(hasta, 280, Suave);
+    }
+
+    // Expandir / contraer la isla: el ancho se anima con muelle y los laterales
+    // aparecen con fundido y escalonados, de dentro hacia fuera
+    void Expandir(bool abrir)
+    {
+        if (!EsIsla || abrir == _expandida) return;
+        if (!abrir && HayPanel) return;   // con un panel abierto la isla se queda desplegada
+        _expandida = abrir;
+
+        // Medir el destino con la visibilidad que tendrá al final...
+        Izq.Visibility = Der.Visibility = abrir ? Visibility.Visible : Visibility.Collapsed;
+        double hasta = MedirAncho();
+        // ...pero dejarlos visibles mientras dura la animación
+        Izq.Visibility = Der.Visibility = Visibility.Visible;
+
+        _animandoAncho = true;
+        AnimarAncho(hasta, abrir ? 480 : 340, abrir ? Muelle : Suave, () =>
+        {
+            _animandoAncho = false;
+            if (_expandida != abrir) return;   // la interrumpió otra animación
+            if (!abrir) Izq.Visibility = Der.Visibility = Visibility.Collapsed;
+        });
+
+        foreach (var lado in new Panel[] { Izq, Der })
+        {
+            double ahora = lado.Opacity;
+            lado.BeginAnimation(OpacityProperty, null);
+            lado.Opacity = abrir ? 1 : 0;                // valor final real
+            lado.BeginAnimation(OpacityProperty, abrir ? Kf(0, 1, 260, 140) : Kf(ahora, 0, 120));
+            Escalonar(lado, abrir);
+        }
+    }
+
+    // Cada módulo del lateral entra un poco desplazado hacia fuera y con retardo
+    // creciente: es lo que le da el aire de la Dynamic Island al abrirse
+    void Escalonar(Panel lado, bool abrir)
+    {
+        var hijos = lado.Children.OfType<UIElement>().ToList();
+        double signo = lado == Izq ? -1 : 1;
+
+        for (int i = 0; i < hijos.Count; i++)
+        {
+            var hijo = hijos[i];
+            int orden = lado == Izq ? hijos.Count - 1 - i : i;   // del centro hacia fuera
+            if (hijo.RenderTransform is not TranslateTransform mover)
+                hijo.RenderTransform = mover = new TranslateTransform();
+
+            double desde = abrir ? signo * 18 : mover.X;
+            mover.BeginAnimation(TranslateTransform.XProperty, null);
+            mover.X = 0;                                         // valor final real
+            if (!abrir) continue;                                // al cerrar basta el fundido
+            mover.BeginAnimation(TranslateTransform.XProperty, Kf(desde, 0, 420, 120 + orden * 30, Muelle));
+        }
+    }
+
+    void FijarLados(bool visibles)
+    {
+        foreach (var lado in new Panel[] { Izq, Der })
+        {
+            lado.BeginAnimation(OpacityProperty, null);
+            lado.Opacity = visibles ? 1 : 0;
+            lado.Visibility = visibles ? Visibility.Visible : Visibility.Collapsed;
+            foreach (var hijo in lado.Children.OfType<UIElement>())
+            {
+                if (hijo.RenderTransform is not TranslateTransform mover) continue;
+                mover.BeginAnimation(TranslateTransform.XProperty, null);
+                mover.X = 0;
+            }
+        }
+    }
+
+    // Iconos de apps: crecen desde 0 al abrirse y se encogen al cerrarse.
+    // Con RenderTransform (y no LayoutTransform) la escala va en la composición y no
+    // obliga a un measure+arrange por fotograma; el hueco lo abre y lo cierra la
+    // animación de ancho de la isla, que es la que se ve.
+    static void AnimarEntrada(FrameworkElement e, double retardoMs = 0)
+    {
+        var escala = new ScaleTransform(1, 1);           // base: tamaño normal
+        e.RenderTransformOrigin = new Point(0.5, 0.5);
+        e.RenderTransform = escala;
+        escala.BeginAnimation(ScaleTransform.ScaleXProperty, Kf(0, 1, 450, retardoMs, Muelle));
+        escala.BeginAnimation(ScaleTransform.ScaleYProperty, Kf(0, 1, 450, retardoMs, Muelle));
+        e.BeginAnimation(OpacityProperty, Kf(0, 1, 250, retardoMs));
+    }
+
+    static void AnimarSalida(FrameworkElement e, Action alTerminar)
+    {
+        e.IsHitTestVisible = false;
+        var escala = new ScaleTransform(1, 1);
+        e.RenderTransformOrigin = new Point(0.5, 0.5);
+        e.RenderTransform = escala;
+        var encoger = Kf(1, 0, 220, 0, Suave);
+        encoger.Completed += (_, _) => alTerminar();
+        escala.BeginAnimation(ScaleTransform.ScaleXProperty, encoger);
+        escala.BeginAnimation(ScaleTransform.ScaleYProperty, Kf(1, 0, 220, 0, Suave));
+        e.BeginAnimation(OpacityProperty, Kf(1, 0, 150));
+    }
+
+    // Rayita bajo cada app: corta y tenue si está abierta, larga y con color de acento si está activa
+    void AnimarIndicador(Border ind, bool activa, bool inmediato = false)
+    {
+        double ms = inmediato ? 0 : 380;
+        double anchoAhora = ind.ActualWidth > 0 ? ind.ActualWidth : ind.Width, opAhora = ind.Opacity;
+
+        ind.BeginAnimation(WidthProperty, null);
+        ind.BeginAnimation(OpacityProperty, null);
+        ind.Width = activa ? 16 : 5;
+        ind.Opacity = activa ? 1 : 0.45;
+        AnimarColor((SolidColorBrush)ind.Background, activa ? _cAcento : _cTexto, ms);
+        if (inmediato) return;
+        ind.BeginAnimation(WidthProperty, Kf(anchoAhora, ind.Width, ms, 0, Muelle));
+        ind.BeginAnimation(OpacityProperty, Kf(opAhora, ind.Opacity, ms));
+    }
+
+    static void CambiarGlifo(TextBlock tb, string nuevo)
+    {
+        tb.Text = nuevo;
+        tb.BeginAnimation(OpacityProperty, Kf(0, 1, 220));
+    }
+
+    // ================= Recarga en caliente =================
+    void VigilarConfig()
+    {
+        _watcher = new FileSystemWatcher(Config.Carpeta, "config.json")
+        {
+            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName,
+            EnableRaisingEvents = true
+        };
+        _watcher.Changed += (_, _) => ProgramarRecarga();
+        _watcher.Created += (_, _) => ProgramarRecarga();
+        _watcher.Renamed += (_, _) => ProgramarRecarga();
+
+        _recarga.Tick += (_, _) =>
+        {
+            _recarga.Stop();
+            if (Config.Cargar() is { } nueva) { _cfg = nueva; Aplicar(); }
+        };
+    }
+
+    void ProgramarRecarga() => Dispatcher.InvokeAsync(() => { _recarga.Stop(); _recarga.Start(); });
+
+    // ================= Wallpaper Engine =================
+    void VigilarWallpaperEngine()
+    {
+        _wpTimer.Tick += async (_, _) => await ActualizarWallpaper();
+        _wpTimer.Start();
+
+        if (WallpaperEngine.Carpeta is { } dir)
+        {
+            _wpWatcher = new FileSystemWatcher(dir, "config.json")
+            {
+                NotifyFilter = NotifyFilters.LastWrite,
+                EnableRaisingEvents = true
+            };
+            _wpWatcher.Changed += (_, _) => Dispatcher.InvokeAsync(async () =>
+            {
+                await Task.Delay(500);
+                await ActualizarWallpaper();
+            });
+        }
+    }
+
+    async Task ActualizarWallpaper(bool forzar = false)
+    {
+        if (_wpOcupado || (!forzar && DateTime.Now - _wpUltimo < TimeSpan.FromSeconds(2))) return;
+        _wpOcupado = true;
+        _wpUltimo = DateTime.Now;
+        try
+        {
+            var ruta = await WallpaperEngine.WallpaperActual(_cfg.Wallpaper.Monitor);
+            if (ruta == null || ruta == _wpRuta) return;
+
+            _wpRuta = ruta;
+            _wpTitulo = WallpaperEngine.Titulo(ruta);
+            var prev = WallpaperEngine.Preview(ruta);
+            _paleta = prev is not null ? Extractor.DesdeImagen(prev) : null;
+            _ultimoColorEnviado = "";
+            Log.Info($"wallpaper: \"{_wpTitulo}\" | {ruta} | preview={prev ?? "ninguna"} | " +
+                     $"paleta={(_paleta is { } pl ? $"fondo={pl.Fondo} texto={pl.Texto} acento={pl.Acento}" : "no extraída")}");
+
+            if (_cfg.Tema.DesdeWallpaper || _cfg.Tema.EnviarColorAlWallpaper) Aplicar();
+            else Tick();
+        }
+        finally { _wpOcupado = false; }
+    }
+
+    void EnviarColor(Color col)
+    {
+        var rgb = string.Format(CultureInfo.InvariantCulture, "{0:0.###} {1:0.###} {2:0.###}",
+                                col.R / 255.0, col.G / 255.0, col.B / 255.0);
+        if (rgb == _ultimoColorEnviado) return;
+        _ultimoColorEnviado = rgb;
+        WallpaperEngine.Enviar("applyProperties", "-properties", $"RAW~({{\"schemecolor\":\"{rgb}\"}})~END");
+    }
+
+    UIElement ModuloWallpaper()
+    {
+        var panel = new StackPanel { Orientation = Orientation.Horizontal };
+
+        var play = Glifo(_wpPausado ? "\uE768" : "\uE769");
+        panel.Children.Add(Boton(play, "Pausar / reanudar wallpaper", () =>
+        {
+            _wpPausado = !_wpPausado;
+            WallpaperEngine.Enviar(_wpPausado ? "pause" : "play");
+            CambiarGlifo(play, _wpPausado ? "\uE768" : "\uE769");
+        }));
+
+        panel.Children.Add(Boton(Glifo("\uE893"), "Siguiente wallpaper (playlist)", () =>
+        {
+            WallpaperEngine.Enviar("nextWallpaper");
+            Dispatcher.InvokeAsync(async () => { await Task.Delay(1500); await ActualizarWallpaper(true); });
+        }));
+
+        var sonido = Glifo(_wpMuteado ? "\uE74F" : "\uE767");
+        panel.Children.Add(Boton(sonido, "Silenciar / activar sonido", () =>
+        {
+            _wpMuteado = !_wpMuteado;
+            WallpaperEngine.Enviar(_wpMuteado ? "mute" : "unmute");
+            CambiarGlifo(sonido, _wpMuteado ? "\uE74F" : "\uE767");
+        }));
+
+        return panel;
+    }
+
+    // ================= Ratón =================
+    void Isla_MouseEnter(object s, MouseEventArgs e) => Expandir(true);
+    void Isla_MouseLeave(object s, MouseEventArgs e) => Expandir(false);
+    void Isla_Salir(object s, MouseButtonEventArgs e) => Close();
+
+    void Isla_MouseDown(object s, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Middle) return;
+        try { Process.Start(new ProcessStartInfo(Config.Ruta) { UseShellExecute = true }); }
+        catch { Process.Start("notepad.exe", Config.Ruta); }
+    }
+
+    // ================= Módulos =================
+    void Llenar(Panel panel, List<string> modulos)
+    {
+        panel.Children.Clear();
+        foreach (var m in modulos) panel.Children.Add(CrearModulo(m));
+    }
+
+    UIElement CrearModulo(string nombre) => nombre.ToLowerInvariant() switch
+    {
+        "inicio"           => Boton(Texto("⊞", 16), "Inicio", AbrirMenuInicio),
+        "apps"             => ModuloApps(),
+        "reloj"            => Etiqueta(() => DateTime.Now.ToString("HH:mm"), animar: true),
+        "fecha"            => Etiqueta(() => DateTime.Now.ToString("ddd d MMM"), animar: true),
+        // "muestra" reserva el ancho del valor más largo para que la isla no respire
+        // al pasar de "CPU 8%" a "CPU 11%" cada segundo
+        "cpu"              => Etiqueta(() => $"CPU {Nativo.Cpu()}%", muestra: "CPU 100%"),
+        "ram"              => Etiqueta(() => $"RAM {Nativo.Ram()}%", muestra: "RAM 100%"),
+        "bateria"          => Etiqueta(Nativo.Bateria, muestra: "BAT 100%"),
+        "wallpaper"        => ModuloWallpaper(),
+        "wallpaper-titulo" => Etiqueta(() => _wpTitulo ?? "", animar: true),
+        "iconos"           => Boton(Glifo("\uE890"), "Mostrar / ocultar iconos del escritorio", () =>
+                              {
+                                  _iconosOcultos = !_iconosOcultos;
+                                  WallpaperEngine.Enviar(_iconosOcultos ? "hideIcons" : "showIcons");
+                              }),
+        "separador"        => new Border { Width = 1, Height = 16, Margin = new Thickness(6, 0, 6, 0), Background = _texto, Opacity = 0.3 },
+        _                  => Etiqueta(() => nombre)
+    };
+
+    UIElement ModuloApps()
+    {
+        var panel = new StackPanel { Orientation = Orientation.Horizontal };
+        var botones = new Dictionary<IntPtr, (Button Boton, Border Ind)>();
+        var activaPrevia = IntPtr.Zero;
+        bool primeraVez = true;
+
+        void Refrescar()
+        {
+            var activa = Nativo.Activa();
+            if (activa == _self) activa = _ultimaActiva; else _ultimaActiva = activa;
+
+            var actuales = Nativo.VentanasAbiertas(_self);
+            var vivas = new HashSet<IntPtr>(actuales);
+
+            // Cerradas: se encogen y desaparecen
+            foreach (var h in botones.Keys.Where(k => !vivas.Contains(k)).ToList())
+            {
+                var b = botones[h].Boton;
+                botones.Remove(h);
+                AnimarSalida(b, () => { panel.Children.Remove(b); AjustarAncho(); });
+            }
+
+            // Nuevas: entran creciendo (al arrancar, en cascada)
+            int orden = 0;
+            foreach (var h in actuales)
+            {
+                if (botones.TryGetValue(h, out var existente))
+                {
+                    existente.Boton.ToolTip = Nativo.Titulo(h);
+                    continue;
+                }
+                var nuevo = CrearBotonApp(h);
+                botones[h] = nuevo;
+                panel.Children.Add(nuevo.Boton);
+                AnimarEntrada(nuevo.Boton, primeraVez ? orden++ * 45 : 0);
+                AnimarIndicador(nuevo.Ind, h == activa, inmediato: true);
+            }
+            primeraVez = false;
+
+            // Cambio de ventana activa: la rayita se desliza a su sitio
+            if (activa != activaPrevia)
+            {
+                foreach (var (h, (_, ind)) in botones) AnimarIndicador(ind, h == activa);
+                activaPrevia = activa;
+            }
+        }
+
+        Refrescar();
+        _actualizadores.Add(Refrescar);
+        return panel;
+    }
+
+    (Button Boton, Border Ind) CrearBotonApp(IntPtr h)
+    {
+        var titulo = Nativo.Titulo(h);
+        var icono = Nativo.Icono(h);
+        UIElement visual = icono != null
+            ? new Image { Source = icono, Width = 18, Height = 18 }
+            : Texto(titulo.Length > 0 ? titulo[..1] : "?", 14);
+        var ind = new Border
+        {
+            Height = 3, Width = 5, CornerRadius = new CornerRadius(1.5), Margin = new Thickness(0, 3, 0, 0),
+            HorizontalAlignment = HorizontalAlignment.Center, Background = new SolidColorBrush(_cTexto), Opacity = 0.45
+        };
+        var contenido = new StackPanel { Children = { visual, ind } };
+        return (Boton(contenido, titulo, () => Nativo.Activar(h)), ind);
+    }
+
+    // "muestra" = el texto más largo que llegará a mostrar este módulo. Se reserva su
+    // ancho para que el contenido cambiante no haga respirar a la isla cada segundo.
+    TextBlock Etiqueta(Func<string> valor, bool animar = false, string? muestra = null)
+    {
+        var tb = new TextBlock
+        {
+            Margin = new Thickness(6, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center,
+            Visibility = Visibility.Collapsed
+        };
+        // Cifras de ancho fijo: si no, un "1" ocupa menos que un "8" y el texto baila
+        Typography.SetNumeralAlignment(tb, FontNumeralAlignment.Tabular);
+        if (muestra != null) tb.MinWidth = AnchoDeTexto(muestra);
+
+        void Act()
+        {
+            var nuevo = valor();
+            if (nuevo == tb.Text) return;
+            bool habia = tb.Text.Length > 0;
+            tb.Text = nuevo;
+            tb.Visibility = nuevo.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+            if (animar && habia)   // p. ej. al cambiar el minuto: pequeño destello
+                tb.BeginAnimation(OpacityProperty, Kf(0.2, 1, 400, 0, Suave));
+        }
+        Act();
+        _actualizadores.Add(Act);
+        return tb;
+    }
+
+    // Ancho que ocuparía ese texto con la fuente y el tamaño actuales del tema
+    double AnchoDeTexto(string texto)
+    {
+        try
+        {
+            double ppp = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+            var tipo = new Typeface(FontFamily, FontStyle, FontWeight, FontStretch);
+            return new FormattedText(texto, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+                                     tipo, FontSize, Brushes.Black, ppp).Width;
+        }
+        catch (Exception ex)
+        {
+            Log.Error("medir texto", ex);
+            return texto.Length * FontSize * 0.6;   // aproximación, mejor eso que nada
+        }
+    }
+
+    TextBlock Texto(string t, double tamano) => new()
+    {
+        Text = t, FontSize = tamano, Foreground = _texto,
+        HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center
+    };
+
+    TextBlock Glifo(string codigo) => new()
+    {
+        Text = codigo, FontFamily = new FontFamily(FuenteIconos), FontSize = 14, Foreground = _texto,
+        HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center
+    };
+
+    Button Boton(object contenido, string tip, Action accion)
+    {
+        var b = new Button
+        {
+            Content = contenido, ToolTip = tip, Foreground = _texto,
+            Height = Math.Max(20, _cfg.Barra.Alto - 8)
+        };
+        b.Click += (_, _) => { accion(); Tick(); };
+        return b;
+    }
+}
