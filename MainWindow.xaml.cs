@@ -86,6 +86,7 @@ public partial class MainWindow : Window
                 _self = new WindowInteropHelper(this).Handle;
                 Nativo.NoActivable(_self);
                 Aplicar();
+                RegistrarAtajos();
             }
             catch (Exception ex) { Log.Error("arranque", ex); }
 
@@ -119,6 +120,7 @@ public partial class MainWindow : Window
             if (_watcher is { } w) w.EnableRaisingEvents = false;
             if (_wpWatcher is { } ww) ww.EnableRaisingEvents = false;
 
+            Nativo.QuitarAtajo(_self, IdAtajoVista);   // el atajo vuelve a quien lo quiera
             AppBar.Quitar(_self);
 
             // Se encola detrás de lo que hubiera pendiente y se espera: el proceso no
@@ -230,6 +232,8 @@ public partial class MainWindow : Window
         // en otro hilo, pero en orden y sin pisarse con el "mostrar" del cierre.
         bool mostrar = !b.OcultarBarraWindows;
         if (!_cerrando) EncolarShell(() => Nativo.MostrarBarraWindows(mostrar));
+
+        AplicarAtajo();   // por si has cambiado AtajoVistaGeneral en caliente
     }
 
     int Px(double dip) =>

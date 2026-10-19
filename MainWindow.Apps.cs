@@ -104,7 +104,14 @@ public partial class MainWindow
 
         RefrescarApps();
         _actualizadores.Add(RefrescarApps);
-        return _carrusel;
+
+        // El botón de la vista general va detrás del carrusel pero FUERA de él:
+        // dentro se desplazaría con la rueda y dejaría de estar a mano
+        return new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Children = { _carrusel, CrearBotonVista() }
+        };
     }
 
     // ================= Refresco =================
@@ -192,6 +199,7 @@ public partial class MainWindow
         _carrusel.Width = Math.Min(_anchoTira, AnchoVisible);
         LimitarDesplazamiento();
         PintarDesvanecido();
+        ActualizarBotonVista();
         AjustarAncho();
     }
 

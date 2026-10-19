@@ -128,6 +128,63 @@ static class Nativo
         foreach (var muerta in _exes.Keys.Where(k => !vivas.Contains(k)).ToList()) _exes.Remove(muerta);
     }
 
+    // ---------- Cerrar una ventana con educación ----------
+    [DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
+
+    // WM_CLOSE: la app decide (puede preguntar si guardas). Nunca se mata el proceso.
+    public static void CerrarVentana(IntPtr h) => PostMessage(h, 0x0010, IntPtr.Zero, IntPtr.Zero);
+
+    // ---------- Atajo global ----------
+    [DllImport("user32.dll", SetLastError = true)] static extern bool RegisterHotKey(IntPtr h, int id, uint mod, uint vk);
+    [DllImport("user32.dll")] static extern bool UnregisterHotKey(IntPtr h, int id);
+
+    public static int UltimoErrorAtajo { get; private set; }
+
+    public const int WM_HOTKEY = 0x0312;
+
+    // "Ctrl+Alt+Space" -> modificadores + tecla. Devuelve false si no se entiende.
+    public static bool TraducirAtajo(string atajo, out uint mod, out uint vk)
+    {
+        mod = 0; vk = 0;
+        foreach (var trozo in atajo.Split('+', StringSplitOptions.RemoveEmptyEntries))
+        {
+            switch (trozo.Trim().ToLowerInvariant())
+            {
+                case "ctrl" or "control": mod |= 0x0002; break;   // MOD_CONTROL
+                case "alt":               mod |= 0x0001; break;   // MOD_ALT
+                case "shift":             mod |= 0x0004; break;   // MOD_SHIFT
+                case "win":               mod |= 0x0008; break;   // MOD_WIN
+                default:
+                    var t = trozo.Trim();
+                    vk = t.ToLowerInvariant() switch
+                    {
+                        "space" or "espacio" => 0x20,
+                        "tab"                => 0x09,
+                        "enter" or "intro"   => 0x0D,
+                        "esc"                => 0x1B,
+                        _ when t.Length == 1 => (uint)char.ToUpperInvariant(t[0]),
+                        _ when t.Length > 1 && t[0] is 'F' or 'f' && int.TryParse(t[1..], out int n) && n is >= 1 and <= 24
+                                             => (uint)(0x70 + n - 1),
+                        _ => 0
+                    };
+                    break;
+            }
+        }
+        return vk != 0;
+    }
+
+    public static bool RegistrarAtajo(IntPtr h, int id, string atajo)
+    {
+        UltimoErrorAtajo = 0;
+        if (!TraducirAtajo(atajo, out uint mod, out uint vk)) { UltimoErrorAtajo = -1; return false; }
+        UnregisterHotKey(h, id);                 // por si ya estaba
+        bool ok = RegisterHotKey(h, id, mod | 0x4000, vk);   // MOD_NOREPEAT
+        if (!ok) UltimoErrorAtajo = Marshal.GetLastWin32Error();
+        return ok;
+    }
+
+    public static void QuitarAtajo(IntPtr h, int id) => UnregisterHotKey(h, id);
+
     public static void AbrirInicio()
     {
         keybd_event(0x5B, 0, 0, UIntPtr.Zero);

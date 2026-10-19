@@ -34,6 +34,7 @@ public class Barra
     public bool ReservarEspacio { get; set; } = true;  // las ventanas maximizadas no la tapan
     public int MaxApps { get; set; } = 10;             // iconos de apps visibles a la vez; el resto, con la rueda
     public bool AgruparApps { get; set; } = true;      // las ventanas del mismo programa, en un solo icono
+    public string AtajoVistaGeneral { get; set; } = "Ctrl+Alt+Space";   // abre la cuadrícula de ventanas
 }
 
 public class Modulos
