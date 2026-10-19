@@ -166,7 +166,8 @@ public partial class MainWindow
                 : Brushes.Transparent
         };
 
-        var boton = Boton(marco, titulo, () => { Nativo.Activar(h); CerrarVista(); });
+        var boton = Boton(marco, titulo, () => { PulsarVentana(h, grupo); CerrarVista(); });
+        boton.PreviewMouseLeftButtonDown += (_, _) => ApuntarActivaAlPulsar();
         boton.Height = AltoCelda - 4;
         boton.Width = AnchoCelda - 6;
         boton.Padding = new Thickness(0);

@@ -80,6 +80,32 @@ static class Nativo
         SetForegroundWindow(h);
     }
 
+    public static bool EstaMinimizada(IntPtr h) => IsIconic(h);
+
+    // Minimizar como lo hace la barra de tareas: se le MANDA la orden a la ventana
+    // en vez de imponérsela. Así cada app hace su animación y su guardado de estado,
+    // y funciona con las de pantalla completa sin bordes y con las de la Store.
+    // ShowWindow queda de respaldo por si alguna no atiende el mensaje.
+    public static void Minimizar(IntPtr h)
+    {
+        const uint WM_SYSCOMMAND = 0x0112;
+        const int SC_MINIMIZE = 0xF020;
+        PostMessage(h, WM_SYSCOMMAND, (IntPtr)SC_MINIMIZE, IntPtr.Zero);
+    }
+
+    public static void MinimizarAlaFuerza(IntPtr h) => ShowWindow(h, 6);   // SW_MINIMIZE
+
+    // ¿Esta ventana es de NubeBar? Hace falta para no confundir nuestros propios
+    // paneles (el menú Inicio y los ajustes sí cogen el foco) con "la app activa"
+    static int _nuestroPid;
+
+    public static bool EsNuestra(IntPtr h)
+    {
+        if (_nuestroPid == 0) _nuestroPid = Environment.ProcessId;
+        GetWindowThreadProcessId(h, out int pid);
+        return pid == _nuestroPid;
+    }
+
     // La barra nunca roba el foco ni sale en Alt+Tab, así Wallpaper Engine
     // no la cuenta como "otra aplicación enfocada" y no se pausa al usarla
     public static void NoActivable(IntPtr h) =>
@@ -120,25 +146,100 @@ static class Nativo
     // Preguntar la ruta abre y cierra un handle de proceso: se guarda por ventana
     static readonly Dictionary<IntPtr, string> _exes = new();
 
+    // ---------- Identidad de las apps de la Store ----------
+    [StructLayout(LayoutKind.Sequential)] struct PROPERTYKEY { public Guid fmtid; public uint pid; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct PROPVARIANT
+    {
+        public ushort vt;
+        ushort r1, r2, r3;
+        public IntPtr valor;
+        public IntPtr relleno;
+    }
+
+    [ComImport, Guid("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IPropertyStore
+    {
+        int GetCount(out uint cuantas);
+        int GetAt(uint i, out PROPERTYKEY clave);
+        int GetValue(ref PROPERTYKEY clave, out PROPVARIANT valor);
+        int SetValue(ref PROPERTYKEY clave, ref PROPVARIANT valor);
+        int Commit();
+    }
+
+    [DllImport("shell32.dll")]
+    static extern int SHGetPropertyStoreForWindow(IntPtr h, ref Guid iid,
+                                                  [MarshalAs(UnmanagedType.Interface)] out object almacen);
+    [DllImport("ole32.dll")] static extern int PropVariantClear(ref PROPVARIANT pv);
+
+    const string AnfitrionStore = "ApplicationFrameHost.exe";
+    const ushort VT_LPWSTR = 31;
+
+    // El identificador con el que Windows distingue las apps empaquetadas, por
+    // ejemplo "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App". Es lo mismo que usa
+    // la barra de tareas de verdad para decidir qué va junto y qué no.
+    static string? IdDeAplicacion(IntPtr h)
+    {
+        object? almacen = null;
+        var pv = new PROPVARIANT();
+        try
+        {
+            var iid = typeof(IPropertyStore).GUID;
+            if (SHGetPropertyStoreForWindow(h, ref iid, out almacen) != 0) return null;
+            if (almacen is not IPropertyStore ps) return null;
+
+            // PKEY_AppUserModel_ID
+            var clave = new PROPERTYKEY
+            {
+                fmtid = new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"),
+                pid = 5
+            };
+            if (ps.GetValue(ref clave, out pv) != 0) return null;
+            if (pv.vt != VT_LPWSTR || pv.valor == IntPtr.Zero) return null;
+            return Marshal.PtrToStringUni(pv.valor);
+        }
+        catch { return null; }
+        finally
+        {
+            PropVariantClear(ref pv);
+            if (almacen != null && Marshal.IsComObject(almacen)) Marshal.ReleaseComObject(almacen);
+        }
+    }
+
     public static string Exe(IntPtr h)
     {
         if (_exes.TryGetValue(h, out var guardado)) return guardado;
 
-        var ruta = "";
-        GetWindowThreadProcessId(h, out int pid);
-        if (pid != 0)
-        {
-            var proceso = OpenProcess(0x1000, false, (uint)pid);   // PROCESS_QUERY_LIMITED_INFORMATION
-            if (proceso != IntPtr.Zero)
-            {
-                var sb = new StringBuilder(512);
-                int n = sb.Capacity;
-                if (QueryFullProcessImageName(proceso, 0, sb, ref n)) ruta = sb.ToString();
-                CloseHandle(proceso);
-            }
-        }
+        var ruta = RutaDelProceso(h);
+
+        // Las apps de la Store (Calculadora, Configuración, Fotos...) son todas
+        // ventanas de ApplicationFrameHost.exe, así que agrupando por ejecutable
+        // acabarían en un solo icono. Se las distingue por su AppUserModelId.
+        if (TerminaEn(ruta, AnfitrionStore) && IdDeAplicacion(h) is { Length: > 0 } id)
+            ruta = id;
+
         _exes[h] = ruta;
         return ruta;
+    }
+
+    static bool TerminaEn(string ruta, string nombre) =>
+        ruta.EndsWith("\\" + nombre, StringComparison.OrdinalIgnoreCase) ||
+        ruta.Equals(nombre, StringComparison.OrdinalIgnoreCase);
+
+    static string RutaDelProceso(IntPtr h)
+    {
+        GetWindowThreadProcessId(h, out int pid);
+        if (pid == 0) return "";
+        var proceso = OpenProcess(0x1000, false, (uint)pid);   // PROCESS_QUERY_LIMITED_INFORMATION
+        if (proceso == IntPtr.Zero) return "";
+        try
+        {
+            var sb = new StringBuilder(512);
+            int n = sb.Capacity;
+            return QueryFullProcessImageName(proceso, 0, sb, ref n) ? sb.ToString() : "";
+        }
+        finally { CloseHandle(proceso); }
     }
 
     // Windows reaprovecha los hwnd, así que hay que soltar los de ventanas que ya no existen

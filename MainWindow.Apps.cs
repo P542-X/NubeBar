@@ -20,9 +20,44 @@ public partial class MainWindow
         public string Exe = "";
         public List<IntPtr> Ventanas = new();
         public IntPtr Ultima;              // la última de este grupo que estuvo activa
+        public IntPtr InicioCiclo;         // por dónde empezó la vuelta actual al grupo
         public Button? Boton;
         public StackPanel? Puntos;
         public ImageSource? Icono;
+    }
+
+    // La ventana activa DE VERDAD. No vale GetForegroundWindow a secas: el menú
+    // Inicio y la ventana de ajustes son nuestras y sí cogen el foco, así que
+    // taparían a la app que el usuario tenía delante.
+    IntPtr ActivaAjena()
+    {
+        var f = Nativo.Activa();
+        if (f != IntPtr.Zero && !Nativo.EsNuestra(f)) _ultimaActiva = f;
+        return _ultimaActiva;
+    }
+
+    // Quién mandaba justo ANTES de pulsar. Se apunta en el mouse-down, no en el
+    // Click: si no, cualquier cambio de foco por el camino decidiría por nosotros.
+    IntPtr _activaAlPulsar;
+
+    void ApuntarActivaAlPulsar() => _activaAlPulsar = ActivaAjena();
+
+    // Minimizar y, si la app no atiende el mensaje, insistir por las malas
+    void MinimizarVentana(IntPtr h)
+    {
+        Log.Info($"minimizando \"{Nativo.Titulo(h)}\"");
+        Nativo.Minimizar(h);
+        Dispatcher.InvokeAsync(async () =>
+        {
+            await System.Threading.Tasks.Task.Delay(400);
+            if (!Nativo.EstaMinimizada(h))
+            {
+                Log.Info("no atendió a WM_SYSCOMMAND: se minimiza con ShowWindow");
+                Nativo.MinimizarAlaFuerza(h);
+            }
+            // La rayita se va a la que haya quedado delante
+            RefrescarApps();
+        });
     }
 
     const double AnchoIcono = 34;          // lo que ocupa cada botón de app, incluidos márgenes
@@ -119,8 +154,7 @@ public partial class MainWindow
     {
         if (_tira == null || _carrusel == null) return;
 
-        var activa = Nativo.Activa();
-        if (activa == _self) activa = _ultimaActiva; else if (activa != IntPtr.Zero) _ultimaActiva = activa;
+        var activa = ActivaAjena();
 
         var abiertas = Nativo.VentanasAbiertas(_self);
         var vivas = new HashSet<IntPtr>(abiertas);
@@ -221,6 +255,9 @@ public partial class MainWindow
 
         var contenido = new StackPanel { Children = { visual, g.Puntos } };
         g.Boton = Boton(contenido, titulo, () => PulsarGrupo(g));
+        // Se apunta quién mandaba ANTES del clic: para cuando salte el Click ya
+        // podría haber cambiado el foco y nunca se minimizaría nada
+        g.Boton.PreviewMouseLeftButtonDown += (_, _) => ApuntarActivaAlPulsar();
         g.Boton.MouseEnter += (_, _) => SenalarGrupo(g);
         g.Boton.MouseLeave += (_, _) => OlvidarGrupo(g);
     }
@@ -273,21 +310,65 @@ public partial class MainWindow
     }
 
     // ================= Pulsar =================
+    // Como en la barra de tareas de Windows: si pulsas la app que ya tienes
+    // delante, se minimiza. Con varias ventanas se va pasando de una a otra y,
+    // al dar la vuelta completa, se minimiza el grupo entero.
     void PulsarGrupo(Grupo g)
     {
         if (g.Ventanas.Count == 0) return;
+        CerrarMiniLista();
 
-        var activa = Nativo.Activa();
+        var activa = _activaAlPulsar != IntPtr.Zero ? _activaAlPulsar : ActivaAjena();
         int i = g.Ventanas.IndexOf(activa);
 
-        // Si ya estás en una ventana del grupo, pasa a la siguiente; si no, a la última usada
-        var destino = i >= 0
-            ? g.Ventanas[(i + 1) % g.Ventanas.Count]
-            : (g.Ventanas.Contains(g.Ultima) ? g.Ultima : g.Ventanas[0]);
+        if (Environment.GetEnvironmentVariable("NUBEBAR_DIAG") == "1")
+            Log.Info($"DIAG pulsar {System.IO.Path.GetFileName(g.Exe)}: alPulsar={_activaAlPulsar} " +
+                     $"ajena={ActivaAjena()} activa={activa} i={i} ciclo={g.InicioCiclo} " +
+                     $"ventanas=[{string.Join(",", g.Ventanas)}]");
 
-        g.Ultima = destino;
-        Nativo.Activar(destino);
-        CerrarMiniLista();
+        // Ninguna del grupo delante: se trae la última que usaste y empieza la vuelta
+        if (i < 0)
+        {
+            var destino = g.Ventanas.Contains(g.Ultima) ? g.Ultima : g.Ventanas[0];
+            g.Ultima = destino;
+            g.InicioCiclo = destino;
+            Log.Info($"grupo {System.IO.Path.GetFileName(g.Exe)}: activando \"{Nativo.Titulo(destino)}\"");
+            Nativo.Activar(destino);
+            return;
+        }
+
+        // Una del grupo está delante: la siguiente
+        var siguiente = g.Ventanas[(i + 1) % g.Ventanas.Count];
+
+        // ¿Hemos vuelto al punto de partida? Entonces toca esconder el grupo.
+        // Con una sola ventana esto pasa al primer clic, que es justo lo que
+        // hace la barra de tareas: pulsas la app que tienes delante y se va.
+        if (g.InicioCiclo == IntPtr.Zero) g.InicioCiclo = activa;
+        if (siguiente == g.InicioCiclo)
+        {
+            Log.Info($"grupo {System.IO.Path.GetFileName(g.Exe)}: vuelta completa, se minimizan sus {g.Ventanas.Count} ventanas");
+            g.InicioCiclo = IntPtr.Zero;
+            foreach (var v in g.Ventanas) MinimizarVentana(v);
+            return;
+        }
+
+        g.Ultima = siguiente;
+        Log.Info($"grupo {System.IO.Path.GetFileName(g.Exe)}: pasando a \"{Nativo.Titulo(siguiente)}\"");
+        Nativo.Activar(siguiente);
+    }
+
+    // Clic sobre una ventana concreta (mini lista o vista general): si ya es la
+    // que está delante, se minimiza; si no, se trae
+    void PulsarVentana(IntPtr h, Grupo? g = null)
+    {
+        var activa = _activaAlPulsar != IntPtr.Zero ? _activaAlPulsar : ActivaAjena();
+        if (h == activa && !Nativo.EstaMinimizada(h))
+        {
+            MinimizarVentana(h);
+            return;
+        }
+        if (g != null) { g.Ultima = h; g.InicioCiclo = h; }
+        Nativo.Activar(h);
     }
 
     // ================= Desplazamiento =================
@@ -395,7 +476,7 @@ public partial class MainWindow
         if (_grupoSenalado is not { } g || g.Ventanas.Count < 2) return;
         if (g.Boton?.IsMouseOver != true) return;   // ya no está el ratón encima
 
-        var activa = Nativo.Activa();
+        var activa = ActivaAjena();
         int filas = Math.Min(MaxFilasMiniLista, g.Ventanas.Count);
         double ancho = 320, alto = filas * 30 + 12;
 
@@ -435,8 +516,9 @@ public partial class MainWindow
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 Width = 286
             };
-            var boton = Boton(fila, titulo, () => { g.Ultima = h; Nativo.Activar(h); CerrarMiniLista(); });
+            var boton = Boton(fila, titulo, () => { CerrarMiniLista(); PulsarVentana(h, g); });
             boton.Height = 28;
+            boton.PreviewMouseLeftButtonDown += (_, _) => ApuntarActivaAlPulsar();
             boton.HorizontalContentAlignment = HorizontalAlignment.Left;
             lista.Children.Add(boton);
         }
