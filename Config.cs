@@ -37,6 +37,7 @@ public class Barra
     public string AtajoVistaGeneral { get; set; } = "Ctrl+Alt+Space";   // abre la cuadrícula de ventanas
     public string Monitores { get; set; } = "todos";   // "todos" | "principal"
     public bool AppsPorMonitor { get; set; } = true;   // cada isla enseña las apps de SU monitor
+    public bool OcultarEnPantallaCompleta { get; set; } = true;
 }
 
 public class Modulos

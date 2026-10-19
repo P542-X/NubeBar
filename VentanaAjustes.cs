@@ -336,6 +336,9 @@ public sealed class VentanaAjustes : Window
         c.Children.Add(Interruptor("Cada isla enseña las apps de su pantalla",
                                    _arbol.Bandera("Barra", "AppsPorMonitor", true),
                                    v => _arbol.Poner("Barra", "AppsPorMonitor", v)));
+        c.Children.Add(Interruptor("Esconderse cuando algo ocupa la pantalla entera",
+                                   _arbol.Bandera("Barra", "OcultarEnPantallaCompleta", true),
+                                   v => _arbol.Poner("Barra", "OcultarEnPantallaCompleta", v)));
         return c;
     }
 

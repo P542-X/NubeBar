@@ -129,6 +129,7 @@ public partial class MainWindow : Window
                 VigilarWallpaperEngine();
                 _tick.Tick += (_, _) => Tick();
                 _tick.Start();
+                VigilarPantallaCompleta();
                 await ActualizarWallpaper(true);
             }
             catch (Exception ex) { Log.Error("arranque", ex); }
@@ -205,7 +206,8 @@ public partial class MainWindow : Window
                 try { a(); } catch (Exception ex) { Log.Error("refrescar el menú", ex); }
             }
         if (Environment.GetEnvironmentVariable("NUBEBAR_DIAG") == "1")
-            Log.Info($"DIAG tick [{_monitor.Dispositivo}] isla={Isla.ActualWidth:0.00} exp={_expandida} | {ResumenGrupos()}");
+            Log.Info($"DIAG tick [{_monitor.Dispositivo}] isla={Isla.ActualWidth:0.00} exp={_expandida} " +
+                     $"oculta={_escondidaPorPantalla} asomada={_asomada} | {ResumenGrupos()}");
     }
 
     // ================= Tema y posición =================

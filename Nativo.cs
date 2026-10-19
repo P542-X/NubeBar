@@ -55,6 +55,20 @@ static class Nativo
 
     public static IntPtr Activa() => GetForegroundWindow();
 
+    [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Izq, Arr, Der, Aba; }
+
+    [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out RECT r);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, StringBuilder s, int n);
+
+    public static RECT Rectangulo(IntPtr h) => GetWindowRect(h, out var r) ? r : default;
+
+    public static string Clase(IntPtr h)
+    {
+        var sb = new StringBuilder(256);
+        GetClassName(h, sb, sb.Capacity);
+        return sb.ToString();
+    }
+
     public static string Titulo(IntPtr h)
     {
         var sb = new StringBuilder(GetWindowTextLength(h) + 1);
