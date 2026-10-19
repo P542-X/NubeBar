@@ -150,7 +150,7 @@ public partial class MainWindow : Window
         foreach (var a in _actualizadores.ToArray()) a();
         AjustarAncho();   // el texto de CPU/RAM/hora cambia de ancho: que se deslice
         if (Environment.GetEnvironmentVariable("NUBEBAR_DIAG") == "1")
-            Log.Info($"DIAG tick isla={Isla.ActualWidth:0.00} exp={_expandida}");
+            Log.Info($"DIAG tick isla={Isla.ActualWidth:0.00} exp={_expandida} | {ResumenGrupos()}");
     }
 
     // ================= Tema y posición =================
@@ -318,9 +318,20 @@ public partial class MainWindow : Window
     // que la pasada real vuelva a medir con su propia restricción.
     double MedirAncho()
     {
-        Contenido.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        double ancho = Contenido.DesiredSize.Width + Isla.Padding.Left + Isla.Padding.Right
-                                                   + Isla.BorderThickness.Left + Isla.BorderThickness.Right;
+        var sinLimite = new Size(double.PositiveInfinity, double.PositiveInfinity);
+
+        // El Grid de dentro tiene columnas *, Auto, *. Midiendo con ancho infinito las
+        // dos estrellas se dimensionan a su contenido, pero al colocar se reparten el
+        // hueco a partes IGUALES: si un lado tiene más cosas que el otro, se recorta.
+        // Por eso el ancho bueno es 2 × el lado más ancho + el centro, y no la suma.
+        Izq.Measure(sinLimite);
+        Cen.Measure(sinLimite);
+        Der.Measure(sinLimite);
+        double lados = Math.Max(Izq.DesiredSize.Width, Der.DesiredSize.Width);
+        double ancho = lados * 2 + Cen.DesiredSize.Width
+                       + Isla.Padding.Left + Isla.Padding.Right
+                       + Isla.BorderThickness.Left + Isla.BorderThickness.Right;
+
         Contenido.InvalidateMeasure();
         double maximo = ActualWidth > 0 ? ActualWidth : SystemParameters.PrimaryScreenWidth;
         return Math.Clamp(ancho, Isla.MinWidth, Math.Max(Isla.MinWidth, maximo));
@@ -451,22 +462,6 @@ public partial class MainWindow : Window
         e.BeginAnimation(OpacityProperty, Kf(1, 0, 150));
     }
 
-    // Rayita bajo cada app: corta y tenue si está abierta, larga y con color de acento si está activa
-    void AnimarIndicador(Border ind, bool activa, bool inmediato = false)
-    {
-        double ms = inmediato ? 0 : 380;
-        double anchoAhora = ind.ActualWidth > 0 ? ind.ActualWidth : ind.Width, opAhora = ind.Opacity;
-
-        ind.BeginAnimation(WidthProperty, null);
-        ind.BeginAnimation(OpacityProperty, null);
-        ind.Width = activa ? 16 : 5;
-        ind.Opacity = activa ? 1 : 0.45;
-        AnimarColor((SolidColorBrush)ind.Background, activa ? _cAcento : _cTexto, ms);
-        if (inmediato) return;
-        ind.BeginAnimation(WidthProperty, Kf(anchoAhora, ind.Width, ms, 0, Muelle));
-        ind.BeginAnimation(OpacityProperty, Kf(opAhora, ind.Opacity, ms));
-    }
-
     static void CambiarGlifo(TextBlock tb, string nuevo)
     {
         tb.Text = nuevo;
@@ -579,7 +574,7 @@ public partial class MainWindow : Window
 
     // ================= Ratón =================
     void Isla_MouseEnter(object s, MouseEventArgs e) => Expandir(true);
-    void Isla_MouseLeave(object s, MouseEventArgs e) => Expandir(false);
+    void Isla_MouseLeave(object s, MouseEventArgs e) { CerrarMiniLista(); Expandir(false); }
     void Isla_Salir(object s, MouseButtonEventArgs e) => Close();
 
     void Isla_MouseDown(object s, MouseButtonEventArgs e)
@@ -618,74 +613,6 @@ public partial class MainWindow : Window
         _                  => Etiqueta(() => nombre)
     };
 
-    UIElement ModuloApps()
-    {
-        var panel = new StackPanel { Orientation = Orientation.Horizontal };
-        var botones = new Dictionary<IntPtr, (Button Boton, Border Ind)>();
-        var activaPrevia = IntPtr.Zero;
-        bool primeraVez = true;
-
-        void Refrescar()
-        {
-            var activa = Nativo.Activa();
-            if (activa == _self) activa = _ultimaActiva; else _ultimaActiva = activa;
-
-            var actuales = Nativo.VentanasAbiertas(_self);
-            var vivas = new HashSet<IntPtr>(actuales);
-
-            // Cerradas: se encogen y desaparecen
-            foreach (var h in botones.Keys.Where(k => !vivas.Contains(k)).ToList())
-            {
-                var b = botones[h].Boton;
-                botones.Remove(h);
-                AnimarSalida(b, () => { panel.Children.Remove(b); AjustarAncho(); });
-            }
-
-            // Nuevas: entran creciendo (al arrancar, en cascada)
-            int orden = 0;
-            foreach (var h in actuales)
-            {
-                if (botones.TryGetValue(h, out var existente))
-                {
-                    existente.Boton.ToolTip = Nativo.Titulo(h);
-                    continue;
-                }
-                var nuevo = CrearBotonApp(h);
-                botones[h] = nuevo;
-                panel.Children.Add(nuevo.Boton);
-                AnimarEntrada(nuevo.Boton, primeraVez ? orden++ * 45 : 0);
-                AnimarIndicador(nuevo.Ind, h == activa, inmediato: true);
-            }
-            primeraVez = false;
-
-            // Cambio de ventana activa: la rayita se desliza a su sitio
-            if (activa != activaPrevia)
-            {
-                foreach (var (h, (_, ind)) in botones) AnimarIndicador(ind, h == activa);
-                activaPrevia = activa;
-            }
-        }
-
-        Refrescar();
-        _actualizadores.Add(Refrescar);
-        return panel;
-    }
-
-    (Button Boton, Border Ind) CrearBotonApp(IntPtr h)
-    {
-        var titulo = Nativo.Titulo(h);
-        var icono = Nativo.Icono(h);
-        UIElement visual = icono != null
-            ? new Image { Source = icono, Width = 18, Height = 18 }
-            : Texto(titulo.Length > 0 ? titulo[..1] : "?", 14);
-        var ind = new Border
-        {
-            Height = 3, Width = 5, CornerRadius = new CornerRadius(1.5), Margin = new Thickness(0, 3, 0, 0),
-            HorizontalAlignment = HorizontalAlignment.Center, Background = new SolidColorBrush(_cTexto), Opacity = 0.45
-        };
-        var contenido = new StackPanel { Children = { visual, ind } };
-        return (Boton(contenido, titulo, () => Nativo.Activar(h)), ind);
-    }
 
     // "muestra" = el texto más largo que llegará a mostrar este módulo. Se reserva su
     // ancho para que el contenido cambiante no haga respirar a la isla cada segundo.

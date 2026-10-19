@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
@@ -88,6 +89,44 @@ static class Nativo
     // Se mantiene WS_EX_TOOLWINDOW para seguir fuera de Alt+Tab.
     public static void Activable(IntPtr h) =>
         SetWindowLong(h, -20, (GetWindowLong(h, -20) & ~0x08000000) | 0x80);
+
+    // ---------- Ejecutable de cada ventana (para agrupar) ----------
+    [DllImport("user32.dll")] static extern int GetWindowThreadProcessId(IntPtr h, out int pid);
+    [DllImport("kernel32.dll")] static extern IntPtr OpenProcess(uint acceso, bool heredar, uint pid);
+    [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr h);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    static extern bool QueryFullProcessImageName(IntPtr proceso, uint flags, StringBuilder ruta, ref int n);
+
+    // Preguntar la ruta abre y cierra un handle de proceso: se guarda por ventana
+    static readonly Dictionary<IntPtr, string> _exes = new();
+
+    public static string Exe(IntPtr h)
+    {
+        if (_exes.TryGetValue(h, out var guardado)) return guardado;
+
+        var ruta = "";
+        GetWindowThreadProcessId(h, out int pid);
+        if (pid != 0)
+        {
+            var proceso = OpenProcess(0x1000, false, (uint)pid);   // PROCESS_QUERY_LIMITED_INFORMATION
+            if (proceso != IntPtr.Zero)
+            {
+                var sb = new StringBuilder(512);
+                int n = sb.Capacity;
+                if (QueryFullProcessImageName(proceso, 0, sb, ref n)) ruta = sb.ToString();
+                CloseHandle(proceso);
+            }
+        }
+        _exes[h] = ruta;
+        return ruta;
+    }
+
+    // Windows reaprovecha los hwnd, así que hay que soltar los de ventanas que ya no existen
+    public static void OlvidarExes(ICollection<IntPtr> vivas)
+    {
+        if (_exes.Count <= vivas.Count) return;
+        foreach (var muerta in _exes.Keys.Where(k => !vivas.Contains(k)).ToList()) _exes.Remove(muerta);
+    }
 
     public static void AbrirInicio()
     {
