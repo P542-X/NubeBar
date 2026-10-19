@@ -586,7 +586,79 @@ public partial class MainWindow : Window
     // ================= Ratón =================
     void Isla_MouseEnter(object s, MouseEventArgs e) => Expandir(true);
     void Isla_MouseLeave(object s, MouseEventArgs e) { CerrarMiniLista(); Expandir(false); }
-    void Isla_Salir(object s, MouseButtonEventArgs e) => Close();
+    // El clic derecho ya no cierra de golpe: antes había que acertar y no había
+    // vuelta atrás. Ahora saca un menú con el mismo aire que la isla.
+    void Isla_Salir(object s, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        AbrirMenuContextual();
+    }
+
+    const string PanelMenu = "contextual";
+
+    // Se usa el mismo cajón que los demás paneles en vez de un ContextMenu de
+    // Windows: así sale de la isla, con sus colores y su animación, en lugar de
+    // una cajita blanca del sistema que no pega con nada.
+    void AbrirMenuContextual()
+    {
+        if (_panelAbierto == PanelMenu) { CerrarPanel(); return; }
+
+        const double ancho = 230, altoFila = 34;
+        var opciones = new (string Texto, Action Accion)[]
+        {
+            ("Ajustes…", AbrirAjustes),
+            ("Recargar el config", () =>
+            {
+                if (Config.Cargar() is { } nueva) { _cfg = nueva; Aplicar(); Log.Info("config recargado a mano"); }
+            }),
+            ("Salir de NubeBar", Close)
+        };
+
+        AbrirPanel(PanelMenu, CrearMenuContextual(opciones, ancho, altoFila),
+                   ancho, opciones.Length * altoFila + 12);
+    }
+
+    FrameworkElement CrearMenuContextual((string Texto, Action Accion)[] opciones, double ancho, double altoFila)
+    {
+        var pila = new StackPanel
+        {
+            Width = ancho,
+            Margin = new Thickness(0, 4, 0, 6),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Background = Brushes.Transparent
+        };
+
+        foreach (var (texto, accion) in opciones)
+        {
+            var etiqueta = new TextBlock
+            {
+                Text = texto,
+                Foreground = _texto,
+                Width = ancho - 28,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var b = Boton(etiqueta, texto, () => { CerrarPanel(); accion(); });
+            b.Height = altoFila - 2;
+            pila.Children.Add(b);
+        }
+
+        bool tocado = false;
+        pila.MouseEnter += (_, _) => tocado = true;
+        pila.MouseLeave += (_, _) => { if (tocado && _panelAbierto == PanelMenu) CerrarPanel(); };
+        return pila;
+    }
+
+    public void AbrirAjustes()
+    {
+        if (VentanaAjustes.Abierta is { } ya) { ya.Activate(); return; }
+        try
+        {
+            var v = new VentanaAjustes();
+            v.Show();
+            v.Activate();
+        }
+        catch (Exception ex) { Log.Error("abrir ajustes", ex); }
+    }
 
     void Isla_MouseDown(object s, MouseButtonEventArgs e)
     {

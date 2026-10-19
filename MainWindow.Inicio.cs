@@ -136,6 +136,10 @@ public partial class MainWindow
     void CerrarMenu()
     {
         if (_panelAbierto != PanelInicio) return;
+        if (Environment.GetEnvironmentVariable("NUBEBAR_DIAG") == "1")
+            Log.Info("DIAG cerrar menú desde: " +
+                     string.Join(" <- ", new System.Diagnostics.StackTrace(1, false).GetFrames()
+                        .Take(5).Select(f => f.GetMethod()?.Name ?? "?")));
         CapturarClicsFuera(false);
         _buscaArchivos?.Cancel();
         _esperaArchivos?.Stop();
@@ -286,6 +290,7 @@ public partial class MainWindow
                 encontrados.AddRange(Fuentes.Apps(norm, 40));
                 encontrados.AddRange(VentanasAbiertas(norm));
                 encontrados.AddRange(Fuentes.Ajustes(norm));
+                if (AjustesDeLaNube(norm) is { } aj) encontrados.Add(aj);
                 encontrados.Add(Fuentes.Web(limpia, _cfg.Inicio.BuscadorWeb));
             }
         }
@@ -299,6 +304,23 @@ public partial class MainWindow
             Log.Info($"DIAG buscar \"{limpia}\": {_resultados.Count} resultados en {reloj.Elapsed.TotalMilliseconds:0.0} ms");
 
         ProgramarArchivos(limpia);
+    }
+
+    // La propia ventana de ajustes, buscable como cualquier otra cosa
+    Resultado? AjustesDeLaNube(string norm)
+    {
+        double p = Math.Max(Parecido.Puntuar(norm, "Ajustes de la nube"),
+                            Parecido.Puntuar(norm, "NubeBar configuración"));
+        if (p < 0.5) return null;
+        return new Resultado
+        {
+            Categoria = Categoria.Ajuste,
+            Titulo = "Ajustes de la nube",
+            Detalle = "Cambiar colores, módulos y comportamiento",
+            Clave = "ajuste:nubebar",
+            Puntos = p,
+            Abrir = AbrirAjustes
+        };
     }
 
     // Las ventanas abiertas salen de los grupos que ya mantiene el carrusel
