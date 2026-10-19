@@ -37,6 +37,85 @@ public partial class MainWindow
 
     double AltoMenu => 8 + 38 + 8 + AltoFila * FilasVisibles + 10;
 
+    // ================= Tecla Windows =================
+    GanchoTeclas? _gancho;
+
+    void MontarTeclaWindows()
+    {
+        if (_gancho == null)
+        {
+            _gancho = new GanchoTeclas();
+            // El hook avisa desde SU hilo: hay que saltar al de la interfaz
+            _gancho.AbrirMenu += () => Dispatcher.BeginInvoke(new Action(MenuDesdeTecla));
+            _gancho.Instalar();
+        }
+        _gancho.Activo = _cfg.Inicio.TeclaWindows;
+    }
+
+    // Win sola (o Ctrl+Esc): si el menú está abierto se cierra, y si no se abre
+    void MenuDesdeTecla()
+    {
+        if (_panelAbierto == PanelInicio)
+        {
+            _gancho!.Capturando = false;
+            VaciarCola(descartar: true);
+            CerrarMenu();
+            return;
+        }
+        AbrirMenuInicio();
+    }
+
+    // Traduce lo que el hook guardó mientras la caja no tenía el foco y lo mete
+    // en orden. Se vacía dos veces: entre la primera y soltar la captura todavía
+    // puede entrar alguna tecla más.
+    void VaciarCola(bool descartar = false)
+    {
+        if (_gancho == null) return;
+
+        for (int vuelta = 0; vuelta < 2; vuelta++)
+        {
+            while (_gancho.Cola.TryDequeue(out var p))
+            {
+                if (descartar || _caja == null) continue;
+                AplicarPulsacion(p);
+            }
+            if (vuelta == 0) _gancho.Capturando = false;
+        }
+    }
+
+    void AplicarPulsacion(GanchoTeclas.Pulsacion p)
+    {
+        if (_caja == null) return;
+        switch (p.Vk)
+        {
+            case 0x08:                                   // retroceso
+                if (_caja.Text.Length > 0) _caja.Text = _caja.Text[..^1];
+                break;
+            case 0x1B:                                   // escape
+                CerrarMenu();
+                break;
+            case 0x0D:                                   // intro
+                var v = Visibles;
+                if (_seleccion < v.Count) Ejecutar(v[_seleccion], p.Ctrl);
+                break;
+            case 0x26: case 0x28:                        // flechas arriba/abajo
+                var lista = Visibles;
+                if (lista.Count > 0)
+                {
+                    _seleccion = p.Vk == 0x28
+                        ? (_seleccion + 1) % lista.Count
+                        : (_seleccion - 1 + lista.Count) % lista.Count;
+                    MoverMarca();
+                }
+                break;
+            default:
+                var texto = Tipografia.Traducir(p);
+                if (texto.Length > 0) _caja.Text += texto;
+                break;
+        }
+        _caja.CaretIndex = _caja.Text.Length;
+    }
+
     // ================= Abrir y cerrar =================
     void AbrirMenuInicio()
     {
@@ -48,6 +127,9 @@ public partial class MainWindow
             _caja?.Focus();
             Keyboard.Focus(_caja);
             Buscar("");
+            // Ya hay dónde escribir: se sueltan las teclas que el hook guardó
+            // mientras se montaba el panel, en el mismo orden en que se pulsaron
+            VaciarCola();
         }, DispatcherPriority.Input);
     }
 

@@ -103,6 +103,7 @@ public partial class MainWindow : Window
                 _tick.Start();
                 Uso.Cargar();
                 _ = Fuentes.CargarApps();   // el índice del buscador se arma por detrás
+                MontarTeclaWindows();
                 await ActualizarWallpaper(true);
             }
             catch (Exception ex) { Log.Error("arranque", ex); }
@@ -124,6 +125,7 @@ public partial class MainWindow : Window
             if (_wpWatcher is { } ww) ww.EnableRaisingEvents = false;
 
             Nativo.QuitarAtajo(_self, IdAtajoVista);   // el atajo vuelve a quien lo quiera
+            _gancho?.Dispose();                        // y la tecla Windows vuelve a la normalidad
             AppBar.Quitar(_self);
 
             // Se encola detrás de lo que hubiera pendiente y se espera: el proceso no
@@ -238,6 +240,7 @@ public partial class MainWindow : Window
         if (!_cerrando) EncolarShell(() => Nativo.MostrarBarraWindows(mostrar));
 
         AplicarAtajo();   // por si has cambiado AtajoVistaGeneral en caliente
+        if (_gancho != null) _gancho.Activo = _cfg.Inicio.TeclaWindows;
     }
 
     int Px(double dip) =>

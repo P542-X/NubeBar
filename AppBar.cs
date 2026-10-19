@@ -64,11 +64,54 @@ static class AppBar
 
     // Pone la barra de Windows en "ocultar automáticamente" para que libere su hueco
     // (si solo se esconde, Windows sigue reservando ese espacio abajo)
+    // El estado de la barra se guarda también en disco. Si matan el proceso (o se
+    // cuelga) sin pasar por aquí, la barra se queda en "ocultar automáticamente", y el
+    // siguiente arranque tomaría ESE como el estado original y lo dejaría así para
+    // siempre. Con el fichero, el primer cierre limpio la devuelve a como estaba.
+    static string RutaEstado => System.IO.Path.Combine(Config.Carpeta, "barra-estado.txt");
+
     public static void AutoOcultarBarraWindows(bool autoOcultar)
     {
         var d = Datos(FindWindow("Shell_TrayWnd", null));
-        _estadoOriginal ??= (int)SHAppBarMessage(ABM_GETSTATE, ref d);
+
+        if (_estadoOriginal == null)
+        {
+            _estadoOriginal = LeerEstadoGuardado() ?? (int)SHAppBarMessage(ABM_GETSTATE, ref d);
+        }
+
+        if (autoOcultar) GuardarEstado(_estadoOriginal.Value);
+
         d.lParam = (IntPtr)(autoOcultar ? (_estadoOriginal.Value | ABS_AUTOHIDE) : _estadoOriginal.Value);
         SHAppBarMessage(ABM_SETSTATE, ref d);
+
+        if (!autoOcultar) BorrarEstadoGuardado();
+    }
+
+    static int? LeerEstadoGuardado()
+    {
+        try
+        {
+            if (System.IO.File.Exists(RutaEstado) &&
+                int.TryParse(System.IO.File.ReadAllText(RutaEstado).Trim(), out int v)) return v;
+        }
+        catch { }
+        return null;
+    }
+
+    static void GuardarEstado(int estado)
+    {
+        try
+        {
+            System.IO.Directory.CreateDirectory(Config.Carpeta);
+            if (!System.IO.File.Exists(RutaEstado))
+                System.IO.File.WriteAllText(RutaEstado, estado.ToString());
+        }
+        catch { }
+    }
+
+    static void BorrarEstadoGuardado()
+    {
+        try { if (System.IO.File.Exists(RutaEstado)) System.IO.File.Delete(RutaEstado); }
+        catch { }
     }
 }
