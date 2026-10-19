@@ -15,6 +15,7 @@ public class Tema
     public double TamanoFuente { get; set; } = 13;
     public bool DesdeWallpaper { get; set; } = false;          // colores sacados del wallpaper actual (tipo pywal)
     public bool EnviarColorAlWallpaper { get; set; } = false;  // manda tu Acento como "schemecolor" al wallpaper
+    public bool BordeAcento { get; set; } = true;              // filo de 1 px y brillo suave del color de acento
 }
 
 public class OpcionesWallpaper

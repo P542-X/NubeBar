@@ -13,6 +13,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
 using System.Windows.Threading;
 
 namespace NubeBar;
@@ -36,6 +37,7 @@ public partial class MainWindow : Window
     bool _aplicando;      // dentro de Aplicar(): no tocar el ancho, aún se está montando todo
     bool _animandoAncho;  // hay una expansión o contracción en curso, no interrumpirla
     bool _cerrando;       // ya se está cerrando: nadie puede volver a esconder la barra
+    DropShadowEffect? _brillo;   // halo del color de acento alrededor de la isla
 
     // Las operaciones sobre la barra de Windows tardan ~0,7 s y van en un hilo aparte,
     // así que se encolan en fila india: sin esto, un "esconder" lanzado antes podría
@@ -178,6 +180,12 @@ public partial class MainWindow : Window
         FontFamily = new FontFamily(t.Fuente);
         FontSize = t.TamanoFuente;
 
+        // Filo y brillo de acento: es lo que hace que el color del wallpaper se note,
+        // porque si no el acento solo pinta la rayita de 3 px bajo la app activa
+        Isla.BorderBrush = _acento;
+        Isla.BorderThickness = new Thickness(t.BordeAcento ? 1 : 0);
+        AjustarBrillo(t.BordeAcento, acento);
+
         _actualizadores.Clear();
         Llenar(Izq, _cfg.Modulos.Izquierda);
         Llenar(Cen, _cfg.Modulos.Centro);
@@ -247,6 +255,46 @@ public partial class MainWindow : Window
         return a;
     }
 
+    // El brillo vive apagado cuando la isla está recogida y sube un poco al expandirse.
+    // Se intensifica con la opacidad y no con el radio: cambiar el radio obliga a
+    // recalcular el núcleo del desenfoque en cada fotograma, y la opacidad no.
+    const double BrilloRecogida = 0.30, BrilloAbierta = 0.60, BrilloRadio = 8;
+
+    void AjustarBrillo(bool activo, Color color)
+    {
+        if (!activo)
+        {
+            Isla.Effect = null;
+            _brillo = null;
+            return;
+        }
+        if (_brillo == null)
+        {
+            _brillo = new DropShadowEffect
+            {
+                ShadowDepth = 0,
+                BlurRadius = BrilloRadio,
+                Opacity = _expandida ? BrilloAbierta : BrilloRecogida
+            };
+            Isla.Effect = _brillo;
+        }
+        var actual = _brillo.Color;
+        _brillo.BeginAnimation(DropShadowEffect.ColorProperty, null);
+        _brillo.Color = color;
+        _brillo.BeginAnimation(DropShadowEffect.ColorProperty,
+                               new ColorAnimation(actual, color, Ms(700)) { EasingFunction = Suave });
+    }
+
+    void AnimarBrillo(bool abrir)
+    {
+        if (_brillo == null) return;
+        double ahora = _brillo.Opacity;
+        double hasta = abrir ? BrilloAbierta : BrilloRecogida;
+        _brillo.BeginAnimation(DropShadowEffect.OpacityProperty, null);
+        _brillo.Opacity = hasta;
+        _brillo.BeginAnimation(DropShadowEffect.OpacityProperty, Kf(ahora, hasta, abrir ? 420 : 320, 0, Suave));
+    }
+
     static void AnimarColor(SolidColorBrush pincel, Color destino, double ms = 700)
     {
         var actual = pincel.Color;                       // color que se ve ahora mismo
@@ -271,7 +319,8 @@ public partial class MainWindow : Window
     double MedirAncho()
     {
         Contenido.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        double ancho = Contenido.DesiredSize.Width + Isla.Padding.Left + Isla.Padding.Right;
+        double ancho = Contenido.DesiredSize.Width + Isla.Padding.Left + Isla.Padding.Right
+                                                   + Isla.BorderThickness.Left + Isla.BorderThickness.Right;
         Contenido.InvalidateMeasure();
         double maximo = ActualWidth > 0 ? ActualWidth : SystemParameters.PrimaryScreenWidth;
         return Math.Clamp(ancho, Isla.MinWidth, Math.Max(Isla.MinWidth, maximo));
@@ -316,6 +365,7 @@ public partial class MainWindow : Window
         // ...pero dejarlos visibles mientras dura la animación
         Izq.Visibility = Der.Visibility = Visibility.Visible;
 
+        MedirFotogramas($"{(abrir ? "expandir" : "contraer")} isla (brillo={_brillo != null})", 700);
         _animandoAncho = true;
         AnimarAncho(hasta, abrir ? 480 : 340, abrir ? Muelle : Suave, () =>
         {
@@ -332,6 +382,8 @@ public partial class MainWindow : Window
             lado.BeginAnimation(OpacityProperty, abrir ? Kf(0, 1, 260, 140) : Kf(ahora, 0, 120));
             Escalonar(lado, abrir);
         }
+
+        AnimarBrillo(abrir);
     }
 
     // Cada módulo del lateral entra un poco desplazado hacia fuera y con retardo
