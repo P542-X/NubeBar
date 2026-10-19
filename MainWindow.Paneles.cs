@@ -181,15 +181,19 @@ public partial class MainWindow
         _panelConTeclado = activar;
         if (activar)
         {
+            var antes = Nativo.Activa();         // a dónde volver al cerrar
+            if (antes != IntPtr.Zero && antes != _self) _ultimaActiva = antes;
             Nativo.Activable(_self);
+            bool alFrente = Nativo.ForzarPrimerPlano(_self);
             Activate();
             Focus();
+            Log.Info($"teclado activado (primer plano={alFrente})");
         }
         else
         {
             Nativo.NoActivable(_self);
             if (_ultimaActiva != IntPtr.Zero) Nativo.Activar(_ultimaActiva);
+            Log.Info("teclado devuelto");
         }
-        Log.Info($"teclado {(activar ? "activado" : "devuelto")} (hwnd no activable = {!activar})");
     }
 }

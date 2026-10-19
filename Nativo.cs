@@ -85,10 +85,30 @@ static class Nativo
     public static void NoActivable(IntPtr h) =>
         SetWindowLong(h, -20, GetWindowLong(h, -20) | 0x08000000 | 0x80); // WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW
 
+    [DllImport("user32.dll")]
+    static extern bool SetWindowPos(IntPtr h, IntPtr tras, int x, int y, int cx, int cy, uint flags);
+
     // Lo contrario: hace falta mientras un panel necesita escribir (el buscador del menú).
     // Se mantiene WS_EX_TOOLWINDOW para seguir fuera de Alt+Tab.
-    public static void Activable(IntPtr h) =>
+    // No basta con cambiar el estilo: hasta que no se avisa con SWP_FRAMECHANGED,
+    // Windows sigue tratando la ventana como no activable y no le da el foco.
+    public static void Activable(IntPtr h)
+    {
         SetWindowLong(h, -20, (GetWindowLong(h, -20) & ~0x08000000) | 0x80);
+        // SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED | SWP_NOACTIVATE
+        SetWindowPos(h, IntPtr.Zero, 0, 0, 0, 0, 0x0002 | 0x0001 | 0x0004 | 0x0020 | 0x0010);
+    }
+
+    // Traer al frente de verdad. Windows bloquea el cambio de primer plano a procesos
+    // que no acaban de recibir entrada del usuario; el toque de Alt levanta ese bloqueo.
+    public static bool ForzarPrimerPlano(IntPtr h)
+    {
+        if (SetForegroundWindow(h) && GetForegroundWindow() == h) return true;
+        keybd_event(0x12, 0, 0, UIntPtr.Zero);
+        keybd_event(0x12, 0, 2, UIntPtr.Zero);
+        SetForegroundWindow(h);
+        return GetForegroundWindow() == h;
+    }
 
     // ---------- Ejecutable de cada ventana (para agrupar) ----------
     [DllImport("user32.dll")] static extern int GetWindowThreadProcessId(IntPtr h, out int pid);

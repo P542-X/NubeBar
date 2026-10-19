@@ -79,6 +79,7 @@ public partial class MainWindow : Window
         Isla.Background = _fondo;
         Foreground = _texto;
 
+
         Loaded += async (_, _) =>
         {
             try
@@ -100,6 +101,8 @@ public partial class MainWindow : Window
                 VigilarWallpaperEngine();
                 _tick.Tick += (_, _) => Tick();
                 _tick.Start();
+                Uso.Cargar();
+                _ = Fuentes.CargarApps();   // el índice del buscador se arma por detrás
                 await ActualizarWallpaper(true);
             }
             catch (Exception ex) { Log.Error("arranque", ex); }
@@ -151,6 +154,7 @@ public partial class MainWindow : Window
         if (!_cerrando && _cfg.Barra.OcultarBarraWindows && Nativo.BarraWindowsVisible()) Nativo.EsconderBarraWindows();
         foreach (var a in _actualizadores.ToArray()) a();
         AjustarAncho();   // el texto de CPU/RAM/hora cambia de ancho: que se deslice
+        VigilarFocoDelMenu();
         if (Environment.GetEnvironmentVariable("NUBEBAR_DIAG") == "1")
             Log.Info($"DIAG tick isla={Isla.ActualWidth:0.00} exp={_expandida} | {ResumenGrupos()}");
     }

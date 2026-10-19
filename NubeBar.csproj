@@ -13,4 +13,9 @@
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Para consultar el índice de Windows Search (Search.CollatorDSO) desde el buscador -->
+    <PackageReference Include="System.Data.OleDb" Version="9.0.0" />
+  </ItemGroup>
+
 </Project>

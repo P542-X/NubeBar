@@ -44,12 +44,22 @@ public class Modulos
     public List<string> Derecha { get; set; } = new() { "cpu", "ram", "bateria", "fecha" };
 }
 
+public class Inicio
+{
+    public List<string> Fijadas { get; set; } = new();              // apps ancladas en el menú
+    public bool TeclaWindows { get; set; } = true;                  // la tecla Windows sola abre este menú (fase 6)
+    public bool BuscarArchivos { get; set; } = true;                // usar el índice de Windows Search
+    public string BuscadorWeb { get; set; } = "https://www.google.com/search?q=";
+    public bool Saludo { get; set; } = true;                        // cabecera con "Buenas tardes, ..."
+}
+
 public class Config
 {
     public Tema Tema { get; set; } = new();
     public Barra Barra { get; set; } = new();
     public Modulos Modulos { get; set; } = new();
     public OpcionesWallpaper Wallpaper { get; set; } = new();
+    public Inicio Inicio { get; set; } = new();
 
     public static string Carpeta =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NubeBar");
