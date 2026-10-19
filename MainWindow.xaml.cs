@@ -62,17 +62,38 @@ public partial class MainWindow : Window
     bool EsIsla => _cfg.Barra.Modo.Equals("isla", StringComparison.OrdinalIgnoreCase);
     bool Arriba => !_cfg.Barra.Posicion.Equals("abajo", StringComparison.OrdinalIgnoreCase);
 
-    public MainWindow()
+    // ================= Una isla por monitor =================
+    // Hay una ventana de estas por cada pantalla. La del monitor principal es la
+    // "jefa": lleva lo que debe existir una sola vez (el hook de teclado, el atajo
+    // global, el índice del buscador, la música, las lecturas de CPU y el trato con
+    // las barras de Windows). Las demás solo se dibujan y atienden a sus apps.
+    public static readonly List<MainWindow> Islas = new();
+
+    Monitores.Info _monitor;
+    readonly bool _esJefa;
+
+    public Monitores.Info Monitor => _monitor;
+
+    public MainWindow() : this(Monitores.Principal(), true) { }
+
+    public MainWindow(Monitores.Info monitor, bool esJefa)
     {
-        Log.Nuevo();
-        // Ningún error tumba la app: se apunta en el log y se sigue
-        Application.Current.DispatcherUnhandledException += (_, e) => { Log.Error("interfaz", e.Exception); e.Handled = true; };
-        TaskScheduler.UnobservedTaskException += (_, e) => { Log.Error("tarea", e.Exception); e.SetObserved(); };
-        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        _monitor = monitor;
+        _esJefa = esJefa;
+
+        if (_esJefa)
         {
-            Log.Error("FATAL", e.ExceptionObject);
-            Nativo.MostrarBarraWindows(true);   // nunca dejarte sin barra de tareas
-        };
+            Log.Nuevo();
+            // Ningún error tumba la app: se apunta en el log y se sigue
+            Application.Current.DispatcherUnhandledException += (_, e) => { Log.Error("interfaz", e.Exception); e.Handled = true; };
+            TaskScheduler.UnobservedTaskException += (_, e) => { Log.Error("tarea", e.Exception); e.SetObserved(); };
+            AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            {
+                Log.Error("FATAL", e.ExceptionObject);
+                Nativo.MostrarBarraWindows(true);   // nunca dejarte sin barra de tareas
+            };
+        }
+        Islas.Add(this);
 
         InitializeComponent();
         Resources["Hover"] = _hover;
@@ -86,8 +107,9 @@ public partial class MainWindow : Window
             {
                 _self = new WindowInteropHelper(this).Handle;
                 Nativo.NoActivable(_self);
+                VigilarCambiosDePantalla();
                 Aplicar();
-                RegistrarAtajos();
+                if (_esJefa) RegistrarAtajos();
             }
             catch (Exception ex) { Log.Error("arranque", ex); }
 
@@ -97,13 +119,16 @@ public partial class MainWindow : Window
 
             try
             {
-                VigilarConfig();
+                if (_esJefa)
+                {
+                    VigilarConfig();
+                    Uso.Cargar();
+                    _ = Fuentes.CargarApps();   // el índice del buscador se arma por detrás
+                    MontarTeclaWindows();
+                }
                 VigilarWallpaperEngine();
                 _tick.Tick += (_, _) => Tick();
                 _tick.Start();
-                Uso.Cargar();
-                _ = Fuentes.CargarApps();   // el índice del buscador se arma por detrás
-                MontarTeclaWindows();
                 await ActualizarWallpaper(true);
             }
             catch (Exception ex) { Log.Error("arranque", ex); }
@@ -112,10 +137,12 @@ public partial class MainWindow : Window
             if (Energia.Simulando)
                 Log.Info("ATENCIÓN: modo simulación de energía ACTIVO (NUBEBAR_SIMULAR_ENERGIA=1): " +
                          "bloquear, suspender, reiniciar y apagar solo se apuntan en el log");
-            Log.Info($"Ventana L={Left} T={Top} {ActualWidth}x{ActualHeight} visible={IsVisible} | " +
-                     $"Isla {Isla.ActualWidth:0}x{Isla.ActualHeight:0} opacidad={Isla.Opacity:0.##} | " +
-                     $"Pantalla {SystemParameters.PrimaryScreenWidth}x{SystemParameters.PrimaryScreenHeight} | " +
-                     $"Modo={_cfg.Barra.Modo} | Wallpaper Engine={WallpaperEngine.Exe ?? "no encontrado"}");
+            Log.Info($"Isla[{_monitor.Dispositivo}{(_esJefa ? " jefa" : "")}] " +
+                     $"ventana L={Left} T={Top} {ActualWidth}x{ActualHeight} visible={IsVisible} | " +
+                     $"isla {Isla.ActualWidth:0}x{Isla.ActualHeight:0} opacidad={Isla.Opacity:0.##} | " +
+                     $"monitor ({_monitor.X},{_monitor.Y}) {_monitor.Ancho}x{_monitor.Alto} dpi={_monitor.Dpi} | " +
+                     $"MaxApps={MaxAppsEfectivo} | Modo={_cfg.Barra.Modo} | " +
+                     $"Wallpaper Engine={WallpaperEngine.Exe ?? "no encontrado"}");
         };
         Closed += (_, _) =>
         {
@@ -127,15 +154,18 @@ public partial class MainWindow : Window
             if (_watcher is { } w) w.EnableRaisingEvents = false;
             if (_wpWatcher is { } ww) ww.EnableRaisingEvents = false;
 
+            Islas.Remove(this);
+            AppBar.Quitar(_self);                      // cada isla suelta SU reserva de espacio
+            if (!_esJefa) return;                      // lo global lo desmonta solo la jefa
+
             Nativo.QuitarAtajo(_self, IdAtajoVista);   // el atajo vuelve a quien lo quiera
             _gancho?.Dispose();                        // y la tecla Windows vuelve a la normalidad
-            AppBar.Quitar(_self);
 
             // Se encola detrás de lo que hubiera pendiente y se espera: el proceso no
-            // puede terminar hasta que la barra de Windows esté de vuelta
+            // puede terminar hasta que las barras de Windows estén de vuelta
             if (!EncolarShell(() => Nativo.MostrarBarraWindows(true)).Wait(TimeSpan.FromSeconds(5)))
             {
-                Log.Info("la cola del shell no terminó a tiempo: restaurando la barra aquí mismo");
+                Log.Info("la cola del shell no terminó a tiempo: restaurando las barras aquí mismo");
                 Nativo.MostrarBarraWindows(true);
             }
             Log.Info($"cerrado. Barra de Windows visible={Nativo.BarraWindowsVisible()}");
@@ -156,8 +186,14 @@ public partial class MainWindow : Window
     void Tick()
     {
         // Explorer a veces vuelve a mostrar su barra: se vuelve a esconder
-        if (!_cerrando && _cfg.Barra.OcultarBarraWindows && Nativo.BarraWindowsVisible()) Nativo.EsconderBarraWindows();
-        Historial.Anotar(Nativo.Cpu(), Nativo.Ram());
+        // Nativo.Cpu() mide la diferencia con la lectura anterior: si lo llamasen dos
+        // islas en el mismo segundo, las cifras saldrían disparatadas. Lo de una sola
+        // vez por tick (y el trato con las barras de Windows) es cosa de la jefa.
+        if (_esJefa)
+        {
+            if (!_cerrando && _cfg.Barra.OcultarBarraWindows && Nativo.BarraWindowsVisible()) Nativo.EsconderBarraWindows();
+            Historial.Anotar(Nativo.Cpu(), Nativo.Ram());
+        }
         RefrescarMusica();
         foreach (var a in _actualizadores.ToArray()) a();
         AjustarAncho();   // el texto de CPU/RAM/hora cambia de ancho: que se deslice
@@ -169,7 +205,7 @@ public partial class MainWindow : Window
                 try { a(); } catch (Exception ex) { Log.Error("refrescar el menú", ex); }
             }
         if (Environment.GetEnvironmentVariable("NUBEBAR_DIAG") == "1")
-            Log.Info($"DIAG tick isla={Isla.ActualWidth:0.00} exp={_expandida} | {ResumenGrupos()}");
+            Log.Info($"DIAG tick [{_monitor.Dispositivo}] isla={Isla.ActualWidth:0.00} exp={_expandida} | {ResumenGrupos()}");
     }
 
     // ================= Tema y posición =================
@@ -187,7 +223,7 @@ public partial class MainWindow : Window
             texto = p.Texto;
             acento = p.Acento;
         }
-        else if (t.EnviarColorAlWallpaper) EnviarColor(acento);
+        else if (t.EnviarColorAlWallpaper && _esJefa) EnviarColor(acento);   // un solo emisor, no dos peleándose
 
         _cTexto = texto; _cAcento = acento;
         AnimarColor(_fondo, fondo);
@@ -229,18 +265,17 @@ public partial class MainWindow : Window
         // En modo isla el ancho siempre va fijado a mano (ver AnimarAncho); en modo barra, automático
         Isla.Width = EsIsla ? MedirAncho() : double.NaN;
 
-        // La ventana es una franja transparente de todo el ancho; dentro va la isla o la barra
+        // La ventana es una franja transparente de todo el ancho de SU monitor
         double altoVentana = b.Alto + b.Margen * 2;
-        Left = 0;
-        Width = SystemParameters.PrimaryScreenWidth;
-        Height = altoVentana;
-        Top = Arriba ? 0 : SystemParameters.PrimaryScreenHeight - altoVentana;
+        ColocarEnMonitor(altoVentana);
 
         _aplicando = false;
 
         // Solo el modo barra reserva espacio; la isla flota encima de las ventanas, como en el iPhone.
         // Esto va en el hilo de la ventana porque la AppBar se registra con nuestro propio hwnd.
-        if (!EsIsla && b.ReservarEspacio) AppBar.Registrar(_self, Arriba, Px(altoVentana));
+        if (!EsIsla && b.ReservarEspacio)
+            AppBar.Registrar(_self, Arriba, (int)Math.Round(altoVentana * _monitor.Escala),
+                             _monitor.X, _monitor.Y, _monitor.Ancho, _monitor.Alto);
         else AppBar.Quitar(_self);
 
         // Esconder la barra de Windows tarda ~0,7 s: Explorer recalcula el área de trabajo y
@@ -355,7 +390,7 @@ public partial class MainWindow : Window
                        + Isla.BorderThickness.Left + Isla.BorderThickness.Right;
 
         Contenido.InvalidateMeasure();
-        double maximo = ActualWidth > 0 ? ActualWidth : SystemParameters.PrimaryScreenWidth;
+        double maximo = ActualWidth > 0 ? ActualWidth : _monitor.Ancho / _monitor.Escala;
         return Math.Clamp(ancho, Isla.MinWidth, Math.Max(Isla.MinWidth, maximo));
     }
 
@@ -505,8 +540,20 @@ public partial class MainWindow : Window
         _recarga.Tick += (_, _) =>
         {
             _recarga.Stop();
-            if (Config.Cargar() is { } nueva) { _cfg = nueva; Aplicar(); }
+            RecargarTodas();
         };
+    }
+
+    // El config lo vigila solo la jefa, pero el cambio lo tienen que ver todas las islas.
+    // Si además has tocado "Monitores", puede que ahora sobren o falten islas.
+    static void RecargarTodas()
+    {
+        if (Config.Cargar() is not { } nueva) return;
+        string antes = Islas.FirstOrDefault()?._cfg.Barra.Monitores ?? "todos";
+        foreach (var i in Islas.ToList()) i._cfg = nueva;
+
+        if (!antes.Equals(nueva.Barra.Monitores, StringComparison.OrdinalIgnoreCase)) Reorganizar();
+        else foreach (var i in Islas.ToList()) i.Aplicar();
     }
 
     void ProgramarRecarga() => Dispatcher.InvokeAsync(() => { _recarga.Stop(); _recarga.Start(); });
@@ -539,7 +586,7 @@ public partial class MainWindow : Window
         _wpUltimo = DateTime.Now;
         try
         {
-            var ruta = await WallpaperEngine.WallpaperActual(_cfg.Wallpaper.Monitor);
+            var ruta = await WallpaperEngine.WallpaperActual(IndiceWallpaper);
             if (ruta == null || ruta == _wpRuta) return;
 
             _wpRuta = ruta;
@@ -620,7 +667,7 @@ public partial class MainWindow : Window
             ("Ajustes…", AbrirAjustes),
             ("Recargar el config", () =>
             {
-                if (Config.Cargar() is { } nueva) { _cfg = nueva; Aplicar(); Log.Info("config recargado a mano"); }
+                RecargarTodas(); Log.Info("config recargado a mano");
             }),
             ("Salir de NubeBar", Close)
         };

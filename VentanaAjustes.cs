@@ -44,7 +44,11 @@ public sealed class VentanaAjustes : Window
         Title = "Ajustes de la nube";
         Width = 760;
         Height = 620;
-        WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        // Centrada en la pantalla donde tengas el ratón, no siempre en la principal
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        var m = Monitores.DelRaton() ?? Monitores.Principal();
+        Left = (m.TrabajoX + (m.TrabajoAncho - Width * m.Escala) / 2) / m.Escala;
+        Top = (m.TrabajoY + (m.TrabajoAlto - Height * m.Escala) / 2) / m.Escala;
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
         Background = Brushes.Transparent;
@@ -324,6 +328,14 @@ public sealed class VentanaAjustes : Window
                                 v => _arbol.Poner("Tema", "Fuente", v)));
         c.Children.Add(Deslizador("Tamaño", 9, 22, _arbol.Numero("Tema", "TamanoFuente", 13),
                                   v => _arbol.Poner("Tema", "TamanoFuente", v)));
+
+        c.Children.Add(Rotulo("Pantallas", true));
+        c.Children.Add(Opciones("Monitores", new[] { "todos", "principal" },
+                                _arbol.Texto("Barra", "Monitores", "todos"),
+                                v => _arbol.Poner("Barra", "Monitores", v)));
+        c.Children.Add(Interruptor("Cada isla enseña las apps de su pantalla",
+                                   _arbol.Bandera("Barra", "AppsPorMonitor", true),
+                                   v => _arbol.Poner("Barra", "AppsPorMonitor", v)));
         return c;
     }
 

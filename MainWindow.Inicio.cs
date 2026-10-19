@@ -41,23 +41,35 @@ public partial class MainWindow
     double AltoMenu => AltoCabecera + 8 + 38 + 8 + AltoFila * FilasVisibles + 10;
 
     // ================= Tecla Windows =================
-    GanchoTeclas? _gancho;
+    // Hay un solo hook de teclado para todas las islas: lo monta la jefa y lo
+    // comparten todas (viven en el mismo hilo de interfaz, así que no hay carrera)
+    static GanchoTeclas? _gancho;
 
     void MontarTeclaWindows()
     {
         if (_gancho == null)
         {
             _gancho = new GanchoTeclas();
-            // El hook avisa desde SU hilo: hay que saltar al de la interfaz
-            _gancho.AbrirMenu += () => Dispatcher.BeginInvoke(new Action(MenuDesdeTecla));
+            // El hook avisa desde SU hilo: hay que saltar al de la interfaz.
+            // El menú sale en la isla del monitor donde tengas el ratón.
+            _gancho.AbrirMenu += () => Dispatcher.BeginInvoke(new Action(() => IslaDelRaton().MenuDesdeTecla()));
             _gancho.Instalar();
         }
         _gancho.Activo = _cfg.Inicio.TeclaWindows;
     }
 
-    // Win sola (o Ctrl+Esc): si el menú está abierto se cierra, y si no se abre
+    // Win sola (o Ctrl+Esc): si el menú está abierto se cierra, y si no se abre.
+    // Con varias islas, el menú abierto en OTRA pantalla también cuenta como abierto:
+    // pulsar Win se lo lleva, no abre un segundo menú.
     void MenuDesdeTecla()
     {
+        foreach (var otra in Islas.Where(i => i != this && i._panelAbierto == PanelInicio).ToList())
+        {
+            _gancho!.Capturando = false;
+            otra.VaciarCola(descartar: true);
+            otra.CerrarMenu();
+            return;
+        }
         if (_panelAbierto == PanelInicio)
         {
             _gancho!.Capturando = false;

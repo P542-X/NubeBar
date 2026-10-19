@@ -27,27 +27,33 @@ static class AppBar
     const uint ABM_NEW = 0, ABM_REMOVE = 1, ABM_QUERYPOS = 2, ABM_SETPOS = 3, ABM_GETSTATE = 4, ABM_SETSTATE = 10;
     const int ABS_AUTOHIDE = 1;
     static int? _estadoOriginal;
-    static bool _registrada;
+
+    // Con varios monitores hay una isla (y por tanto una appbar) por pantalla, cada una
+    // con su hwnd. Se lleva la cuenta por ventana: si no, la segunda isla no llegaría
+    // a registrarse y al cerrar la primera se daría de baja un hwnd que no era el suyo.
+    static readonly System.Collections.Generic.HashSet<IntPtr> _registradas = new();
 
     static APPBARDATA Datos(IntPtr h) => new() { cbSize = Marshal.SizeOf<APPBARDATA>(), hWnd = h };
 
-    public static void Registrar(IntPtr h, bool arriba, int altoPx)
+    // El rectángulo que se pide es el del MONITOR de esa isla, en píxeles de pantalla:
+    // así Windows reserva el hueco en la pantalla correcta y no siempre en la principal.
+    public static void Registrar(IntPtr h, bool arriba, int altoPx, int mx, int my, int mAncho, int mAlto)
     {
         var d = Datos(h);
-        if (!_registrada)
+        if (_registradas.Add(h))
         {
             d.uCallbackMessage = RegisterWindowMessage("NubeBarAppBar");
             SHAppBarMessage(ABM_NEW, ref d);
-            _registrada = true;
         }
 
-        int ancho = GetSystemMetrics(0), alto = GetSystemMetrics(1); // pantalla principal en píxeles
+        if (mAncho <= 0 || mAlto <= 0) { mx = 0; my = 0; mAncho = GetSystemMetrics(0); mAlto = GetSystemMetrics(1); }
+
         d.uEdge = arriba ? 1u : 3u;                                  // ABE_TOP / ABE_BOTTOM
         d.rc = new RECT
         {
-            Left = 0, Right = ancho,
-            Top = arriba ? 0 : alto - altoPx,
-            Bottom = arriba ? altoPx : alto
+            Left = mx, Right = mx + mAncho,
+            Top = arriba ? my : my + mAlto - altoPx,
+            Bottom = arriba ? my + altoPx : my + mAlto
         };
         SHAppBarMessage(ABM_QUERYPOS, ref d);
         if (arriba) d.rc.Bottom = d.rc.Top + altoPx; else d.rc.Top = d.rc.Bottom - altoPx;
@@ -56,10 +62,9 @@ static class AppBar
 
     public static void Quitar(IntPtr h)
     {
-        if (!_registrada) return;
+        if (!_registradas.Remove(h)) return;
         var d = Datos(h);
         SHAppBarMessage(ABM_REMOVE, ref d);
-        _registrada = false;
     }
 
     // Pone la barra de Windows en "ocultar automáticamente" para que libere su hueco

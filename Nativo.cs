@@ -26,6 +26,7 @@ static class Nativo
     [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr FindWindow(string c, string? t);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr FindWindowEx(IntPtr padre, IntPtr tras, string? clase, string? titulo);
     [DllImport("user32.dll")] static extern IntPtr SendMessageTimeout(IntPtr h, uint msg, IntPtr w, IntPtr l, uint flags, uint timeout, out IntPtr result);
     [DllImport("user32.dll")] static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
     [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h, int attr, out int val, int size);
@@ -124,6 +125,12 @@ static class Nativo
         // SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED | SWP_NOACTIVATE
         SetWindowPos(h, IntPtr.Zero, 0, 0, 0, 0, 0x0002 | 0x0001 | 0x0004 | 0x0020 | 0x0010);
     }
+
+    // Colocar en píxeles de pantalla de verdad. Con monitores de distinto DPI las
+    // unidades de WPF no sirven para posicionar entre pantallas: hay que ir en crudo
+    // y dejar que WPF convierta a su escala el contenido de dentro.
+    public static void Colocar(IntPtr h, int x, int y, int ancho, int alto) =>
+        SetWindowPos(h, IntPtr.Zero, x, y, ancho, alto, 0x0010 | 0x0004);   // SWP_NOACTIVATE | SWP_NOZORDER
 
     // Traer al frente de verdad. Windows bloquea el cambio de primer plano a procesos
     // que no acaban de recibir entrada del usuario; el toque de Alt levanta ese bloqueo.
@@ -312,16 +319,33 @@ static class Nativo
         keybd_event(0x5B, 0, 2, UIntPtr.Zero);
     }
 
+    // Con varios monitores hay una barra principal y una secundaria por cada uno
+    // de los demás. Todas se esconden y todas se devuelven.
+    public static List<IntPtr> BarrasDeWindows()
+    {
+        var lista = new List<IntPtr>();
+        var principal = FindWindow("Shell_TrayWnd", null);
+        if (principal != IntPtr.Zero) lista.Add(principal);
+
+        var h = IntPtr.Zero;
+        while ((h = FindWindowEx(IntPtr.Zero, h, "Shell_SecondaryTrayWnd", null)) != IntPtr.Zero)
+            lista.Add(h);
+        return lista;
+    }
+
     public static void MostrarBarraWindows(bool mostrar)
     {
         AppBar.AutoOcultarBarraWindows(!mostrar);
-        ShowWindow(FindWindow("Shell_TrayWnd", null), mostrar ? 5 : 0);
+        foreach (var b in BarrasDeWindows()) ShowWindow(b, mostrar ? 5 : 0);
     }
 
-    // Solo esconder (sin tocar el auto-ocultar), para cuando Explorer la vuelve a mostrar
-    public static void EsconderBarraWindows() => ShowWindow(FindWindow("Shell_TrayWnd", null), 0);
+    // Solo esconder (sin tocar el auto-ocultar), para cuando Explorer las vuelve a mostrar
+    public static void EsconderBarraWindows()
+    {
+        foreach (var b in BarrasDeWindows()) ShowWindow(b, 0);
+    }
 
-    public static bool BarraWindowsVisible() => IsWindowVisible(FindWindow("Shell_TrayWnd", null));
+    public static bool BarraWindowsVisible() => BarrasDeWindows().Any(IsWindowVisible);
 
     // ---------- Sistema ----------
     [DllImport("kernel32.dll")] static extern bool GetSystemTimes(out long idle, out long kernel, out long user);

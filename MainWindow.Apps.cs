@@ -75,7 +75,7 @@ public partial class MainWindow
 
     double _anchoTira;                     // ancho natural de la fila entera, medido
 
-    double AnchoVisible => Math.Max(AnchoIcono, _cfg.Barra.MaxApps * AnchoIcono);
+    double AnchoVisible => Math.Max(AnchoIcono, MaxAppsEfectivo * AnchoIcono);
     double DesplazamientoMaximo => Math.Max(0, _anchoTira - AnchoVisible);
 
     // Para el log de diagnóstico: qué grupos hay, en qué orden y con cuántas ventanas
@@ -157,8 +157,14 @@ public partial class MainWindow
         var activa = ActivaAjena();
 
         var abiertas = Nativo.VentanasAbiertas(_self);
-        var vivas = new HashSet<IntPtr>(abiertas);
-        Nativo.OlvidarExes(vivas);
+        // La caché de ejecutables se limpia con TODAS las ventanas, no solo con las
+        // de este monitor: si no, cada isla le borraría a la otra lo que sí sigue vivo
+        Nativo.OlvidarExes(new HashSet<IntPtr>(abiertas));
+
+        // Cada isla enseña las apps de su pantalla. Al mover una ventana de monitor
+        // su grupo desaparece de una isla y aparece en la otra, y eso ya tiene
+        // animación de salida y de entrada más abajo: el icono "viaja" solo.
+        abiertas = SoloDeMiMonitor(abiertas);
 
         // Repartir las ventanas en grupos. Sin agrupar, cada ventana es su propio grupo.
         var ahora = new Dictionary<string, List<IntPtr>>(StringComparer.OrdinalIgnoreCase);

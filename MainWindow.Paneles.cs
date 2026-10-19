@@ -39,9 +39,7 @@ public partial class MainWindow
     // Alto que necesita la ventana para que quepa la isla con su cajón
     void AjustarVentana(double altoIsla)
     {
-        double alto = altoIsla + _cfg.Barra.Margen * 2;
-        Height = alto;
-        Top = Arriba ? 0 : SystemParameters.PrimaryScreenHeight - alto;
+        ColocarEnMonitor(altoIsla + _cfg.Barra.Margen * 2);
     }
 
     // ---------- Abrir y cerrar ----------

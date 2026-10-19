@@ -35,6 +35,8 @@ public class Barra
     public int MaxApps { get; set; } = 10;             // iconos de apps visibles a la vez; el resto, con la rueda
     public bool AgruparApps { get; set; } = true;      // las ventanas del mismo programa, en un solo icono
     public string AtajoVistaGeneral { get; set; } = "Ctrl+Alt+Space";   // abre la cuadrícula de ventanas
+    public string Monitores { get; set; } = "todos";   // "todos" | "principal"
+    public bool AppsPorMonitor { get; set; } = true;   // cada isla enseña las apps de SU monitor
 }
 
 public class Modulos

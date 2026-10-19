@@ -34,7 +34,7 @@ public partial class MainWindow
 
     void AplicarAtajo()
     {
-        if (_self == IntPtr.Zero) return;
+        if (_self == IntPtr.Zero || !_esJefa) return;   // un solo dueño del atajo global
         var atajo = _cfg.Barra.AtajoVistaGeneral;
         if (string.IsNullOrWhiteSpace(atajo)) { Nativo.QuitarAtajo(_self, IdAtajoVista); return; }
 
@@ -53,7 +53,10 @@ public partial class MainWindow
     {
         if (msg != Nativo.WM_HOTKEY || wParam.ToInt32() != IdAtajoVista) return IntPtr.Zero;
         manejado = true;
-        AlternarVista();
+        // La vista general se abre en la pantalla donde tengas el ratón.
+        // Si estaba abierta en otra, esa se cierra y no se abre una segunda.
+        var abierta = Islas.FirstOrDefault(i => i._panelAbierto == PanelVista);
+        (abierta ?? IslaDelRaton()).AlternarVista();
         return IntPtr.Zero;
     }
 
@@ -77,7 +80,7 @@ public partial class MainWindow
     void ActualizarBotonVista()
     {
         if (_textoVista == null || _botonVista == null) return;
-        int ocultos = _tira == null ? 0 : Math.Max(0, _tira.Children.Count - _cfg.Barra.MaxApps);
+        int ocultos = _tira == null ? 0 : Math.Max(0, _tira.Children.Count - MaxAppsEfectivo);
         _textoVista.Text = ocultos > 0 ? $" +{ocultos}" : "";
         _textoVista.FontFamily = ocultos > 0
             ? new FontFamily($"{FuenteIconos}, {_cfg.Tema.Fuente}")
