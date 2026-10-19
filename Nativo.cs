@@ -95,6 +95,10 @@ static class Nativo
         SetForegroundWindow(h);
     }
 
+    [DllImport("user32.dll")] static extern int GetDoubleClickTime();
+
+    public static int TiempoDobleClic => GetDoubleClickTime();
+
     public static bool EstaMinimizada(IntPtr h) => IsIconic(h);
 
     // Minimizar como lo hace la barra de tareas: se le MANDA la orden a la ventana

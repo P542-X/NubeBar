@@ -122,6 +122,11 @@ public partial class MainWindow : Window
                 if (_esJefa)
                 {
                     Guardian.Lanzar();          // por si me matan: alguien tiene que devolver el shell
+                    // Encenderla hace que las apps nos manden sus iconos a NOSOTROS en
+                    // vez de a Explorer. Si el módulo no está puesto en ninguna zona,
+                    // los iconos desaparecerían de la barra de Windows sin aparecer en
+                    // ningún sitio, así que hace falta la clave Y el módulo.
+                    if (_cfg.Barra.Bandeja && HayModuloBandeja()) Bandeja.Encender();
                     VigilarConfig();
                     Uso.Cargar();
                     _ = Fuentes.CargarApps();   // el índice del buscador se arma por detrás
@@ -162,6 +167,8 @@ public partial class MainWindow : Window
 
             Nativo.QuitarAtajo(_self, IdAtajoVista);   // el atajo vuelve a quien lo quiera
             _gancho?.Dispose();                        // y la tecla Windows vuelve a la normalidad
+            Bandeja.Apagar();                          // los iconos vuelven a la bandeja de Explorer
+            Guardian.Despedir();                       // cierre limpio: el guardián sobra
 
             // Se encola detrás de lo que hubiera pendiente y se espera: el proceso no
             // puede terminar hasta que las barras de Windows estén de vuelta
@@ -755,6 +762,7 @@ public partial class MainWindow : Window
         "musica-barras"    => ModuloBarras(),
         "wallpaper"        => ModuloWallpaper(),
         "wallpaper-titulo" => Etiqueta(() => _wpTitulo ?? "", animar: true),
+        "bandeja"          => ModuloBandeja(),
         "iconos"           => Boton(Glifo("\uE890"), "Mostrar / ocultar iconos del escritorio", () =>
                               {
                                   _iconosOcultos = !_iconosOcultos;

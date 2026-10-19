@@ -23,7 +23,7 @@ public sealed class VentanaAjustes : Window
     readonly List<string> _modulosDisponibles = new()
     {
         "inicio", "apps", "reloj", "fecha", "cpu", "ram", "bateria",
-        "wallpaper", "wallpaper-titulo", "iconos", "separador"
+        "wallpaper", "wallpaper-titulo", "iconos", "bandeja", "separador"
     };
 
     SolidColorBrush _fondo = new(Color.FromRgb(0x16, 0x16, 0x1A));
@@ -824,6 +824,21 @@ public sealed class VentanaAjustes : Window
         c.Children.Add(new TextBlock
         {
             Text = "Crea o quita un acceso directo en la carpeta Inicio de Windows hacia " + Arranque.ExeRecomendado(),
+            Foreground = _texto, Opacity = 0.45, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0)
+        });
+
+        c.Children.Add(Rotulo("Bandeja del sistema", true));
+        c.Children.Add(Interruptor("Traer los iconos de la bandeja a la isla",
+                                   _arbol.Bandera("Barra", "Bandeja", false),
+                                   v => _arbol.Poner("Barra", "Bandeja", v)));
+        c.Children.Add(Deslizador("Iconos visibles antes del desplegable", 1, 15,
+                                  _arbol.Numero("Barra", "MaxBandeja", 6),
+                                  v => _arbol.Poner("Barra", "MaxBandeja", Math.Round(v))));
+        c.Children.Add(new TextBlock
+        {
+            Text = "Viene apagado a propósito. Con la barra de tareas de Windows 11 funcionando, " +
+                   "las apps siguen entregándole a ella sus iconos y aquí no llega ninguno. " +
+                   "Hay que añadir además el módulo \"bandeja\" en Módulos para que se encienda.",
             Foreground = _texto, Opacity = 0.45, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0)
         });
 
