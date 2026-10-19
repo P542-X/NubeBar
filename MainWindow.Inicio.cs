@@ -20,7 +20,7 @@ namespace NubeBar;
 public partial class MainWindow
 {
     const string PanelInicio = "inicio";
-    const double AnchoMenu = 620, AltoFila = 44, FilasVisibles = 7;
+    const double AnchoMenu = 660, AltoFila = 44, FilasVisibles = 9;
     const int MaxFilas = 20;
 
     TextBox? _caja;
@@ -35,7 +35,10 @@ public partial class MainWindow
     CancellationTokenSource? _buscaArchivos;
     DispatcherTimer? _esperaArchivos;
 
-    double AltoMenu => 8 + 38 + 8 + AltoFila * FilasVisibles + 10;
+    // Con la portada (lo que suena, accesos, gráficas, wallpaper, fijadas y energía)
+    // hace falta bastante más alto que con la lista de resultados a secas
+    double AltoCabecera => _cfg.Inicio.Saludo ? 58 : 0;
+    double AltoMenu => AltoCabecera + 8 + 38 + 8 + AltoFila * FilasVisibles + 10;
 
     // ================= Tecla Windows =================
     GanchoTeclas? _gancho;
@@ -155,12 +158,14 @@ public partial class MainWindow
         if (activar)
         {
             Isla.PreviewMouseDown += ClicQuizaFuera;
+            Isla.PreviewMouseUp += RearmarCaptura;
             Isla.LostMouseCapture += RecuperarCaptura;
             Mouse.Capture(Isla, CaptureMode.SubTree);
         }
         else
         {
             Isla.PreviewMouseDown -= ClicQuizaFuera;
+            Isla.PreviewMouseUp -= RearmarCaptura;
             Isla.LostMouseCapture -= RecuperarCaptura;
             if (ReferenceEquals(Mouse.Captured, Isla)) Mouse.Capture(null);
         }
@@ -198,17 +203,44 @@ public partial class MainWindow
         Dispatcher.InvokeAsync(() => { _caja?.Focus(); Keyboard.Focus(_caja); }, DispatcherPriority.Input);
     }
 
+    // Un Button captura el ratón al pulsarlo y lo suelta al soltarlo: así sabe si
+    // levantaste el dedo encima. Si se la quitamos en ese momento, nunca llega a su
+    // Click. Por eso solo se recupera cuando la captura no la tiene NADIE.
     void RecuperarCaptura(object remitente, MouseEventArgs e)
     {
-        if (_panelAbierto == PanelInicio)
-            Dispatcher.InvokeAsync(() => { if (_panelAbierto == PanelInicio) Mouse.Capture(Isla, CaptureMode.SubTree); });
+        if (_panelAbierto != PanelInicio) return;
+        Dispatcher.InvokeAsync(() =>
+        {
+            if (_panelAbierto != PanelInicio) return;
+            if (Mouse.Captured != null) return;      // se la ha llevado algo de dentro
+            Mouse.Capture(Isla, CaptureMode.SubTree);
+        }, DispatcherPriority.Input);
+    }
+
+    // Y al soltar el botón se vuelve a armar, que es cuando la suelta él
+    void RearmarCaptura(object remitente, MouseButtonEventArgs e)
+    {
+        if (_panelAbierto != PanelInicio) return;
+        Dispatcher.InvokeAsync(() =>
+        {
+            if (_panelAbierto != PanelInicio) return;
+            if (Mouse.Captured != null) return;
+            Mouse.Capture(Isla, CaptureMode.SubTree);
+        }, DispatcherPriority.Input);
     }
 
     // ================= Montaje =================
+    // Los actualizadores del menú viven aparte de los de la isla: se tiran a la
+    // basura al cerrarlo, porque sus controles ya no existen
+    readonly List<Action> _actualizadoresMenu = new();
+
     FrameworkElement CrearMenuInicio()
     {
+        _actualizadoresMenu.Clear();
+
         var raiz = new Grid { Margin = new Thickness(6, 8, 6, 10) };
-        raiz.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        raiz.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });   // cabecera
+        raiz.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });   // caja de búsqueda
         raiz.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
         _caja = new TextBox
@@ -225,8 +257,15 @@ public partial class MainWindow
         };
         _caja.TextChanged += (_, _) => Buscar(_caja!.Text);
         _caja.PreviewKeyDown += CajaTecla;
-        Grid.SetRow(_caja, 0);
+        Grid.SetRow(_caja, 1);
         raiz.Children.Add(_caja);
+
+        if (_cfg.Inicio.Saludo)
+        {
+            var cabecera = CrearCabecera();
+            Grid.SetRow(cabecera, 0);
+            raiz.Children.Add(cabecera);
+        }
 
         // La marca de selección va por detrás de las filas y se desliza entre ellas
         _marcaSeleccion = new Border
@@ -254,8 +293,14 @@ public partial class MainWindow
             VerticalScrollBarVisibility = ScrollBarVisibility.Hidden,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
         };
-        Grid.SetRow(_scroll, 1);
+        Grid.SetRow(_scroll, 2);
         raiz.Children.Add(_scroll);
+
+        // Sin nada escrito no se ven resultados, sino el panel de siempre: lo que
+        // suena, los accesos rápidos, las gráficas, el wallpaper y las fijadas
+        _portada = CrearPortada();
+        Grid.SetRow(_portada, 2);
+        raiz.Children.Add(_portada);
 
         _pista = new TextBlock
         {
@@ -263,12 +308,49 @@ public partial class MainWindow
             Opacity = 0.4,
             Margin = new Thickness(12, 14, 12, 0),
             VerticalAlignment = VerticalAlignment.Top,
-            Text = "Escribe para buscar aplicaciones, ventanas, archivos y ajustes  ·  > para un comando  ·  Esc cierra"
+            Visibility = Visibility.Collapsed,
+            Text = "Sin resultados"
         };
-        Grid.SetRow(_pista, 1);
+        Grid.SetRow(_pista, 2);
         raiz.Children.Add(_pista);
 
         return raiz;
+    }
+
+    ScrollViewer? _portada;
+
+    // Entra escalonada: cada tarjeta un pelín después que la anterior
+    ScrollViewer CrearPortada()
+    {
+        var pila = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+        var piezas = new UIElement[]
+        {
+            CrearTarjetaMusica(),
+            CrearAccesosRapidos(),
+            CrearGraficas(),
+            CrearTarjetaWallpaper(),
+            CrearFijadas(),
+            CrearEnergia()
+        };
+
+        for (int i = 0; i < piezas.Length; i++)
+        {
+            pila.Children.Add(piezas[i]);
+            if (piezas[i] is not FrameworkElement fe) continue;
+            var mover = new TranslateTransform { Y = 14 };
+            fe.RenderTransform = mover;
+            double retardo = 90 + i * 45;
+            fe.BeginAnimation(OpacityProperty, Kf(0, 1, 240, retardo));
+            mover.BeginAnimation(TranslateTransform.YProperty, Kf(14, 0, 420, retardo, Muelle));
+            mover.Y = 0;
+        }
+
+        return new ScrollViewer
+        {
+            Content = pila,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Hidden,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+        };
     }
 
     // ================= Búsqueda =================
@@ -387,10 +469,12 @@ public partial class MainWindow
         if (_lista == null || _pista == null) return;
 
         var mostrar = _filtro is { } f ? _resultados.Where(r => r.Categoria == f).ToList() : _resultados;
-        _pista.Visibility = mostrar.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        _pista.Text = _caja?.Text.Length > 0
-            ? "Sin resultados"
-            : "Escribe para buscar aplicaciones, ventanas, archivos y ajustes  ·  > para un comando  ·  Esc cierra";
+        bool escribiendo = _caja?.Text.Trim().Length > 0;
+
+        // Con la caja vacía manda la portada; en cuanto escribes, los resultados
+        if (_portada != null) _portada.Visibility = escribiendo ? Visibility.Collapsed : Visibility.Visible;
+        if (_scroll != null) _scroll.Visibility = escribiendo ? Visibility.Visible : Visibility.Collapsed;
+        _pista.Visibility = escribiendo && mostrar.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
 
         _lista.Children.Clear();
         // Más filas de las que caben no aportan nada y cada una cuesta un icono

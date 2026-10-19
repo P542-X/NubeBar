@@ -109,6 +109,9 @@ public partial class MainWindow : Window
             catch (Exception ex) { Log.Error("arranque", ex); }
 
             await Task.Delay(2000);
+            if (Energia.Simulando)
+                Log.Info("ATENCIÓN: modo simulación de energía ACTIVO (NUBEBAR_SIMULAR_ENERGIA=1): " +
+                         "bloquear, suspender, reiniciar y apagar solo se apuntan en el log");
             Log.Info($"Ventana L={Left} T={Top} {ActualWidth}x{ActualHeight} visible={IsVisible} | " +
                      $"Isla {Isla.ActualWidth:0}x{Isla.ActualHeight:0} opacidad={Isla.Opacity:0.##} | " +
                      $"Pantalla {SystemParameters.PrimaryScreenWidth}x{SystemParameters.PrimaryScreenHeight} | " +
@@ -154,9 +157,17 @@ public partial class MainWindow : Window
     {
         // Explorer a veces vuelve a mostrar su barra: se vuelve a esconder
         if (!_cerrando && _cfg.Barra.OcultarBarraWindows && Nativo.BarraWindowsVisible()) Nativo.EsconderBarraWindows();
+        Historial.Anotar(Nativo.Cpu(), Nativo.Ram());
+        RefrescarMusica();
         foreach (var a in _actualizadores.ToArray()) a();
         AjustarAncho();   // el texto de CPU/RAM/hora cambia de ancho: que se deslice
         VigilarFocoDelMenu();
+        // Lo del menú solo se refresca si el menú está delante
+        if (_panelAbierto == PanelInicio)
+            foreach (var a in _actualizadoresMenu.ToArray())
+            {
+                try { a(); } catch (Exception ex) { Log.Error("refrescar el menú", ex); }
+            }
         if (Environment.GetEnvironmentVariable("NUBEBAR_DIAG") == "1")
             Log.Info($"DIAG tick isla={Isla.ActualWidth:0.00} exp={_expandida} | {ResumenGrupos()}");
     }
@@ -685,6 +696,13 @@ public partial class MainWindow : Window
         "cpu"              => Etiqueta(() => $"CPU {Nativo.Cpu()}%", muestra: "CPU 100%"),
         "ram"              => Etiqueta(() => $"RAM {Nativo.Ram()}%", muestra: "RAM 100%"),
         "bateria"          => Etiqueta(Nativo.Bateria, muestra: "BAT 100%"),
+        "musica"           => new StackPanel
+                              {
+                                  Orientation = Orientation.Horizontal,
+                                  Children = { ModuloCaratula(), ModuloBarras() }
+                              },
+        "musica-caratula"  => ModuloCaratula(),
+        "musica-barras"    => ModuloBarras(),
         "wallpaper"        => ModuloWallpaper(),
         "wallpaper-titulo" => Etiqueta(() => _wpTitulo ?? "", animar: true),
         "iconos"           => Boton(Glifo("\uE890"), "Mostrar / ocultar iconos del escritorio", () =>
