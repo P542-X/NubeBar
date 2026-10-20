@@ -102,7 +102,7 @@ public partial class MainWindow : Window
         fila.Children.Add(si);
         columna.Children.Add(fila);
 
-        AbrirPanel(PanelConfirmar, columna, ancho, alto);
+        AbrirPanel(PanelConfirmar, columna, ancho, alto, encoger: true);
     }
 
     // Un recado corto dentro de la isla, para cuando algo no se pudo hacer
@@ -113,7 +113,7 @@ public partial class MainWindow : Window
             Text = texto, Foreground = Brushes.Tomato, TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(16, 4, 16, 12)
         };
-        AbrirPanel(PanelConfirmar, tb, 340, 64);
+        AbrirPanel(PanelConfirmar, tb, 340, 64, encoger: true);
         Log.Info("aviso: " + texto);
     }
 

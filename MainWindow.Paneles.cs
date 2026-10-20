@@ -53,7 +53,8 @@ public partial class MainWindow
         return true;
     }
 
-    void AbrirPanel(string nombre, FrameworkElement contenido, double ancho, double alto, bool teclado = false)
+    void AbrirPanel(string nombre, FrameworkElement contenido, double ancho, double alto,
+                    bool teclado = false, bool encoger = false)
     {
         bool habiaOtro = _panelAbierto != null;
         _panelAbierto = nombre;
@@ -62,14 +63,19 @@ public partial class MainWindow
 
         // ¿Se despliega la isla o se queda recogida?
         //
-        // Un panel estrecho (un menú de 250 px) dentro de una isla tan ancha como
-        // la fila entera de módulos deja dos vacíos negros enormes a los lados y
-        // queda raro. En ese caso la isla se queda recogida y toma la anchura DEL
-        // PANEL, que es lo que hace la isla del iPhone: adopta la forma de lo que
-        // está enseñando. Si el panel es ancho, se despliega como siempre.
+        // Un panel estrecho dentro de una isla tan ancha como la fila entera de
+        // módulos deja dos vacíos negros enormes a los lados y queda raro, así que
+        // puede encogerse hasta la anchura DEL PANEL, como hace la isla del iPhone.
+        //
+        // Pero eso SOLO vale para los paneles que no cuelgan de un módulo. Si el
+        // panel lo ha abierto un icono del carrusel (su mini lista, su menú), al
+        // encoger la isla el icono desaparece de debajo del cursor, la isla cree
+        // que te has ido y cierra el panel justo cuando ibas a usarlo. Por eso
+        // "encoger" es opt-in y no automático.
         if (EsIsla)
         {
-            bool estrecho = ancho + 40 < AnchoConModulos();
+            bool estrecho = encoger && ancho + 40 < AnchoConModulos();
+            _panelEncogido = estrecho;
             Expandir(!estrecho, forzar: true);
         }
 
@@ -103,16 +109,23 @@ public partial class MainWindow
         AjustarVentana(altoIsla);
         if (teclado) ActivarTeclado(true);
 
-        AnimarAncho(anchoIsla, habiaOtro ? 260 : 420, habiaOtro ? Suave : Muelle);
-        AnimarAlto(altoIsla, habiaOtro ? 260 : 460, habiaOtro ? Suave : Muelle);
+        // Un panel pequeño no necesita el mismo recorrido que el menú Inicio: con
+        // la duración larga, un menú de cuatro líneas tardaba medio segundo en
+        // poder leerse y daba sensación de lento. Se escala con lo que crece.
+        bool pequeno = alto < 220;
+        double msAncho = habiaOtro ? 240 : pequeno ? 280 : 420;
+        double msAlto = habiaOtro ? 240 : pequeno ? 300 : 460;
+        AnimarAncho(anchoIsla, msAncho, habiaOtro ? Suave : Muelle);
+        AnimarAlto(altoIsla, msAlto, habiaOtro ? Suave : Muelle);
 
         // El contenido entra un pelín después, cuando ya hay hueco donde verlo
-        double retardo = habiaOtro ? 40 : 110;
-        contenido.BeginAnimation(OpacityProperty, Kf(0, 1, 220, retardo));
+        double retardo = habiaOtro ? 30 : pequeno ? 55 : 110;
+        contenido.BeginAnimation(OpacityProperty, Kf(0, 1, pequeno ? 150 : 220, retardo));
         contenido.Opacity = 1;
         if (contenido.RenderTransform is TranslateTransform t)
         {
-            t.BeginAnimation(TranslateTransform.YProperty, Kf(Arriba ? -12 : 12, 0, 380, retardo, Muelle));
+            t.BeginAnimation(TranslateTransform.YProperty,
+                             Kf(Arriba ? -12 : 12, 0, pequeno ? 260 : 380, retardo, Muelle));
             t.Y = 0;
         }
         MedirFotogramas($"abrir panel {nombre}");
@@ -125,6 +138,7 @@ public partial class MainWindow
         var nombre = _panelAbierto;
         _panelAbierto = null;
         _panelAlto = _panelAncho = 0;
+        _panelEncogido = false;
 
         if (_panelConTeclado) ActivarTeclado(false);
 
@@ -157,6 +171,7 @@ public partial class MainWindow
         Log.Info($"panel {_panelAbierto} cerrado por recarga del config");
         if (_panelConTeclado) ActivarTeclado(false);
         _panelAbierto = null;
+        _panelEncogido = false;
         _panelAlto = _panelAncho = 0;
         Cajon.Content = null;
     }

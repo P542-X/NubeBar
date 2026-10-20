@@ -34,6 +34,7 @@ public partial class MainWindow : Window
     readonly DispatcherTimer _wpTimer = new() { Interval = TimeSpan.FromSeconds(15) };
     FileSystemWatcher? _watcher, _wpWatcher;
     bool _expandida;
+    bool _panelEncogido;  // el panel abierto quiere la isla recogida: el ratón no la vuelve a abrir
     bool _aplicando;      // dentro de Aplicar(): no tocar el ancho, aún se está montando todo
     bool _animandoAncho;  // hay una expansión o contracción en curso, no interrumpirla
     bool _cerrando;       // ya se está cerrando: nadie puede volver a esconder la barra
@@ -452,7 +453,11 @@ public partial class MainWindow : Window
     void Expandir(bool abrir, bool forzar = false)
     {
         if (!EsIsla || abrir == _expandida) return;
-        if (abrir && _sinExpandir) return;   // la tienes cogida: no se abre mientras la llevas
+        if (abrir && _sinExpandir) return;     // la tienes cogida: no se abre mientras la llevas
+        // Con un panel estrecho abierto, volver a pasar el ratón NO la re-expande:
+        // la isla crecería y el panel se quedaría descuadrado dentro, con el
+        // resaltado de cada fila a todo lo ancho y el texto en medio.
+        if (abrir && _panelEncogido) return;
         // Con un panel abierto la isla se queda desplegada, salvo que el propio
         // panel pida lo contrario porque es estrecho y la quiere recogida
         if (!abrir && HayPanel && !forzar) return;
@@ -703,18 +708,26 @@ public partial class MainWindow : Window
         opciones.Add(("Salir de NubeBar", Close));
 
         AbrirPanel(PanelMenu, CrearMenuContextual(opciones.ToArray(), ancho, altoFila),
-                   ancho, opciones.Count * altoFila + 12);
+                   ancho, opciones.Count * altoFila + 12, encoger: true);
     }
 
     FrameworkElement CrearMenuContextual((string Texto, Action Accion)[] opciones, double ancho, double altoFila)
     {
+        // Nada de anchos fijos aquí. La isla tiene su Padding y su filo, así que
+        // una pila de "ancho" exacto se sale por los lados y el recorte del cajón
+        // se come el principio de cada texto. Estirándose, el ancho lo decide la
+        // isla y todo queda alineado.
         var pila = new StackPanel
         {
-            Width = ancho,
             Margin = new Thickness(0, 4, 0, 6),
-            HorizontalAlignment = HorizontalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
             Background = Brushes.Transparent
         };
+
+        // La plantilla de los botones centra su contenido, así que para que todas
+        // las opciones empiecen en la misma columna se les da a todas el ancho de
+        // la más larga. Medido, no a ojo: así se adapta al tema y a la tipografía.
+        double anchoTexto = opciones.Length == 0 ? 0 : opciones.Max(o => AnchoDeTexto(o.Texto));
 
         foreach (var (texto, accion) in opciones)
         {
@@ -722,11 +735,18 @@ public partial class MainWindow : Window
             {
                 Text = texto,
                 Foreground = _texto,
-                Width = ancho - 28,
-                VerticalAlignment = VerticalAlignment.Center
+                Width = anchoTexto,
+                TextAlignment = TextAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis
             };
-            var b = Boton(etiqueta, texto, () => { CerrarPanel(); accion(); });
+            // Sin tooltip: el texto ya está delante y el globo de Windows salía
+            // tapando la propia opción que estabas leyendo
+            var b = Boton(etiqueta, null!, () => { CerrarPanel(); accion(); });
+            b.ToolTip = null;
             b.Height = altoFila - 2;
+            b.HorizontalContentAlignment = HorizontalAlignment.Left;
+            b.Padding = new Thickness(12, 0, 12, 0);
             pila.Children.Add(b);
         }
 

@@ -594,6 +594,7 @@ public partial class MainWindow
                 Width = 286
             };
             var boton = Boton(fila, titulo, () => { CerrarMiniLista(); PulsarVentana(h, g); });
+            boton.ToolTip = null;   // el título ya está escrito en la propia fila
             boton.Height = 28;
             boton.PreviewMouseLeftButtonDown += (_, _) => ApuntarActivaAlPulsar();
             boton.HorizontalContentAlignment = HorizontalAlignment.Left;
