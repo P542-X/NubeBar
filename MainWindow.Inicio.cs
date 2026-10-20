@@ -260,9 +260,11 @@ public partial class MainWindow
         var otra = Nativo.Activa();
         if (otra == _self || Nativo.EsNuestra(otra)) { _intentosFoco = 0; return; }
 
-        // Lo de "se lo ha llevado una aplicación de verdad" ya lo cierra el
-        // vigilante de 150 ms. Aquí solo queda pelearse con los que se lo devuelven
-        // solos, y rendirse si insisten.
+        // Si se lo ha llevado una aplicación de verdad no se toca nada: ya lo cierra
+        // el vigilante de 150 ms. Pelearse aquí le robaba el primer plano al juego
+        // durante un instante antes de cerrarse.
+        if (!SeLoDevuelveSolo(otra)) return;
+
         if (++_intentosFoco > 3)
         {
             Log.Info("el menú no consigue mantener el foco: se cierra");

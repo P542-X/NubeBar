@@ -331,5 +331,7 @@ Dos cambios:
   depender de la captura. Se usa el bit de "pulsado desde la última vez" de
   `GetAsyncKeyState` para no perderse los clics cortos.
 
-Medido: del clic fuera al menú cerrado, 219 ms. Y escribiendo durante 10
+Medido: del clic fuera al menú cerrado, 180-220 ms. Y el vigilante de un
+segundo ya ni lo intenta con una aplicación de verdad: hacerlo le robaba el
+primer plano al juego durante un instante antes de cerrarse. Y escribiendo durante 10
 segundos seguidos el menú aguanta abierto, que era lo que protegía la captura.
