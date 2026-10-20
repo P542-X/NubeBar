@@ -108,6 +108,7 @@ public partial class MainWindow : Window
                 _self = new WindowInteropHelper(this).Handle;
                 Nativo.NoActivable(_self);
                 VigilarCambiosDePantalla();
+                MontarArrastre();
                 Aplicar();
                 if (_esJefa) RegistrarAtajos();
             }

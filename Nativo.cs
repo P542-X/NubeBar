@@ -109,6 +109,12 @@ static class Nativo
 
     public static int TiempoDobleClic => GetDoubleClickTime();
 
+    [DllImport("user32.dll")] static extern short GetAsyncKeyState(int vk);
+
+    // El estado real del botón izquierdo, esté el puntero donde esté. Hace falta
+    // para arrastrar la isla sin capturar el ratón.
+    public static bool BotonIzquierdoPulsado() => (GetAsyncKeyState(0x01) & 0x8000) != 0;
+
     public static bool EstaMinimizada(IntPtr h) => IsIconic(h);
 
     // Minimizar como lo hace la barra de tareas: se le MANDA la orden a la ventana

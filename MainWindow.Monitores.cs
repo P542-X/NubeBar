@@ -44,6 +44,18 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Mientras la estás arrastrando manda el ratón: aquí solo se ajusta el
+        // TAMAÑO, nunca la posición, o la isla se escaparía de debajo del cursor
+        // en cuanto se abriera un panel o cambiara el ancho.
+        if (_arrastrando)
+        {
+            var r = Nativo.Rectangulo(_self);
+            Nativo.Colocar(_self, r.Izq, r.Arr, m.Ancho, altoPx);
+            Width = double.NaN;
+            Height = double.NaN;
+            return;
+        }
+
         Nativo.Colocar(_self, m.X, y, m.Ancho, altoPx);
 
         // Y ahora lo importante: soltar Width/Height de WPF.

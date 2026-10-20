@@ -329,6 +329,14 @@ public sealed class VentanaAjustes : Window
         c.Children.Add(Deslizador("Tamaño", 9, 22, _arbol.Numero("Tema", "TamanoFuente", 13),
                                   v => _arbol.Poner("Tema", "TamanoFuente", v)));
 
+        c.Children.Add(Rotulo("Mover la isla", true));
+        c.Children.Add(Interruptor("Se puede apartar arrastrándola",
+                                   _arbol.Bandera("Barra", "Arrastrable", true),
+                                   v => _arbol.Poner("Barra", "Arrastrable", v)));
+        c.Children.Add(Deslizador("Segundos antes de volver a su sitio", 0.5, 10,
+                                  _arbol.Numero("Barra", "SegundosParaVolver", 2),
+                                  v => _arbol.Poner("Barra", "SegundosParaVolver", Math.Round(v, 1))));
+
         c.Children.Add(Rotulo("Pantallas", true));
         c.Children.Add(Opciones("Monitores", new[] { "todos", "principal" },
                                 _arbol.Texto("Barra", "Monitores", "todos"),

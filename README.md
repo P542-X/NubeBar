@@ -24,6 +24,8 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
   wallpaper, iconos, separador.
 - Borde y halo del color de acento, con animaciones de muelle a la velocidad de
   refresco del monitor.
+- **Se aparta cuando molesta**: la coges, la arrastras donde quieras y a los
+  2 segundos de soltarla vuelve sola a su sitio con un muelle.
 
 **Las apps**
 - Carrusel con las ventanas abiertas, agrupadas por programa, con rueda para
@@ -181,6 +183,8 @@ la isla se adapta sola. Las claves que no reconoce se conservan tal cual.
 | `Barra.NotificacionesSilenciadas` | `[]` | Trozos de identificador de app que no avisan (p. ej. `"Discord"`) |
 | `Barra.AppsDelEscritorio` | `false` | El carrusel, solo con las apps del escritorio virtual actual |
 | `Barra.AppsFijadas` | `[]` | Apps siempre presentes en el carrusel, en este orden. Rutas de ejecutable, o `shell:AppsFolder\<id>` para las de la Store |
+| `Barra.Arrastrable` | `true` | La isla se puede apartar arrastrándola con el ratón |
+| `Barra.SegundosParaVolver` | `2` | Cuánto espera, tras soltarla, antes de volver a su sitio |
 
 ### Módulos
 
