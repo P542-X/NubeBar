@@ -445,3 +445,39 @@ el guardián podía quedarse esperando sobre un handle que el GC había cerrado.
 tres veces por tick (el historial, el módulo de la isla y la gráfica del menú);
 la segunda no tenía tiempo que comparar y devolvía 0. Ahora la medida real se
 toma como mucho cada medio segundo y todos reciben la misma cifra.
+
+## "Un solo fichero" no era un solo fichero
+
+Lo que de verdad provocó la caída de hoy. `PublishSingleFile` **no** mete las DLL
+nativas en el exe salvo que se le diga: `IncludeNativeLibrariesForSelfExtract`
+vale `false` por defecto. El `dist\` local tenía esto al lado del ejecutable:
+
+```
+PresentationNative_cor3.dll  wpfgfx_cor3.dll  D3DCompiler_47_cor3.dll
+PenImc_cor3.dll  vcruntime140_cor3.dll  e_sqlite3.dll
+```
+
+El exe funciona mientras esos seis ficheros estén a su lado. Copiado solo a otra
+carpeta, muere nada más arrancar con `System.DllNotFoundException` en
+`SetWindowLongPtrWndProc` (código de salida `0xC000041D`), y sin escribir **ni
+una línea** en el log, porque se cae antes de llegar a él.
+
+Y de ahí el enredo entero: cuando yo republicaba `dist` con NubeBar abierta
+desde ahí, el proceso vivo se quedaba sin sus piezas y cualquier ensamblado que
+cargara a partir de ese momento reventaba. Eso explica el
+`System.Data.OleDb` del buscador, el `UIAutomationProvider` al mover el foco y
+hasta un `System.Linq` imposible. No era un fallo del buscador: era el exe
+desapareciendo bajo sus pies.
+
+Dos conclusiones:
+
+1. `IncludeNativeLibrariesForSelfExtract=true` en el .csproj. El workflow de la
+   Release ya publicaba bien (su exe **sí** arranca solo en una carpeta vacía,
+   comprobado), así que esto arregla el publish local, que es el que va a
+   `dist\`. El exe pasa de 65 a 69,6 MB, que es exactamente lo que pesa el de
+   GitHub.
+2. Nunca republicar `dist` con una NubeBar corriendo desde ahí. Para probar, una
+   copia en otra carpeta; para usar a diario, el exe de la Release.
+
+El arreglo de las excepciones en hilos de fondo (la red de seguridad que se
+añadió el mismo día) sigue siendo bueno por su cuenta, pero no era la causa.
