@@ -20,7 +20,8 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
 - En modo barra reserva su hueco como una appbar de verdad: las ventanas
   maximizadas no la tapan.
 - Módulos colocables en tres zonas (izquierda, centro, derecha): inicio, apps,
-  reloj, fecha, CPU, RAM, batería, música, wallpaper, iconos, separador.
+  reloj, fecha, CPU, RAM, batería, música, bandeja, control, escritorios,
+  wallpaper, iconos, separador.
 - Borde y halo del color de acento, con animaciones de muelle a la velocidad de
   refresco del monitor.
 
@@ -53,6 +54,40 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
   pantalla se desliza hacia arriba y desaparece; la otra sigue en su sitio.
 - Con el ratón pegado al borde superior unos 300 ms, asoma.
 - Una ventana simplemente maximizada no la esconde.
+
+**Bandeja del sistema**
+- Los iconos de la bandeja (Discord, Steam, OneDrive, el antivirus…) con su
+  tooltip, su clic izquierdo, su menú de clic derecho y su doble clic.
+- Se actualizan en vivo y entran y salen con animación; si hay muchos, un
+  desplegable `^` que nace de la isla.
+- Al cerrar NubeBar los iconos vuelven solos a la bandeja de Windows.
+
+**Centro de control**
+- Iconos de red, volumen y batería; al pulsarlos, un panel al estilo del centro
+  de control del iPhone.
+- Volumen general y **por aplicación**, selector de salida de audio, lista de
+  redes wifi, Bluetooth con sus dispositivos emparejados y brillo por DDC/CI.
+- Lo que tu equipo no admite no aparece: sin batería no hay icono de batería, y
+  si el monitor no contesta a DDC/CI no hay deslizador de brillo.
+
+![El centro de control](docs/centro-control.png)
+
+**Avisos en la isla**
+- Al cambiar el volumen, la isla se estira y enseña una barra animada 1,5 s.
+- Las notificaciones de Windows asoman unos segundos con el nombre de la app,
+  el título y el texto; al pulsarlas se abre la app. Respeta «No molestar» y
+  puedes silenciar apps concretas.
+
+**Escritorios virtuales**
+- Numeritos tipo *workspaces* de Linux, con el actual en color de acento.
+- Clic para cambiar, rueda para ir al siguiente o al anterior y `+` para crear.
+- Opcionalmente, el carrusel enseña solo las apps del escritorio actual.
+
+**Si la matan, el shell vuelve igual**
+- Un proceso guardián (el mismo ejecutable con `--guardian`) vigila a NubeBar.
+  Si la cierras desde el Administrador de tareas, o se cuelga, devuelve las dos
+  barras de tareas y el «ocultar automáticamente» en menos de medio segundo,
+  sin reiniciar el Explorador.
 
 **Wallpaper Engine**
 - Detecta el fondo actual y puede sacar de él la paleta de colores (tipo pywal).
@@ -99,6 +134,7 @@ Variables de entorno útiles para depurar:
 | `NUBEBAR_DIAG2=1` | Añade el detalle del carrusel |
 | `NUBEBAR_SINMASCARA=1` | Desactiva el truco de la tecla máscara del gancho de teclado |
 | `NUBEBAR_SIMULAR_ENERGIA=1` | Bloquear, suspender, reiniciar y apagar solo se apuntan en el log |
+| `NUBEBAR_NOTIS_PRUEBA=<carpeta>` | Lee las notificaciones de esa carpeta en vez de las de Windows |
 
 El log vive en `%APPDATA%\NubeBar\nubebar.log`.
 
@@ -133,10 +169,15 @@ la isla se adapta sola. Las claves que no reconoce se conservan tal cual.
 | `Barra.ReservarEspacio` | `true` | Solo en modo barra: reserva su hueco para que no la tapen las ventanas |
 | `Barra.MaxApps` | `10` | Iconos de apps visibles a la vez; el resto, con la rueda |
 | `Barra.AgruparApps` | `true` | Las ventanas del mismo programa, en un solo icono |
-| `Barra.AtajoVistaGeneral` | `"Ctrl+Alt+Space"` | Atajo global de la vista general |
+| `Barra.AtajoVistaGeneral` | `"Ctrl+Alt+W"` | Atajo global de la vista general |
 | `Barra.Monitores` | `"todos"` | `"todos"` (una isla por pantalla) o `"principal"` |
 | `Barra.AppsPorMonitor` | `true` | Cada isla enseña solo las apps de su pantalla |
 | `Barra.OcultarEnPantallaCompleta` | `true` | La isla se esconde si algo ocupa su pantalla entera |
+| `Barra.Bandeja` | `true` | Traer los iconos de la bandeja del sistema (hace falta el módulo `bandeja`) |
+| `Barra.MaxBandeja` | `6` | Iconos de bandeja visibles antes del desplegable `^` |
+| `Barra.Notificaciones` | `true` | Las notificaciones de Windows asoman en la isla |
+| `Barra.NotificacionesSilenciadas` | `[]` | Trozos de identificador de app que no avisan (p. ej. `"Discord"`) |
+| `Barra.AppsDelEscritorio` | `false` | El carrusel, solo con las apps del escritorio virtual actual |
 
 ### Módulos
 
@@ -151,7 +192,8 @@ Listas de nombres; el orden es el orden en que salen.
 ```
 
 Disponibles: `inicio`, `apps`, `reloj`, `fecha`, `cpu`, `ram`, `bateria`, `musica`,
-`wallpaper`, `wallpaper-titulo`, `iconos`, `separador`.
+`bandeja`, `control`, `escritorios`, `wallpaper`, `wallpaper-titulo`, `iconos`,
+`separador`.
 
 ### Menú Inicio
 

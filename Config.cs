@@ -34,7 +34,10 @@ public class Barra
     public bool ReservarEspacio { get; set; } = true;  // las ventanas maximizadas no la tapan
     public int MaxApps { get; set; } = 10;             // iconos de apps visibles a la vez; el resto, con la rueda
     public bool AgruparApps { get; set; } = true;      // las ventanas del mismo programa, en un solo icono
-    public string AtajoVistaGeneral { get; set; } = "Ctrl+Alt+Space";   // abre la cuadrícula de ventanas
+    // Ctrl+Alt+Space estaba ocupado en el equipo de desarrollo y el registro fallaba
+    // con el error 1409. Ctrl+Alt+W ("W de ventanas") sí está libre, y no choca con
+    // Ctrl+Shift+Space, que en Visual Studio es la ayuda de parámetros.
+    public string AtajoVistaGeneral { get; set; } = "Ctrl+Alt+W";       // abre la cuadrícula de ventanas
     public string Monitores { get; set; } = "todos";   // "todos" | "principal"
     public bool AppsPorMonitor { get; set; } = true;   // cada isla enseña las apps de SU monitor
     public bool OcultarEnPantallaCompleta { get; set; } = true;
