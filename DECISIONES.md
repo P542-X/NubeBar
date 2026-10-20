@@ -203,3 +203,34 @@ hueco, la barra del secundario también queda en modo "ocultar
 automáticamente": está, se usa, pero hay que llevar el ratón al borde para que
 asome. La alternativa sería no esconder la barra principal, que es lo contrario
 de lo que hace NubeBar.
+
+## Una sola NubeBar, y la isla centrada pase lo que pase
+
+Dos cosas que salieron al probar el exe en otro equipo.
+
+**1. Se podían abrir dos NubeBar.** No había nada que lo impidiera. Con dos,
+hay dos juegos de islas, dos ganchos de teclado peleándose por la tecla
+Windows, dos servicios de bandeja disputándose el orden Z y dos procesos
+escondiendo y mostrando la barra de tareas: lo normal es acabar sin barra.
+Ahora hay un mutex con nombre (`Local\NubeBar.UnaSola`); la segunda lo ve, lo
+apunta en el log y se cierra sin tocar nada. El guardián queda fuera de la
+comprobación a propósito: es el mismo ejecutable y tiene que poder convivir.
+Windows limpia el mutex aunque el proceso muera a lo bruto, y si aun así
+quedara abandonado, `WaitOne` lo avisa y lo tomamos nosotros: no hay forma de
+quedarse bloqueado sin poder arrancar.
+
+**2. La isla podía quedarse descentrada.** El XAML fijaba `Width="10"` y esa
+propiedad no se actualizaba nunca, porque la ventana se dimensiona con
+`SetWindowPos` en píxeles. Mientras nadie la mira da igual, pero al llegar un
+`WM_DPICHANGED` —arrancar en un monitor al 125 %, o mover la ventana entre
+pantallas con distinto escalado— WPF **reimpone** esa anchura y encoge la
+ventana. Como la isla va centrada *dentro* de la ventana, una ventana de 10 px
+la deja pegada al borde izquierdo en vez de en medio de la pantalla.
+
+Arreglado poniendo `Width`/`Height` a `NaN` después de colocar, que es como se
+le dice a WPF "el tamaño no lo gestionas tú", y atendiendo `WM_DPICHANGED` para
+releer el monitor y recolocar. Así la isla queda centrada en 720p, 1080p, 2K o
+4K y con cualquier escalado.
+
+De paso, las pantallas se filtran por handle único (`DistinctBy`), por si
+`EnumDisplayMonitors` devolviera dos veces la misma en algún clonado.

@@ -22,6 +22,22 @@ public partial class App : Application
             return;
         }
 
+        // Una sola NubeBar a la vez. El guardián queda fuera de esta comprobación
+        // a propósito: es el mismo ejecutable y tiene que poder convivir con ella.
+        if (!Instancia.SoyLaPrimera())
+        {
+            Log.Info("ya hay otra NubeBar abierta: esta se cierra sin tocar nada");
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Shutdown(0);
+            return;
+        }
+
         MainWindow = NubeBar.MainWindow.Arrancar();
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        Instancia.Soltar();
+        base.OnExit(e);
     }
 }

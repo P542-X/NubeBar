@@ -20,8 +20,27 @@ public partial class MainWindow : Window
         int altoPx = Math.Max(1, (int)Math.Round(altoVentanaDip * m.Escala));
         int y = Arriba ? m.Y : m.Abajo - altoPx;
 
-        if (_self != IntPtr.Zero) Nativo.Colocar(_self, m.X, y, m.Ancho, altoPx);
-        else { Left = m.X; Top = y; Width = m.Ancho; Height = altoVentanaDip; }
+        if (_self == IntPtr.Zero)
+        {
+            Left = m.X; Top = y; Width = m.Ancho; Height = altoVentanaDip;
+            return;
+        }
+
+        Nativo.Colocar(_self, m.X, y, m.Ancho, altoPx);
+
+        // Y ahora lo importante: soltar Width/Height de WPF.
+        //
+        // El tamaño lo pone SetWindowPos en píxeles, pero Window.Width seguía
+        // valiendo lo que dijera el XAML. Mientras nadie la mire da igual; en
+        // cuanto Windows manda un WM_DPICHANGED (al mover la ventana a un monitor
+        // con otro escalado, o al arrancar en uno al 125%), WPF REIMPONE esa
+        // anchura y la ventana se encoge. La isla va centrada dentro de la
+        // ventana, así que una ventana encogida la deja pegada al borde izquierdo
+        // en vez de en medio de la pantalla.
+        //
+        // Con NaN, WPF entiende "no la gestiono yo" y respeta el tamaño del hwnd.
+        Width = double.NaN;
+        Height = double.NaN;
     }
 
     // ================= Cuántas apps caben de verdad =================
@@ -84,7 +103,7 @@ public partial class MainWindow : Window
     // ================= Crear y rehacer el juego de islas =================
     static List<Monitores.Info> Deseados(Config cfg)
     {
-        var todos = Monitores.Todos();
+        var todos = Monitores.Todos().DistinctBy(m => m.Handle).ToList();
         return cfg.Barra.Monitores.Equals("principal", StringComparison.OrdinalIgnoreCase)
             ? todos.Take(1).ToList()     // Todos() ya pone el principal el primero
             : todos;
@@ -98,7 +117,10 @@ public partial class MainWindow : Window
 
         var jefa = new MainWindow(ms[0], true);
         jefa.Show();
-        foreach (var m in ms.Skip(1)) new MainWindow(m, false).Show();
+        // Una isla por monitor y ni una más: si EnumDisplayMonitors devolviera dos
+        // veces la misma pantalla (pasa con algunos clonados), saldrían dos islas
+        // superpuestas en ella.
+        foreach (var m in ms.Skip(1).DistinctBy(m => m.Handle)) new MainWindow(m, false).Show();
         Log.Info($"islas creadas: {ms.Count} ({string.Join(", ", ms.Select(m => m.Dispositivo))})");
         return jefa;
     }
@@ -155,6 +177,23 @@ public partial class MainWindow : Window
     IntPtr MensajePantalla(IntPtr hwnd, int msg, IntPtr w, IntPtr l, ref bool manejado)
     {
         if (msg != WM_DISPLAYCHANGE && msg != WM_DPICHANGED && msg != WM_SETTINGCHANGE) return IntPtr.Zero;
+
+        // El cambio de DPI va dirigido a ESTA ventana, no es un aviso general: hay
+        // que recolocarla aquí mismo y además deprisa, porque WPF va a intentar
+        // redimensionarla por su cuenta justo después.
+        if (msg == WM_DPICHANGED)
+        {
+            manejado = true;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (Monitores.DeVentana(_self) is { } m) _monitor = m;
+                ColocarEnMonitor(_cfg.Barra.Alto + _cfg.Barra.Margen * 2 + (_panelAbierto != null ? _panelAlto : 0));
+                AjustarAncho();
+                Log.Info($"cambio de DPI en {_monitor.Dispositivo}: {_monitor.Dpi} ppp, isla recolocada");
+            }), DispatcherPriority.Render);
+            return IntPtr.Zero;
+        }
+
         if (!_esJefa) return IntPtr.Zero;   // el aviso llega a todas las ventanas; basta con una
 
         // Windows manda varios avisos seguidos mientras recoloca las pantallas:
