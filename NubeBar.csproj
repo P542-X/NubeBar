@@ -21,6 +21,7 @@
     <!-- Para consultar el índice de Windows Search (Search.CollatorDSO) desde el buscador -->
     <PackageReference Include="ManagedShell" Version="0.0.374" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+    <PackageReference Include="Slions.VirtualDesktop" Version="6.9.2" />
     <PackageReference Include="System.Data.OleDb" Version="9.0.0" />
   </ItemGroup>
 

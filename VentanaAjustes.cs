@@ -23,7 +23,7 @@ public sealed class VentanaAjustes : Window
     readonly List<string> _modulosDisponibles = new()
     {
         "inicio", "apps", "reloj", "fecha", "cpu", "ram", "bateria",
-        "wallpaper", "wallpaper-titulo", "iconos", "bandeja", "control", "separador"
+        "wallpaper", "wallpaper-titulo", "iconos", "bandeja", "control", "escritorios", "separador"
     };
 
     SolidColorBrush _fondo = new(Color.FromRgb(0x16, 0x16, 0x1A));
@@ -600,6 +600,9 @@ public sealed class VentanaAjustes : Window
         c.Children.Add(Rotulo("Iconos de aplicaciones", true));
         c.Children.Add(Deslizador("Máximo visibles", 3, 30, _arbol.Numero("Barra", "MaxApps", 10),
                                   v => _arbol.Poner("Barra", "MaxApps", Math.Round(v))));
+        c.Children.Add(Interruptor("Enseñar solo las apps del escritorio virtual actual",
+                                   _arbol.Bandera("Barra", "AppsDelEscritorio", false),
+                                   v => _arbol.Poner("Barra", "AppsDelEscritorio", v)));
         c.Children.Add(Interruptor("Agrupar las ventanas del mismo programa",
                                    _arbol.Bandera("Barra", "AgruparApps", true),
                                    v => _arbol.Poner("Barra", "AgruparApps", v)));

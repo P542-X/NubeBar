@@ -163,3 +163,24 @@ sintética con el mismo esquema. Con ella sí se ha probado el camino entero:
 identificador de app convertido en algo legible, solo las nuevas desde el
 arranque, y el aviso saliendo en la isla con su icono, la app en color de
 acento, el título y el texto.
+
+## Fase 5 · Escritorios virtuales: te dejo los 2 que ya tenías
+
+El encargo decía "al acabar, un solo escritorio virtual". Resulta que **ya
+tenías 2** antes de que yo empezara, así que dejarte uno habría significado
+borrarte uno tuyo. Lo correcto es dejarlo como estaba: 2 escritorios y en el
+mismo en el que estabas. Comprobado al terminar.
+
+La librería es `Slions.VirtualDesktop` 6.9.2 (MIT), el fork mantenido del
+clásico de Grabacr07. Funciona en tu build (Windows 10.0.26200.9711). Como esta
+API no es pública y Microsoft la cambia entre versiones, todo va dentro de
+try/catch y el módulo se esconde si deja de reconocer el sistema, en vez de
+tumbar NubeBar.
+
+Probado crear, cambiar y borrar con un escritorio **de prueba** creado por mí
+(nunca sobre los tuyos): 2 → crea el 3 → va al 3 → vuelve al 1 → borra el 3 →
+2 escritorios y en el 1, igual que al empezar.
+
+| Paquete | Versión | Licencia | Para qué |
+|---|---|---|---|
+| Slions.VirtualDesktop | 6.9.2 | MIT | Listar, cambiar y crear escritorios virtuales |

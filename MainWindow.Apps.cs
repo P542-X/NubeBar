@@ -166,6 +166,10 @@ public partial class MainWindow
         // animación de salida y de entrada más abajo: el icono "viaja" solo.
         abiertas = SoloDeMiMonitor(abiertas);
 
+        // Y, si lo pides, solo las del escritorio virtual en el que estás
+        if (_cfg.Barra.AppsDelEscritorio && Escritorios.Disponible)
+            abiertas = abiertas.Where(Escritorios.EstaEnElActual).ToList();
+
         // Repartir las ventanas en grupos. Sin agrupar, cada ventana es su propio grupo.
         var ahora = new Dictionary<string, List<IntPtr>>(StringComparer.OrdinalIgnoreCase);
         foreach (var h in abiertas)
