@@ -203,11 +203,18 @@ public partial class MainWindow
         // Primero las fijadas, en el orden en que las pusiste tú, y detrás las demás
         // por nombre de ejecutable: los botones se añaden al final según van
         // apareciendo, así que sin ordenar aquí saldrían en distinto sitio cada vez.
+        // Si has reordenado a mano arrastrando, mandas tú. Lo que no esté en tu
+        // orden va detrás: primero las fijadas y después el resto por nombre.
         int orden = 0;
+        var tuyo = _cfg.Barra.OrdenApps ?? new List<string>();
         var enOrden = ahora
-            .OrderBy(p => fijadas.FindIndex(f => f.Equals(p.Key, StringComparison.OrdinalIgnoreCase)) is var i && i >= 0 ? i : int.MaxValue)
+            .OrderBy(p => Indice(tuyo, p.Key) is var i && i >= 0 ? i : int.MaxValue)
+            .ThenBy(p => Indice(fijadas, p.Key) is var j && j >= 0 ? j : int.MaxValue)
             .ThenBy(p => p.Key, StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+        static int Indice(List<string> lista, string clave) =>
+            lista.FindIndex(x => x.Equals(clave, StringComparison.OrdinalIgnoreCase));
 
         foreach (var (clave, ventanas) in enOrden)
         {
@@ -300,6 +307,9 @@ public partial class MainWindow
         // Clic derecho: fijar o quitar de la nube. Se marca como manejado para que
         // no suba hasta la isla y abra SU menú contextual en vez de este.
         g.Boton.MouseRightButtonUp += (_, e) => { e.Handled = true; MenuDeGrupo(g); };
+
+        // Y se puede coger y arrastrar para cambiarla de sitio en el carrusel
+        ConReordenado(g.Boton, g);
     }
 
     // Estado visual del grupo: cuántos puntos y de qué color

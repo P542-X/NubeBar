@@ -40,9 +40,13 @@ public partial class MainWindow : Window
         //
         // Así que se sondea el ratón una vez por fotograma con GetCursorPos y
         // GetAsyncKeyState, que funcionan esté el puntero donde esté.
-        Isla.PreviewMouseLeftButtonDown += (_, _) =>
+        Isla.PreviewMouseLeftButtonDown += (_, e) =>
         {
             if (!_cfg.Barra.Arrastrable || _siguiendoRaton != null) return;
+
+            // Si has cogido un icono del carrusel, lo que se mueve es el icono,
+            // no la isla entera. Cada arrastre con lo suyo.
+            if (EsDelCarrusel(e.OriginalSource)) return;
 
             _raizRaton = PuntoRaton();
             var r = Nativo.Rectangulo(_self);
