@@ -296,3 +296,17 @@ completa sigue marcado como maximizado).
 
 Escondida por maximizada se comporta como escondida por pantalla completa:
 asoma si dejas el ratón pegado al borde 300 ms.
+
+## La isla no le roba el primer plano a nadie al arrancar
+
+Probando con VALORANT delante salió un fallo de verdad: al arrancar, NubeBar se
+ponía ella misma en primer plano y sacaba del juego. Y de rebote la isla se
+quedaba encima, porque "¿hay algo a pantalla completa?" mira la ventana activa,
+y la activa éramos nosotros (que no contamos, claro).
+
+La ventana lleva `WS_EX_NOACTIVATE` desde siempre, pero ese estilo se pone en
+`Loaded`, o sea **después** de que WPF haya hecho el `Show()` y la haya
+activado. La cura es una propiedad en el XAML, `ShowActivated="False"`: así no
+se activa ni en ese primer instante. Solo afecta al primer `Show()`; el menú
+Inicio sigue cogiendo el teclado con su mecanismo de siempre (comprobado:
+tecla Windows, escribir "calc", sale la Calculadora).
