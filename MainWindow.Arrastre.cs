@@ -18,6 +18,8 @@ public partial class MainWindow : Window
 {
     bool _arrastrando;                 // el ratón manda: nadie más toca la geometría
     bool _huboArrastre;                // se movió de verdad, no fue un clic
+    bool _sinExpandir;                 // mientras la llevas cogida no se abre
+    bool _fueraDeSitio;                // está donde la dejaste, pendiente de volver
     Point _raizRaton;                  // dónde estaba el ratón al empezar
     int _raizX, _raizY;                // dónde estaba la ventana al empezar
     int _ahoraX, _ahoraY;              // dónde está ahora
@@ -57,6 +59,12 @@ public partial class MainWindow : Window
             _siguiendoRaton = (_, _) => SeguirRaton();
             CompositionTarget.Rendering += _siguiendoRaton;
         };
+
+        // La vuelta a su sitio la manda el ratón, no un reloj: mientras sigas
+        // con ella encima se queda donde la pusiste, y en cuanto la dejas
+        // empieza la cuenta atrás.
+        Isla.MouseEnter += (_, _) => { if (_fueraDeSitio) PararVuelta(); };
+        Isla.MouseLeave += (_, _) => { if (_fueraDeSitio) ProgramarVuelta(); };
     }
 
     void SeguirRaton()
@@ -68,9 +76,16 @@ public partial class MainWindow : Window
             if (_huboArrastre)
             {
                 _arrastrando = false;
+                _sinExpandir = false;
+                _fueraDeSitio = true;
                 Isla.Cursor = null;
-                ProgramarVuelta();
-                Log.Info($"isla soltada en {_ahoraX},{_ahoraY}; vuelve en {_cfg.Barra.SegundosParaVolver:0.#} s");
+
+                // Si ya no tienes el ratón encima, empieza la cuenta atrás. Si lo
+                // tienes, se espera a que la sueltes de verdad: no va a volverse
+                // a su sitio mientras sigues con ella.
+                if (!Isla.IsMouseOver) ProgramarVuelta();
+                Log.Info($"isla soltada en {_ahoraX},{_ahoraY}" +
+                         (Isla.IsMouseOver ? "; se queda mientras sigas encima" : "; vuelve enseguida"));
             }
             return;
         }
@@ -85,6 +100,12 @@ public partial class MainWindow : Window
             PararVuelta();
             _arrastrando = true;
             _huboArrastre = true;
+
+            // Mientras la llevas NO se abre: la tienes cogida, no la estás usando.
+            // Se recoge y se queda recogida hasta que la sueltes.
+            _sinExpandir = true;
+            Expandir(false);
+
             Isla.Cursor = Cursors.SizeAll;
             Log.Info("arrastrando la isla");
         }
@@ -124,9 +145,28 @@ public partial class MainWindow : Window
         _vuelta.Start();
     }
 
+    // Red de seguridad, una vez por segundo: si la isla está fuera de su sitio,
+    // no tienes el ratón encima y no hay ninguna cuenta atrás en marcha, se
+    // programa. Hace falta porque MouseLeave no llega si el cursor se teletransporta
+    // (lo hace algún programa, o al saltar de monitor muy rápido), y sin esto la
+    // isla se quedaría descolocada para siempre.
+    void VigilarVuelta()
+    {
+        if (!_fueraDeSitio || _arrastrando) return;
+        if (Isla.IsMouseOver || _panelAbierto != null) return;
+        if (_vuelta is { IsEnabled: true }) return;
+        ProgramarVuelta();
+    }
+
     void AlTocarVolver(object? s, EventArgs e)
     {
         _vuelta?.Stop();
+
+        // Si has vuelto a ponerte encima o has abierto algo, no se mueve: se
+        // espera otra vez. Volver a su sitio con el menú abierto sería lo peor.
+        if (Isla.IsMouseOver || _panelAbierto != null) { ProgramarVuelta(); return; }
+
+        _fueraDeSitio = false;
         AnimarVuelta();
     }
 

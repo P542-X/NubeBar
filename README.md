@@ -24,8 +24,12 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
   wallpaper, iconos, separador.
 - Borde y halo del color de acento, con animaciones de muelle a la velocidad de
   refresco del monitor.
-- **Se aparta cuando molesta**: la coges, la arrastras donde quieras y a los
-  2 segundos de soltarla vuelve sola a su sitio con un muelle.
+- **Se aparta cuando molesta**: la coges y la arrastras donde quieras. Mientras
+  la tengas cogida no se abre, y se queda donde la dejes todo el tiempo que
+  sigas con ella; en cuanto le quitas el ratón de encima, vuelve sola a su
+  sitio con un muelle.
+- La isla **toma la forma de lo que enseña**: con un panel estrecho se queda
+  recogida en vez de estirarse de lado a lado.
 
 **Las apps**
 - Carrusel con las ventanas abiertas, agrupadas por programa, con rueda para
@@ -190,7 +194,7 @@ la isla se adapta sola. Las claves que no reconoce se conservan tal cual.
 | `Barra.AppsFijadas` | `[]` | Apps siempre presentes en el carrusel, en este orden. Rutas de ejecutable, o `shell:AppsFolder\<id>` para las de la Store |
 | `Barra.OrdenApps` | `[]` | El orden que les has dado arrastrando los iconos; se escribe solo |
 | `Barra.Arrastrable` | `true` | La isla se aparta arrastrándola, y los iconos se reordenan igual |
-| `Barra.SegundosParaVolver` | `2` | Cuánto espera, tras soltarla, antes de volver a su sitio |
+| `Barra.SegundosParaVolver` | `1` | Tras quitarle el ratón de encima, cuánto tarda en volver a su sitio |
 
 ### Módulos
 

@@ -60,8 +60,18 @@ public partial class MainWindow
         _panelAlto = alto;
         _panelAncho = ancho;
 
-        // Los módulos laterales se quedan desplegados mientras haya panel
-        if (EsIsla && !_expandida) Expandir(true);
+        // ¿Se despliega la isla o se queda recogida?
+        //
+        // Un panel estrecho (un menú de 250 px) dentro de una isla tan ancha como
+        // la fila entera de módulos deja dos vacíos negros enormes a los lados y
+        // queda raro. En ese caso la isla se queda recogida y toma la anchura DEL
+        // PANEL, que es lo que hace la isla del iPhone: adopta la forma de lo que
+        // está enseñando. Si el panel es ancho, se despliega como siempre.
+        if (EsIsla)
+        {
+            bool estrecho = ancho + 40 < AnchoConModulos();
+            Expandir(!estrecho, forzar: true);
+        }
 
         contenido.Opacity = 0;
         contenido.RenderTransform = new TranslateTransform { Y = Arriba ? -12 : 12 };

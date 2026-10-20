@@ -208,6 +208,7 @@ public partial class MainWindow : Window
             Historial.Anotar(Nativo.Cpu(), Nativo.Ram());
         }
         if (_esJefa) VigilarNotificaciones();
+        VigilarVuelta();
         RefrescarMusica();
         foreach (var a in _actualizadores.ToArray()) a();
         AjustarAncho();   // el texto de CPU/RAM/hora cambia de ancho: que se deslice
@@ -437,10 +438,24 @@ public partial class MainWindow : Window
 
     // Expandir / contraer la isla: el ancho se anima con muelle y los laterales
     // aparecen con fundido y escalonados, de dentro hacia fuera
-    void Expandir(bool abrir)
+    // Ancho que tendría la isla con los módulos de los lados a la vista, los
+    // tenga ahora o no. Hace falta para decidir si un panel cabe sin desplegarla.
+    double AnchoConModulos()
+    {
+        var antes = Izq.Visibility;
+        Izq.Visibility = Der.Visibility = Visibility.Visible;
+        double w = MedirAncho();
+        Izq.Visibility = Der.Visibility = antes;
+        return w;
+    }
+
+    void Expandir(bool abrir, bool forzar = false)
     {
         if (!EsIsla || abrir == _expandida) return;
-        if (!abrir && HayPanel) return;   // con un panel abierto la isla se queda desplegada
+        if (abrir && _sinExpandir) return;   // la tienes cogida: no se abre mientras la llevas
+        // Con un panel abierto la isla se queda desplegada, salvo que el propio
+        // panel pida lo contrario porque es estrecho y la quiere recogida
+        if (!abrir && HayPanel && !forzar) return;
         _expandida = abrir;
 
         // Medir el destino con la visibilidad que tendrá al final...

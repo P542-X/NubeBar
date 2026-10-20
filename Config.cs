@@ -47,7 +47,7 @@ public class Barra
     public bool AppsDelEscritorio { get; set; } = false;   // el carrusel, solo con las del escritorio virtual actual
     public List<string> AppsFijadas { get; set; } = new();  // apps siempre presentes en el carrusel
     public bool Arrastrable { get; set; } = true;           // se puede apartar con el ratón
-    public double SegundosParaVolver { get; set; } = 2;     // y vuelve sola a su sitio
+    public double SegundosParaVolver { get; set; } = 1;     // tras dejarla, cuánto tarda en volver
     public List<string> OrdenApps { get; set; } = new();    // el orden que les has dado tú arrastrando
     public List<string> NotificacionesSilenciadas { get; set; } = new();   // trozos de AppUserModelId
 }
