@@ -567,3 +567,42 @@ navegar, el foco vuelve solo a la caja para poder seguir escribiendo.
    del ratón no se recupera si el primer plano no es nuestro, y mientras delante haya
    un recortador conocido (Recortes, Game Bar, ShareX, Greenshot, Snagit, Lightshot,
    PicPick, Flameshot) el menú no se cierra ni pelea por el foco.
+
+## La isla respira con lo que suena, y cerrar deja de ser un portazo
+
+**El pulso de audio.** El medidor de la salida (`IAudioMeterInformation`, el mismo que
+usa el mezclador de Windows) da el pico de lo que está sonando AHORA, de 0 a 1, sin
+importar de qué programa venga: vale para Spotify, para un vídeo o para un juego. Se
+pregunta 25 veces por segundo y con eso se mueven tres cosas:
+
+- la isla se ensancha un 1,6 % y se achata un 2,2 %, como si el sonido le hiciera presión;
+- el halo del acento crece de 8 a 22 de radio, que es lo que se ve de lejos;
+- y dos filos de color, uno frío y uno cálido, se separan hasta 2,6 px: aberración cromática.
+
+Tres decisiones dentro de esto:
+
+1. **La escala va en `Cuerpo`, no en `Isla`.** La isla ya tiene alto y ancho animados, y
+   su `RenderTransform` lo usan el arrastre y el deslizar para esconderse. `Cuerpo`
+   estaba libre y escalarlo no provoca ni una medida de layout.
+2. **Del halo solo se toca el radio.** La opacidad la animan el expandirse y el destello
+   de los avisos; pelearse con ellas dejaba parpadeos.
+3. **La curva es lineal y con poca ganancia** (`pico × 1,25`). Medido con el medidor de
+   verdad, la música real da picos de 0,06 a 0,81; al comprimirlos con una curva el
+   efecto se quedaba casi a tope todo el rato, que es lo que lo vuelve cansino. Sube
+   rápido y baja despacio, como un vúmetro.
+
+El temporizador rápido solo corre mientras hay sonido: en silencio se para solo a los
+2 s y lo despierta el tick de un segundo. Se apaga en Ajustes > Isla.
+
+**Y el cierre.** `Suave` es `CubicEase EaseOut`: arranca de golpe y se arrastra al
+final. Para abrir es perfecto (ves el panel aparecer ya), pero para cerrar es malísimo,
+y se usaba para las dos cosas: el panel se plegaba casi entero en los primeros 80 ms de
+los 300 y el resto no se veía, así que parecía un corte y no un cierre. Peor aún, el
+contenido se desvanecía en 120 ms mientras la isla tardaba el triple, o sea que lo que
+veías era una isla VACÍA encogiéndose.
+
+Ahora hay una curva `Comoda` (`EaseInOut`) para cerrar, el cierre dura lo que duró
+abrir (380 ms el menú Inicio, 260 ms los paneles pequeños), y el contenido se va con la
+isla metiéndose hacia ella, acabando un pelín antes que el pliegue. Lo mismo al
+recogerse la isla: antes se estrechaba del todo en 90 ms y los módulos desaparecían en
+120 ms.

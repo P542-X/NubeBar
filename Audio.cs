@@ -91,6 +91,15 @@ public static class Audio
         int GetVolumeRange(out float minDb, out float maxDb, out float incrementoDb);
     }
 
+    // El medidor de la salida: cuánto suena AHORA MISMO, de 0 a 1. Es lo que hace
+    // respirar a la isla con la música. Solo hace falta el primer método, pero el
+    // orden de la tabla manda, así que va el primero y no se declara nada más.
+    [ComImport, Guid("C02216F6-8C67-4B5B-9D00-D008E73E0064"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IAudioMeterInformation
+    {
+        int GetPeakValue(out float pico);
+    }
+
     [ComImport, Guid("77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     interface IAudioSessionManager2
     {
@@ -190,6 +199,49 @@ public static class Audio
         var iid = typeof(IAudioEndpointVolume).GUID;
         if (disp.Activate(ref iid, CLSCTX_ALL, IntPtr.Zero, out object o) != 0) return null;
         return _cacheVolumen = o as IAudioEndpointVolume;
+    }
+
+    // ---------- Pico de la salida ----------
+    // Mismo truco que con el volumen: el objeto COM se guarda, porque esto se pregunta
+    // 25 veces por segundo. Y el valor se cachea 10 ms, que con dos monitores son dos
+    // islas preguntando lo mismo en el mismo fotograma.
+    static IAudioMeterInformation? _cacheMedidor;
+    static float _ultimoPico;
+    static long _picoDe;
+
+    static IAudioMeterInformation? MedidorDelDefecto()
+    {
+        if (_cacheMedidor != null)
+        {
+            try
+            {
+                if (_cacheMedidor.GetPeakValue(out _) == 0) return _cacheMedidor;
+                Marshal.ReleaseComObject(_cacheMedidor);
+            }
+            catch { }
+            _cacheMedidor = null;
+        }
+        var enumerador = NuevoEnumerador();
+        if (enumerador.GetDefaultAudioEndpoint(eRender, eConsole, out var disp) != 0 || disp == null) return null;
+        var iid = typeof(IAudioMeterInformation).GUID;
+        if (disp.Activate(ref iid, CLSCTX_ALL, IntPtr.Zero, out object o) != 0) return null;
+        return _cacheMedidor = o as IAudioMeterInformation;
+    }
+
+    // 0 = silencio, 1 = a tope. Devuelve 0 si no se puede preguntar, que es lo que
+    // deja la isla quieta en vez de dar un salto raro.
+    public static float PicoSalida()
+    {
+        var ahora = Environment.TickCount64;
+        if (ahora - _picoDe < 10) return _ultimoPico;
+        _picoDe = ahora;
+        try
+        {
+            if (MedidorDelDefecto() is not { } m) return _ultimoPico = 0;
+            if (m.GetPeakValue(out float pico) != 0) return _ultimoPico = 0;
+            return _ultimoPico = pico;
+        }
+        catch { return _ultimoPico = 0; }
     }
 
     public static int Volumen()

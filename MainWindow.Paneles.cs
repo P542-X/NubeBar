@@ -153,29 +153,41 @@ public partial class MainWindow
     {
         if (_panelAbierto == null) return;
         var nombre = _panelAbierto;
+        bool pequeno = _panelAlto < 220;
         _panelAbierto = null;
         _panelAlto = _panelAncho = 0;
         _panelEncogido = false;
 
         if (_panelConTeclado) ActivarTeclado(false);
 
+        // Cerrar tiene que durar lo que duró abrir, o se siente un portazo. Y el
+        // contenido no se puede ir en 120 ms mientras la isla tarda el triple en
+        // plegarse: lo que veías era una isla VACÍA encogiéndose. Ahora se va con la
+        // isla, metiéndose hacia ella, y termina un poco antes de que acabe el pliegue.
+        double ms = pequeno ? 260 : 380;
         if (Cajon.Content is FrameworkElement viejo)
         {
             viejo.IsHitTestVisible = false;
-            viejo.BeginAnimation(OpacityProperty, Kf(viejo.Opacity, 0, 120));
+            viejo.BeginAnimation(OpacityProperty, Kf(viejo.Opacity, 0, ms * 0.75, 0, Comoda));
             viejo.Opacity = 0;
+            if (viejo.RenderTransform is TranslateTransform t)
+            {
+                double hasta = Arriba ? -10 : 10;       // hacia la isla, no hacia fuera
+                t.BeginAnimation(TranslateTransform.YProperty, Kf(t.Y, hasta, ms * 0.85, 0, Comoda));
+                t.Y = hasta;
+            }
         }
 
         // La isla vuelve a su alto normal y solo entonces se encoge la ventana
         double altoIsla = _cfg.Barra.Alto;
-        AnimarAlto(altoIsla, 300, Suave, () =>
+        AnimarAlto(altoIsla, ms, Comoda, () =>
         {
             if (_panelAbierto != null) return;          // ya se abrió otro por el camino
             Cajon.Content = null;
             AjustarVentana(altoIsla);
             if (!Isla.IsMouseOver) Expandir(false);     // si el ratón ya no está, recogerse
         });
-        AnimarAncho(MedirAncho(), 300, Suave);
+        AnimarAncho(MedirAncho(), ms, Comoda);
         MedirFotogramas($"cerrar panel {nombre}");
         Log.Info($"panel cerrado: {nombre}");
     }

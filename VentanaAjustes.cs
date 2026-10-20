@@ -329,6 +329,11 @@ public sealed class VentanaAjustes : Window
         c.Children.Add(Deslizador("Tamaño", 9, 22, _arbol.Numero("Tema", "TamanoFuente", 13),
                                   v => _arbol.Poner("Tema", "TamanoFuente", v)));
 
+        c.Children.Add(Rotulo("Reacción al sonido", true));
+        c.Children.Add(Interruptor("La isla respira con lo que suena",
+                                   _arbol.Bandera("Barra", "PulsoAudio", true),
+                                   v => _arbol.Poner("Barra", "PulsoAudio", v)));
+
         c.Children.Add(Rotulo("Mover la isla", true));
         c.Children.Add(Interruptor("Se puede apartar arrastrándola",
                                    _arbol.Bandera("Barra", "Arrastrable", true),

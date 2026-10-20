@@ -61,6 +61,11 @@ public partial class MainWindow : Window
     // Curvas: "Muelle" se pasa un pelín y vuelve (como la isla del iPhone), "Suave" frena sin rebote
     static readonly IEasingFunction Muelle = new BackEase { Amplitude = 0.35, EasingMode = EasingMode.EaseOut };
     static readonly IEasingFunction Suave = new CubicEase { EasingMode = EasingMode.EaseOut };
+    // Para CERRAR. Suave es EaseOut: arranca de golpe y se arrastra al final, que es
+    // perfecto para abrir (lo ves aparecer ya) y malísimo para cerrar: el panel se
+    // plegaba casi entero en los primeros 80 ms y parecía un corte, no un cierre.
+    // Comoda arranca despacio y acelera, que es como se dobla algo de verdad.
+    static readonly IEasingFunction Comoda = new CubicEase { EasingMode = EasingMode.EaseInOut };
     static Duration Ms(double ms) => new(TimeSpan.FromMilliseconds(ms));
 
     bool EsIsla => _cfg.Barra.Modo.Equals("isla", StringComparison.OrdinalIgnoreCase);
@@ -139,6 +144,7 @@ public partial class MainWindow : Window
                     if (_cfg.Barra.Notificaciones && Notificaciones.Disponible) Notificaciones.Arrancar();
                 }
                 VigilarWallpaperEngine();
+                MontarPulsoAudio();
                 _tick.Tick += (_, _) => Tick();
                 _tick.Start();
                 VigilarPantallaCompleta();
@@ -162,6 +168,7 @@ public partial class MainWindow : Window
             // Primero callar a todo lo que podría volver a esconder la barra
             _cerrando = true;
             _tick.Stop();
+            PararPulsoAudio();
             _recarga.Stop();
             _wpTimer.Stop();
             if (_watcher is { } w) w.EnableRaisingEvents = false;
@@ -216,6 +223,7 @@ public partial class MainWindow : Window
         if (_esJefa) VigilarNotificaciones();
         VigilarVuelta();
         RefrescarMusica();
+        VigilarPulsoAudio();   // si ha empezado a sonar algo, despierta al pulso
         // Cada actualizador con su red: uno que falle no debe llevarse por delante el
         // resto del tick (el ancho de la isla, el vigilante del foco, el menú...)
         foreach (var a in _actualizadores.ToArray())
@@ -529,7 +537,10 @@ public partial class MainWindow : Window
 
         MedirFotogramas($"{(abrir ? "expandir" : "contraer")} isla (brillo={_brillo != null})", 700);
         _animandoAncho = true;
-        AnimarAncho(hasta, abrir ? 480 : 340, abrir ? Muelle : Suave, () =>
+        // Recogerse con Comoda y no con Suave, por lo mismo que al cerrar un panel:
+        // con EaseOut la isla se estrechaba casi del todo en los primeros 90 ms y el
+        // resto de la animación no se veía, así que parecía un recorte
+        AnimarAncho(hasta, abrir ? 480 : 340, abrir ? Muelle : Comoda, () =>
         {
             _animandoAncho = false;
             if (_expandida != abrir) return;   // la interrumpió otra animación
@@ -541,7 +552,9 @@ public partial class MainWindow : Window
             double ahora = lado.Opacity;
             lado.BeginAnimation(OpacityProperty, null);
             lado.Opacity = abrir ? 1 : 0;                // valor final real
-            lado.BeginAnimation(OpacityProperty, abrir ? Kf(0, 1, 260, 140) : Kf(ahora, 0, 120));
+            // Y los módulos se van en 220 ms, no en 120: desaparecían antes de que la
+            // isla hubiera empezado a estrecharse de verdad
+            lado.BeginAnimation(OpacityProperty, abrir ? Kf(0, 1, 260, 140) : Kf(ahora, 0, 220, 0, Comoda));
             Escalonar(lado, abrir);
         }
 
