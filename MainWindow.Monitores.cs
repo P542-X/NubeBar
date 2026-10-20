@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace NubeBar;
@@ -14,10 +15,27 @@ public partial class MainWindow : Window
     // La ventana se coloca con SetWindowPos y no con Left/Top/Width/Height: las
     // propiedades de WPF van en sus unidades, y cuando dos monitores tienen DPI
     // distinto esas unidades no significan lo mismo en cada uno. En píxeles, sí.
+    // La escala que usa WPF PARA ESTA VENTANA, que no siempre es la del monitor.
+    // La ventana nace en el monitor principal y después la movemos al suyo; hasta
+    // que Windows manda el WM_DPICHANGED y WPF se entera, su escala es la vieja.
+    // Si dimensionáramos con la del monitor, el alto en píxeles y el que WPF cree
+    // tener no cuadrarían, y la isla saldría más alta que su ventana: recortada,
+    // viéndose solo la mitad de arriba.
+    double EscalaDeWpf()
+    {
+        try
+        {
+            double s = VisualTreeHelper.GetDpi(this).DpiScaleY;
+            return s > 0 ? s : _monitor.Escala;
+        }
+        catch { return _monitor.Escala; }
+    }
+
     void ColocarEnMonitor(double altoVentanaDip)
     {
         var m = _monitor;
-        int altoPx = Math.Max(1, (int)Math.Round(altoVentanaDip * m.Escala));
+        double escala = _self != IntPtr.Zero ? EscalaDeWpf() : m.Escala;
+        int altoPx = Math.Max(1, (int)Math.Round(altoVentanaDip * escala));
         int y = Arriba ? m.Y : m.Abajo - altoPx;
 
         if (_self == IntPtr.Zero)
@@ -172,27 +190,34 @@ public partial class MainWindow : Window
     void VigilarCambiosDePantalla()
     {
         HwndSource.FromHwnd(_self)?.AddHook(MensajePantalla);
+
+        // Cuando WPF ya se ha enterado del cambio de escala, se rehace la
+        // geometría con la escala nueva. Sin esto, al arrastrar la ventana a un
+        // monitor con otro escalado la isla queda recortada o descentrada.
+        DpiChanged += (_, e) =>
+        {
+            if (Monitores.DeVentana(_self) is { } m) _monitor = m;
+            ColocarEnMonitor(AltoVentanaAhora());
+            AjustarAncho();
+            Log.Info($"cambio de escala en {_monitor.Dispositivo}: " +
+                     $"{e.OldDpi.DpiScaleY:0.##} -> {e.NewDpi.DpiScaleY:0.##}, isla recolocada");
+        };
     }
+
+    // El alto que debe tener la ventana ahora mismo: la fila de módulos más el
+    // cajón si hay un panel abierto.
+    double AltoVentanaAhora() =>
+        _cfg.Barra.Alto + _cfg.Barra.Margen * 2 + (_panelAbierto != null ? _panelAlto : 0);
 
     IntPtr MensajePantalla(IntPtr hwnd, int msg, IntPtr w, IntPtr l, ref bool manejado)
     {
         if (msg != WM_DISPLAYCHANGE && msg != WM_DPICHANGED && msg != WM_SETTINGCHANGE) return IntPtr.Zero;
 
-        // El cambio de DPI va dirigido a ESTA ventana, no es un aviso general: hay
-        // que recolocarla aquí mismo y además deprisa, porque WPF va a intentar
-        // redimensionarla por su cuenta justo después.
-        if (msg == WM_DPICHANGED)
-        {
-            manejado = true;
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                if (Monitores.DeVentana(_self) is { } m) _monitor = m;
-                ColocarEnMonitor(_cfg.Barra.Alto + _cfg.Barra.Margen * 2 + (_panelAbierto != null ? _panelAlto : 0));
-                AjustarAncho();
-                Log.Info($"cambio de DPI en {_monitor.Dispositivo}: {_monitor.Dpi} ppp, isla recolocada");
-            }), DispatcherPriority.Render);
-            return IntPtr.Zero;
-        }
+        // El WM_DPICHANGED crudo no se atiende aquí: WPF todavía no ha actualizado
+        // su propia escala cuando llega, así que recolocar ahora usaría la vieja.
+        // Se hace en el evento DpiChanged de WPF (ver VigilarCambiosDePantalla),
+        // que salta DESPUÉS de que se entere.
+        if (msg == WM_DPICHANGED) return IntPtr.Zero;
 
         if (!_esJefa) return IntPtr.Zero;   // el aviso llega a todas las ventanas; basta con una
 

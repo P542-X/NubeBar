@@ -374,6 +374,7 @@ public partial class MainWindow
             CerrarMiniLista();
             if (!g.Fijada) return;
             Log.Info($"abriendo la app fijada {g.Lanzar}");
+            if (g.Boton != null) LatirIcono(g.Exe);   // late mientras la app arranca
             Uso.Apuntar("fijada:" + g.Lanzar);
             Fuentes.Lanzar(g.Lanzar);
             return;

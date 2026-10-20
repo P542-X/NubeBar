@@ -800,8 +800,7 @@ public partial class MainWindow : Window
             bool habia = tb.Text.Length > 0;
             tb.Text = nuevo;
             tb.Visibility = nuevo.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
-            if (animar && habia)   // p. ej. al cambiar el minuto: pequeño destello
-                tb.BeginAnimation(OpacityProperty, Kf(0.2, 1, 400, 0, Suave));
+            if (animar && habia) DeslizarTexto(tb);   // el minuto entra desde abajo
         }
         Act();
         _actualizadores.Add(Act);
@@ -845,6 +844,7 @@ public partial class MainWindow : Window
             Height = Math.Max(20, _cfg.Barra.Alto - 8)
         };
         b.Click += (_, _) => { accion(); Tick(); };
+        ConLevantado(b);          // se levanta un pelín al pasar el ratón
         return b;
     }
 }

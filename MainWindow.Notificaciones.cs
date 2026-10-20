@@ -51,6 +51,7 @@ public partial class MainWindow : Window
 
         var a = _cola.Dequeue();
         isla.AbrirPanel(PanelNota, isla.CrearNota(a), 420, AltoNota);
+        isla.DestellarBorde();
         Log.Info($"notificación en la isla: {a.App}");
 
         _cierraNota ??= new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };

@@ -67,6 +67,7 @@ public partial class MainWindow : Window
             if (_panelAbierto != null && _panelAbierto != PanelAviso) return;
 
             AbrirPanel(PanelAviso, CrearAviso(glifo, porCiento, etiqueta), 300, AltoAviso);
+            DestellarBorde();
             RearmarCierre();
         }
         catch (Exception ex) { Log.Error("aviso de volumen", ex); }
