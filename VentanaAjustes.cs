@@ -348,7 +348,7 @@ public sealed class VentanaAjustes : Window
                                    _arbol.Bandera("Barra", "OcultarEnPantallaCompleta", true),
                                    v => _arbol.Poner("Barra", "OcultarEnPantallaCompleta", v)));
         c.Children.Add(Interruptor("Esconderse también con una ventana maximizada (juegos, vídeos)",
-                                   _arbol.Bandera("Barra", "OcultarConMaximizada", false),
+                                   _arbol.Bandera("Barra", "OcultarConMaximizada", true),
                                    v => _arbol.Poner("Barra", "OcultarConMaximizada", v)));
         return c;
     }

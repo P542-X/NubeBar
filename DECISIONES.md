@@ -281,9 +281,14 @@ desaparecería cada vez que maximizas el navegador, que es casi siempre. El
 problema es que un juego o un vídeo en ventana maximizada tampoco la echaban,
 y ahí sí estorba.
 
-Nueva clave opcional `Barra.OcultarConMaximizada` (por defecto `false`, con su
-interruptor en Ajustes > Isla). Una config sin la clave se comporta
-exactamente igual que antes. Cuando está activa se mira el **rectángulo**
+Clave `Barra.OcultarConMaximizada`, con su interruptor en Ajustes > Isla.
+Nació en `false` para no cambiarle el comportamiento a nadie, pero Paulo
+pidió que fuera `true` de serie con un argumento que es el bueno: quien está
+jugando o viendo un vídeo a pantalla completa no tiene por qué ver la isla
+encima, y eso no se descubre si hay que ir a buscarlo a los ajustes. Es la
+primera clave nueva que SÍ cambia el comportamiento de una config vieja: al
+actualizar, la isla se aparta también al maximizar el navegador. Quien no lo
+quiera lo apaga en Ajustes. Cuando está activa se mira el **rectángulo**
 contra el área de trabajo del monitor, no si Windows marca la ventana como
 maximizada: así también cuenta una ventana estirada a mano hasta ocupar lo
 mismo, y se evita el lío de F11 (un navegador maximizado que pasa a pantalla

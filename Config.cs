@@ -41,10 +41,10 @@ public class Barra
     public string Monitores { get; set; } = "todos";   // "todos" | "principal"
     public bool AppsPorMonitor { get; set; } = true;   // cada isla enseña las apps de SU monitor
     public bool OcultarEnPantallaCompleta { get; set; } = true;
-    // Una ventana maximizada NO es pantalla completa: deja ver la isla y el borde de
-    // Windows, y si contara, la isla desaparecería cada vez que maximizas el navegador.
-    // Con esto en true cuenta igual, que es lo que quieres viendo un vídeo o jugando.
-    public bool OcultarConMaximizada { get; set; } = false;
+    // Una ventana maximizada también la echa. Va activado de serie: quien juega o ve
+    // un vídeo en ventana maximizada no tiene por qué ver la isla encima. A cambio,
+    // se aparta también al maximizar el navegador; se quita en Ajustes > Isla.
+    public bool OcultarConMaximizada { get; set; } = true;
     public bool Bandeja { get; set; } = true;        // iconos de la bandeja del sistema en la isla
     public int MaxBandeja { get; set; } = 6;         // cuántos se ven sin abrir el desplegable "^"
     public bool Notificaciones { get; set; } = true; // las notificaciones asoman en la isla
