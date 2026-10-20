@@ -42,3 +42,20 @@ bandeja de Explorer salvo que lo pidas a propósito.
 | Paquete | Versión | Licencia | Para qué |
 |---|---|---|---|
 | ManagedShell | 0.0.374 | MIT (cairoshell) | Recibir los iconos de la bandeja del sistema |
+
+## Fase 2 · Un fallo de COM que escondía todas las sesiones de audio
+
+`IAudioSessionControl2.IsSystemSoundsSession()` no lleva parámetros de salida.
+En una interfaz `ComImport` sin `PreserveSig`, el marshaller de .NET interpreta
+el `int` declarado como el valor de retorno lógico y no como el HRESULT, así que
+devolvía **0 siempre**, o sea "sí, son los sonidos del sistema", y el filtro se
+comía las tres sesiones. Se distingue por PID, que para esto vale igual: los
+sonidos del sistema son el pid 0.
+
+## Fase 2 · Lo que NO se probó a propósito
+
+Cambiar la salida de audio, conectarse a una wifi y encender o apagar el
+bluetooth están implementados pero sin probar: tocarlos de verdad cambiaría la
+configuración del equipo. `IPolicyConfig` sí se comprueba (responde en este
+Windows), y si no respondiera la opción no aparecería. Los pasos para probarlo
+a mano están en PRUEBAS-PARA-PAULO.md.

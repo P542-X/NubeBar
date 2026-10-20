@@ -763,6 +763,7 @@ public partial class MainWindow : Window
         "wallpaper"        => ModuloWallpaper(),
         "wallpaper-titulo" => Etiqueta(() => _wpTitulo ?? "", animar: true),
         "bandeja"          => ModuloBandeja(),
+        "control"          => ModuloControl(),
         "iconos"           => Boton(Glifo("\uE890"), "Mostrar / ocultar iconos del escritorio", () =>
                               {
                                   _iconosOcultos = !_iconosOcultos;

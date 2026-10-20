@@ -23,7 +23,7 @@ public sealed class VentanaAjustes : Window
     readonly List<string> _modulosDisponibles = new()
     {
         "inicio", "apps", "reloj", "fecha", "cpu", "ram", "bateria",
-        "wallpaper", "wallpaper-titulo", "iconos", "bandeja", "separador"
+        "wallpaper", "wallpaper-titulo", "iconos", "bandeja", "control", "separador"
     };
 
     SolidColorBrush _fondo = new(Color.FromRgb(0x16, 0x16, 0x1A));
