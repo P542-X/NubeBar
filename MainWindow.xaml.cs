@@ -201,7 +201,9 @@ public partial class MainWindow : Window
         // vez por tick (y el trato con las barras de Windows) es cosa de la jefa.
         if (_esJefa)
         {
-            if (!_cerrando && _cfg.Barra.OcultarBarraWindows && Nativo.BarraWindowsVisible()) Nativo.EsconderBarraWindows();
+            var mias = MonitoresConIsla();
+            if (!_cerrando && _cfg.Barra.OcultarBarraWindows && Nativo.BarraWindowsVisible(mias))
+                Nativo.EsconderBarraWindows(mias);
             Historial.Anotar(Nativo.Cpu(), Nativo.Ram());
         }
         if (_esJefa) VigilarNotificaciones();
@@ -295,7 +297,8 @@ public partial class MainWindow : Window
         // clavado y la animación de entrada se congela a medias. Va en la cola del shell:
         // en otro hilo, pero en orden y sin pisarse con el "mostrar" del cierre.
         bool mostrar = !b.OcultarBarraWindows;
-        if (!_cerrando) EncolarShell(() => Nativo.MostrarBarraWindows(mostrar));
+        var conIsla = MonitoresConIsla();
+        if (!_cerrando) EncolarShell(() => Nativo.MostrarBarraWindows(mostrar, conIsla));
 
         AplicarAtajo();   // por si has cambiado AtajoVistaGeneral en caliente
         if (_gancho != null) _gancho.Activo = _cfg.Inicio.TeclaWindows;

@@ -50,6 +50,11 @@ public partial class MainWindow : Window
         return ventanas.Where(h => Monitores.HandleDe(h) == _monitor.Handle).ToList();
     }
 
+    // Las pantallas donde de verdad hay isla. Solo en esas se esconde la barra de
+    // Windows: si no, con Monitores="principal" el secundario se quedaría pelado.
+    public static HashSet<IntPtr> MonitoresConIsla() =>
+        Islas.Select(i => i._monitor.Handle).ToHashSet();
+
     // ================= Qué wallpaper mira cada isla =================
     // Wallpaper Engine guarda un fondo por pantalla ("Monitor0", "Monitor1"...) en el
     // mismo orden que Windows numera los DISPLAY. Con una sola isla se respeta tu clave

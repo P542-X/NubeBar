@@ -361,32 +361,44 @@ static class Nativo
         return lista;
     }
 
+    // Solo se esconden las barras de las pantallas donde NubeBar pone isla. Si
+    // tienes Barra.Monitores="principal", el monitor secundario se quedaría sin
+    // ninguna barra: ni la suya ni la nuestra. Con null se tocan todas, que es lo
+    // que hace falta al devolverlas.
+    static List<IntPtr> BarrasEn(HashSet<IntPtr>? monitores)
+    {
+        var todas = BarrasDeWindows();
+        if (monitores == null) return todas;
+        return todas.Where(b => monitores.Contains(Monitores.HandleDe(b))).ToList();
+    }
+
     // El orden importa, y es distinto en cada sentido. Al devolverlas, primero que
     // se VEAN (ShowWindow es instantáneo) y después el "ocultar automáticamente",
     // que tarda porque Explorer recalcula el área de trabajo y avisa a todas las
     // ventanas: así, si alguien está mirando, la barra reaparece ya. Al esconderlas,
     // al revés, para que no se vea el hueco saltar.
-    public static void MostrarBarraWindows(bool mostrar)
+    public static void MostrarBarraWindows(bool mostrar, HashSet<IntPtr>? monitores = null)
     {
         if (mostrar)
         {
-            foreach (var b in BarrasDeWindows()) ShowWindow(b, 5);
+            foreach (var b in BarrasDeWindows()) ShowWindow(b, 5);   // al devolver, TODAS
             AppBar.AutoOcultarBarraWindows(false);
         }
         else
         {
             AppBar.AutoOcultarBarraWindows(true);
-            foreach (var b in BarrasDeWindows()) ShowWindow(b, 0);
+            foreach (var b in BarrasEn(monitores)) ShowWindow(b, 0);
         }
     }
 
     // Solo esconder (sin tocar el auto-ocultar), para cuando Explorer las vuelve a mostrar
-    public static void EsconderBarraWindows()
+    public static void EsconderBarraWindows(HashSet<IntPtr>? monitores = null)
     {
-        foreach (var b in BarrasDeWindows()) ShowWindow(b, 0);
+        foreach (var b in BarrasEn(monitores)) ShowWindow(b, 0);
     }
 
-    public static bool BarraWindowsVisible() => BarrasDeWindows().Any(IsWindowVisible);
+    public static bool BarraWindowsVisible(HashSet<IntPtr>? monitores = null) =>
+        BarrasEn(monitores).Any(IsWindowVisible);
 
     // ---------- Sistema ----------
     [DllImport("kernel32.dll")] static extern bool GetSystemTimes(out long idle, out long kernel, out long user);

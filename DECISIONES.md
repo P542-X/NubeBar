@@ -184,3 +184,22 @@ Probado crear, cambiar y borrar con un escritorio **de prueba** creado por mí
 | Paquete | Versión | Licencia | Para qué |
 |---|---|---|---|
 | Slions.VirtualDesktop | 6.9.2 | MIT | Listar, cambiar y crear escritorios virtuales |
+
+## Solo esconder la barra de Windows donde hay isla
+
+Con `Barra.Monitores = "principal"`, NubeBar seguía escondiendo **todas** las
+barras de tareas, incluidas las secundarias, aunque en esas pantallas no pusiera
+ninguna isla. Resultado: el monitor secundario se quedaba sin nada, ni la barra
+de Windows ni la nuestra.
+
+Ahora solo se esconden las barras de los monitores donde de verdad hay isla
+(`MainWindow.MonitoresConIsla()`). Al devolverlas se muestran **todas**, sin
+filtrar, que es lo seguro.
+
+Queda una limitación que no tiene arreglo por API: el "ocultar automáticamente"
+de la barra de tareas es un ajuste **global** de Windows, no hay uno por
+pantalla. Como en el monitor principal hace falta para que la barra libere su
+hueco, la barra del secundario también queda en modo "ocultar
+automáticamente": está, se usa, pero hay que llevar el ratón al borde para que
+asome. La alternativa sería no esconder la barra principal, que es lo contrario
+de lo que hace NubeBar.
