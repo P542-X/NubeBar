@@ -221,7 +221,7 @@ public partial class MainWindow : Window
 
     TextBlock Titulito(string texto) => new()
     {
-        Text = texto, Foreground = _acento, FontSize = 11, Opacity = 0.9,
+        Text = texto, Foreground = _acentoLegible, FontSize = 11, Opacity = 0.9,
         Margin = new Thickness(0, 8, 0, 2)
     };
 

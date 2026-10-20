@@ -97,7 +97,7 @@ public partial class MainWindow : Window
             Margin = new Thickness(0, 10, 0, 0)
         };
         fila.Children.Add(Boton(new TextBlock { Text = "Cancelar", Foreground = _texto }, "No hacer nada", CerrarPanel));
-        var si = Boton(new TextBlock { Text = queHace, Foreground = peligro ? Brushes.Tomato : _acento },
+        var si = Boton(new TextBlock { Text = queHace, Foreground = peligro ? Brushes.Tomato : _acentoLegible },
                        queHace, () => { CerrarPanel(); accion(); });
         fila.Children.Add(si);
         columna.Children.Add(fila);

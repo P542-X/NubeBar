@@ -586,7 +586,7 @@ public partial class MainWindow
             var fila = new TextBlock
             {
                 Text = titulo.Length > 48 ? titulo[..47] + "…" : titulo,
-                Foreground = h == activa ? _acento : _texto,
+                Foreground = h == activa ? _acentoLegible : _texto,
                 Opacity = h == activa ? 1 : 0.8,
                 Margin = new Thickness(10, 0, 10, 0),
                 VerticalAlignment = VerticalAlignment.Center,

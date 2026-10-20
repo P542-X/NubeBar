@@ -114,8 +114,10 @@ public partial class MainWindow
 
     FrameworkElement CrearRejilla(List<(Grupo Grupo, IntPtr Ventana)> ventanas, int columnas)
     {
-        var activa = Nativo.Activa();
-        if (activa == _self) activa = _ultimaActiva;
+        // Nada de GetForegroundWindow a secas: cuando la vista se abre con el atajo
+        // global, Windows devuelve 0 mientras procesa la combinación de teclas y no
+        // se resaltaba ninguna ventana. ActivaAjena recuerda la última de verdad.
+        var activa = ActivaAjena();
 
         var rejilla = new UniformGrid
         {
@@ -129,6 +131,10 @@ public partial class MainWindow
 
         foreach (var (grupo, h) in ventanas)
             rejilla.Children.Add(CrearCelda(grupo, h, h == activa));
+
+        var resaltada = ventanas.FirstOrDefault(v => v.Ventana == activa).Ventana;
+        Log.Info($"vista general: {ventanas.Count} ventanas, foreground 0x{Nativo.Activa().ToInt64():X} ultima 0x{_ultimaActiva.ToInt64():X} = " +
+                 (resaltada == IntPtr.Zero ? "ninguna de la rejilla" : Nativo.Titulo(resaltada)));
 
         // Solo se cierra al salir si antes ha entrado: si se abrió con el atajo,
         // el ratón puede estar en cualquier sitio y se cerraría al primer movimiento
@@ -148,7 +154,7 @@ public partial class MainWindow
         fila.Children.Add(new TextBlock
         {
             Text = titulo,
-            Foreground = esActiva ? _acento : _texto,
+            Foreground = esActiva ? _acentoLegible : _texto,
             Opacity = esActiva ? 1 : 0.85,
             MaxWidth = AnchoCelda - 60,
             TextTrimming = TextTrimming.CharacterEllipsis,
@@ -163,9 +169,9 @@ public partial class MainWindow
             Margin = new Thickness(3),
             Height = AltoCelda - 8,
             BorderThickness = new Thickness(esActiva ? 1 : 0),
-            BorderBrush = _acento,
+            BorderBrush = _acentoLegible,
             Background = esActiva
-                ? new SolidColorBrush(Color.FromArgb(0x22, _cAcento.R, _cAcento.G, _cAcento.B))
+                ? new SolidColorBrush(Color.FromArgb(0x22, _cAcentoLegible.R, _cAcentoLegible.G, _cAcentoLegible.B))
                 : Brushes.Transparent
         };
 

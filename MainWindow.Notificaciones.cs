@@ -87,7 +87,7 @@ public partial class MainWindow : Window
         var pila = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         pila.Children.Add(new TextBlock
         {
-            Text = a.App, Foreground = _acento, FontSize = 10, Opacity = 0.9
+            Text = a.App, Foreground = _acentoLegible, FontSize = 10, Opacity = 0.9
         });
         pila.Children.Add(new TextBlock
         {

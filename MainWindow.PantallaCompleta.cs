@@ -30,7 +30,9 @@ public partial class MainWindow : Window
         _vigia = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
         _vigia.Tick += (_, _) =>
         {
-            Islas.FirstOrDefault(i => i._esJefa)?.VigilarVolumen();
+            var jefa = Islas.FirstOrDefault(i => i._esJefa);
+            jefa?.VigilarVolumen();
+            jefa?.VigilarBarraDeWindows();
             foreach (var i in Islas.ToList())
             {
                 try { i.RevisarPantallaCompleta(); }
@@ -38,6 +40,21 @@ public partial class MainWindow : Window
             }
         };
         _vigia.Start();
+    }
+
+    // Explorer vuelve a mostrar su barra por su cuenta en varios casos: al hacer
+    // una captura de pantalla, al reiniciarse, al cambiar de pantalla completa.
+    // Antes esto se miraba una vez por segundo y se veía el parpadeo; aquí se
+    // mira cada 150 ms y no da tiempo a verla.
+    void VigilarBarraDeWindows()
+    {
+        if (_cerrando || !_cfg.Barra.OcultarBarraWindows) return;
+        try
+        {
+            var mias = MonitoresConIsla();
+            if (Nativo.BarraWindowsVisible(mias)) Nativo.EsconderBarraWindows(mias);
+        }
+        catch { }
     }
 
     // ---------- ¿Hay algo a pantalla completa en MI monitor? ----------

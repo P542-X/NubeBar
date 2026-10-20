@@ -26,7 +26,10 @@ public partial class MainWindow : Window
     // Pinceles fijos: cuando cambia el tema se anima su color, y todo lo que los usa cambia suave
     readonly SolidColorBrush _fondo = new(Colors.Black), _texto = new(Colors.White),
                              _acento = new(Colors.CornflowerBlue), _hover = new(Color.FromArgb(0x30, 255, 255, 255));
-    Color _cTexto = Colors.White, _cAcento = Colors.CornflowerBlue;
+    // El acento "legible" es el mismo color corregido para que se lea sobre el
+    // fondo. Se usa en TEXTO; para bordes y barras sigue valiendo el de verdad.
+    readonly SolidColorBrush _acentoLegible = new(Colors.CornflowerBlue);
+    Color _cTexto = Colors.White, _cAcento = Colors.CornflowerBlue, _cAcentoLegible = Colors.CornflowerBlue;
 
     readonly List<Action> _actualizadores = new();
     readonly DispatcherTimer _tick = new() { Interval = TimeSpan.FromSeconds(1) };
@@ -203,9 +206,10 @@ public partial class MainWindow : Window
         // vez por tick (y el trato con las barras de Windows) es cosa de la jefa.
         if (_esJefa)
         {
-            var mias = MonitoresConIsla();
-            if (!_cerrando && _cfg.Barra.OcultarBarraWindows && Nativo.BarraWindowsVisible(mias))
-                Nativo.EsconderBarraWindows(mias);
+            // Lo de esconder la barra ya NO va aquí: con un tick de un segundo,
+            // cuando algo la volvía a mostrar (una captura de pantalla, por
+            // ejemplo) se quedaba a la vista hasta un segundo entero y se veía
+            // el parpadeo. Ahora lo hace el vigilante de 150 ms.
             Historial.Anotar(Nativo.Cpu(), Nativo.Ram());
         }
         if (_esJefa) VigilarNotificaciones();
@@ -242,10 +246,21 @@ public partial class MainWindow : Window
         }
         else if (t.EnviarColorAlWallpaper && _esJefa) EnviarColor(acento);   // un solo emisor, no dos peleándose
 
+        // El acento para TEXTO se corrige si no se lee sobre el fondo de la isla.
+        // Un acento oscuro sobre un fondo negro dejaba, por ejemplo, el nombre de
+        // la ventana activa en la vista general en negro sobre negro: invisible.
+        // Se conserva el tono y solo se acerca al blanco lo justo.
+        var fondoOpaco = Color.FromRgb(fondo.R, fondo.G, fondo.B);
+        _cAcentoLegible = Contraste.Legible(acento, fondoOpaco);
+        if (_cAcentoLegible != acento)
+            Log.Info($"el acento {acento} no contrasta con el fondo {fondoOpaco} " +
+                     $"(ratio {Contraste.Entre(acento, fondoOpaco):0.0}); para texto se usa {_cAcentoLegible}");
+
         _cTexto = texto; _cAcento = acento;
         AnimarColor(_fondo, fondo);
         AnimarColor(_texto, texto);
         AnimarColor(_acento, acento);
+        AnimarColor(_acentoLegible, _cAcentoLegible);
         AnimarColor(_hover, Color.FromArgb(0x30, texto.R, texto.G, texto.B));
 
         Isla.CornerRadius = new CornerRadius(t.Radio);

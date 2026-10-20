@@ -85,7 +85,7 @@ public partial class MainWindow : Window
         pila.Children.Add(new TextBlock
         {
             Text = d.Numero.ToString(),
-            Foreground = d.EsElActual ? _acento : _texto,
+            Foreground = d.EsElActual ? _acentoLegible : _texto,
             Opacity = d.EsElActual ? 1 : 0.45,
             FontSize = 12,
             HorizontalAlignment = HorizontalAlignment.Center
