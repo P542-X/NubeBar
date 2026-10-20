@@ -374,3 +374,16 @@ o sea con la isla escondida:
 
 Y con un panel abierto la isla ya no se vuelve a esconder al apartar el ratón:
 estarías usando el menú con el teclado y se te iba debajo.
+
+## Al cerrar un panel la isla desaparecía bajo el puntero
+
+Con una ventana maximizada detrás: abres la vista general desde la isla, la
+cierras con el mismo botón, y al cerrarse el panel el primer plano vuelve a la
+ventana maximizada. Como ahora eso esconde la isla, se iba justo debajo del
+puntero, donde acababas de hacer clic. Parecía que cerrar el panel cerraba la
+isla entera.
+
+Regla nueva: cuando toca esconderse, si tienes el ratón dentro de la franja de
+la isla, se queda **asomada** en vez de irse, y se va cuando apartas el ratón,
+igual que cuando asoma por el borde. La franja se mide con el alto de la barra
+y no con `ActualHeight`, que con un panel abierto es el del panel entero.

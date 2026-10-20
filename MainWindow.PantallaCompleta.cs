@@ -111,6 +111,18 @@ public partial class MainWindow : Window
     }
 
 
+    // ¿Está el ratón dentro de la franja donde vive la isla? Se mide con el alto
+    // de la barra, no con ActualHeight: con un panel abierto ActualHeight es el del
+    // panel entero y la franja saldría enorme.
+    bool RatonEnLaFranja()
+    {
+        var p = Monitores.Raton();
+        double altoDip = _cfg.Barra.Alto + _cfg.Barra.Margen * 2;
+        int franja = (int)Math.Round(altoDip * _monitor.Escala);
+        return p.X >= _monitor.X && p.X < _monitor.Derecha &&
+               (Arriba ? p.Y < _monitor.Y + franja : p.Y > _monitor.Abajo - franja);
+    }
+
     void RevisarPantallaCompleta()
     {
         if (!_cfg.Barra.OcultarEnPantallaCompleta)
@@ -124,10 +136,17 @@ public partial class MainWindow : Window
         if (completa != _escondidaPorPantalla)
         {
             _escondidaPorPantalla = completa;
-            _asomada = false;
+            // Si justo cuando toca esconderse tienes el ratón encima de la isla, se
+            // queda asomada. Pasaba al cerrar un panel: el primer plano volvía a la
+            // ventana maximizada y la isla desaparecía debajo del puntero, que es
+            // justo donde acababas de hacer clic.
+            _asomada = completa && RatonEnLaFranja();
             _ratonEnElBorde = DateTime.MaxValue;
-            Deslizar(completa);
-            Log.Info($"pantalla completa en {_monitor.Dispositivo}: {(completa ? "sí, la isla se esconde" : "no, la isla vuelve")}");
+            Deslizar(completa && !_asomada);
+            Log.Info($"pantalla completa en {_monitor.Dispositivo}: " +
+                     (completa ? _asomada ? "sí, pero la isla se queda asomada (tienes el ratón encima)"
+                                          : "sí, la isla se esconde"
+                               : "no, la isla vuelve"));
             return;
         }
         if (!_escondidaPorPantalla) return;
@@ -151,12 +170,7 @@ public partial class MainWindow : Window
         // Con un panel abierto no: estarías usando el menú con el teclado y se
         // escondería debajo en cuanto apartases el ratón.
         if (_panelAbierto != null) return;
-
-        double altoDip = ActualHeight > 0 ? ActualHeight : _cfg.Barra.Alto + _cfg.Barra.Margen * 2;
-        int franja = (int)Math.Round(altoDip * _monitor.Escala);
-        bool dentro = p.X >= _monitor.X && p.X < _monitor.Derecha &&
-                      (Arriba ? p.Y < _monitor.Y + franja : p.Y > _monitor.Abajo - franja);
-        if (dentro) return;
+        if (RatonEnLaFranja()) return;
 
         _asomada = false;
         _ratonEnElBorde = DateTime.MaxValue;
