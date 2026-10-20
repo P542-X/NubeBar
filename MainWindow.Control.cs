@@ -146,7 +146,7 @@ public partial class MainWindow : Window
         {
             columna.Children.Add(Titulito("Brillo"));
             foreach (var p in pantallas)
-                columna.Children.Add(Deslizador(p.PorCiento, v => Brillo.Poner(p, (int)v)));
+                columna.Children.Add(Deslizador(p.PorCiento, v => { Brillo.Poner(p, (int)v); AvisoDeBrillo((int)v); }));
         }
 
         // --- Red y Bluetooth ---

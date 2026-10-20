@@ -89,3 +89,28 @@ Windows (ManagedShell vuelve a difundir `TaskbarCreated` al soltarse).
 
 **Aviso sobre RetroBar:** al cerrarlo dejó la barra de tareas de Windows en
 "ocultar automáticamente". Se devolvió a su estado con `ABM_SETSTATE`.
+
+## Fase 3 · El aviso de volumen de Windows NO se esconde
+
+La regla era: esconderlo solo si puedo garantizar que vuelve aunque maten
+NubeBar. **No puedo**, así que se queda visible.
+
+El motivo no es el guardián, es que en este Windows 11 (26200) el aviso de
+volumen ya no es una ventana que se pueda esconder. Comprobado enumerando todas
+las ventanas de nivel superior justo antes y justo después de pulsar la tecla de
+volumen: no aparece ninguna nueva, ni visible ni oculta, y `ShellExperienceHost`
+y `ShellHost` solo tienen un `DesktopWindowXamlSource` de 1x1 px. Lo pinta el
+compositor, no una `NativeHWNDHost` como en Windows 10, así que no hay ningún
+`ShowWindow(SW_HIDE)` que aplicar.
+
+Consecuencia: al cambiar el volumen se ven los dos avisos, el de Windows y el
+de la isla. El hueco para devolverlo sigue marcado en `Guardian.RestaurarElShell()`
+por si en una versión futura vuelve a ser una ventana.
+
+## Fase 3 · El brillo no se vigila, se avisa al cambiarlo
+
+Preguntarle el brillo a un monitor por DDC/CI es un viaje de ida y vuelta por el
+cable de unos 50 ms. Sondearlo diez veces por segundo como el volumen sería un
+disparate, así que el aviso de brillo lo dispara quien lo cambia (el deslizador
+del centro de control). Si lo cambias desde el menú del propio monitor, NubeBar
+no se entera: no hay forma barata de enterarse.

@@ -155,13 +155,23 @@ public static class Audio
         (IMMDeviceEnumerator)new EnumeradorDispositivos();
 
     // ---------- Volumen general ----------
+    // Se guarda el objeto: se consulta varias veces por segundo para el aviso de la
+    // isla, y crear el enumerador COM cada vez es caro de verdad. Si la salida
+    // cambia, la llamada falla y se vuelve a pedir.
+    static IAudioEndpointVolume? _cacheVolumen;
+
     static IAudioEndpointVolume? VolumenDelDefecto()
     {
+        if (_cacheVolumen != null)
+        {
+            try { _cacheVolumen.GetMasterVolumeLevelScalar(out _); return _cacheVolumen; }
+            catch { _cacheVolumen = null; }
+        }
         var enumerador = NuevoEnumerador();
         if (enumerador.GetDefaultAudioEndpoint(eRender, eConsole, out var disp) != 0 || disp == null) return null;
         var iid = typeof(IAudioEndpointVolume).GUID;
         if (disp.Activate(ref iid, CLSCTX_ALL, IntPtr.Zero, out object o) != 0) return null;
-        return o as IAudioEndpointVolume;
+        return _cacheVolumen = o as IAudioEndpointVolume;
     }
 
     public static int Volumen()
@@ -357,6 +367,7 @@ public static class Audio
     public static bool CambiarSalida(string idDispositivo)
     {
         if (!PuedeCambiarSalida) return false;
+        _cacheVolumen = null;             // la salida cambia: el objeto guardado ya no vale
         try
         {
             var cfg = (IPolicyConfig)new ConfigDirectiva();

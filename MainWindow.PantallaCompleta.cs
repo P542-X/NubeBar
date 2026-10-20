@@ -30,6 +30,7 @@ public partial class MainWindow : Window
         _vigia = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
         _vigia.Tick += (_, _) =>
         {
+            Islas.FirstOrDefault(i => i._esJefa)?.VigilarVolumen();
             foreach (var i in Islas.ToList())
             {
                 try { i.RevisarPantallaCompleta(); }
