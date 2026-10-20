@@ -186,6 +186,7 @@ la isla se adapta sola. Las claves que no reconoce se conservan tal cual.
 | `Barra.Monitores` | `"todos"` | `"todos"` (una isla por pantalla) o `"principal"` |
 | `Barra.AppsPorMonitor` | `true` | Cada isla enseña solo las apps de su pantalla |
 | `Barra.OcultarEnPantallaCompleta` | `true` | La isla se esconde si algo ocupa su pantalla entera |
+| `Barra.OcultarConMaximizada` | `false` | Se esconde también con una ventana maximizada (juegos, vídeos) |
 | `Barra.Bandeja` | `true` | Traer los iconos de la bandeja del sistema (hace falta el módulo `bandeja`) |
 | `Barra.MaxBandeja` | `6` | Iconos de bandeja visibles antes del desplegable `^` |
 | `Barra.Notificaciones` | `true` | Las notificaciones de Windows asoman en la isla |

@@ -92,9 +92,22 @@ public partial class MainWindow : Window
         // lado (son los bordes invisibles de redimensionar) y la de pantalla completa
         // coincide exactamente con el monitor.
         var r = Nativo.Rectangulo(h);
-        return Math.Abs(r.Izq - _monitor.X) <= 1 && Math.Abs(r.Arr - _monitor.Y) <= 1 &&
-               Math.Abs(r.Der - _monitor.Derecha) <= 1 && Math.Abs(r.Aba - _monitor.Abajo) <= 1;
+        if (Math.Abs(r.Izq - _monitor.X) <= 1 && Math.Abs(r.Arr - _monitor.Y) <= 1 &&
+            Math.Abs(r.Der - _monitor.Derecha) <= 1 && Math.Abs(r.Aba - _monitor.Abajo) <= 1)
+            return true;
+
+        // Maximizada: tapa el área de trabajo entera (la pantalla menos lo que
+        // reservamos nosotros y menos la barra de Windows si está). Por defecto no
+        // cuenta, porque entonces la isla se iría cada vez que maximizas cualquier
+        // cosa; con Barra.OcultarConMaximizada sí, para los juegos y los vídeos.
+        // Se mira el rectángulo y no "¿Windows la marca como maximizada?" porque una
+        // ventana puede estar estirada a mano hasta ocupar lo mismo.
+        if (!_cfg.Barra.OcultarConMaximizada) return false;
+        return r.Izq <= _monitor.TrabajoX + 2 && r.Arr <= _monitor.TrabajoY + 2 &&
+               r.Der >= _monitor.TrabajoX + _monitor.TrabajoAncho - 2 &&
+               r.Aba >= _monitor.TrabajoY + _monitor.TrabajoAlto - 2;
     }
+
 
     void RevisarPantallaCompleta()
     {

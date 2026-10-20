@@ -272,3 +272,22 @@ por ejemplo) se respeta tal cual: eso es una decisión de diseño, no un error.
 Para que esto no vuelva a ser un misterio, al arrancar y en cada cambio de tema
 se escribe una línea con lo que de verdad se está pintando:
 `tema aplicado: fondo=... texto=... acento=... (origen: config | wallpaper)`.
+
+## Maximizada no es pantalla completa, pero ahora puedes decidirlo tú
+
+La isla se aparta cuando algo ocupa la pantalla entera, y una ventana
+**maximizada** no contaba: deja ver la isla y el borde de Windows, y si contara
+desaparecería cada vez que maximizas el navegador, que es casi siempre. El
+problema es que un juego o un vídeo en ventana maximizada tampoco la echaban,
+y ahí sí estorba.
+
+Nueva clave opcional `Barra.OcultarConMaximizada` (por defecto `false`, con su
+interruptor en Ajustes > Isla). Una config sin la clave se comporta
+exactamente igual que antes. Cuando está activa se mira el **rectángulo**
+contra el área de trabajo del monitor, no si Windows marca la ventana como
+maximizada: así también cuenta una ventana estirada a mano hasta ocupar lo
+mismo, y se evita el lío de F11 (un navegador maximizado que pasa a pantalla
+completa sigue marcado como maximizado).
+
+Escondida por maximizada se comporta como escondida por pantalla completa:
+asoma si dejas el ratón pegado al borde 300 ms.
