@@ -234,3 +234,21 @@ releer el monitor y recolocar. Así la isla queda centrada en 720p, 1080p, 2K o
 
 De paso, las pantallas se filtran por handle único (`DistinctBy`), por si
 `EnumDisplayMonitors` devolviera dos veces la misma en algún clonado.
+
+## Los paneles miden su contenido en vez de fiarse de un alto a mano
+
+Cada sitio que abre un panel le pasaba un alto calculado a mano (la vista
+general, por ejemplo, `filas * 46 + 16`). Basta con que esa cuenta se quede
+corta por un píxel para que la última fila salga recortada, porque el cajón
+recorta a sus bordes. Y hay dos cosas que la cuenta no tenía en cuenta: el filo
+de acento de la isla, que se come su grosor por arriba y por abajo, y que los
+márgenes y tamaños de dentro dependen del tema y de `Barra.Alto`.
+
+Ahora `AbrirPanel` mide el contenido con `Measure` y, si lo que necesita es más
+que lo pedido, le da lo que necesita y lo apunta en el log. El alto que pasa
+quien abre el panel pasa a ser un mínimo, no un máximo.
+
+**No pude reproducir el recorte en este equipo**: la vista general con 8
+ventanas sale en 3 filas y le sobran 12 px. El arreglo es preventivo pero ataca
+la causa real; si sigue pasando, en el log habrá una línea "pedía X de alto
+pero necesita Y".

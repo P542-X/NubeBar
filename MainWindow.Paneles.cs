@@ -67,6 +67,25 @@ public partial class MainWindow
         contenido.RenderTransform = new TranslateTransform { Y = Arriba ? -12 : 12 };
         Cajon.Content = contenido;
 
+        // El alto que pide quien abre el panel es una estimación hecha a mano, y
+        // basta con que se quede corta por un píxel para que la última fila salga
+        // recortada: el cajón recorta a sus bordes. Así que se MIDE el contenido y
+        // se usa lo que de verdad necesita, si es más. Hay que sumarle el filo de
+        // la isla, que se come su grosor por arriba y por abajo.
+        double bordes = Isla.BorderThickness.Top + Isla.BorderThickness.Bottom;
+        try
+        {
+            contenido.Measure(new Size(ancho, double.PositiveInfinity));
+            double pide = contenido.DesiredSize.Height + bordes;
+            if (pide > alto)
+            {
+                Log.Info($"panel {nombre}: pedía {alto:0} de alto pero necesita {pide:0}; se le da el que necesita");
+                alto = pide;
+                _panelAlto = alto;
+            }
+        }
+        catch (Exception ex) { Log.Error("medir el panel", ex); }
+
         double altoIsla = _cfg.Barra.Alto + alto;
         double anchoIsla = Math.Max(ancho, MedirAncho());
 
