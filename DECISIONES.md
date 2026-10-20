@@ -252,3 +252,23 @@ quien abre el panel pasa a ser un mínimo, no un máximo.
 ventanas sale en 3 filas y le sobran 12 px. El arreglo es preventivo pero ataca
 la causa real; si sigue pasando, en el log habrá una línea "pedía X de alto
 pero necesita Y".
+
+## El acento es tinta, y la tinta no lleva transparencia
+
+El color de acento pinta **texto, filos y gráficas**: el reloj grande del menú,
+los porcentajes de CPU y RAM, el filo de la isla, la ventana activa de la vista
+general. Si ese color viene con alfa (un `#80FFFFFF`, por ejemplo), todo eso se
+dibuja a medias y queda gris, y da la sensación de que la isla "no cambia de
+color" por mucho que toques el tema. La transparencia de la isla la pone
+`Tema.Fondo`, que es donde tiene sentido; en el acento solo estorba, así que al
+aplicar el tema se ignora el alfa y se deja constancia en el log.
+
+Y un acento que resulta ser **el mismo gris que el texto** no es un acento: no
+hay nada que distinguir. En ese caso (saturación < 8% y contraste con el texto
+< 1.5) se vuelve al de por defecto `#7AA2F7` y se avisa en el log, con el
+porqué. Un gris que sí se distingue del texto (un `#808080` sobre texto blanco,
+por ejemplo) se respeta tal cual: eso es una decisión de diseño, no un error.
+
+Para que esto no vuelva a ser un misterio, al arrancar y en cada cambio de tema
+se escribe una línea con lo que de verdad se está pintando:
+`tema aplicado: fondo=... texto=... acento=... (origen: config | wallpaper)`.

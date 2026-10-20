@@ -41,6 +41,14 @@ static class Contraste
         (byte)Math.Round(a.G + (b.G - a.G) * k),
         (byte)Math.Round(a.B + (b.B - a.B) * k));
 
+    // Saturación de 0 a 1: 0 es un gris puro (R=G=B) y 1 un color a tope.
+    public static double Saturacion(Color c)
+    {
+        double r = c.R / 255.0, g = c.G / 255.0, b = c.B / 255.0;
+        double max = Math.Max(r, Math.Max(g, b)), min = Math.Min(r, Math.Min(g, b));
+        return max == 0 ? 0 : (max - min) / max;
+    }
+
     // Devuelve el color tal cual si ya se lee; si no, el mismo tono acercado al
     // blanco (sobre fondo oscuro) o al negro (sobre fondo claro) lo justo.
     public static Color Legible(Color color, Color fondo, double minimo = Minimo)

@@ -246,6 +246,28 @@ public partial class MainWindow : Window
         }
         else if (t.EnviarColorAlWallpaper && _esJefa) EnviarColor(acento);   // un solo emisor, no dos peleándose
 
+        // El acento es TINTA: pinta texto, filos y gráficas. Si viene con alfa
+        // (un "#80FFFFFF", por ejemplo), todo eso se dibuja a medias y sale gris:
+        // el reloj del menú, los porcentajes y el filo de la isla parecen
+        // apagados y da la sensación de que la isla no tiene color. La
+        // transparencia de la isla la pone Tema.Fondo, no el acento.
+        if (acento.A != 0xFF)
+        {
+            Log.Info($"el acento {acento} viene con transparencia: la tinta se pinta opaca " +
+                     "(la transparencia de la isla es cosa de Tema.Fondo)");
+            acento = Color.FromRgb(acento.R, acento.G, acento.B);
+        }
+
+        // Y un acento que es el mismo gris que el texto no es un acento: no hay
+        // nada que distinguir, así que se vuelve al de por defecto y se avisa.
+        if (Contraste.Saturacion(acento) < 0.08 && Contraste.Entre(acento, texto) < 1.5)
+        {
+            var porDefecto = Color.FromRgb(0x7A, 0xA2, 0xF7);
+            Log.Info($"el acento {acento} es un gris igual que el texto {texto}: no se distinguiría " +
+                     $"de nada, se usa {porDefecto} (cámbialo en Ajustes > Colores)");
+            acento = porDefecto;
+        }
+
         // El acento para TEXTO se corrige si no se lee sobre el fondo de la isla.
         // Un acento oscuro sobre un fondo negro dejaba, por ejemplo, el nombre de
         // la ventana activa en la vista general en negro sobre negro: invisible.
@@ -255,6 +277,12 @@ public partial class MainWindow : Window
         if (_cAcentoLegible != acento)
             Log.Info($"el acento {acento} no contrasta con el fondo {fondoOpaco} " +
                      $"(ratio {Contraste.Entre(acento, fondoOpaco):0.0}); para texto se usa {_cAcentoLegible}");
+
+        // Una línea con lo que de verdad se pinta: si alguna vez "no cambia de
+        // color", esto dice en un vistazo qué acento se está usando y de dónde sale
+        if (_esJefa && (_cAcento != acento || _cTexto != texto))
+            Log.Info($"tema aplicado: fondo={fondo} texto={texto} acento={acento} " +
+                     $"(origen: {(t.DesdeWallpaper && _paleta != null ? "wallpaper" : "config")})");
 
         _cTexto = texto; _cAcento = acento;
         AnimarColor(_fondo, fondo);
