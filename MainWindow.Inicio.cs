@@ -31,6 +31,8 @@ public partial class MainWindow
 
     List<Resultado> _resultados = new();
     int _seleccion;
+    string _ultimaConsulta = "";
+    Point _ratonAlPintar = new(double.NaN, double.NaN);
     Categoria? _filtro;                 // Tab va rotando entre las categorías que hay
     CancellationTokenSource? _buscaArchivos;
     DispatcherTimer? _esperaArchivos;
@@ -110,8 +112,7 @@ public partial class MainWindow
                 CerrarMenu();
                 break;
             case 0x0D:                                   // intro
-                var v = Visibles;
-                if (_seleccion < v.Count) Ejecutar(v[_seleccion], p.Ctrl);
+                EjecutarSeleccion(Visibles, p.Ctrl);
                 break;
             case 0x26: case 0x28:                        // flechas arriba/abajo
                 var lista = Visibles;
@@ -438,6 +439,11 @@ public partial class MainWindow
         var limpia = consulta.Trim();
         var norm = Parecido.Normalizar(limpia);
 
+        // Al cambiar lo escrito se vuelve a la primera fila: lo que teclees manda sobre
+        // donde estuviera la marca (una flecha de antes, o el ratón quieto encima de la
+        // lista). Así Intro abre siempre la primera opción, que es lo que esperas.
+        if (limpia != _ultimaConsulta) { _ultimaConsulta = limpia; _seleccion = 0; }
+
         var reloj = Stopwatch.StartNew();
         var encontrados = new List<Resultado>();
 
@@ -549,6 +555,10 @@ public partial class MainWindow
         var mostrar = _filtro is { } f ? _resultados.Where(r => r.Categoria == f).ToList() : _resultados;
         bool escribiendo = _caja?.Text.Trim().Length > 0;
 
+        // Dónde está el ratón ahora, antes de crear las filas: las de abajo comparan
+        // con esto para saber si un MouseEnter es tuyo o del repintado
+        _ratonAlPintar = Mouse.GetPosition(Isla);
+
         // Con la caja vacía manda la portada; en cuanto escribes, los resultados
         if (_portada != null) _portada.Visibility = escribiendo ? Visibility.Collapsed : Visibility.Visible;
         if (_scroll != null) _scroll.Visibility = escribiendo ? Visibility.Visible : Visibility.Collapsed;
@@ -558,7 +568,7 @@ public partial class MainWindow
         // Más filas de las que caben no aportan nada y cada una cuesta un icono
         foreach (var r in mostrar.Take(MaxFilas)) _lista.Children.Add(CrearFila(r));
 
-        _seleccion = Math.Min(_seleccion, Math.Max(0, mostrar.Count - 1));
+        _seleccion = Math.Min(_seleccion, Math.Max(0, Math.Min(mostrar.Count, MaxFilas) - 1));
         if (mostrar.Count == 0) _seleccion = 0;
         MoverMarca(inmediato: true);
     }
@@ -618,11 +628,22 @@ public partial class MainWindow
         var zona = new Border { Background = Brushes.Transparent, Child = fila, Cursor = Cursors.Hand };
         zona.MouseEnter += (_, _) =>
         {
+            if (!RatonSeHaMovido()) return;
             int i = Visibles.FindIndex(x => ReferenceEquals(x, r));
             if (i >= 0) { _seleccion = i; MoverMarca(); }
         };
         zona.MouseLeftButtonUp += (_, _) => Ejecutar(r, false);
         return zona;
+    }
+
+    // Al repintar la lista las filas nuevas nacen debajo del puntero y disparan su
+    // MouseEnter sin que hayas movido el ratón: eso le robaba la marca a cada tecla, y
+    // entonces Intro abría lo que hubiera bajo el cursor en vez de la primera opción.
+    // Solo cuenta como hover si el puntero está en otro sitio que cuando se pintó.
+    bool RatonSeHaMovido()
+    {
+        if (double.IsNaN(_ratonAlPintar.X)) return true;
+        return (Mouse.GetPosition(Isla) - _ratonAlPintar).Length > 2;
     }
 
     // La marca de selección se desliza hasta la fila elegida en vez de saltar
@@ -671,7 +692,7 @@ public partial class MainWindow
                 break;
 
             case Key.Enter:
-                if (_seleccion < visibles.Count) Ejecutar(visibles[_seleccion], Teclado.Control);
+                EjecutarSeleccion(visibles, Teclado.Control);
                 e.Handled = true;
                 break;
 
@@ -680,6 +701,13 @@ public partial class MainWindow
                 e.Handled = true;
                 break;
         }
+    }
+
+    // Intro abre la fila marcada; si la marca se ha quedado fuera de sitio, la primera
+    void EjecutarSeleccion(List<Resultado> visibles, bool ctrl)
+    {
+        if (visibles.Count == 0) return;
+        Ejecutar(visibles[_seleccion >= 0 && _seleccion < visibles.Count ? _seleccion : 0], ctrl);
     }
 
     // Tab rota entre las categorías que hay ahora mismo, y vuelve a "todas"
