@@ -214,6 +214,13 @@ public partial class MainWindow
         //    cerrar el menú nada más abrirlo.
         var otra = Nativo.Activa();
         if (otra == _self || Nativo.EsNuestra(otra)) { _tuvoFoco = true; return; }
+
+        // Hacer una captura del menú abierto tiene que poder hacerse. El recortador
+        // se pone delante y te hace arrastrar un recuadro por encima de la isla: con
+        // la regla normal, eso es "otra aplicación al frente" y un clic fuera, o sea
+        // dos motivos para cerrar el menú justo mientras lo estabas fotografiando.
+        if (EsRecortador(otra)) return;
+
         if (_tuvoFoco && !SeLoDevuelveSolo(otra))
         {
             Log.Info($"el primer plano se ha ido a \"{Nativo.Titulo(otra)}\": el menú se cierra");
@@ -251,6 +258,23 @@ public partial class MainWindow
         "SHELLDLL_DefView", "SysListView32"
     };
 
+    // Los que salen a pantalla completa a recortar: mientras uno de estos está
+    // delante, el menú no se cierra ni se pelea por el primer plano
+    static readonly string[] Recortadores =
+    {
+        "snippingtool", "screenclippinghost", "screensketch", "gamebar",
+        "sharex", "greenshot", "snagit", "lightshot", "picpick", "flameshot"
+    };
+
+    static bool EsRecortador(IntPtr h)
+    {
+        if (h == IntPtr.Zero) return false;
+        var exe = Nativo.Exe(h);
+        if (exe.Length == 0) return false;
+        var nombre = Path.GetFileNameWithoutExtension(exe);
+        return Recortadores.Any(r => nombre.Contains(r, StringComparison.OrdinalIgnoreCase));
+    }
+
     static bool SeLoDevuelveSolo(IntPtr h)
     {
         if (h == IntPtr.Zero) return true;                       // nadie al frente: no es un clic tuyo
@@ -270,6 +294,7 @@ public partial class MainWindow
         // el vigilante de 150 ms. Pelearse aquí le robaba el primer plano al juego
         // durante un instante antes de cerrarse.
         if (!SeLoDevuelveSolo(otra)) return;
+        if (EsRecortador(otra)) return;      // y al recortador tampoco se le quita
 
         if (++_intentosFoco > 3)
         {
@@ -285,25 +310,24 @@ public partial class MainWindow
     // Un Button captura el ratón al pulsarlo y lo suelta al soltarlo: así sabe si
     // levantaste el dedo encima. Si se la quitamos en ese momento, nunca llega a su
     // Click. Por eso solo se recupera cuando la captura no la tiene NADIE.
-    void RecuperarCaptura(object remitente, MouseEventArgs e)
+    void RecuperarCaptura(object remitente, MouseEventArgs e) => ArmarCaptura();
+
+    // Y al soltar el botón se vuelve a armar, que es cuando la suelta él
+    void RearmarCaptura(object remitente, MouseButtonEventArgs e) => ArmarCaptura();
+
+    void ArmarCaptura()
     {
         if (_panelAbierto != PanelInicio) return;
         Dispatcher.InvokeAsync(() =>
         {
             if (_panelAbierto != PanelInicio) return;
             if (Mouse.Captured != null) return;      // se la ha llevado algo de dentro
-            Mouse.Capture(Isla, CaptureMode.SubTree);
-        }, DispatcherPriority.Input);
-    }
-
-    // Y al soltar el botón se vuelve a armar, que es cuando la suelta él
-    void RearmarCaptura(object remitente, MouseButtonEventArgs e)
-    {
-        if (_panelAbierto != PanelInicio) return;
-        Dispatcher.InvokeAsync(() =>
-        {
-            if (_panelAbierto != PanelInicio) return;
-            if (Mouse.Captured != null) return;
+            // Y si el primer plano NO es nuestro, la captura no se recupera. Windows
+            // nos la quita cuando se activa otra aplicación, y volver a cogerla le
+            // robaba el ratón a quien esté delante: con el menú abierto, el recortador
+            // de pantalla (Win+Shift+S, Impr Pant) salía pero no te dejaba arrastrar
+            // el recuadro. El clic de fuera lo sigue cazando el vigilante de 150 ms.
+            if (!Nativo.EsNuestra(Nativo.Activa())) return;
             Mouse.Capture(Isla, CaptureMode.SubTree);
         }, DispatcherPriority.Input);
     }
@@ -329,15 +353,20 @@ public partial class MainWindow
             VerticalContentAlignment = VerticalAlignment.Center,
             Background = new SolidColorBrush(Color.FromArgb(0x24, _cTexto.R, _cTexto.G, _cTexto.B)),
             Foreground = _texto,
-            CaretBrush = _acento,
+            CaretBrush = _acentoLegible,
             BorderThickness = new Thickness(0),
             FontSize = FontSize + 3,
             Tag = "caja"
         };
         _caja.TextChanged += (_, _) => Buscar(_caja!.Text);
-        _caja.PreviewKeyDown += CajaTecla;
         Grid.SetRow(_caja, 1);
         raiz.Children.Add(_caja);
+
+        // El teclado se escucha en la RAÍZ del panel, no solo en la caja: así las
+        // flechas, Intro, Tab y Escape siguen funcionando aunque el foco se haya ido a
+        // un botón de la portada o a una fila. Antes, en cuanto tocabas algo del panel,
+        // dejabas de poder bajar con las flechas hasta volver a hacer clic en la caja.
+        raiz.PreviewKeyDown += CajaTecla;
 
         if (_cfg.Inicio.Saludo)
         {
@@ -346,13 +375,16 @@ public partial class MainWindow
             raiz.Children.Add(cabecera);
         }
 
-        // La marca de selección va por detrás de las filas y se desliza entre ellas
+        // La marca de selección va por detrás de las filas y se desliza entre ellas.
+        // Con el acento LEGIBLE, no con el de verdad: si eliges un acento negro (o lo
+        // saca así el extractor del wallpaper) la marca quedaba negra sobre fondo negro
+        // y no se veía NADA de lo que estaba seleccionado, ni moverse con las flechas.
         _marcaSeleccion = new Border
         {
             Height = AltoFila - 4,
             CornerRadius = new CornerRadius(8),
-            Background = new SolidColorBrush(Color.FromArgb(0x26, _cAcento.R, _cAcento.G, _cAcento.B)),
-            BorderBrush = _acento,
+            Background = new SolidColorBrush(Color.FromArgb(0x33, _cAcentoLegible.R, _cAcentoLegible.G, _cAcentoLegible.B)),
+            BorderBrush = _acentoLegible,
             BorderThickness = new Thickness(1),
             HorizontalAlignment = HorizontalAlignment.Stretch,
             VerticalAlignment = VerticalAlignment.Top,
@@ -616,7 +648,7 @@ public partial class MainWindow
         var etiqueta = new TextBlock
         {
             Text = r.Etiqueta,
-            Foreground = _acento,
+            Foreground = _acentoLegible,
             Opacity = 0.7,
             FontSize = FontSize - 3,
             VerticalAlignment = VerticalAlignment.Center,
@@ -666,6 +698,16 @@ public partial class MainWindow
         if (!inmediato && Math.Abs(ahora - destino) > 0.5)
             t.BeginAnimation(TranslateTransform.YProperty, Kf(ahora, destino, 180, 0, Suave));
 
+        // La fila elegida a pleno color y las demás un poco apagadas: con la marca a
+        // secas no se distinguía bien cuál era, y menos al bajar con las flechas
+        for (int i = 0; i < _lista.Children.Count; i++)
+            if (_lista.Children[i] is UIElement fila)
+                fila.Opacity = i == _seleccion ? 1 : 0.65;
+
+        // Y un destello al cambiar de fila, para que el salto se note además de verse
+        if (!inmediato && Math.Abs(ahora - destino) > 0.5)
+            _marcaSeleccion.BeginAnimation(OpacityProperty, Kf(0.45, 1, 220, 0, Suave));
+
         // Mantener la selección a la vista
         _scroll?.ScrollToVerticalOffset(Math.Max(0, destino - (FilasVisibles - 1) * AltoFila));
     }
@@ -683,11 +725,13 @@ public partial class MainWindow
 
             case Key.Down:
                 if (visibles.Count > 0) { _seleccion = (_seleccion + 1) % visibles.Count; MoverMarca(); }
+                VolverALaCaja();
                 e.Handled = true;
                 break;
 
             case Key.Up:
                 if (visibles.Count > 0) { _seleccion = (_seleccion - 1 + visibles.Count) % visibles.Count; MoverMarca(); }
+                VolverALaCaja();
                 e.Handled = true;
                 break;
 
@@ -701,6 +745,16 @@ public partial class MainWindow
                 e.Handled = true;
                 break;
         }
+    }
+
+    // Si el foco se había ido a otro trasto del panel, al navegar vuelve a la caja,
+    // para que puedas seguir escribiendo sin tener que hacer clic en ella
+    void VolverALaCaja()
+    {
+        if (_caja == null || _caja.IsKeyboardFocused) return;
+        _caja.Focus();
+        Keyboard.Focus(_caja);
+        _caja.CaretIndex = _caja.Text.Length;
     }
 
     // Intro abre la fila marcada; si la marca se ha quedado fuera de sitio, la primera

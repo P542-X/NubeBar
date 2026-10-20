@@ -538,3 +538,32 @@ Y dos cosas más, que son la misma historia por otro lado:
 2. "Arrancar con Windows" se niega a crear el acceso directo si el exe está en
    una carpeta temporal: apuntaría a la nada en el siguiente arranque. Antes lo
    creaba tan contento.
+
+## El buscador: lo que no se veía y las capturas de pantalla
+
+**La marca de selección era invisible.** El menú Inicio pintaba la marca, su borde,
+la etiqueta de categoría y el cursor de la caja con el acento **de verdad**, no con
+el corregido. Con un acento negro —el de la configuración de aquí, y también lo que
+puede sacar el extractor del wallpaper— eso es negro sobre fondo negro: las flechas
+movían la selección y no se veía absolutamente nada. Ya existía `_cAcentoLegible`
+(el mismo tono aclarado hasta que contrasta, ver `Contraste.cs`) y se usa en media
+interfaz; el buscador se había quedado fuera. Ahora lo usa, la fila elegida va a
+pleno color con las demás al 65 %, y la marca da un destello al saltar de fila.
+
+**Las flechas se escuchan en la raíz del panel**, no en la caja. En cuanto pulsabas
+cualquier cosa del panel (una tarjeta de la portada, una fila), el foco se iba de la
+caja y las flechas dejaban de bajar hasta que volvías a hacer clic en ella. Al
+navegar, el foco vuelve solo a la caja para poder seguir escribiendo.
+
+**Y no se podían hacer capturas con el menú abierto**, por dos motivos distintos:
+
+1. En modo captura, el hook se tragaba *todas* las teclas durante hasta 1,5 s, Impr
+   Pant incluida. Ahora deja pasar Impr Pant y cualquier combinación con Win o Alt:
+   son del sistema, no de la caja.
+2. El recortador sale a pantalla completa y te hace arrastrar un recuadro por encima
+   de la isla. Para NubeBar eso era "otra aplicación al frente" *y* "un clic fuera",
+   o sea dos motivos para cerrar el menú, y además `RecuperarCaptura` le volvía a
+   quitar el ratón, con lo que no dejaba ni arrastrar el recuadro. Ahora la captura
+   del ratón no se recupera si el primer plano no es nuestro, y mientras delante haya
+   un recortador conocido (Recortes, Game Bar, ShareX, Greenshot, Snagit, Lightshot,
+   PicPick, Flameshot) el menú no se cierra ni pelea por el foco.

@@ -51,7 +51,7 @@ public sealed class GanchoTeclas : IDisposable
     const uint WM_QUIT = 0x0012;
 
     public const int VkWinIzq = 0x5B, VkWinDer = 0x5C, VkNeutra = 0xFF;
-    const int VkEsc = 0x1B, VkCtrl = 0x11, VkShift = 0x10, VkAlt = 0x12;
+    const int VkEsc = 0x1B, VkCtrl = 0x11, VkShift = 0x10, VkAlt = 0x12, VkImprPant = 0x2C;
 
     // Marca en dwExtraInfo para reconocer lo que inyectamos nosotros: sin esto el
     // hook se vería su propia tecla neutra y se realimentaría
@@ -167,6 +167,11 @@ public sealed class GanchoTeclas : IDisposable
             {
                 _capturando = false;
             }
+            else if (EsDelSistema(vk))
+            {
+                // Esto no es para la caja: pasa de largo sin encolarse
+                return CallNextHookEx(_hook, codigo, wParam, lParam);
+            }
             else
             {
                 if (abajo && vk is not (VkWinIzq or VkWinDer or VkCtrl or VkShift or VkAlt))
@@ -220,6 +225,14 @@ public sealed class GanchoTeclas : IDisposable
     }
 
     static bool Abajo(int vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
+
+    // Teclas que nunca son para la caja de búsqueda, aunque estemos capturando:
+    // Impr Pant (sola o con Win/Alt/Shift, que es como se piden las capturas en
+    // Windows 11) y cualquier combinación con Win o Alt, que son del sistema. Antes
+    // se las tragaba todas y, nada más abrir el menú, el atajo de captura no hacía
+    // nada. Las normales siguen yendo a la cola, que es para lo que está la captura.
+    static bool EsDelSistema(uint vk) =>
+        vk == VkImprPant || Abajo(VkWinIzq) || Abajo(VkWinDer) || Abajo(VkAlt);
 
     void InyectarNeutra()
     {
