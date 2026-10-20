@@ -115,6 +115,10 @@ static class Nativo
     // para arrastrar la isla sin capturar el ratón.
     public static bool BotonIzquierdoPulsado() => (GetAsyncKeyState(0x01) & 0x8000) != 0;
 
+    // El bit de abajo dice "se ha pulsado desde la última vez que preguntaste". Hace
+    // falta para no perderse un clic corto entre dos vueltas del vigilante.
+    public static bool HuboClicIzquierdo() => (GetAsyncKeyState(0x01) & 1) != 0;
+
     public static bool EstaMinimizada(IntPtr h) => IsIconic(h);
 
     // Minimizar como lo hace la barra de tareas: se le MANDA la orden a la ventana

@@ -193,24 +193,83 @@ public partial class MainWindow
         e.Handled = true;
     }
 
+    // La captura del ratón no basta cuando hay un juego delante: en cuanto otra
+    // aplicación se activa, Windows nos quita la captura y el clic de fuera ya no
+    // llega. Así que el clic fuera se mira también a pelo, cada 150 ms, preguntando
+    // por el botón y por dónde está el puntero. InputHitTest acierta hasta en las
+    // esquinas redondeadas, que es más de lo que daría comparar rectángulos.
+    bool _clicContado;
+
+    void VigilarClicFueraDelMenu()
+    {
+        if (_panelAbierto != PanelInicio) { _clicContado = false; return; }
+
+        // 1) ¿Se ha llevado el primer plano una aplicación de verdad? Entonces has
+        //    hecho clic en ella y el menú sobra. Esto va aquí, cada 150 ms, y no en
+        //    el tick de un segundo: tardaba dos segundos largos en enterarse.
+        var otra = Nativo.Activa();
+        if (otra != _self && !Nativo.EsNuestra(otra) && !SeLoDevuelveSolo(otra))
+        {
+            Log.Info($"el primer plano se ha ido a \"{Nativo.Titulo(otra)}\": el menú se cierra");
+            CerrarMenu();
+            return;
+        }
+
+        // 2) Y un clic fuera aunque nadie se lleve el foco (el escritorio, por
+        //    ejemplo). HuboClicIzquierdo no se pierde los clics cortos.
+        bool clic = Nativo.BotonIzquierdoPulsado() || Nativo.HuboClicIzquierdo();
+        if (!clic) { _clicContado = false; return; }
+        if (_clicContado) return;
+        _clicContado = true;
+        try
+        {
+            var r = Monitores.Raton();
+            if (Isla.InputHitTest(Isla.PointFromScreen(new Point(r.X, r.Y))) != null) return;
+            Log.Info("clic fuera del menú: se cierra");
+            CerrarMenu();
+        }
+        catch { }
+    }
+
     int _intentosFoco;
 
-    // Hay programas (Wallpaper Engine es uno) que se devuelven el primer plano a sí
-    // mismos cada pocos segundos. Si eso pasa con el menú abierto, el teclado se va
-    // con ellos y te quedas escribiendo en el vacío. Mientras el menú esté abierto se
-    // recupera el foco, con un tope: si algo insiste, se cierra el menú y en paz.
+    // Quien se lleva el primer plano puede ser una aplicación de verdad (has hecho
+    // clic en ella) o uno de esos programas que se lo devuelven a sí mismos cada
+    // pocos segundos: Wallpaper Engine y el escritorio. Con los primeros no hay nada
+    // que pelear, el menú sobra. Con los segundos sí, que si no te quedas escribiendo
+    // en el vacío. Antes se peleaba con todos, y con un juego delante era imposible
+    // cerrar el menú con un clic fuera: lo cerrabas y el foco volvía solo.
+    static readonly string[] SeDevuelvenElFoco =
+    {
+        "Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd",
+        "SHELLDLL_DefView", "SysListView32"
+    };
+
+    static bool SeLoDevuelveSolo(IntPtr h)
+    {
+        if (h == IntPtr.Zero) return true;                       // nadie al frente: no es un clic tuyo
+        if (SeDevuelvenElFoco.Contains(Nativo.Clase(h))) return true;
+        var exe = Nativo.Exe(h);
+        return exe.Length > 0 &&
+               Path.GetFileNameWithoutExtension(exe).StartsWith("wallpaper", StringComparison.OrdinalIgnoreCase);
+    }
+
     void VigilarFocoDelMenu()
     {
         if (_panelAbierto != PanelInicio) { _intentosFoco = 0; return; }
-        if (Nativo.Activa() == _self) { _intentosFoco = 0; return; }
+        var otra = Nativo.Activa();
+        if (otra == _self || Nativo.EsNuestra(otra)) { _intentosFoco = 0; return; }
 
+        // Lo de "se lo ha llevado una aplicación de verdad" ya lo cierra el
+        // vigilante de 150 ms. Aquí solo queda pelearse con los que se lo devuelven
+        // solos, y rendirse si insisten.
         if (++_intentosFoco > 3)
         {
             Log.Info("el menú no consigue mantener el foco: se cierra");
             CerrarMenu();
             return;
         }
-        Log.Info($"el menú ha perdido el foco frente a \"{Nativo.Titulo(Nativo.Activa())}\": recuperándolo ({_intentosFoco})");
+        Log.Info($"el menú ha perdido el foco frente a \"{Nativo.Titulo(otra)}\": recuperándolo ({_intentosFoco})");
         Nativo.ForzarPrimerPlano(_self);
         Dispatcher.InvokeAsync(() => { _caja?.Focus(); Keyboard.Focus(_caja); }, DispatcherPriority.Input);
     }

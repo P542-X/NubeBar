@@ -310,3 +310,26 @@ activado. La cura es una propiedad en el XAML, `ShowActivated="False"`: así no
 se activa ni en ese primer instante. Solo afecta al primer `Show()`; el menú
 Inicio sigue cogiendo el teclado con su mecanismo de siempre (comprobado:
 tecla Windows, escribir "calc", sale la Calculadora).
+
+## Con un juego delante, el menú no se dejaba cerrar
+
+El menú Inicio se cerraba con un clic fuera gracias a la captura del ratón
+(`Mouse.Capture` en modo subárbol, como hacen los menús de Windows). Eso se cae
+en cuanto **otra aplicación se activa**: Windows nos quita la captura y el clic
+ya no nos llega. Con VALORANT delante pasaba justo eso, y encima el vigilante
+del foco creía que se lo había robado Wallpaper Engine y nos devolvía el primer
+plano: el menú parecía reabrirse solo y solo se podía cerrar con Esc.
+
+Dos cambios:
+
+- El vigilante del foco distingue a quién se lo ha llevado. Si es una
+  aplicación de verdad (has hecho clic en ella), el menú **se cierra**. Solo se
+  pelea con los que se devuelven el foco solos: Wallpaper Engine y las ventanas
+  del escritorio.
+- El clic fuera se mira además **a pelo cada 150 ms** (botón + posición del
+  puntero + `InputHitTest`, que acierta en las esquinas redondeadas), sin
+  depender de la captura. Se usa el bit de "pulsado desde la última vez" de
+  `GetAsyncKeyState` para no perderse los clics cortos.
+
+Medido: del clic fuera al menú cerrado, 219 ms. Y escribiendo durante 10
+segundos seguidos el menú aguanta abierto, que era lo que protegía la captura.
