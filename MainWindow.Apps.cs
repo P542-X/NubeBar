@@ -549,6 +549,10 @@ public partial class MainWindow
         if (_grupoSenalado is not { } g || g.Ventanas.Count < 2) return;
         if (g.Boton?.IsMouseOver != true) return;   // ya no está el ratón encima
 
+        // Con el menú del clic derecho abierto, la mini lista se lo comería: el
+        // ratón sigue encima del icono y el temporizador salta igual.
+        if (_panelAbierto == PanelMenu) return;
+
         var activa = ActivaAjena();
         int filas = Math.Min(MaxFilasMiniLista, g.Ventanas.Count);
         double ancho = 320, alto = filas * 30 + 12;

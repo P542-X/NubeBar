@@ -57,6 +57,9 @@ public partial class MainWindow : Window
     // ---------- El menú del clic derecho sobre un icono ----------
     void MenuDeGrupo(Grupo g)
     {
+        CerrarMiniLista();
+        _tiempoMiniLista?.Stop();   // que no vuelva a saltar encima del menú
+
         bool fijada = EstaFijada(g.Exe);
         string nombre = NombreDeClave(g.Exe);
 
@@ -73,7 +76,9 @@ public partial class MainWindow : Window
         else
             opciones.Add(($"Abrir {nombre}", () => Fuentes.Lanzar(g.Lanzar)));
 
-        const double ancho = 260, altoFila = 34;
+        opciones.AddRange(OpcionesDeCierre(g));
+
+        const double ancho = 300, altoFila = 34;
         AbrirPanel(PanelMenu, CrearMenuContextual(opciones.ToArray(), ancho, altoFila),
                    ancho, opciones.Count * altoFila + 12);
     }

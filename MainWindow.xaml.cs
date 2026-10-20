@@ -677,19 +677,18 @@ public partial class MainWindow : Window
     {
         if (_panelAbierto == PanelMenu) { CerrarPanel(); return; }
 
-        const double ancho = 230, altoFila = 34;
-        var opciones = new (string Texto, Action Accion)[]
+        const double ancho = 250, altoFila = 34;
+        var opciones = new List<(string Texto, Action Accion)>();
+        opciones.AddRange(OpcionesDeCerrarTodas());
+        opciones.Add(("Ajustes…", AbrirAjustes));
+        opciones.Add(("Recargar el config", () =>
         {
-            ("Ajustes…", AbrirAjustes),
-            ("Recargar el config", () =>
-            {
-                RecargarTodas(); Log.Info("config recargado a mano");
-            }),
-            ("Salir de NubeBar", Close)
-        };
+            RecargarTodas(); Log.Info("config recargado a mano");
+        }));
+        opciones.Add(("Salir de NubeBar", Close));
 
-        AbrirPanel(PanelMenu, CrearMenuContextual(opciones, ancho, altoFila),
-                   ancho, opciones.Length * altoFila + 12);
+        AbrirPanel(PanelMenu, CrearMenuContextual(opciones.ToArray(), ancho, altoFila),
+                   ancho, opciones.Count * altoFila + 12);
     }
 
     FrameworkElement CrearMenuContextual((string Texto, Action Accion)[] opciones, double ancho, double altoFila)

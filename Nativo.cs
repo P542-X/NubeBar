@@ -294,7 +294,39 @@ static class Nativo
     [DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
 
     // WM_CLOSE: la app decide (puede preguntar si guardas). Nunca se mata el proceso.
+    // Cerrar por las buenas: se le PIDE a la ventana que se cierre, igual que al
+    // pulsar su aspa. La app puede preguntarte si quieres guardar, y debe poder.
     public static void CerrarVentana(IntPtr h) => PostMessage(h, 0x0010, IntPtr.Zero, IntPtr.Zero);
+
+    public static int PidDe(IntPtr h)
+    {
+        GetWindowThreadProcessId(h, out int pid);
+        return pid;
+    }
+
+    // Cerrar por las malas, como "Finalizar tarea" del Administrador de tareas:
+    // el proceso muere sin poder guardar nada. Devuelve el porqué si no se pudo,
+    // que casi siempre es que el proceso va como administrador y nosotros no.
+    public static string? MatarProceso(int pid)
+    {
+        if (pid <= 0) return "no sé de qué proceso es esa ventana";
+        if (pid == Environment.ProcessId) return "esa es la propia NubeBar";
+        try
+        {
+            using var p = System.Diagnostics.Process.GetProcessById(pid);
+            string nombre = p.ProcessName;
+            p.Kill(entireProcessTree: true);
+            Log.Info($"proceso {nombre} ({pid}) finalizado a la fuerza");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"finalizar el proceso {pid}", ex);
+            return ex is System.ComponentModel.Win32Exception
+                ? "no tengo permiso: seguramente va como administrador"
+                : ex.Message;
+        }
+    }
 
     // ---------- Atajo global ----------
     [DllImport("user32.dll", SetLastError = true)] static extern bool RegisterHotKey(IntPtr h, int id, uint mod, uint vk);

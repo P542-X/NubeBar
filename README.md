@@ -36,6 +36,9 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
   siempre, abiertas o no; cerradas se ven atenuadas y al pulsarlas se abren.
 - **Se reordenan arrastrándolas**: coges un icono dentro de la isla, lo llevas
   donde quieras y los demás se apartan. El orden se guarda y aguanta reinicios.
+- **Cerrar desde la isla**: clic derecho en un icono para cerrar esa app, o
+  **forzar su cierre** como con «Finalizar tarea». Clic derecho en la isla para
+  cerrarlas todas. Las tres piden confirmación antes de hacer nada.
 - Vista general tipo Exposé con todas las ventanas, con atajo global.
 
 **El menú Inicio propio**
