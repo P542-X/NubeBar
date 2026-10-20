@@ -21,6 +21,8 @@ public partial class MainWindow
         public List<IntPtr> Ventanas = new();
         public IntPtr Ultima;              // la última de este grupo que estuvo activa
         public IntPtr InicioCiclo;         // por dónde empezó la vuelta actual al grupo
+        public bool Fijada;                // está anclada: se ve aunque no esté abierta
+        public string Lanzar = "";         // qué abrir si está fijada y cerrada
         public Button? Boton;
         public StackPanel? Puntos;
         public ImageSource? Icono;
@@ -181,6 +183,13 @@ public partial class MainWindow
             lista.Add(h);
         }
 
+        // Las fijadas entran aunque no estén abiertas, con la lista de ventanas
+        // vacía. Si ya estaban abiertas no se duplican: comparten clave con su
+        // grupo, así que el icono es el mismo y solo se le enciende la marca.
+        var fijadas = Fijadas.Select(ClaveDeFijada).ToList();
+        foreach (var f in fijadas)
+            if (!ahora.ContainsKey(f)) ahora[f] = new List<IntPtr>();
+
         // Grupos que ya no existen: se encogen y se van
         foreach (var clave in _grupos.Keys.Where(k => !ahora.ContainsKey(k)).ToList())
         {
@@ -191,10 +200,16 @@ public partial class MainWindow
         }
 
         // Grupos nuevos y actualización de los que siguen.
-        // En orden de ejecutable: los botones se añaden al final según van apareciendo,
-        // así que sin ordenar aquí los iconos salían en distinto sitio en cada arranque.
+        // Primero las fijadas, en el orden en que las pusiste tú, y detrás las demás
+        // por nombre de ejecutable: los botones se añaden al final según van
+        // apareciendo, así que sin ordenar aquí saldrían en distinto sitio cada vez.
         int orden = 0;
-        foreach (var (clave, ventanas) in ahora.OrderBy(p => p.Key, StringComparer.OrdinalIgnoreCase))
+        var enOrden = ahora
+            .OrderBy(p => fijadas.FindIndex(f => f.Equals(p.Key, StringComparison.OrdinalIgnoreCase)) is var i && i >= 0 ? i : int.MaxValue)
+            .ThenBy(p => p.Key, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        foreach (var (clave, ventanas) in enOrden)
         {
             if (_grupos.TryGetValue(clave, out var g))
             {
@@ -205,10 +220,18 @@ public partial class MainWindow
                 g.Ventanas = g.Ventanas.Where(conocidas.Contains)
                                        .Concat(ventanas.Where(h => !g.Ventanas.Contains(h)))
                                        .ToList();
+                g.Fijada = EstaFijada(clave);
                 ActualizarGrupo(g, activa);
                 continue;
             }
-            g = new Grupo { Exe = clave, Ventanas = ventanas, Ultima = ventanas[0] };
+            g = new Grupo
+            {
+                Exe = clave,
+                Ventanas = ventanas,
+                Ultima = ventanas.Count > 0 ? ventanas[0] : IntPtr.Zero,
+                Fijada = EstaFijada(clave),
+                Lanzar = FijadaDeClave(clave)
+            };
             _grupos[clave] = g;
             CrearBotonGrupo(g);
             _tira.Children.Add(g.Boton);
@@ -249,8 +272,11 @@ public partial class MainWindow
 
     void CrearBotonGrupo(Grupo g)
     {
-        var titulo = Nativo.Titulo(g.Ventanas[0]);
-        g.Icono = Nativo.Icono(g.Ventanas[0]);
+        // Una app fijada y cerrada no tiene ventana de la que sacar el icono:
+        // se lo pedimos al shell a partir de su ruta o de su AppUserModelId.
+        bool cerrada = g.Ventanas.Count == 0;
+        var titulo = cerrada ? NombreDeClave(g.Exe) : Nativo.Titulo(g.Ventanas[0]);
+        g.Icono = cerrada ? Iconos.De(g.Lanzar, 32) : Nativo.Icono(g.Ventanas[0]);
         UIElement visual = g.Icono != null
             ? new Image { Source = g.Icono, Width = 18, Height = 18 }
             : Texto(titulo.Length > 0 ? titulo[..1] : "?", 14);
@@ -270,6 +296,10 @@ public partial class MainWindow
         g.Boton.PreviewMouseLeftButtonDown += (_, _) => ApuntarActivaAlPulsar();
         g.Boton.MouseEnter += (_, _) => SenalarGrupo(g);
         g.Boton.MouseLeave += (_, _) => OlvidarGrupo(g);
+
+        // Clic derecho: fijar o quitar de la nube. Se marca como manejado para que
+        // no suba hasta la isla y abra SU menú contextual en vez de este.
+        g.Boton.MouseRightButtonUp += (_, e) => { e.Handled = true; MenuDeGrupo(g); };
     }
 
     // Estado visual del grupo: cuántos puntos y de qué color
@@ -279,10 +309,23 @@ public partial class MainWindow
 
         bool tieneLaActiva = g.Ventanas.Contains(activa);
         int cuantos = Math.Min(3, g.Ventanas.Count);
+        bool cerrada = g.Ventanas.Count == 0;
+
+        // Una app fijada pero cerrada se ve apagada y sin puntitos: se nota de un
+        // vistazo que está ahí para abrirla, no para volver a ella.
+        double opacidad = cerrada ? 0.45 : 1;
+        if (Math.Abs(g.Boton.Opacity - opacidad) > 0.01)
+        {
+            double antes = g.Boton.Opacity;
+            g.Boton.BeginAnimation(OpacityProperty, null);
+            g.Boton.Opacity = opacidad;
+            if (!inmediato) g.Boton.BeginAnimation(OpacityProperty, Kf(antes, opacidad, 260));
+        }
 
         // Con una sola ventana, tooltip normal. Con varias no, porque el que manda
         // es la mini lista y el tooltip se le pondría encima tapando la primera fila.
-        g.Boton.ToolTip = g.Ventanas.Count == 1 ? Nativo.Titulo(g.Ventanas[0]) : null;
+        g.Boton.ToolTip = cerrada ? NombreDeClave(g.Exe)
+                        : g.Ventanas.Count == 1 ? Nativo.Titulo(g.Ventanas[0]) : null;
 
         // Crear o quitar puntos hasta llegar al número que toca
         while (g.Puntos.Children.Count > cuantos) g.Puntos.Children.RemoveAt(g.Puntos.Children.Count - 1);
@@ -325,7 +368,16 @@ public partial class MainWindow
     // al dar la vuelta completa, se minimiza el grupo entero.
     void PulsarGrupo(Grupo g)
     {
-        if (g.Ventanas.Count == 0) return;
+        // Fijada y cerrada: se abre, que es para lo que está ahí
+        if (g.Ventanas.Count == 0)
+        {
+            CerrarMiniLista();
+            if (!g.Fijada) return;
+            Log.Info($"abriendo la app fijada {g.Lanzar}");
+            Uso.Apuntar("fijada:" + g.Lanzar);
+            Fuentes.Lanzar(g.Lanzar);
+            return;
+        }
         CerrarMiniLista();
 
         var activa = _activaAlPulsar != IntPtr.Zero ? _activaAlPulsar : ActivaAjena();

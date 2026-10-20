@@ -594,6 +594,66 @@ public sealed class VentanaAjustes : Window
         return lista.Items.Count;
     }
 
+    // Lista editable con subir y bajar: el ORDEN importa en las apps fijadas
+    UIElement ListaEditable(String seccion, String clave, String ayuda)
+    {
+        var c = Columna();
+        var lista = new ListBox
+        {
+            Height = 120,
+            Background = new SolidColorBrush(Color.FromArgb(0x18, 255, 255, 255)),
+            Foreground = _texto, BorderThickness = new Thickness(0)
+        };
+        foreach (var f in _arbol.Lista(seccion, clave)) lista.Items.Add(f);
+
+        var nueva = new TextBox
+        {
+            Height = 28, Margin = new Thickness(0, 6, 0, 0),
+            Padding = new Thickness(8, 0, 8, 0),
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Background = new SolidColorBrush(Color.FromArgb(0x22, 255, 255, 255)),
+            Foreground = _texto, BorderThickness = new Thickness(0)
+        };
+        void Volcar() { _arbol.PonerLista(seccion, clave, lista.Items.Cast<string>()); Cambio(); }
+
+        void Mover(int paso)
+        {
+            int i = lista.SelectedIndex;
+            int j = i + paso;
+            if (i < 0 || j < 0 || j >= lista.Items.Count) return;
+            var s = lista.Items[i];
+            lista.Items.RemoveAt(i);
+            lista.Items.Insert(j, s);
+            lista.SelectedIndex = j;
+            Volcar();
+        }
+
+        var fila = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 0) };
+        fila.Children.Add(BotonPlano("Añadir", () =>
+        {
+            if (nueva.Text.Trim().Length == 0) return;
+            lista.Items.Add(nueva.Text.Trim());
+            nueva.Text = "";
+            Volcar();
+        }, false));
+        fila.Children.Add(BotonPlano("Quitar", () =>
+        {
+            if (lista.SelectedItem is string s) { lista.Items.Remove(s); Volcar(); }
+        }, false));
+        fila.Children.Add(BotonPlano("Subir", () => Mover(-1), false));
+        fila.Children.Add(BotonPlano("Bajar", () => Mover(1), false));
+
+        c.Children.Add(lista);
+        c.Children.Add(nueva);
+        c.Children.Add(fila);
+        c.Children.Add(new TextBlock
+        {
+            Text = ayuda, Foreground = _texto, Opacity = 0.45,
+            TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0)
+        });
+        return c;
+    }
+
     UIElement SeccionApps()
     {
         var c = Columna();
@@ -603,6 +663,12 @@ public sealed class VentanaAjustes : Window
         c.Children.Add(Interruptor("Enseñar solo las apps del escritorio virtual actual",
                                    _arbol.Bandera("Barra", "AppsDelEscritorio", false),
                                    v => _arbol.Poner("Barra", "AppsDelEscritorio", v)));
+
+        c.Children.Add(Rotulo("Apps fijadas en la barra", true));
+        c.Children.Add(ListaEditable("Barra", "AppsFijadas",
+            "Siempre visibles en el carrusel, abiertas o no, y en este orden. " +
+            "Una ruta de ejecutable por línea, o shell:AppsFolder\\<id> para las de la Store. " +
+            "Más cómodo: clic derecho sobre el icono de una app en la isla."));
         c.Children.Add(Interruptor("Agrupar las ventanas del mismo programa",
                                    _arbol.Bandera("Barra", "AgruparApps", true),
                                    v => _arbol.Poner("Barra", "AgruparApps", v)));

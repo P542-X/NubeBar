@@ -30,6 +30,8 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
   desplazarse y un límite configurable de iconos visibles.
 - Clic para activar, clic en la que ya está delante para minimizarla, y una
   mini lista para elegir entre las ventanas de un mismo programa.
+- **Apps fijadas**: clic derecho sobre un icono para anclarlo. Se quedan
+  siempre, abiertas o no; cerradas se ven atenuadas y al pulsarlas se abren.
 - Vista general tipo Exposé con todas las ventanas, con atajo global.
 
 **El menú Inicio propio**
@@ -178,6 +180,7 @@ la isla se adapta sola. Las claves que no reconoce se conservan tal cual.
 | `Barra.Notificaciones` | `true` | Las notificaciones de Windows asoman en la isla |
 | `Barra.NotificacionesSilenciadas` | `[]` | Trozos de identificador de app que no avisan (p. ej. `"Discord"`) |
 | `Barra.AppsDelEscritorio` | `false` | El carrusel, solo con las apps del escritorio virtual actual |
+| `Barra.AppsFijadas` | `[]` | Apps siempre presentes en el carrusel, en este orden. Rutas de ejecutable, o `shell:AppsFolder\<id>` para las de la Store |
 
 ### Módulos
 

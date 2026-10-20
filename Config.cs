@@ -45,6 +45,7 @@ public class Barra
     public int MaxBandeja { get; set; } = 6;         // cuántos se ven sin abrir el desplegable "^"
     public bool Notificaciones { get; set; } = true; // las notificaciones asoman en la isla
     public bool AppsDelEscritorio { get; set; } = false;   // el carrusel, solo con las del escritorio virtual actual
+    public List<string> AppsFijadas { get; set; } = new();  // apps siempre presentes en el carrusel
     public List<string> NotificacionesSilenciadas { get; set; } = new();   // trozos de AppUserModelId
 }
 
