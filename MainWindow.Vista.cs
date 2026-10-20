@@ -161,15 +161,18 @@ public partial class MainWindow
             VerticalAlignment = VerticalAlignment.Center
         });
 
-        // La activa se resalta con un filo del color de acento. Sin altura fija: la
-        // tenía, y entre la altura y los márgenes pedía 44 px dentro de un botón de
-        // 42, así que al filo se le comían 2 px y se veía cortado por abajo. Ahora
-        // se estira a lo que quede y entra entero.
+        // La activa se resalta con un filo del color de acento. Las cuentas importan:
+        // el marco pedía 38 de alto más 3+3 de margen, o sea 44, dentro de un botón
+        // de 42, y WPF recortaba la diferencia por abajo. Quitarle la altura tampoco
+        // vale: el borde se encoge al tamaño del texto (19 px) porque el botón centra
+        // su contenido. Así que marco de 36 + 6 de margen = 42 dentro de un botón de
+        // 44, con un pelín de aire y sin recortes.
         var marco = new Border
         {
             Child = fila,
             CornerRadius = new CornerRadius(8),
             Margin = new Thickness(3),
+            Height = AltoCelda - 10,
             BorderThickness = new Thickness(esActiva ? 1 : 0),
             BorderBrush = _acentoLegible,
             Background = esActiva
@@ -179,7 +182,7 @@ public partial class MainWindow
 
         var boton = Boton(marco, titulo, () => { PulsarVentana(h, grupo); CerrarVista(); });
         boton.PreviewMouseLeftButtonDown += (_, _) => ApuntarActivaAlPulsar();
-        boton.Height = AltoCelda - 4;
+        boton.Height = AltoCelda - 2;
         boton.Width = AnchoCelda - 6;
         boton.Padding = new Thickness(0);
 

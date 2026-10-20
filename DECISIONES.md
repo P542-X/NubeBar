@@ -343,6 +343,13 @@ color de acento. Pedía más alto del que tenía: el marco medía 38 px y llevab
 3 px de margen arriba y abajo, o sea 44, dentro de un botón de 42. WPF recorta
 lo que sobra y se comía el filo de abajo.
 
-Se le quita la altura fija y se deja que se estire a lo que quede (36 px). El
-alto de la celda sigue siendo el mismo, así que la rejilla no cambia de tamaño.
-Comprobado con zoom x5: el filo sale entero por los cuatro lados.
+Quitarle la altura tampoco valía: el botón centra su contenido, así que el
+borde se encogía al tamaño del texto (19 px medidos) y parecía que faltaba el
+filo de abajo. Las cuentas que sí salen: marco de 36 + 3+3 de margen = 42
+dentro de un botón de 44, y el botón entra en la fila de 46. Medido contando
+píxeles azules en la captura: filo arriba en y=104 y abajo en y=139, 35 px.
+
+Y una lección de método: `dotnet build` con NubeBar abierta falla al copiar el
+exe con MSB3027, no con un "error CS". Filtrar el log del build por "error CS"
+me hizo creer dos veces que había compilado cuando no. Se filtra por "error" a
+secas, o se cierra NubeBar antes.
