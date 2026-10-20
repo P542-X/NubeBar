@@ -161,13 +161,15 @@ public partial class MainWindow
             VerticalAlignment = VerticalAlignment.Center
         });
 
-        // La activa se resalta con un filo del color de acento
+        // La activa se resalta con un filo del color de acento. Sin altura fija: la
+        // tenía, y entre la altura y los márgenes pedía 44 px dentro de un botón de
+        // 42, así que al filo se le comían 2 px y se veía cortado por abajo. Ahora
+        // se estira a lo que quede y entra entero.
         var marco = new Border
         {
             Child = fila,
             CornerRadius = new CornerRadius(8),
             Margin = new Thickness(3),
-            Height = AltoCelda - 8,
             BorderThickness = new Thickness(esActiva ? 1 : 0),
             BorderBrush = _acentoLegible,
             Background = esActiva

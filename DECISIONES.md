@@ -335,3 +335,14 @@ Medido: del clic fuera al menú cerrado, 180-220 ms. Y el vigilante de un
 segundo ya ni lo intenta con una aplicación de verdad: hacerlo le robaba el
 primer plano al juego durante un instante antes de cerrarse. Y escribiendo durante 10
 segundos seguidos el menú aguanta abierto, que era lo que protegía la captura.
+
+## El filo de la ventana activa salía cortado
+
+En la vista general, la celda de la ventana activa lleva un filo redondeado del
+color de acento. Pedía más alto del que tenía: el marco medía 38 px y llevaba
+3 px de margen arriba y abajo, o sea 44, dentro de un botón de 42. WPF recorta
+lo que sobra y se comía el filo de abajo.
+
+Se le quita la altura fija y se deja que se estire a lo que quede (36 px). El
+alto de la celda sigue siendo el mismo, así que la rejilla no cambia de tamaño.
+Comprobado con zoom x5: el filo sale entero por los cuatro lados.
