@@ -61,6 +61,17 @@ public partial class MainWindow
         _panelAlto = alto;
         _panelAncho = ancho;
 
+        // Si la isla estaba escondida por un juego o una ventana maximizada, aquí la
+        // traemos de vuelta nosotros mismos. Esperar al vigilante de 150 ms y a que
+        // el primer plano cambie añadía casi medio segundo al abrir el menú con la
+        // tecla Windows, y el juego puede no soltar el primer plano nunca.
+        if (_escondidaPorPantalla && !_asomada)
+        {
+            _asomada = true;
+            _ratonEnElBorde = DateTime.MaxValue;
+            Deslizar(false);
+        }
+
         // ¿Se despliega la isla o se queda recogida?
         //
         // Un panel estrecho dentro de una isla tan ancha como la fila entera de
@@ -129,7 +140,13 @@ public partial class MainWindow
             t.Y = 0;
         }
         MedirFotogramas($"abrir panel {nombre}");
-        Log.Info($"panel abierto: {nombre} ({ancho:0}x{alto:0}, teclado={teclado})");
+        // Cuánto ha tardado el menú desde que soltaste la tecla Windows: hasta que
+        // la ventana está colocada y el contenido montado, sin contar la animación
+        var tecla = GanchoTeclas.MarcaTecla;
+        GanchoTeclas.MarcaTecla = 0;
+        string desdeTecla = tecla == 0 ? "" :
+            $", {System.Diagnostics.Stopwatch.GetElapsedTime(tecla).TotalMilliseconds:0} ms desde la tecla";
+        Log.Info($"panel abierto: {nombre} ({ancho:0}x{alto:0}, teclado={teclado}){desdeTecla}");
     }
 
     void CerrarPanel()

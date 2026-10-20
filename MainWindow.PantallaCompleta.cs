@@ -147,7 +147,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Asomada: se va en cuanto sacas el ratón de la franja donde está la isla
+        // Asomada: se va en cuanto sacas el ratón de la franja donde está la isla.
+        // Con un panel abierto no: estarías usando el menú con el teclado y se
+        // escondería debajo en cuanto apartases el ratón.
+        if (_panelAbierto != null) return;
+
         double altoDip = ActualHeight > 0 ? ActualHeight : _cfg.Barra.Alto + _cfg.Barra.Margen * 2;
         int franja = (int)Math.Round(altoDip * _monitor.Escala);
         bool dentro = p.X >= _monitor.X && p.X < _monitor.Derecha &&

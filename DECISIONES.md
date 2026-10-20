@@ -353,3 +353,24 @@ Y una lección de método: `dotnet build` con NubeBar abierta falla al copiar el
 exe con MSB3027, no con un "error CS". Filtrar el log del build por "error CS"
 me hizo creer dos veces que había compilado cuando no. Se filtra por "error" a
 secas, o se cierra NubeBar antes.
+
+## El menú con un juego delante: salir rápido y no cerrarse solo
+
+Dos cosas más que solo se ven con un juego o una ventana maximizada delante,
+o sea con la isla escondida:
+
+- **Tardaba en salir.** Al abrir el menú, la isla seguía deslizada fuera y
+  esperaba a que el vigilante de 150 ms viera que el primer plano había
+  cambiado. Y si el juego no soltaba el primer plano, no cambiaba nunca y el
+  menú se quedaba invisible hasta que movías el ratón al borde. Ahora `AbrirPanel`
+  saca la isla él mismo, sin depender de nadie. Medido: de la tecla al panel
+  colocado, 25-42 ms en caliente y 108-116 ms la primera vez; el resto de lo que
+  se ve es la animación de apertura.
+- **Se cerraba solo.** La regla nueva de "si el primer plano se lo lleva una
+  aplicación de verdad, cierro el menú" cerraba el menú recién abierto cuando el
+  juego no nos cedía el primer plano. Ahora solo cierra si el menú **llegó a
+  tener** el foco y lo perdió después. El clic fuera lo sigue cerrando igual,
+  porque eso se mira aparte.
+
+Y con un panel abierto la isla ya no se vuelve a esconder al apartar el ratón:
+estarías usando el menú con el teclado y se te iba debajo.

@@ -64,6 +64,10 @@ public sealed class GanchoTeclas : IDisposable
     // así que quien se suscriba tiene que saltar al hilo de la UI por su cuenta.
     public event Action? AbrirMenu;
 
+    // Marca de cuándo soltaste la tecla, para poder medir lo que tarda el menú en
+    // salir. Lo que se mide es de la tecla a la ventana colocada, sin la animación.
+    public static long MarcaTecla;
+
     public readonly ConcurrentQueue<Pulsacion> Cola = new();
 
     volatile bool _capturando;
@@ -189,6 +193,7 @@ public sealed class GanchoTeclas : IDisposable
                     // se ha pulsado nada más. Inyectando una tecla neutra se lo creemos.
                     InyectarNeutra();
                     Capturando = true;
+                    MarcaTecla = System.Diagnostics.Stopwatch.GetTimestamp();
                     AbrirMenu?.Invoke();
                 }
                 return CallNextHookEx(_hook, codigo, wParam, lParam);
@@ -204,6 +209,7 @@ public sealed class GanchoTeclas : IDisposable
             if (vk == VkEsc && Abajo(VkCtrl))
             {
                 Capturando = true;
+                MarcaTecla = System.Diagnostics.Stopwatch.GetTimestamp();
                 AbrirMenu?.Invoke();
                 return (IntPtr)1;
             }

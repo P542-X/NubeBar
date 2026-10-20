@@ -199,16 +199,21 @@ public partial class MainWindow
     // por el botón y por dónde está el puntero. InputHitTest acierta hasta en las
     // esquinas redondeadas, que es más de lo que daría comparar rectángulos.
     bool _clicContado;
+    bool _tuvoFoco;        // el menú ha llegado a tener el primer plano alguna vez
 
     void VigilarClicFueraDelMenu()
     {
-        if (_panelAbierto != PanelInicio) { _clicContado = false; return; }
+        if (_panelAbierto != PanelInicio) { _clicContado = false; _tuvoFoco = false; return; }
 
         // 1) ¿Se ha llevado el primer plano una aplicación de verdad? Entonces has
         //    hecho clic en ella y el menú sobra. Esto va aquí, cada 150 ms, y no en
         //    el tick de un segundo: tardaba dos segundos largos en enterarse.
+        //    Ojo: solo si el menú LLEGÓ a tener el foco. Con un juego a pantalla
+        //    completa puede que no nos lo suelte nunca, y entonces cerrar aquí sería
+        //    cerrar el menú nada más abrirlo.
         var otra = Nativo.Activa();
-        if (otra != _self && !Nativo.EsNuestra(otra) && !SeLoDevuelveSolo(otra))
+        if (otra == _self || Nativo.EsNuestra(otra)) { _tuvoFoco = true; return; }
+        if (_tuvoFoco && !SeLoDevuelveSolo(otra))
         {
             Log.Info($"el primer plano se ha ido a \"{Nativo.Titulo(otra)}\": el menú se cierra");
             CerrarMenu();
