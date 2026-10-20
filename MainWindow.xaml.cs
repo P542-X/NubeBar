@@ -131,6 +131,7 @@ public partial class MainWindow : Window
                     Uso.Cargar();
                     _ = Fuentes.CargarApps();   // el índice del buscador se arma por detrás
                     MontarTeclaWindows();
+                    if (_cfg.Barra.Notificaciones && Notificaciones.Disponible) Notificaciones.Arrancar();
                 }
                 VigilarWallpaperEngine();
                 _tick.Tick += (_, _) => Tick();
@@ -203,6 +204,7 @@ public partial class MainWindow : Window
             if (!_cerrando && _cfg.Barra.OcultarBarraWindows && Nativo.BarraWindowsVisible()) Nativo.EsconderBarraWindows();
             Historial.Anotar(Nativo.Cpu(), Nativo.Ram());
         }
+        if (_esJefa) VigilarNotificaciones();
         RefrescarMusica();
         foreach (var a in _actualizadores.ToArray()) a();
         AjustarAncho();   // el texto de CPU/RAM/hora cambia de ancho: que se deslice

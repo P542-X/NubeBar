@@ -40,6 +40,8 @@ public class Barra
     public bool OcultarEnPantallaCompleta { get; set; } = true;
     public bool Bandeja { get; set; } = true;        // iconos de la bandeja del sistema en la isla
     public int MaxBandeja { get; set; } = 6;         // cuántos se ven sin abrir el desplegable "^"
+    public bool Notificaciones { get; set; } = true; // las notificaciones asoman en la isla
+    public List<string> NotificacionesSilenciadas { get; set; } = new();   // trozos de AppUserModelId
 }
 
 public class Modulos

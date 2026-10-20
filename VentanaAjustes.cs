@@ -842,6 +842,30 @@ public sealed class VentanaAjustes : Window
             Foreground = _texto, Opacity = 0.45, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0)
         });
 
+        c.Children.Add(Rotulo("Notificaciones", true));
+        c.Children.Add(Interruptor("Enseñar las notificaciones en la isla",
+                                   _arbol.Bandera("Barra", "Notificaciones", true),
+                                   v => _arbol.Poner("Barra", "Notificaciones", v)));
+        var silenciadas = _arbol.Lista("Barra", "NotificacionesSilenciadas");
+        var caja = new TextBox
+        {
+            Text = string.Join(Environment.NewLine, silenciadas),
+            AcceptsReturn = true, MinHeight = 56, MaxHeight = 110,
+            Background = new SolidColorBrush(Color.FromArgb(0x22, 255, 255, 255)),
+            Foreground = _texto, BorderBrush = _acento, BorderThickness = new Thickness(1),
+            Padding = new Thickness(6), Margin = new Thickness(0, 4, 0, 0),
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+        };
+        caja.TextChanged += (_, _) => _arbol.PonerLista("Barra", "NotificacionesSilenciadas",
+            caja.Text.Split('\n').Select(s => s.Trim()).Where(s => s.Length > 0).ToList());
+        c.Children.Add(caja);
+        c.Children.Add(new TextBlock
+        {
+            Text = "Una app por línea para silenciarla: basta un trozo de su identificador " +
+                   "(por ejemplo \"Discord\" o \"WindowsStore\"). \"No molestar\" se respeta siempre.",
+            Foreground = _texto, Opacity = 0.45, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0)
+        });
+
         c.Children.Add(Rotulo("Barra de tareas de Windows", true));
         c.Children.Add(Interruptor("Ocultarla mientras la nube esté abierta",
                                    _arbol.Bandera("Barra", "OcultarBarraWindows", true),

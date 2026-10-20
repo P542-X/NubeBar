@@ -114,3 +114,52 @@ cable de unos 50 ms. Sondearlo diez veces por segundo como el volumen sería un
 disparate, así que el aviso de brillo lo dispara quien lo cambia (el deslizador
 del centro de control). Si lo cambias desde el menú del propio monitor, NubeBar
 no se entera: no hay forma barata de enterarse.
+
+## Fase 4 · Notificaciones: se lee la base de Windows, sin paquetes ni certificados
+
+Tal como pediste, nada de MSIX disperso ni de instalar certificados. Se lee
+`%LOCALAPPDATA%\Microsoft\Windows\Notifications\wpndatabase.db`, que es donde
+Windows las guarda, **sin tocarla**: se copian los tres archivos (db, -wal y
+-shm) a una carpeta temporal con `FileShare.ReadWrite` y se abre la copia en
+solo lectura. Nunca se escribe ni se borra nada del original.
+
+Dos fallos encontrados por el camino:
+
+- **El archivo copiado se quedaba bloqueado.** Microsoft.Data.Sqlite mantiene la
+  conexión en un grupo y no suelta el archivo al salir del `using`, así que la
+  copia siguiente fallaba: las notificaciones habrían funcionado una sola vez y
+  nunca más. Se arregla con `Pooling = false`.
+- **"No molestar" salía encendido siempre.** `SHQueryUserNotificationState`
+  devuelve 5 para *acepta notificaciones*, y el 5 estaba en la lista de estados
+  que cuentan como "no molestar". Los buenos son 2, 3, 4 y 6. Venía de la fase 5
+  del bloque anterior.
+
+### Aviso: dependencia con una vulnerabilidad conocida
+
+`Microsoft.Data.Sqlite` 10.0.0 arrastra `SQLitePCLRaw.lib.e_sqlite3` 2.1.11, que
+tiene el aviso **GHSA-2m69-gcr7-jv3q** (gravedad alta) y **no hay versión
+parcheada** a día de hoy. Es un fallo de corrupción de memoria de SQLite cuando
+el número de términos de agregación supera al de columnas, o sea: hace falta
+poder ejecutar SQL hecho a medida. Aquí la consulta es fija, la base la genera
+el propio Windows en local y no entra nada de fuera, así que no es explotable en
+este uso. Lo dejo escrito para que lo sepas y decidas; si prefieres no tener esa
+dependencia, dímelo y quito la fase entera.
+
+| Paquete | Versión | Licencia | Para qué |
+|---|---|---|---|
+| Microsoft.Data.Sqlite | 10.0.0 | MIT | Leer la base de notificaciones de Windows |
+
+### Lo que no se pudo probar con notificaciones de verdad
+
+Tienes las notificaciones **apagadas en Windows** (`ToastEnabled = 0` en
+`HKCU\...\PushNotifications`), así que la base real no guarda ningún toast: hay
+2 filas y las dos son de tipo `badge`. Lanzar un toast de prueba desde
+PowerShell no cambia nada porque Windows lo descarta antes de guardarlo.
+
+No te toco ese ajuste. Para poder probarlo igualmente hay una variable de
+entorno, `NUBEBAR_NOTIS_PRUEBA=<carpeta>`, que apunta el lector a una base
+sintética con el mismo esquema. Con ella sí se ha probado el camino entero:
+3 toasts leídos y el `badge` descartado, el XML partido en título y texto, el
+identificador de app convertido en algo legible, solo las nuevas desde el
+arranque, y el aviso saliendo en la isla con su icono, la app en color de
+acento, el título y el texto.

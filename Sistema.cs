@@ -17,7 +17,11 @@ public static class NoMolestar
     {
         get
         {
-            try { return SHQueryUserNotificationState(out int e) == 0 && e is 2 or 3 or 4 or 5; }
+            // OJO con el 5: es QUNS_ACCEPTS_NOTIFICATIONS, o sea justo lo contrario.
+            // Estaba en la lista por error y el botón salía encendido siempre.
+            // Molestan: 2 (app a pantalla completa), 3 (juego en D3D), 4 (presentando)
+            // y 6 (horas de silencio).
+            try { return SHQueryUserNotificationState(out int e) == 0 && e is 2 or 3 or 4 or 6; }
             catch { return false; }
         }
     }
