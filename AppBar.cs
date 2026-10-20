@@ -81,8 +81,17 @@ static class AppBar
 
         if (_estadoOriginal == null)
         {
-            _estadoOriginal = LeerEstadoGuardado() ?? (int)SHAppBarMessage(ABM_GETSTATE, ref d);
+            // Si no hay fichero (no se pudo escribir, o lo borró alguien) se pregunta
+            // a Windows. Pero en ese momento el "ocultar automáticamente" puede ser el
+            // que pusimos nosotros: si se guardara tal cual, la barra se quedaría
+            // oculta para siempre. Por eso se quita ese bit del estado de respaldo:
+            // vale más dejarla visible de más que dejar al usuario sin barra.
+            var guardado = LeerEstadoGuardado();
+            _estadoOriginal = guardado ?? ((int)SHAppBarMessage(ABM_GETSTATE, ref d) & ~ABS_AUTOHIDE);
+            if (guardado == null)
+                Log.Info($"no había estado guardado de la barra: se toma {_estadoOriginal} (sin auto-ocultar)");
         }
+
 
         if (autoOcultar) GuardarEstado(_estadoOriginal.Value);
 
@@ -109,9 +118,11 @@ static class AppBar
         {
             System.IO.Directory.CreateDirectory(Config.Carpeta);
             if (!System.IO.File.Exists(RutaEstado))
-                System.IO.File.WriteAllText(RutaEstado, estado.ToString());
+                ConfigArbol.EscribirAtomico(RutaEstado, estado.ToString());
         }
-        catch { }
+        // Que esto falle en silencio era peligroso: sin el fichero, un cierre feo
+        // deja la barra en auto-ocultar y nadie sabe por qué
+        catch (Exception ex) { Log.Error("guardar el estado de la barra de Windows", ex); }
     }
 
     static void BorrarEstadoGuardado()

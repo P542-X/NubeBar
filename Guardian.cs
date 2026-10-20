@@ -84,6 +84,11 @@ static class Guardian
         int cual;
         try { cual = WaitHandle.WaitAny(new WaitHandle[] { fin, muerte }); }
         catch (Exception ex) { Log.Error("guardián esperando", ex); return; }
+        // El SafeWaitHandle se creó con ownsHandle:false, así que no es dueño del
+        // handle: si el GC finaliza "padre" durante la espera, Process lo cierra y el
+        // WaitAny se queda esperando sobre un handle muerto. Justo el guardián, que
+        // existe para devolverte la barra de tareas, es el que no debe fallar.
+        GC.KeepAlive(padre);
 
         // Si los dos están señalados gana el evento, pero se vuelve a mirar por si
         // la señal llegó justo entre medias: un cierre limpio no debe tocar nada.

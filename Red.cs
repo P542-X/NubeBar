@@ -39,7 +39,10 @@ static class Red
     [DllImport("wlanapi.dll")] static extern int WlanGetAvailableNetworkList(IntPtr handle, ref Guid iface, uint flags, IntPtr res, out IntPtr lista);
     [DllImport("wlanapi.dll")] static extern void WlanFreeMemory(IntPtr p);
 
-    [StructLayout(LayoutKind.Sequential)]
+    // Igual que en Brillo: strInterfaceDescription es WCHAR[256]. Sin CharSet.Unicode
+    // la estructura mide 276 en vez de 532 y, a partir del segundo adaptador, el GUID
+    // que se lee es basura.
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     struct WLAN_INTERFACE_INFO
     {
         public Guid InterfaceGuid;
@@ -54,7 +57,10 @@ static class Red
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 32)] public byte[] ucSSID;
     }
 
-    [StructLayout(LayoutKind.Sequential)]
+    // strProfileName es WCHAR[256]: sin CharSet.Unicode la estructura mide 372 en vez
+    // de 628 y, de la segunda red en adelante, el puntero cae a mitad de estructura
+    // (SSID, señal y banderas basura, y uSSIDLength disparatado reventaba el GetString)
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     struct WLAN_AVAILABLE_NETWORK
     {
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)] public string strProfileName;

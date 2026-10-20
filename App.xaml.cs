@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 
 namespace NubeBar;
@@ -13,6 +14,27 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        // Redes de seguridad. Una excepción suelta en un hilo de fondo no la caza
+        // nadie y se lleva por delante el proceso entero (le pasó al buscador con
+        // System.Data.OleDb). Aquí no se puede evitar el cierre, pero al menos queda
+        // escrito en el log qué fue. Las de la interfaz sí se pueden perdonar: más
+        // vale una isla con un módulo tonto que quedarte sin barra de tareas.
+        AppDomain.CurrentDomain.UnhandledException += (_, a) =>
+        {
+            var ex = a.ExceptionObject as Exception;
+            Log.Error("excepción sin capturar en un hilo de fondo", ex ?? new Exception(a.ExceptionObject?.ToString() ?? "desconocida"));
+        };
+        TaskScheduler.UnobservedTaskException += (_, a) =>
+        {
+            Log.Error("tarea que falló y nadie miró", a.Exception);
+            a.SetObserved();
+        };
+        DispatcherUnhandledException += (_, a) =>
+        {
+            Log.Error("excepción en la interfaz (no se cierra la aplicación)", a.Exception);
+            a.Handled = true;
+        };
 
         if (e.Args.Length > 0 && e.Args[0] == Guardian.Bandera)
         {

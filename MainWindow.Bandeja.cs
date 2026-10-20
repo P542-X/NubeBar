@@ -30,6 +30,10 @@ public partial class MainWindow : Window
     {
         _bandeja = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         _botonesBandeja.Clear();
+        // El botón "^" se vuelve a crear en cada Aplicar; si se queda el viejo, sigue
+        // teniendo por padre el panel anterior y añadirlo al nuevo lanza "ya es hijo
+        // de otro elemento", que abortaba Aplicar() a medias y dejaba la isla coja.
+        _botonMas = null;
 
         // Suscribirse siempre, aunque la bandeja todavía no esté en marcha: los
         // módulos se montan en Aplicar(), que corre ANTES de encenderla, y si aquí

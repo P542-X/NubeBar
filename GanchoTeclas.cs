@@ -115,6 +115,7 @@ public sealed class GanchoTeclas : IDisposable
         if (_hook == IntPtr.Zero)
         {
             Log.Info($"no se pudo instalar el hook de teclado (error {Marshal.GetLastWin32Error()})");
+            _hilo = null;    // si no, Instalar() no vuelve a intentarlo en toda la sesión
             return;
         }
         Log.Info("hook de teclado instalado en su propio hilo");

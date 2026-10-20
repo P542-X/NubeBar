@@ -61,7 +61,17 @@ public partial class MainWindow : Window
     void AbrirControl()
     {
         bool hayBrillo = Brillo.Disponible;
-        double alto = 420 + (hayBrillo ? Brillo.Pantallas().Count * 34 : 0);
+        // Solo para medir el alto del panel: se abren los monitores físicos y se
+        // devuelven en el acto. Antes se quedaban abiertos y se fugaba un handle del
+        // driver de vídeo por monitor cada vez que abrías el centro de control.
+        int cuantas = 0;
+        if (hayBrillo)
+        {
+            var p = Brillo.Pantallas();
+            cuantas = p.Count;
+            Brillo.Soltar(p);
+        }
+        double alto = 420 + cuantas * 34;
         AlternarPanel(PanelControl, CrearControl, 460, alto);
     }
 

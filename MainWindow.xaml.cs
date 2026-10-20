@@ -174,6 +174,7 @@ public partial class MainWindow : Window
             Nativo.QuitarAtajo(_self, IdAtajoVista);   // el atajo vuelve a quien lo quiera
             _gancho?.Dispose();                        // y la tecla Windows vuelve a la normalidad
             Bandeja.Apagar();                          // los iconos vuelven a la bandeja de Explorer
+            Notificaciones.Limpiar();                  // y la copia de su base se borra del temporal
             Guardian.Despedir();                       // cierre limpio: el guardián sobra
 
             // Se encola detrás de lo que hubiera pendiente y se espera: el proceso no
@@ -215,7 +216,13 @@ public partial class MainWindow : Window
         if (_esJefa) VigilarNotificaciones();
         VigilarVuelta();
         RefrescarMusica();
-        foreach (var a in _actualizadores.ToArray()) a();
+        // Cada actualizador con su red: uno que falle no debe llevarse por delante el
+        // resto del tick (el ancho de la isla, el vigilante del foco, el menú...)
+        foreach (var a in _actualizadores.ToArray())
+        {
+            try { a(); }
+            catch (Exception ex) { Log.Error("refrescar un módulo", ex); }
+        }
         AjustarAncho();   // el texto de CPU/RAM/hora cambia de ancho: que se deslice
         VigilarFocoDelMenu();
         // Lo del menú solo se refresca si el menú está delante
@@ -230,9 +237,19 @@ public partial class MainWindow : Window
     }
 
     // ================= Tema y posición =================
+    // La bandera _aplicando bloquea el ajuste de ancho mientras se monta todo. Si una
+    // excepción se escapaba por el medio, se quedaba puesta para siempre y la isla ya
+    // no volvía a ajustar su ancho en toda la sesión. Por eso el try/finally.
     void Aplicar()
     {
+        if (_cerrando) return;
         _aplicando = true;
+        try { AplicarTema(); }
+        finally { _aplicando = false; }
+    }
+
+    void AplicarTema()
+    {
         var t = _cfg.Tema;
         var b = _cfg.Barra;
         WallpaperEngine.RutaManual = _cfg.Wallpaper.Ruta;
@@ -328,8 +345,6 @@ public partial class MainWindow : Window
         // La ventana es una franja transparente de todo el ancho de SU monitor
         double altoVentana = b.Alto + b.Margen * 2;
         ColocarEnMonitor(altoVentana);
-
-        _aplicando = false;
 
         // Solo el modo barra reserva espacio; la isla flota encima de las ventanas, como en el iPhone.
         // Esto va en el hilo de la ventana porque la AppBar se registra con nuestro propio hwnd.

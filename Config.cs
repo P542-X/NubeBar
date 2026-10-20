@@ -102,8 +102,34 @@ public class Config
                 Directory.CreateDirectory(Carpeta);
                 File.WriteAllText(Ruta, JsonSerializer.Serialize(new Config(), Opc));
             }
-            return JsonSerializer.Deserialize<Config>(File.ReadAllText(Ruta), Opc);
+            var c = JsonSerializer.Deserialize<Config>(File.ReadAllText(Ruta), Opc);
+            if (c == null) return null;
+
+            // Un "Barra": null explícito en el JSON SÍ deja la propiedad a null: los
+            // inicializadores = new() solo valen cuando la clave no está. Y como el
+            // resto del programa da por hecho que estas secciones existen, un null
+            // aquí mataba el arranque antes incluso de que hubiera log. Se normaliza.
+            c.Tema ??= new();
+            c.Barra ??= new();
+            c.Modulos ??= new();
+            c.Wallpaper ??= new();
+            c.Inicio ??= new();
+            c.Barra.AppsFijadas ??= new();
+            c.Barra.OrdenApps ??= new();
+            c.Barra.NotificacionesSilenciadas ??= new();
+            c.Modulos.Izquierda ??= new();
+            c.Modulos.Centro ??= new();
+            c.Modulos.Derecha ??= new();
+            c.Inicio.Fijadas ??= new();
+            return c;
         }
-        catch { return null; }
+        catch (Exception ex)
+        {
+            // Sin esto, un solo valor con el tipo equivocado ("Alto": "38") dejaba la
+            // isla con el tema de fábrica y ni una palabra en el log
+            Log.Error("leer config.json (se usa la configuración de fábrica)", ex);
+            return null;
+        }
+
     }
 }

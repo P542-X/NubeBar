@@ -29,18 +29,47 @@ public sealed class ConfigArbol
         try { if (File.Exists(Config.Ruta)) texto = File.ReadAllText(Config.Ruta); }
         catch (Exception ex) { Log.Error("leer config para ajustes", ex); }
 
-        JsonObject raiz;
+        JsonObject? raiz = null;
         try
         {
-            raiz = (JsonNode.Parse(texto, documentOptions: new JsonDocumentOptions
+            raiz = JsonNode.Parse(texto, documentOptions: new JsonDocumentOptions
             {
                 CommentHandling = JsonCommentHandling.Skip,
                 AllowTrailingCommas = true
-            }) as JsonObject) ?? new JsonObject();
+            }) as JsonObject;
         }
-        catch { raiz = new JsonObject(); }
+        catch (Exception ex) { Log.Error("el config no se puede leer como JSON", ex); }
 
-        return new ConfigArbol(raiz, texto);
+        // Antes, si el fichero estaba roto se empezaba con un árbol VACÍO y el primer
+        // guardado desde ajustes borraba toda la configuración del usuario. Ahora el
+        // roto se aparta con su fecha y se intenta recuperar la copia .bak.
+        if (raiz == null && texto.Length > 0)
+        {
+            try
+            {
+                var apartado = Config.Ruta + ".roto-" + DateTime.Now.ToString("yyyyMMdd-HHmmss");
+                File.Copy(Config.Ruta, apartado, true);
+                Log.Info("config ilegible: se guarda tal cual en " + apartado);
+            }
+            catch (Exception ex) { Log.Error("apartar el config roto", ex); }
+
+            try
+            {
+                if (File.Exists(RutaCopia))
+                {
+                    var copia = File.ReadAllText(RutaCopia);
+                    if (JsonNode.Parse(copia) is JsonObject buena)
+                    {
+                        Log.Info("se recupera la copia de seguridad " + RutaCopia);
+                        return new ConfigArbol(buena, copia);
+                    }
+                }
+            }
+            catch (Exception ex) { Log.Error("recuperar la copia del config", ex); }
+        }
+
+        return new ConfigArbol(raiz ?? new JsonObject(), texto);
+
     }
 
     JsonObject Seccion(string nombre)
@@ -102,17 +131,35 @@ public sealed class ConfigArbol
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
+    // Escribir un fichero sin dejarlo a medias. File.WriteAllText trunca y luego
+    // escribe: si el proceso muere ahí (o se va la luz), el config queda vacío. Con
+    // un temporal y File.Replace el cambio es atómico, y de paso Windows deja la
+    // versión anterior en el .bak, que así está siempre al día en vez de ser una
+    // foto de la primera vez que se abrieron los ajustes.
+    public static void EscribirAtomico(string ruta, string texto, string? copia = null)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(ruta)!);
+        var tmp = ruta + ".tmp";
+        File.WriteAllText(tmp, texto);
+        if (File.Exists(ruta))
+        {
+            if (copia != null) File.Replace(tmp, ruta, copia, true);
+            else File.Replace(tmp, ruta, null, true);
+        }
+        else File.Move(tmp, ruta);
+    }
+
     public string Serializar() => _raiz.ToJsonString(Formato);
 
     public void Guardar()
     {
         try
         {
-            Directory.CreateDirectory(Config.Carpeta);
-            File.WriteAllText(Config.Ruta, Serializar());
+            EscribirAtomico(Config.Ruta, Serializar(), RutaCopia);
         }
         catch (Exception ex) { Log.Error("guardar config", ex); }
     }
+
 
     // Antes de tocar nada por primera vez se deja una copia a mano
     public void HacerCopiaUnaVez()
@@ -132,7 +179,7 @@ public sealed class ConfigArbol
     {
         try
         {
-            if (_original.Length > 0) File.WriteAllText(Config.Ruta, _original);
+            if (_original.Length > 0) EscribirAtomico(Config.Ruta, _original, RutaCopia);
         }
         catch (Exception ex) { Log.Error("revertir config", ex); }
     }

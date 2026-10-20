@@ -387,3 +387,61 @@ Regla nueva: cuando toca esconderse, si tienes el ratón dentro de la franja de
 la isla, se queda **asomada** en vez de irse, y se va cuando apartas el ratón,
 igual que cuando asoma por el borde. La franja se mide con el alto de la barra
 y no con `ActualHeight`, que con un panel abierto es el del panel entero.
+
+## La caída del buscador, y por qué una excepción suelta se lleva la aplicación
+
+Caída real, con su rastro en el log:
+
+```
+ERROR en FATAL: System.IO.FileNotFoundException: 'System.Data.OleDb ...'
+   at NubeBar.Fuentes.ConsultarIndice(...)
+   at System.Threading.Thread.StartHelper.Callback(...)
+guardián: NubeBar ha muerto sin avisar, devuelvo el shell
+```
+
+Dos lecciones. La primera: `ConsultarIndice` **sí** tenía su `try/catch`, pero no
+sirvió de nada, porque el fallo es al **cargar el ensamblado**, y eso pasa al
+entrar en el método, antes de que su `try` exista. Un `catch` solo protege de lo
+que ocurre dentro; para esto tiene que estar en quien llama.
+
+La segunda: una excepción sin capturar en un hilo de fondo **no la ve nadie** y
+termina el proceso. Ahora el cuerpo de ese hilo va envuelto, la búsqueda de
+archivos se apaga sola si falla (y lo dice en el log, una vez), y en `App` hay
+tres redes: `AppDomain.UnhandledException` (solo puede dejar constancia),
+`TaskScheduler.UnobservedTaskException` y `DispatcherUnhandledException`, esta
+última con `Handled = true`: vale más una isla con un módulo tonto que dejarte
+sin barra de tareas.
+
+## Lo que encontraron tres auditorías en paralelo
+
+Con el equipo parado una hora, tres agentes revisaron a la vez la interoperación
+con Win32/COM, la configuración y el disco, y la interfaz. Lo que de verdad
+estaba roto:
+
+**Corrupción de memoria** (tres sitios, todos por lo mismo): `ByValTStr` sin
+`CharSet.Unicode` cuenta BYTES donde el nativo cuenta WCHAR, así que la
+estructura mide la mitad y el API escribe fuera. `PHYSICAL_MONITOR` (136 contra
+264, y eso corre en **cada arranque** al probar el brillo), `WLAN_INTERFACE_INFO`
+y `WLAN_AVAILABLE_NETWORK` (372 contra 628, de ahí que la lista de wifis saliera
+corta o vacía). Y el `PROPVARIANT` de `Audio.cs` declaraba 16 bytes cuando en x64
+son 24: machacaba la pila cada vez que se leía el nombre de una salida. En
+`Nativo.cs` ya estaba bien declarado; ahora los dos son iguales.
+
+**Arranque y configuración**: un `"Barra": null` explícito en el JSON deja la
+propiedad a null (los inicializadores `= new()` solo valen si falta la clave) y
+mataba el arranque **antes de que existiera el log**: ni ventana, ni error, nada.
+Si el config no parseaba, la ventana de ajustes empezaba con un árbol vacío y el
+primer guardado borraba toda la configuración. Y ninguna escritura era atómica.
+
+**Seguridad de la barra de tareas**: si no se podía guardar `barra-estado.txt`,
+el respaldo preguntaba a Windows el estado actual, que ya incluía el
+auto-ocultar puesto por nosotros, y la barra se quedaba oculta para siempre. Y
+el guardián podía quedarse esperando sobre un handle que el GC había cerrado.
+
+**Cerrar todas las apps** incluía nuestra propia ventana de ajustes, así que
+"forzar el cierre" podía matar a NubeBar.
+
+**El `CPU 0%`**: `Nativo.Cpu()` es una lectura diferencial y se llamaba dos o
+tres veces por tick (el historial, el módulo de la isla y la gráfica del menú);
+la segunda no tenía tiempo que comparar y devolvía 0. Ahora la medida real se
+toma como mucho cada medio segundo y todos reciben la misma cifra.

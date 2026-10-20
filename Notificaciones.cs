@@ -56,10 +56,36 @@ public static class Notificaciones
         catch (Exception ex) { Log.Error("arrancar las notificaciones", ex); }
     }
 
+    // La copia de trabajo se borra al cerrar: es la base de notificaciones de
+    // Windows (con los textos de tus mensajes) y no tiene por qué quedarse en el
+    // temporal cuando NubeBar ya no está.
+    public static void Limpiar()
+    {
+        try { if (Directory.Exists(CarpetaCopia)) Directory.Delete(CarpetaCopia, true); }
+        catch (Exception ex) { Log.Info("no se pudo borrar la copia de las notificaciones: " + ex.Message); }
+    }
+
     // Las que han llegado desde la última vez que se preguntó
+    // Si Arrancar() falla (la base con otro esquema, el temporal lleno, un antivirus
+    // de por medio), antes se reintentaba en CADA vuelta de 3 segundos, y cada
+    // reintento copiaba la base entera de Windows: disco a tope para siempre. Ahora
+    // se espera un minuto entre intentos y a los 5 fallos se deja estar.
+    static DateTime _proximoIntento = DateTime.MinValue;
+    static int _fallos;
+
     public static List<Aviso> Nuevas()
     {
-        if (_ultimaVista < 0) { Arrancar(); return new List<Aviso>(); }
+        if (_ultimaVista < 0)
+        {
+            if (_fallos >= 5 || DateTime.Now < _proximoIntento) return new List<Aviso>();
+            _proximoIntento = DateTime.Now.AddMinutes(1);
+            _fallos++;
+            Arrancar();
+            if (_ultimaVista < 0 && _fallos >= 5)
+                Log.Info("notificaciones: 5 intentos fallidos, se deja de probar hasta el próximo arranque");
+            return new List<Aviso>();
+        }
+
         try
         {
             // Si Windows no ha escrito nada, no hay nada nuevo y nos ahorramos la copia

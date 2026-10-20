@@ -63,7 +63,8 @@ static class Nativo
 
     // La bandeja que encontraría Windows al repartir los Shell_NotifyIcon: la
     // primera Shell_TrayWnd en orden Z. Sirve para comprobar si ganamos nosotros.
-    public static IntPtr PrimeraBandeja() => FindWindow("Shell_TrayWnd", "");
+    // Con "" se exige que el título sea exactamente vacío; con null vale cualquiera.
+    public static IntPtr PrimeraBandeja() => FindWindow("Shell_TrayWnd", null);
 
     [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Izq, Arr, Der, Aba; }
 
@@ -290,7 +291,9 @@ static class Nativo
     // Windows reaprovecha los hwnd, así que hay que soltar los de ventanas que ya no existen
     public static void OlvidarExes(ICollection<IntPtr> vivas)
     {
-        if (_exes.Count <= vivas.Count) return;
+        // Nada de atajos por número: si se cierra una ventana y se abre otra entre dos
+        // vueltas, los contadores coinciden y la nueva heredaría el exe cacheado de la
+        // muerta (el icono se agrupaba con el programa equivocado).
         foreach (var muerta in _exes.Keys.Where(k => !vivas.Contains(k)).ToList()) _exes.Remove(muerta);
     }
 
@@ -447,14 +450,28 @@ static class Nativo
     static long _pi, _pk, _pu;
     static bool _cpuMedida;
 
+    // La medida es diferencial: cada llamada compara con la anterior. Si se llama dos
+    // veces seguidas (el módulo de la isla, la gráfica del menú y el historial lo
+    // hacían en el mismo tick), la segunda no tiene tiempo que comparar y devuelve 0:
+    // por eso la isla marcaba "CPU 0%" casi siempre. Ahora la lectura real se hace
+    // como mucho cada medio segundo y las demás reciben la misma cifra.
+    static int _ultimoCpu;
+    static long _marcaCpu;
+
     public static int Cpu()
     {
+        long ahora = Environment.TickCount64;
+        if (_cpuMedida && ahora - _marcaCpu < 500) return _ultimoCpu;
+        _marcaCpu = ahora;
+
         GetSystemTimes(out var i, out var k, out var u);
         long di = i - _pi, dt = (k - _pk) + (u - _pu); // kernel incluye idle
         _pi = i; _pk = k; _pu = u;
         if (!_cpuMedida) { _cpuMedida = true; return 0; }  // la primera lectura no tiene con qué compararse
-        return dt <= 0 ? 0 : (int)Math.Round(100.0 * (dt - di) / dt);
+        _ultimoCpu = dt <= 0 ? _ultimoCpu : (int)Math.Round(100.0 * (dt - di) / dt);
+        return _ultimoCpu;
     }
+
 
     [StructLayout(LayoutKind.Sequential)]
     struct MEMORYSTATUSEX

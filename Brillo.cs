@@ -12,7 +12,10 @@ namespace NubeBar;
 // esto se prueba al arrancar y, si el monitor no contesta, la opción no se ofrece.
 static class Brillo
 {
-    [StructLayout(LayoutKind.Sequential)]
+    // CharSet.Unicode NO es decorativo: szDescription es WCHAR[128] en el nativo.
+    // Sin él, ByValTStr se marshala como 128 BYTES y la estructura mide 136 en vez de
+    // 264: dxva2 escribe 264 por monitor sobre un hueco de 136 y machaca el montón.
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     struct PHYSICAL_MONITOR
     {
         public IntPtr hPhysicalMonitor;
@@ -42,7 +45,21 @@ static class Brillo
     // Se abren los monitores físicos de cada pantalla y se pregunta el brillo.
     // Los que no contestan se descartan en silencio: es lo normal en monitores
     // conectados por DisplayPort con DDC/CI apagado de fábrica.
+    // Los handles de monitor físico hay que devolverlos. Antes solo se devolvían
+    // cuando NINGUNO contestaba, así que cada vez que se abría el panel de control
+    // (que llama a Pantallas() dos veces) se fugaban tantos handles del driver de
+    // vídeo como monitores con DDC/CI. Ahora se devuelven todos al terminar.
+    public static void Soltar(List<Pantalla> pantallas)
+    {
+        foreach (var p in pantallas)
+        {
+            try { DestroyPhysicalMonitors(1, new[] { new PHYSICAL_MONITOR { hPhysicalMonitor = p.Fisico, szDescription = "" } }); }
+            catch { }
+        }
+    }
+
     public static List<Pantalla> Pantallas()
+
     {
         var lista = new List<Pantalla>();
         foreach (var m in Monitores.Todos())

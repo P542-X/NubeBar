@@ -52,12 +52,21 @@ public static class Audio
 
     [StructLayout(LayoutKind.Sequential)] struct PROPERTYKEY { public Guid fmtid; public int pid; }
 
-    [StructLayout(LayoutKind.Explicit)]
+    // Un PROPVARIANT ocupa 24 bytes en x64 (vt + 3 huecos + el valor + relleno). Si se
+    // declara más pequeño, el shell escribe 24 bytes sobre el hueco que reservó el
+    // marshaller y machaca la pila. Esta es la misma declaración que Nativo.cs, que ya
+    // estaba bien; la de aquí medía 16 y corrompía memoria en cada lectura de nombre.
+    [StructLayout(LayoutKind.Sequential)]
     struct PROPVARIANT
     {
-        [FieldOffset(0)] public short vt;
-        [FieldOffset(8)] public IntPtr punteroValor;
+        public ushort vt;
+        ushort r1, r2, r3;
+        public IntPtr punteroValor;
+        public IntPtr relleno;
     }
+
+    [DllImport("ole32.dll")] static extern int PropVariantClear(ref PROPVARIANT v);
+
 
     [ComImport, Guid("5CDF2C82-841E-4546-9722-0CF74078229A"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     interface IAudioEndpointVolume
@@ -164,8 +173,17 @@ public static class Audio
     {
         if (_cacheVolumen != null)
         {
-            try { _cacheVolumen.GetMasterVolumeLevelScalar(out _); return _cacheVolumen; }
-            catch { _cacheVolumen = null; }
+            // Los métodos están declarados devolviendo el HRESULT (PreserveSig), así
+            // que un dispositivo invalidado NO lanza excepción: devuelve un código de
+            // error. Mirando solo el catch, el objeto muerto se quedaba cacheado para
+            // siempre y al cambiar de altavoces el volumen se congelaba.
+            try
+            {
+                if (_cacheVolumen.GetMasterVolumeLevelScalar(out _) == 0) return _cacheVolumen;
+                Marshal.ReleaseComObject(_cacheVolumen);
+            }
+            catch { }
+            _cacheVolumen = null;
         }
         var enumerador = NuevoEnumerador();
         if (enumerador.GetDefaultAudioEndpoint(eRender, eConsole, out var disp) != 0 || disp == null) return null;
@@ -248,7 +266,9 @@ public static class Audio
             if (d.OpenPropertyStore(0, out var props) != 0 || props == null) return null;
             var clave = ClaveNombre;
             if (props.GetValue(ref clave, out var v) != 0) return null;
-            return v.punteroValor == IntPtr.Zero ? null : Marshal.PtrToStringUni(v.punteroValor);
+            var nombre = v.punteroValor == IntPtr.Zero ? null : Marshal.PtrToStringUni(v.punteroValor);
+            PropVariantClear(ref v);   // el shell reservó la cadena: hay que soltarla
+            return nombre;
         }
         catch { return null; }
     }

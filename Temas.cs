@@ -25,7 +25,7 @@ public static class Temas
     public static void Exportar(TemaGuardado tema, string ruta)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(ruta)!);
-        File.WriteAllText(ruta, JsonSerializer.Serialize(tema, new JsonSerializerOptions { WriteIndented = true }));
+        ConfigArbol.EscribirAtomico(ruta, JsonSerializer.Serialize(tema, new JsonSerializerOptions { WriteIndented = true }));
     }
 
     public static TemaGuardado? Importar(string ruta)

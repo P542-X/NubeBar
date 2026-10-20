@@ -255,18 +255,36 @@ public static class Fuentes
     // Si el servicio no está o tarda, se devuelve vacío y no pasa nada.
     // El proveedor Search.CollatorDSO quiere un hilo STA: desde un hilo del pool
     // (que es MTA) devuelve 0x80041607 y parece que el índice no está disponible.
+    // Si el índice no se puede usar (el servicio parado, el ensamblado de OleDb que
+    // no carga...), se apunta UNA vez y no se vuelve a intentar en toda la sesión.
+    static bool _sinIndice;
+
     public static List<Resultado> Archivos(string consulta, int tope, CancellationToken ct)
     {
         var salida = new List<Resultado>();
-        if (consulta.Length < 3) return salida;
+        if (consulta.Length < 3 || _sinIndice) return salida;
 
-        var hilo = new Thread(() => salida = ConsultarIndice(consulta, tope, ct));
+        // El cuerpo del hilo va envuelto SIEMPRE. Una excepción suelta en un hilo de
+        // fondo no la caza nadie y se lleva por delante el proceso entero: pasó de
+        // verdad, con un FileNotFoundException de System.Data.OleDb al ENTRAR en
+        // ConsultarIndice (el fallo es al cargar el ensamblado, antes de que exista
+        // su propio try, así que el catch tiene que estar aquí fuera).
+        var hilo = new Thread(() =>
+        {
+            try { salida = ConsultarIndice(consulta, tope, ct); }
+            catch (Exception ex)
+            {
+                _sinIndice = true;
+                Log.Error("buscar archivos en el índice de Windows (se desactiva)", ex);
+            }
+        });
         hilo.SetApartmentState(ApartmentState.STA);
         hilo.IsBackground = true;
         hilo.Start();
         if (!hilo.Join(TimeSpan.FromSeconds(3))) Log.Info("Windows Search tardó demasiado: se deja estar");
         return salida;
     }
+
 
     static List<Resultado> ConsultarIndice(string consulta, int tope, CancellationToken ct)
     {
@@ -336,7 +354,7 @@ public static class Uso
         try
         {
             Directory.CreateDirectory(Config.Carpeta);
-            File.WriteAllText(Ruta, JsonSerializer.Serialize(_veces, new JsonSerializerOptions { WriteIndented = true }));
+            ConfigArbol.EscribirAtomico(Ruta, JsonSerializer.Serialize(_veces, new JsonSerializerOptions { WriteIndented = true }));
         }
         catch (Exception ex) { Log.Error("guardar uso.json", ex); }
     }

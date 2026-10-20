@@ -208,12 +208,20 @@ public partial class MainWindow : Window
         // monitor con otro escalado la isla queda recortada o descentrada.
         DpiChanged += (_, e) =>
         {
+            // Recolocar la ventana puede provocar otro DpiChanged, y ese otro
+            // recoloca y vuelve a provocarlo: el log se llenaba de "cambio de escala
+            // 1 -> 1" decenas de veces por segundo. Si la escala no ha cambiado de
+            // verdad no hay nada que hacer.
+            if (Math.Abs(e.OldDpi.DpiScaleY - e.NewDpi.DpiScaleY) < 0.001 &&
+                Math.Abs(e.OldDpi.DpiScaleX - e.NewDpi.DpiScaleX) < 0.001) return;
+
             if (Monitores.DeVentana(_self) is { } m) _monitor = m;
             ColocarEnMonitor(AltoVentanaAhora());
             AjustarAncho();
             Log.Info($"cambio de escala en {_monitor.Dispositivo}: " +
                      $"{e.OldDpi.DpiScaleY:0.##} -> {e.NewDpi.DpiScaleY:0.##}, isla recolocada");
         };
+
     }
 
     // El alto que debe tener la ventana ahora mismo: la fila de módulos más el

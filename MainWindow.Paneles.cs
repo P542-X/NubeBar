@@ -241,7 +241,9 @@ public partial class MainWindow
         if (activar)
         {
             var antes = Nativo.Activa();         // a dónde volver al cerrar
-            if (antes != IntPtr.Zero && antes != _self) _ultimaActiva = antes;
+            // Cualquier ventana NUESTRA (la de ajustes, la otra isla) no cuenta: al
+            // cerrar el panel devolveríamos el foco a nosotros mismos.
+            if (antes != IntPtr.Zero && !Nativo.EsNuestra(antes)) _ultimaActiva = antes;
             Nativo.Activable(_self);
             bool alFrente = Nativo.ForzarPrimerPlano(_self);
             Activate();

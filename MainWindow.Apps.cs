@@ -159,6 +159,10 @@ public partial class MainWindow
         var activa = ActivaAjena();
 
         var abiertas = Nativo.VentanasAbiertas(_self);
+        // Nuestras propias ventanas (la de ajustes, sobre todo) NO son apps del
+        // carrusel: si no, salía un icono de NubeBar y "cerrar todas" o "forzar el
+        // cierre" podían acabar matando a la propia NubeBar.
+        abiertas.RemoveAll(Nativo.EsNuestra);
         // La caché de ejecutables se limpia con TODAS las ventanas, no solo con las
         // de este monitor: si no, cada isla le borraría a la otra lo que sí sigue vivo
         Nativo.OlvidarExes(new HashSet<IntPtr>(abiertas));
