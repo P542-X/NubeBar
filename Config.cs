@@ -38,7 +38,7 @@ public class Barra
     public string Monitores { get; set; } = "todos";   // "todos" | "principal"
     public bool AppsPorMonitor { get; set; } = true;   // cada isla enseña las apps de SU monitor
     public bool OcultarEnPantallaCompleta { get; set; } = true;
-    public bool Bandeja { get; set; } = false;       // iconos de la bandeja del sistema (ver DECISIONES.md)
+    public bool Bandeja { get; set; } = true;        // iconos de la bandeja del sistema en la isla
     public int MaxBandeja { get; set; } = 6;         // cuántos se ven sin abrir el desplegable "^"
 }
 

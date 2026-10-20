@@ -829,16 +829,16 @@ public sealed class VentanaAjustes : Window
 
         c.Children.Add(Rotulo("Bandeja del sistema", true));
         c.Children.Add(Interruptor("Traer los iconos de la bandeja a la isla",
-                                   _arbol.Bandera("Barra", "Bandeja", false),
+                                   _arbol.Bandera("Barra", "Bandeja", true),
                                    v => _arbol.Poner("Barra", "Bandeja", v)));
         c.Children.Add(Deslizador("Iconos visibles antes del desplegable", 1, 15,
                                   _arbol.Numero("Barra", "MaxBandeja", 6),
                                   v => _arbol.Poner("Barra", "MaxBandeja", Math.Round(v))));
         c.Children.Add(new TextBlock
         {
-            Text = "Viene apagado a propósito. Con la barra de tareas de Windows 11 funcionando, " +
-                   "las apps siguen entregándole a ella sus iconos y aquí no llega ninguno. " +
-                   "Hay que añadir además el módulo \"bandeja\" en Módulos para que se encienda.",
+            Text = "Para que se encienda hay que añadir además el módulo \"bandeja\" en Módulos: " +
+                   "si no estuviera puesto, los iconos desaparecerían de la barra de Windows sin " +
+                   "salir en ningún sitio. Al cerrar NubeBar vuelven solos a la bandeja de Windows.",
             Foreground = _texto, Opacity = 0.45, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0)
         });
 

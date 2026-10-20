@@ -36,21 +36,20 @@ static class Bandeja
         if (_shell != null) return;
         try
         {
-            var cfg = new ShellConfig
-            {
-                EnableTrayService = true,
-                AutoStartTrayService = false,   // lo arrancamos nosotros, abajo
-                EnableTasksService = false,    // la lista de ventanas ya la llevamos nosotros
-                AutoStartTasksService = false,
-                EnableWin11DpiWorkaround = true,
-                PinnedNotifyIcons = NotificationArea.DEFAULT_PINNED
-            };
-            _shell = new ShellManager(cfg);
+            // Montaje calcado al de RetroBar, que es el que funciona en Windows 11 con
+            // Explorer vivo. Lo que hace la magia está dentro de NotificationArea.
+            // Initialize(): crea una ventana de clase Shell_TrayWnd, manda la de
+            // Explorer al FONDO del orden Z, pone la nuestra arriba del todo y repite
+            // esa comprobación cada 100 ms. Como FindWindow devuelve la primera en
+            // orden Z, los Shell_NotifyIcon de las apps acaban llegándonos a nosotros.
+            // Después difunde "TaskbarCreated" para que todas vuelvan a registrarse.
+            ManagedShell.Common.Helpers.EnvironmentHelper.IsAppRunningAsShell =
+                Nativo.VentanaDelShell() == IntPtr.Zero;
 
-            // Esto es lo que de verdad enciende la bandeja: crea la ventana que recibe
-            // los Shell_NotifyIcon y difunde "TaskbarCreated" para que todas las apps
-            // vuelvan a registrar sus iconos con nosotros.
-            _shell.NotificationArea?.Initialize();
+            var cfg = ShellManager.DefaultShellConfig;
+            cfg.EnableTasksService = false;       // la lista de ventanas ya la llevamos nosotros
+            cfg.AutoStartTasksService = false;
+            _shell = new ShellManager(cfg);       // con AutoStartTrayService, ya llama a Initialize()
 
             if (_shell.NotificationArea == null || _shell.NotificationArea.IsFailed)
             {
@@ -62,17 +61,22 @@ static class Bandeja
 
             _shell.NotificationArea.TrayIcons.CollectionChanged += (_, _) => Cambio?.Invoke();
             Fallo = false;
+            Cambio?.Invoke();           // los módulos ya montados se enteran y se rellenan
             Log.Info($"bandeja encendida: {_shell.NotificationArea.TrayIcons.Count} iconos de salida");
 
             // Aviso honesto: si en 8 segundos no ha llegado ni un icono es que las apps
-            // siguen hablando con la bandeja de Explorer y este módulo no sirve de nada
-            var espera = new System.Threading.Timer(_ =>
+            // siguen hablando con la bandeja de Explorer y este módulo no sirve de nada.
+            // TrayIcons es una colección de WPF: solo se puede mirar desde el hilo de
+            // la interfaz, así que el temporizador salta allí antes de contar.
+            var interfaz = System.Windows.Threading.Dispatcher.CurrentDispatcher;
+            _avisoVacia = new System.Threading.Timer(_ => interfaz.BeginInvoke(new Action(() =>
             {
-                if (_shell?.NotificationArea?.TrayIcons.Count == 0)
-                    Log.Info("bandeja: ninguna app ha registrado su icono con nosotros. " +
-                             "Con la barra de Windows 11 viva, las apps siguen usando la suya.");
-            }, null, 8000, System.Threading.Timeout.Infinite);
-            _avisoVacia = espera;
+                int cuantos = _shell?.NotificationArea?.TrayIcons.Count ?? 0;
+                var nuestra = _shell?.NotificationArea?.Handle ?? IntPtr.Zero;
+                var primera = Nativo.PrimeraBandeja();
+                Log.Info($"bandeja a los 8 s: {cuantos} iconos | nuestra ventana={nuestra} | " +
+                         $"la que encuentra Windows={primera} | ¿ganamos?={nuestra == primera}");
+            })), null, 8000, System.Threading.Timeout.Infinite);
         }
         catch (Exception ex)
         {

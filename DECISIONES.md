@@ -9,7 +9,7 @@ estaba previsto en el encargo o que cambió sobre la marcha.
 |---|---|---|---|
 | System.Data.OleDb | 9.0.0 | MIT | Índice de Windows Search en el buscador del menú Inicio |
 
-## Fase 1 · La bandeja del sistema viene APAGADA por defecto
+## Fase 1 · La bandeja del sistema (resuelto en la segunda pasada)
 
 **Qué pasa.** ManagedShell 0.0.374 se registra bien como bandeja del shell: su
 ventana `Shell_TrayWnd` se crea y queda *antes* que la de Explorer, así que un
@@ -59,3 +59,33 @@ bluetooth están implementados pero sin probar: tocarlos de verdad cambiaría la
 configuración del equipo. `IPolicyConfig` sí se comprueba (responde en este
 Windows), y si no respondiera la opción no aparecería. Los pasos para probarlo
 a mano están en PRUEBAS-PARA-PAULO.md.
+
+### Fase 1 (corregido) · Sí funciona: faltaba el truco del orden Z
+
+La conclusión de arriba era **equivocada**, y lo demostró RetroBar: ejecutado un
+minuto en este mismo PC, con Explorer vivo, enseña los 16 iconos de la bandeja.
+Leyendo su código y el de ManagedShell apareció lo que faltaba.
+
+`NotificationArea.Initialize()` llama a `TrayService.Run()`, y ahí está la magia:
+
+```
+Resume()  ->  SetWindowsTrayBottommost()   // la Shell_TrayWnd de Explorer, al FONDO
+              MakeTrayTopmost()            // la nuestra, arriba del todo
+              trayMonitor.Start()          // y lo revisa cada 100 ms
+SendTaskbarCreated()                       // "volved a registrar vuestros iconos"
+```
+
+Como `FindWindow` devuelve la primera ventana en orden Z, con eso los
+`Shell_NotifyIcon` de las apps nos llegan a nosotros. Mis dos intentos fallaron
+por montar el `ShellConfig` a mano; usando `ShellManager.DefaultShellConfig` y
+fijando `EnvironmentHelper.IsAppRunningAsShell` (que es lo que hace RetroBar)
+entran los 16 iconos a los 8 segundos.
+
+**Resultado:** `Barra.Bandeja` pasa a **true** por defecto. Sigue haciendo falta
+poner el módulo `bandeja` en alguna zona para que el servicio arranque, por la
+misma razón de antes: encenderlo sin enseñarlo dejaría los iconos en tierra de
+nadie. Comprobado que al cerrar NubeBar los iconos vuelven a la bandeja de
+Windows (ManagedShell vuelve a difundir `TaskbarCreated` al soltarse).
+
+**Aviso sobre RetroBar:** al cerrarlo dejó la barra de tareas de Windows en
+"ocultar automáticamente". Se devolvió a su estado con `ABM_SETSTATE`.

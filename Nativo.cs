@@ -55,6 +55,16 @@ static class Nativo
 
     public static IntPtr Activa() => GetForegroundWindow();
 
+    [DllImport("user32.dll")] static extern IntPtr GetShellWindow();
+
+    // Si no hay ventana de shell, es que nadie hace de escritorio: ManagedShell
+    // necesita saberlo para decidir si difunde "TaskbarCreated" al arrancar.
+    public static IntPtr VentanaDelShell() => GetShellWindow();
+
+    // La bandeja que encontraría Windows al repartir los Shell_NotifyIcon: la
+    // primera Shell_TrayWnd en orden Z. Sirve para comprobar si ganamos nosotros.
+    public static IntPtr PrimeraBandeja() => FindWindow("Shell_TrayWnd", "");
+
     [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Izq, Arr, Der, Aba; }
 
     [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out RECT r);

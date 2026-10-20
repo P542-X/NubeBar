@@ -31,12 +31,10 @@ public partial class MainWindow : Window
         _bandeja = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         _botonesBandeja.Clear();
 
-        if (!Bandeja.Encendida)
-        {
-            // Apagada o no pudo registrarse: el módulo simplemente no ocupa sitio
-            return _bandeja;
-        }
-
+        // Suscribirse siempre, aunque la bandeja todavía no esté en marcha: los
+        // módulos se montan en Aplicar(), que corre ANTES de encenderla, y si aquí
+        // nos rindiéramos el panel se quedaría vacío para siempre. Cuando arranque
+        // (o cuando llegue un icono nuevo) avisará y esto se rellena solo.
         Bandeja.Cambio -= RefrescarBandeja;
         Bandeja.Cambio += RefrescarBandeja;
         RefrescarBandeja();
