@@ -13,13 +13,24 @@
     <RootNamespace>NubeBar</RootNamespace>
     <AssemblyName>NubeBar</AssemblyName>
     <PlatformTarget>x64</PlatformTarget>
-    <!-- Sin esto, "un solo fichero" es mentira: las DLL nativas de WPF
-         (PresentationNative_cor3, wpfgfx_cor3, D3DCompiler_47_cor3, PenImc_cor3,
-         vcruntime140_cor3) y e_sqlite3 se quedan SUELTAS junto al exe, y el exe
-         solo, copiado a otra carpeta, muere con DllNotFoundException nada más
-         arrancar. El workflow de la Release ya publicaba bien; esto arregla el
-         publish local, que es el que va a dist. -->
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <!-- TODO el contenido se extrae a %TEMP%\.net\NubeBar\<id> antes de que arranque
+         el runtime, no solo las DLL nativas.
+
+         Con solo las nativas, los ensamblados gestionados se leen del PROPIO EXE a
+         medida que hacen falta. Si el exe desaparece a media sesión, la siguiente
+         carga tardía muere con FileNotFoundException. Y desaparece en el caso más
+         normal del mundo: abrir la descarga desde la barra del navegador. Chrome lo
+         ejecuta desde una carpeta temporal suya (%TEMP%\scoped_dir…) y la borra a los
+         pocos segundos. Entonces al enfocar la caja del buscador WPF pedía
+         UIAutomationProvider (la accesibilidad del foco, que carga tarde), ya no
+         había de dónde leerlo, y NubeBar se cerraba de golpe.
+
+         Cuesta medio segundo en el PRIMER arranque de cada versión (700 ms contra
+         190 ms); los siguientes van a 90 ms porque la extracción ya está hecha.
+         Esto incluye las nativas, así que sustituye a IncludeNativeLibrariesForSelfExtract.
+         OJO: AppContext.BaseDirectory pasa a ser la carpeta de extracción, no la del
+         exe; para saber dónde está el exe, Environment.ProcessPath. -->
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>

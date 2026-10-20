@@ -18,6 +18,15 @@ static class Log
         }
         catch { }
         Info("==== " + Version + " ====");
+
+        // Desde dónde se está ejecutando. Parece un detalle y es media investigación:
+        // cuando el exe vive en la carpeta temporal del navegador, este se lo lleva a
+        // los pocos segundos y pasan cosas rarísimas (ver Arranque.EnCarpetaVolatil).
+        var exe = Environment.ProcessPath ?? "?";
+        Info("ejecutable: " + exe);
+        if (Arranque.EnCarpetaVolatil(exe))
+            Info("OJO: eso es una carpeta temporal, el navegador la borra sola. " +
+                 "Mueve NubeBar.exe a una carpeta de verdad.");
     }
 
     // Antes solo se miraba el tamaño al arrancar: en una sesión larga (NubeBar

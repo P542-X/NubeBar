@@ -481,3 +481,60 @@ Dos conclusiones:
 
 El arreglo de las excepciones en hilos de fondo (la red de seguridad que se
 añadió el mismo día) sigue siendo bueno por su cuenta, pero no era la causa.
+
+## El exe desapareciendo bajo sus pies, parte 2: la barra de descargas
+
+**Qué pasa.** Con la Release v1.1.24 ya instalada, abrir la caja del buscador
+cerraba NubeBar de golpe. En el log, al enfocar:
+
+```
+TypeInitializationException: AutomationPeer
+ ---> FileNotFoundException: 'UIAutomationProvider, Version=10.0.0.0...'
+   at ButtonBase.OnMouseLeftButtonDown
+```
+
+y tres segundos después, en el guardián, un `System.Linq` imposible. Los mismos
+dos síntomas de la vez anterior, pero esta vez nadie estaba republicando nada.
+
+**Por qué.** El exe que se estaba ejecutando no era el de `Descargas`:
+
+```
+pid 35732  C:\...\AppData\Local\Temp\scoped_dir2664_1428973678\NubeBar.exe
+```
+
+`scoped_dir…` es la carpeta temporal de Chrome. Al abrir la descarga desde la
+barra del navegador, Chrome no ejecuta el fichero de `Descargas`: lo copia a una
+carpeta suya, lo lanza desde ahí y la borra a los pocos segundos. Esa carpeta se
+quedó vacía con el proceso vivo (y su guardián siguió en marcha apuntando a un
+exe que ya no existía).
+
+Con `IncludeNativeLibrariesForSelfExtract`, los ensamblados **gestionados** no se
+extraen: se leen del propio exe a medida que hacen falta. Mientras solo cargues
+cosas al arrancar no se nota; la primera carga tardía después del borrado
+revienta. Y la accesibilidad del foco (`UIAutomationProvider`, que WPF pide la
+primera vez que algo recibe el foco) es justo una carga tardía. De ahí que
+crasheara al abrir el buscador y no antes.
+
+Medido con una prueba de consola aparte, publicada de las dos formas, borrando el
+exe en marcha:
+
+| Publicación | Carga tardía con el exe ya borrado |
+|---|---|
+| `IncludeNativeLibrariesForSelfExtract` | `FileNotFoundException` |
+| `IncludeAllContentForSelfExtract` | OK |
+
+**Decisión.** `IncludeAllContentForSelfExtract=true` en el .csproj y en el
+workflow. Extrae los 247 ficheros a `%TEMP%\.net\NubeBar\<id>` **antes** de que
+arranque el runtime, así que el exe no vuelve a hacer falta en toda la sesión.
+Cuesta medio segundo en el primer arranque de cada versión (1,1 s contra 0,6 s
+medidos con el exe de verdad); los siguientes, 90 ms. Incluye las nativas, así
+que sustituye a la propiedad anterior. Efecto colateral a recordar:
+`AppContext.BaseDirectory` pasa a ser la carpeta de extracción, no la del exe.
+
+Y dos cosas más, que son la misma historia por otro lado:
+
+1. El log dice desde dónde se está ejecutando, y avisa si es una carpeta
+   temporal. Media investigación de hoy era averiguar precisamente eso.
+2. "Arrancar con Windows" se niega a crear el acceso directo si el exe está en
+   una carpeta temporal: apuntaría a la nada en el siguiente arranque. Antes lo
+   creaba tan contento.

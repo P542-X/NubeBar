@@ -26,6 +26,21 @@ public static class Arranque
 
     public static bool Activo => File.Exists(RutaAcceso);
 
+    // Chrome y los demás navegadores no ejecutan la descarga desde la carpeta Descargas:
+    // la copian a una carpeta temporal suya (%TEMP%\scoped_dir…) y la borran a los pocos
+    // segundos, con el programa ya en marcha. Un acceso directo hacia ahí apunta a la nada
+    // en el siguiente arranque de Windows, así que no se crea: mejor decirlo que fingir.
+    public static bool EnCarpetaVolatil(string? ruta)
+    {
+        if (string.IsNullOrEmpty(ruta)) return false;
+        try
+        {
+            var temp = Path.GetFullPath(Path.GetTempPath());
+            return Path.GetFullPath(ruta).StartsWith(temp, StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return false; }
+    }
+
     public static bool Poner(bool activo, out string mensaje)
     {
         mensaje = "";
@@ -40,6 +55,12 @@ public static class Arranque
 
             var destino = ExeRecomendado();
             if (!File.Exists(destino)) { mensaje = "no encuentro el exe: " + destino; return false; }
+            if (EnCarpetaVolatil(destino))
+            {
+                mensaje = "NubeBar.exe está en una carpeta temporal y Windows la borra: " +
+                          "muévelo a una carpeta fija y vuelve a activarlo";
+                return false;
+            }
 
             var tipo = Type.GetTypeFromProgID("WScript.Shell");
             if (tipo == null) { mensaje = "WScript.Shell no disponible"; return false; }
