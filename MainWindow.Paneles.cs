@@ -198,7 +198,7 @@ public partial class MainWindow
     // hacía el menú Inicio y estos se quedaban abiertos hasta volver a pulsar el icono.
     // Se mira igual que en el menú (VigilarClicFueraDelMenu): a pelo cada 150 ms, que
     // funciona aunque el clic caiga en otra aplicación y no nos llegue.
-    static readonly HashSet<string> SeCierranConClicFuera = new() { PanelRed, PanelControl, PanelBandeja };
+    static readonly HashSet<string> SeCierranConClicFuera = new() { PanelRed, PanelControl, PanelBandeja, PanelBateria };
     bool _clicFueraContado;
 
     void VigilarClicFueraDelPanel()

@@ -34,7 +34,7 @@ public partial class MainWindow : Window
 
         var bRed = Boton(red, "Red", AbrirRed);
         var bVol = Boton(vol, "Volumen", AbrirControl);
-        var bBat = Boton(bat, "Batería", AbrirControl);
+        var bBat = Boton(bat, "Batería", AbrirBateria);
 
         // La rueda sobre el altavoz sube y baja el volumen de 2 en 2, sin abrir nada.
         // El aviso de la isla sale solo: VigilarVolumen ve el cambio.
@@ -76,10 +76,16 @@ public partial class MainWindow : Window
                 vol.Text = mudo || v == 0 ? "" : v < 33 ? "" : v < 66 ? "" : "";
                 bVol.ToolTip = mudo ? "Volumen: silenciado" : $"Volumen: {v}%";
 
-                string bateria = Nativo.Bateria();
-                bool hayBateria = !string.IsNullOrWhiteSpace(bateria) && bateria != "—";
-                bBat.Visibility = hayBateria ? Visibility.Visible : Visibility.Collapsed;
-                bBat.ToolTip = hayBateria ? $"Batería: {bateria}" : null;
+                // La pila enseña su nivel de 10 en 10 y el rayo si está cargando
+                var energia = Bateria.Leer();
+                bBat.Visibility = energia.HayBateria ? Visibility.Visible : Visibility.Collapsed;
+                if (energia.HayBateria)
+                {
+                    bat.Text = Bateria.Glifo(energia);
+                    bat.Foreground = energia.Ahorro ? Brushes.Gold
+                                   : energia.PorCiento <= 15 && !energia.Enchufado ? Brushes.Tomato : _texto;
+                    bBat.ToolTip = $"Batería: {energia.PorCiento}% · {Bateria.Texto(energia)}";
+                }
             }
             catch { }
         });

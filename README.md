@@ -88,6 +88,14 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
   su código (`ES`, `EN`…). Clic para pasar a la siguiente, como Win+Espacio, o
   rueda para ir y volver; en el centro de control, todas para elegir.
 
+**Batería**
+- Al pulsar la pila: porcentaje, si está cargando y lo que queda, el ahorro de
+  batería y el **modo de energía** (Eficiencia / Equilibrado / Rendimiento).
+
+**Apps en segundo plano**
+- Un botón `^` junto a la hora que despliega los iconos de las apps en segundo
+  plano, como los iconos ocultos de Windows. Viene de serie (módulo `bandeja`).
+
 **Red**
 - Al pulsar el icono de red: lo que tienes conectado (wifi o cable) con su IP, su
   velocidad de enlace y el adaptador.
@@ -205,7 +213,7 @@ la isla se adapta sola. Las claves que no reconoce se conservan tal cual.
 | `Barra.OcultarEnPantallaCompleta` | `true` | La isla se esconde si algo ocupa su pantalla entera |
 | `Barra.OcultarConMaximizada` | `true` | Se esconde también con una ventana maximizada (juegos, vídeos) |
 | `Barra.Bandeja` | `true` | Traer los iconos de la bandeja del sistema (hace falta el módulo `bandeja`) |
-| `Barra.MaxBandeja` | `6` | Iconos de bandeja visibles antes del desplegable `^` |
+| `Barra.MaxBandeja` | `0` | Iconos de bandeja visibles antes del desplegable `^`; con `0`, solo el `^` (como los iconos ocultos de Windows) |
 | `Barra.Notificaciones` | `true` | Las notificaciones de Windows asoman en la isla |
 | `Barra.NotificacionesSilenciadas` | `[]` | Trozos de identificador de app que no avisan (p. ej. `"Discord"`) |
 | `Barra.AppsDelEscritorio` | `false` | El carrusel, solo con las apps del escritorio virtual actual |
@@ -222,7 +230,7 @@ Listas de nombres; el orden es el orden en que salen.
 "Modulos": {
   "Izquierda": ["inicio", "apps"],
   "Centro":    ["reloj"],
-  "Derecha":   ["cpu", "ram", "bateria", "control", "fecha"]
+  "Derecha":   ["cpu", "ram", "bateria", "bandeja", "control", "fecha"]
 }
 ```
 

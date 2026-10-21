@@ -662,3 +662,24 @@ por el teclado sino por HID directo a Windows; esos seguirán sacando su aviso.
 
 Clave `Barra.TeclasVolumen` (true de serie), con interruptor en Ajustes > Isla.
 Probado con la tecla simulada: sale la barra en la isla y abajo no aparece nada.
+## Batería, apps en segundo plano y redes que tardaban
+
+**Las redes que "tardaban".** No era la app: listar las wifis cuesta 28 ms medidos.
+Lo que da Windows es su lista en caché, y solo la renueva cuando escanea, más o
+menos una vez por minuto; a veces traía una sola red hasta pulsar "buscar".
+Ahora el panel enseña la caché al momento, pide un escaneo y repasa a los 1,5,
+3,5 y 6 s, rehaciendo la lista solo si algo ha cambiado (y nunca con la caja de
+la contraseña abierta, que perderías lo escrito).
+
+**El icono de la batería abría el centro de control.** No tenía panel propio y
+reaprovechaba el del volumen. Ahora tiene el suyo: porcentaje, si carga, lo que
+queda, el ahorro de batería (solo se lee: no hay API pública para encenderlo, se
+manda a Configuración) y el modo de energía Eficiencia / Equilibrado /
+Rendimiento con `PowerSetActiveOverlayScheme`, que es lo que usa la propia
+Configuración. El icono de la pila enseña su nivel y el rayo al cargar.
+
+**Las apps en segundo plano.** El módulo `bandeja` ya existía pero no venía
+puesto. Ahora viene de serie, igual que `control` (se añade una vez a las configs
+de antes, con su bandera `Modulos.BandejaDeSerie`), y `Barra.MaxBandeja` admite 0:
+solo el `^`, que despliega todas, como los iconos ocultos de Windows. A quien se le
+añade se le pone a 0; quien ya tenía la bandeja conserva lo suyo.

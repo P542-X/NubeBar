@@ -92,10 +92,30 @@ public partial class MainWindow : Window
         Velocidad.Cambio += VelocidadCambio;
         columna.Unloaded += (_, _) => Velocidad.Cambio -= VelocidadCambio;
 
-        // Listar wifis tarda (wlanapi va por el driver): el panel se abre ya y se rellena
-        Dispatcher.InvokeAsync(RellenarRed, DispatcherPriority.Background);
+        // El panel se abre ya y se rellena por detrás
+        Dispatcher.InvokeAsync(RellenarYEscanear, DispatcherPriority.Background);
         return columna;
     }
+
+    // Listar las wifis es instantáneo (28 ms medidos), pero lo que da Windows es su
+    // lista en caché, y solo la renueva cuando escanea, más o menos una vez por
+    // minuto. Por eso a veces salía una sola red hasta pulsar "buscar". Ahora se
+    // enseña la caché al momento, se pide un escaneo y se va repasando unos segundos:
+    // las redes nuevas aparecen según Windows las va viendo.
+    async Task RellenarYEscanear()
+    {
+        await RellenarRed();
+        if (_panelAbierto != PanelRed) return;
+        await Task.Run(Red.Escanear);
+        foreach (int ms in new[] { 1500, 2000, 2500 })
+        {
+            await Task.Delay(ms);
+            if (_panelAbierto != PanelRed) return;
+            await RellenarRed(soloSiCambia: true);
+        }
+    }
+
+    string _firmaRedes = "";
 
     TextBlock Tenue(string texto) => new()
     {
@@ -103,21 +123,24 @@ public partial class MainWindow : Window
         TextTrimming = TextTrimming.CharacterEllipsis
     };
 
-    void AbrirAjustesRed(string uri)
-    {
-        CerrarPanel();
-        try { Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true }); }
-        catch (Exception ex) { Log.Error("abrir los ajustes de red", ex); }
-    }
+    void AbrirAjustesRed(string uri) => AbrirAjustes(uri);
 
-    async Task RellenarRed()
+    // soloSiCambia: para los repasos automáticos. Rehacer la lista cuando no ha
+    // cambiado nada la haría parpadear y te devolvería el scroll arriba, y con la caja
+    // de la contraseña abierta o conectando no se toca: perderías lo escrito.
+    async Task RellenarRed(bool soloSiCambia = false)
     {
         if (_panelAbierto != PanelRed || _redConectadas == null || _redLista == null) return;
+        if (soloSiCambia && (_redConClave != null || _redConectando)) return;
         try
         {
             var conexiones = await Task.Run(Red.Conexiones);
             var wifis = await Task.Run(Red.Wifis);
             if (_panelAbierto != PanelRed) return;
+
+            string firma = string.Join("|", wifis.Select(w => $"{w.Nombre}:{w.Conectada}:{w.Senal / 10}"));
+            if (soloSiCambia && firma == _firmaRedes) return;
+            _firmaRedes = firma;
 
             // Conectado
             _redConectadas.Children.Clear();
@@ -275,7 +298,7 @@ public partial class MainWindow : Window
         {
             // Abrir o cerrar la caja de esa fila; solo una a la vez
             _redConClave = _redConClave?.Nombre == w.Nombre ? null : w;
-            Dispatcher.InvokeAsync(RellenarRed);
+            Dispatcher.InvokeAsync(() => RellenarRed());
             return;
         }
         _ = ConectarWifi(w, null);
@@ -308,7 +331,7 @@ public partial class MainWindow : Window
         caja.KeyDown += (_, e) =>
         {
             if (e.Key == Key.Enter) { Entrar(); e.Handled = true; }
-            else if (e.Key == Key.Escape) { _redConClave = null; Dispatcher.InvokeAsync(RellenarRed); e.Handled = true; }
+            else if (e.Key == Key.Escape) { _redConClave = null; Dispatcher.InvokeAsync(() => RellenarRed()); e.Handled = true; }
         };
 
         var boton = Boton(new TextBlock { Text = "Conectar", Foreground = _acentoLegible }, $"Conectar a {w.Nombre}", Entrar);

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -50,7 +50,7 @@ public partial class MainWindow : Window
         if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(new Action(RefrescarBandeja)); return; }
         if (_bandeja == null || Bandeja.Iconos is not { } iconos) return;
 
-        int tope = Math.Max(1, _cfg.Barra.MaxBandeja);
+        int tope = Math.Max(0, _cfg.Barra.MaxBandeja);
         // Los que no caben se van al desplegable "^", igual que en Windows
         var dentro = iconos.Where(i => !i.IsHidden).Take(tope).ToList();
 
@@ -94,7 +94,8 @@ public partial class MainWindow : Window
                 AnimarEntrada(_botonMas, 0);
             }
             else if (!_bandeja.Children.Contains(_botonMas)) _bandeja.Children.Add(_botonMas);
-            _botonMas.ToolTip = $"Otros {sobran} iconos";
+            // Con 0 a la vista el "^" es la puerta a todas, como los iconos ocultos de Windows
+            _botonMas.ToolTip = tope == 0 ? $"Apps en segundo plano ({sobran})" : $"Otros {sobran} iconos";
         }
         else if (_botonMas != null && _bandeja.Children.Contains(_botonMas))
         {
@@ -183,7 +184,7 @@ public partial class MainWindow : Window
     void AlternarBandejaExtra()
     {
         if (Bandeja.Iconos is not { } iconos) return;
-        int tope = Math.Max(1, _cfg.Barra.MaxBandeja);
+        int tope = Math.Max(0, _cfg.Barra.MaxBandeja);
         var resto = iconos.Where(i => !i.IsHidden).Skip(tope).ToList();
         if (resto.Count == 0) return;
 
@@ -200,7 +201,11 @@ public partial class MainWindow : Window
         {
             Columns = porFila,
             Background = Brushes.Transparent,   // sin fondo, un Panel no recibe el ratón en los huecos
-            Margin = new Thickness(10, 4, 10, 10)
+            Margin = new Thickness(10, 4, 10, 10),
+            // Con la isla desplegada el panel es tan ancho como ella, y la rejilla
+            // repartía seis iconos por todo ese ancho, uno en cada punta
+            Width = porFila * 40,
+            HorizontalAlignment = HorizontalAlignment.Center
         };
         foreach (var i in iconos)
         {

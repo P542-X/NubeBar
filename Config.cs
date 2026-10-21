@@ -46,7 +46,7 @@ public class Barra
     // se aparta también al maximizar el navegador; se quita en Ajustes > Isla.
     public bool OcultarConMaximizada { get; set; } = true;
     public bool Bandeja { get; set; } = true;        // iconos de la bandeja del sistema en la isla
-    public int MaxBandeja { get; set; } = 6;         // cuántos se ven sin abrir el desplegable "^"
+    public int MaxBandeja { get; set; } = 0;         // cuántos se ven sin abrir el desplegable "^" (0 = solo el "^")
     public bool Notificaciones { get; set; } = true; // las notificaciones asoman en la isla
     public bool AppsDelEscritorio { get; set; } = false;   // el carrusel, solo con las del escritorio virtual actual
     public List<string> AppsFijadas { get; set; } = new();  // apps siempre presentes en el carrusel
@@ -62,9 +62,10 @@ public class Modulos
 {
     public List<string> Izquierda { get; set; } = new() { "inicio", "apps" };
     public List<string> Centro { get; set; } = new() { "reloj" };
-    public List<string> Derecha { get; set; } = new() { "cpu", "ram", "bateria", "control", "fecha" };
-    // Ya se puso "control" una vez en una config de antes (ver Config.ControlDeSerie)
+    public List<string> Derecha { get; set; } = new() { "cpu", "ram", "bateria", "bandeja", "control", "fecha" };
+    // Ya se pusieron "control" y "bandeja" una vez en una config de antes (ver Config.ModulosDeSerie)
     public bool ControlDeSerie { get; set; } = true;
+    public bool BandejaDeSerie { get; set; } = true;
 }
 
 public class Inicio
@@ -125,7 +126,7 @@ public class Config
             c.Modulos.Centro ??= new();
             c.Modulos.Derecha ??= new();
             c.Inicio.Fijadas ??= new();
-            ControlDeSerie(c);
+            ModulosDeSerie(c);
             return c;
         }
         catch (Exception ex)
@@ -138,34 +139,61 @@ public class Config
 
     }
 
-    // El módulo "control" (red, volumen, idioma del teclado) viene de serie. Las
-    // configs de antes tienen la lista de la derecha escrita entera, así que el
-    // valor por defecto no les llega nunca: se añade UNA vez, delante de la fecha,
-    // y se apunta. Si luego lo quitas en Ajustes, no vuelve a aparecer.
+    // Los módulos "control" (red, volumen, idioma, batería) y "bandeja" (las apps en
+    // segundo plano, tras el "^") vienen de serie. Las configs de antes tienen la
+    // lista de la derecha escrita entera, así que el valor por defecto no les llega
+    // nunca: se añade cada uno UNA vez y se apunta. Si luego lo quitas en Ajustes,
+    // no vuelve a aparecer.
     //
     // Se escribe con ConfigArbol para no perder las claves que NubeBar no conoce.
     // Guardar dispara la recarga en caliente, que lee ya la bandera puesta: no hay bucle.
-    static void ControlDeSerie(Config c)
+    static void ModulosDeSerie(Config c)
     {
         try
         {
             var arbol = ConfigArbol.Cargar();
-            if (arbol.Bandera("Modulos", "ControlDeSerie", false)) return;
+            bool tocado = false;
 
-            bool yaEsta = c.Modulos.Izquierda.Concat(c.Modulos.Centro).Concat(c.Modulos.Derecha)
-                           .Any(m => m.Equals("control", StringComparison.OrdinalIgnoreCase));
-            if (!yaEsta)
+            // "control" delante de la fecha
+            if (!arbol.Bandera("Modulos", "ControlDeSerie", false))
             {
-                var der = c.Modulos.Derecha;
-                int fecha = der.FindIndex(m => m.Equals("fecha", StringComparison.OrdinalIgnoreCase));
-                der.Insert(fecha < 0 ? der.Count : fecha, "control");
-                arbol.PonerLista("Modulos", "Derecha", der);
+                if (AnadirUnaVez(c, arbol, "control", antesDe: "fecha"))
+                    Log.Info("módulo control añadido a la derecha (viene de serie)");
+                arbol.Poner("Modulos", "ControlDeSerie", true);
+                c.Modulos.ControlDeSerie = tocado = true;
             }
-            arbol.Poner("Modulos", "ControlDeSerie", true);
-            c.Modulos.ControlDeSerie = true;
-            arbol.Guardar();
-            Log.Info(yaEsta ? "módulo control: ya estaba" : "módulo control añadido a la derecha (viene de serie)");
+
+            // "bandeja" delante de "control". Quien no la tenía puesta nunca ha
+            // elegido cuántos iconos ver, así que empieza como los iconos ocultos de
+            // Windows: solo el "^", y dentro todas las apps en segundo plano
+            if (!arbol.Bandera("Modulos", "BandejaDeSerie", false))
+            {
+                if (AnadirUnaVez(c, arbol, "bandeja", antesDe: "control"))
+                {
+                    arbol.Poner("Barra", "MaxBandeja", 0);
+                    c.Barra.MaxBandeja = 0;
+                    Log.Info("módulo bandeja añadido a la derecha (viene de serie), solo con el \"^\"");
+                }
+                arbol.Poner("Modulos", "BandejaDeSerie", true);
+                c.Modulos.BandejaDeSerie = tocado = true;
+            }
+
+            if (tocado) arbol.Guardar();
         }
-        catch (Exception ex) { Log.Error("añadir el módulo control", ex); }
+        catch (Exception ex) { Log.Error("añadir los módulos de serie", ex); }
+    }
+
+    // Lo mete en la derecha delante de "antesDe" (o al final) si no está en ninguna
+    // zona. Devuelve si lo ha añadido.
+    static bool AnadirUnaVez(Config c, ConfigArbol arbol, string modulo, string antesDe)
+    {
+        bool yaEsta = c.Modulos.Izquierda.Concat(c.Modulos.Centro).Concat(c.Modulos.Derecha)
+                       .Any(m => m.Equals(modulo, StringComparison.OrdinalIgnoreCase));
+        if (yaEsta) return false;
+        var der = c.Modulos.Derecha;
+        int donde = der.FindIndex(m => m.Equals(antesDe, StringComparison.OrdinalIgnoreCase));
+        der.Insert(donde < 0 ? der.Count : donde, modulo);
+        arbol.PonerLista("Modulos", "Derecha", der);
+        return true;
     }
 }

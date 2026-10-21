@@ -495,7 +495,7 @@ public sealed class VentanaAjustes : Window
 
         var izq = ListaModulos("Izquierda", _arbol.Lista("Modulos", "Izquierda", "inicio", "apps"));
         var cen = ListaModulos("Centro", _arbol.Lista("Modulos", "Centro", "reloj"));
-        var der = ListaModulos("Derecha", _arbol.Lista("Modulos", "Derecha", "cpu", "ram", "bateria", "control", "fecha"));
+        var der = ListaModulos("Derecha", _arbol.Lista("Modulos", "Derecha", "cpu", "ram", "bateria", "bandeja", "control", "fecha"));
 
         Grid.SetColumn(izq.Caja, 0); Grid.SetColumn(cen.Caja, 1); Grid.SetColumn(der.Caja, 2);
         rejilla.Children.Add(izq.Caja); rejilla.Children.Add(cen.Caja); rejilla.Children.Add(der.Caja);
@@ -919,8 +919,8 @@ public sealed class VentanaAjustes : Window
         c.Children.Add(Interruptor("Traer los iconos de la bandeja a la isla",
                                    _arbol.Bandera("Barra", "Bandeja", true),
                                    v => _arbol.Poner("Barra", "Bandeja", v)));
-        c.Children.Add(Deslizador("Iconos visibles antes del desplegable", 1, 15,
-                                  _arbol.Numero("Barra", "MaxBandeja", 6),
+        c.Children.Add(Deslizador("Iconos visibles antes del desplegable (0 = solo el \"^\")", 0, 15,
+                                  _arbol.Numero("Barra", "MaxBandeja", 0),
                                   v => _arbol.Poner("Barra", "MaxBandeja", Math.Round(v))));
         c.Children.Add(new TextBlock
         {
