@@ -144,4 +144,10 @@ public static class Monitores
         GetCursorPos(out var p);
         return p;
     }
+
+    [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(POINT p);
+
+    // La ventana que hay bajo el puntero (la de más arriba)
+    public static IntPtr VentanaBajoElRaton() =>
+        GetCursorPos(out var p) ? WindowFromPoint(p) : IntPtr.Zero;
 }

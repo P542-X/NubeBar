@@ -192,6 +192,37 @@ public partial class MainWindow
         Log.Info($"panel cerrado: {nombre}");
     }
 
+    // ---------- Clic fuera ----------
+    // Los paneles que se abren desde un icono (red, centro de control, bandeja) se
+    // cierran con un clic fuera de la isla, como los menús de Windows. Antes solo lo
+    // hacía el menú Inicio y estos se quedaban abiertos hasta volver a pulsar el icono.
+    // Se mira igual que en el menú (VigilarClicFueraDelMenu): a pelo cada 150 ms, que
+    // funciona aunque el clic caiga en otra aplicación y no nos llegue.
+    static readonly HashSet<string> SeCierranConClicFuera = new() { PanelRed, PanelControl, PanelBandeja };
+    bool _clicFueraContado;
+
+    void VigilarClicFueraDelPanel()
+    {
+        if (_panelAbierto == null || !SeCierranConClicFuera.Contains(_panelAbierto)) { _clicFueraContado = false; return; }
+
+        bool clic = Nativo.BotonIzquierdoPulsado() || Nativo.HuboClicIzquierdo();
+        if (!clic) { _clicFueraContado = false; return; }
+        if (_clicFueraContado) return;      // un clic largo cuenta una vez
+        _clicFueraContado = true;
+        try
+        {
+            var r = Monitores.Raton();
+            if (Isla.InputHitTest(Isla.PointFromScreen(new Point(r.X, r.Y))) != null) return;
+            // Un desplegable (la salida de audio), un tooltip o la ventana de ajustes
+            // son ventanas NUESTRAS aparte de la isla: elegir algo en ellos no es "fuera"
+            var bajo = Monitores.VentanaBajoElRaton();
+            if (bajo != IntPtr.Zero && bajo != _self && Nativo.EsNuestra(bajo)) return;
+            Log.Info($"clic fuera del panel {_panelAbierto}: se cierra");
+            CerrarPanel();
+        }
+        catch { }
+    }
+
     // Para los paneles que se rellenan por detrás (la lista de wifis, el test de
     // velocidad, la caja de la contraseña): AbrirPanel midió el contenido cuando aún
     // estaba a medias, así que se vuelve a medir y la isla crece o encoge a lo que
