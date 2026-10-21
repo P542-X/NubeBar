@@ -192,6 +192,33 @@ public partial class MainWindow
         Log.Info($"panel cerrado: {nombre}");
     }
 
+    // Para los paneles que se rellenan por detrás (la lista de wifis, el test de
+    // velocidad, la caja de la contraseña): AbrirPanel midió el contenido cuando aún
+    // estaba a medias, así que se vuelve a medir y la isla crece o encoge a lo que
+    // ahora necesita. Sin esto lo que llegaba tarde salía recortado por abajo.
+    void ReajustarPanel(string nombre)
+    {
+        if (_panelAbierto != nombre || Cajon.Content is not FrameworkElement contenido) return;
+        try
+        {
+            double bordes = Isla.BorderThickness.Top + Isla.BorderThickness.Bottom;
+            contenido.Measure(new Size(_panelAncho, double.PositiveInfinity));
+            double alto = contenido.DesiredSize.Height + bordes;
+            if (Math.Abs(alto - _panelAlto) < 1) return;
+
+            bool crece = alto > _panelAlto;
+            _panelAlto = alto;
+            double altoIsla = _cfg.Barra.Alto + alto;
+            // Igual que al abrir: si crece, la ventana primero; si encoge, al final
+            if (crece) AjustarVentana(altoIsla);
+            AnimarAlto(altoIsla, 220, Suave, crece ? null : () =>
+            {
+                if (_panelAbierto == nombre) AjustarVentana(_cfg.Barra.Alto + _panelAlto);
+            });
+        }
+        catch (Exception ex) { Log.Error("reajustar el panel", ex); }
+    }
+
     // Al recargar el config en caliente cambian alto, posición y modo, así que las
     // medidas del panel abierto dejan de valer: se cierra sin animación y a empezar
     void CerrarPanelAlRecargar()

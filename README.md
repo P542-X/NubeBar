@@ -76,10 +76,25 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
 - Al cerrar NubeBar los iconos vuelven solos a la bandeja de Windows.
 
 **Centro de control**
-- Iconos de red, volumen y batería; al pulsarlos, un panel al estilo del centro
-  de control del iPhone.
-- Volumen general y **por aplicación**, selector de salida de audio, lista de
-  redes wifi, Bluetooth con sus dispositivos emparejados y brillo por DDC/CI.
+- Iconos de idioma del teclado, red, volumen y batería; al pulsarlos, un panel al
+  estilo del centro de control del iPhone.
+- Volumen general (deslizador con su cifra, botones `−` / `+` de 5 en 5 y rueda) y
+  **por aplicación**, selector de salida de audio, Bluetooth con sus dispositivos
+  emparejados y brillo por DDC/CI.
+- **Rueda sobre el altavoz** de la isla: sube y baja el volumen sin abrir nada.
+- **Idioma del teclado**: si tienes más de una distribución puesta en Windows, sale
+  su código (`ES`, `EN`…). Clic para pasar a la siguiente, como Win+Espacio, o
+  rueda para ir y volver; en el centro de control, todas para elegir.
+
+**Red**
+- Al pulsar el icono de red: lo que tienes conectado (wifi o cable) con su IP, su
+  velocidad de enlace y el adaptador.
+- Las **wifis a la vista** con su señal y candado. Clic para conectarte: si ya
+  habías entrado antes, directo; si no, pide la contraseña ahí mismo. Si la
+  contraseña no vale, no se queda guardada. Las redes de empresa (802.1X) se
+  abren en los ajustes de Windows. Botón para desconectarse y para volver a buscar.
+- **Test de velocidad** integrado: ping, bajada y subida contra
+  speed.cloudflare.com, con las cifras moviéndose en vivo. Tarda unos 15 s.
 - Lo que tu equipo no admite no aparece: sin batería no hay icono de batería, y
   si el monitor no contesta a DDC/CI no hay deslizador de brillo.
 

@@ -1,9 +1,10 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Threading;
 
@@ -24,10 +25,28 @@ public partial class MainWindow : Window
         var vol = Glifo("");
         var bat = Glifo("");
 
-        var bRed = Boton(red, "Red", AbrirControl);
+        // El idioma del teclado: solo sale si tienes más de una distribución puesta.
+        // Clic para pasar a la siguiente (como Win+Espacio), rueda para ir y volver.
+        var idioma = new TextBlock { Foreground = _texto, FontSize = 11, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+        var bIdioma = Boton(idioma, "Idioma del teclado", () => Idioma.Siguiente());
+        bIdioma.MouseWheel += (_, e) => { Idioma.Siguiente(atras: e.Delta > 0); Tick(); e.Handled = true; };
+        bIdioma.Visibility = Visibility.Collapsed;
+
+        var bRed = Boton(red, "Red", AbrirRed);
         var bVol = Boton(vol, "Volumen", AbrirControl);
         var bBat = Boton(bat, "Batería", AbrirControl);
 
+        // La rueda sobre el altavoz sube y baja el volumen de 2 en 2, sin abrir nada.
+        // El aviso de la isla sale solo: VigilarVolumen ve el cambio.
+        bVol.MouseWheel += (_, e) =>
+        {
+            int v = Audio.Volumen();
+            if (v >= 0) Audio.PonerVolumen(v + (e.Delta > 0 ? 2 : -2));
+            if (Audio.Silenciado && e.Delta > 0) Audio.Silenciar(false);
+            e.Handled = true;
+        };
+
+        fila.Children.Add(bIdioma);
         fila.Children.Add(bRed);
         fila.Children.Add(bVol);
         fila.Children.Add(bBat);
@@ -36,6 +55,16 @@ public partial class MainWindow : Window
         {
             try
             {
+                var distribuciones = Idioma.Lista();
+                if (distribuciones.Count > 1)
+                {
+                    var actual = distribuciones.FirstOrDefault(d => d.Hkl == Idioma.Actual());
+                    idioma.Text = actual?.Corto ?? "··";
+                    bIdioma.ToolTip = $"Teclado: {actual?.Nombre ?? "?"}\nClic o rueda para cambiar";
+                    bIdioma.Visibility = Visibility.Visible;
+                }
+                else bIdioma.Visibility = Visibility.Collapsed;
+
                 red.Text = Red.Estado() switch
                 {
                     Red.Tipo.Cable => "",     // cable de red
@@ -71,7 +100,8 @@ public partial class MainWindow : Window
             cuantas = p.Count;
             Brillo.Soltar(p);
         }
-        double alto = 420 + cuantas * 34;
+        // Es un mínimo: AbrirPanel mide, y lo que llega tarde (bluetooth) lo reajusta
+        double alto = 300 + cuantas * 34;
         AlternarPanel(PanelControl, CrearControl, 460, alto);
     }
 
@@ -85,7 +115,10 @@ public partial class MainWindow : Window
         var mudo = Audio.Silenciado;
         var filaVol = new Grid();
         filaVol.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        filaVol.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         filaVol.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        filaVol.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        filaVol.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
         var botonMudo = Boton(Glifo(mudo ? "" : ""), "Silenciar", () =>
         {
             Audio.Silenciar(!Audio.Silenciado);
@@ -94,9 +127,50 @@ public partial class MainWindow : Window
         Grid.SetColumn(botonMudo, 0);
         filaVol.Children.Add(botonMudo);
 
+        var cifraVol = new TextBlock
+        {
+            Foreground = _texto, VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Right, Text = $"{Math.Max(0, Audio.Volumen())}%"
+        };
+        Typography.SetNumeralAlignment(cifraVol, FontNumeralAlignment.Tabular);
+
         var desVol = Deslizador(Audio.Volumen(), v => Audio.PonerVolumen((int)v));
-        Grid.SetColumn(desVol, 1);
+        desVol.Margin = new Thickness(4, 0, 4, 0);
+        // La cifra sigue al deslizador mientras lo arrastras, aunque el volumen
+        // de verdad solo se aplique al soltar (ver Deslizador)
+        desVol.ValueChanged += (_, e) => cifraVol.Text = $"{(int)Math.Round(e.NewValue)}%";
+        // La rueda encima del deslizador también vale, de 2 en 2
+        desVol.PreviewMouseWheel += (_, e) =>
+        {
+            desVol.Value = Math.Clamp(desVol.Value + (e.Delta > 0 ? 2 : -2), 0, 100);
+            Audio.PonerVolumen((int)desVol.Value);
+            e.Handled = true;
+        };
+        Grid.SetColumn(desVol, 2);
         filaVol.Children.Add(desVol);
+
+        // Bajar y subir de 5 en 5, para afinar sin tener que acertar con el ratón
+        Button Paso(string glifo, string tip, int paso)
+        {
+            var b = Boton(Glifo(glifo), tip, () =>
+            {
+                int v = Math.Clamp((int)Math.Round(desVol.Value) + paso, 0, 100);
+                desVol.Value = v;
+                Audio.PonerVolumen(v);
+                if (paso > 0 && Audio.Silenciado) Audio.Silenciar(false);
+            });
+            b.Height = 26;
+            return b;
+        }
+        var menos = Paso("", "Bajar el volumen", -5);
+        Grid.SetColumn(menos, 1);
+        filaVol.Children.Add(menos);
+        var mas = Paso("", "Subir el volumen", 5);
+        Grid.SetColumn(mas, 3);
+        filaVol.Children.Add(mas);
+
+        Grid.SetColumn(cifraVol, 4);
+        filaVol.Children.Add(cifraVol);
         columna.Children.Add(filaVol);
 
         // --- Volumen por aplicación ---
@@ -159,41 +233,61 @@ public partial class MainWindow : Window
                 columna.Children.Add(Deslizador(p.PorCiento, v => { Brillo.Poner(p, (int)v); AvisoDeBrillo((int)v); }));
         }
 
+        // --- Teclado ---
+        var distribuciones = Idioma.Lista();
+        if (distribuciones.Count > 1)
+        {
+            columna.Children.Add(Titulito("Teclado"));
+            var actual = Idioma.Actual();
+            var filaTeclado = new WrapPanel();
+            foreach (var d in distribuciones)
+            {
+                bool es = d.Hkl == actual;
+                var b = Boton(new TextBlock
+                {
+                    Text = d.Corto, Foreground = es ? _acentoLegible : _texto,
+                    FontWeight = es ? FontWeights.Bold : FontWeights.Normal
+                }, d.Nombre, () => { Idioma.Poner(d); Dispatcher.BeginInvoke(new Action(RefrescarControl), DispatcherPriority.Background); });
+                b.Height = 26;
+                b.Margin = new Thickness(-4, 0, 6, 0);
+                filaTeclado.Children.Add(b);
+            }
+            columna.Children.Add(filaTeclado);
+        }
+
         // --- Red y Bluetooth ---
+        // Lo de la red, entero (wifis, conectar, test de velocidad), vive en su
+        // propio panel; aquí solo el resumen y la puerta para ir
         columna.Children.Add(Titulito("Red"));
-        var estadoRed = new TextBlock { Foreground = _texto, Opacity = 0.7 };
+        var estadoRed = new TextBlock { Foreground = _texto, VerticalAlignment = VerticalAlignment.Center };
         estadoRed.Text = Red.Estado() switch
         {
             Red.Tipo.Cable => "Conectado por cable",
             Red.Tipo.Wifi => "Wi-Fi",
             _ => "Sin conexión"
         };
-        columna.Children.Add(estadoRed);
-
-        var listaWifi = new StackPanel { Margin = new Thickness(0, 4, 0, 0) };
-        columna.Children.Add(listaWifi);
+        var irRed = Boton(new TextBlock { Text = "Redes y velocidad ›", Foreground = _acentoLegible, FontSize = 11 },
+                          "Ver las redes wifi, conectarse y medir la velocidad", AbrirRed);
+        irRed.Height = 24;
+        var filaRed = new Grid();
+        filaRed.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        filaRed.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        filaRed.Children.Add(estadoRed);
+        Grid.SetColumn(irRed, 1);
+        filaRed.Children.Add(irRed);
+        columna.Children.Add(filaRed);
 
         var estadoBt = new TextBlock { Foreground = _texto, Opacity = 0.7, Margin = new Thickness(0, 8, 0, 0), Text = "Bluetooth: …" };
         columna.Children.Add(estadoBt);
         var listaBt = new StackPanel();
         columna.Children.Add(listaBt);
 
-        // Escanear wifis y preguntar al bluetooth tarda: se hace por detrás para que
-        // el panel se abra al instante y se vaya rellenando
+        // Preguntar al bluetooth tarda: se hace por detrás para que el panel se abra
+        // al instante y se vaya rellenando
         Dispatcher.InvokeAsync(async () =>
         {
             try
             {
-                var redes = await Task.Run(Red.Wifis);
-                foreach (var w in redes.Where(w => w.Senal > 0 || w.Conectada).Take(5))
-                    listaWifi.Children.Add(new TextBlock
-                    {
-                        Text = $"{(w.Conectada ? "● " : "   ")}{w.Nombre}   {w.Senal}%",
-                        Foreground = _texto, Opacity = w.Conectada ? 1 : 0.6
-                    });
-                if (!redes.Any(w => w.Senal > 0 || w.Conectada))
-                    listaWifi.Children.Add(new TextBlock { Text = "   (sin redes a la vista)", Foreground = _texto, Opacity = 0.45 });
-
                 var est = await Bluetooth.Estado();
                 estadoBt.Text = est switch
                 {
@@ -217,6 +311,7 @@ public partial class MainWindow : Window
                 }
             }
             catch (Exception ex) { Log.Error("rellenar el centro de control", ex); }
+            ReajustarPanel(PanelControl);
         }, DispatcherPriority.Background);
 
         return columna;

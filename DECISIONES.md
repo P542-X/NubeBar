@@ -606,3 +606,40 @@ abrir (380 ms el menú Inicio, 260 ms los paneles pequeños), y el contenido se 
 isla metiéndose hacia ella, acabando un pelín antes que el pliegue. Lo mismo al
 recogerse la isla: antes se estrechaba del todo en 90 ms y los módulos desaparecían en
 120 ms.
+
+## Red, volumen a mano, idioma del teclado y test de velocidad
+
+**La red tiene su propio panel.** Meter las wifis con su contraseña y un test de
+velocidad dentro del centro de control lo hacía larguísimo, así que el icono de
+red abre un panel suyo y el centro de control se queda con un resumen y un
+enlace "Redes y velocidad ›".
+
+**Conectarse a una wifi.** Con perfil guardado, `WlanConnect` con ese perfil. Sin
+perfil, se crea uno (WPA, WPA2 o WPA3-SAE con la contraseña, o abierta) con
+`WlanSetProfile` y se espera hasta 15 s a que Windows diga que está dentro. Si no
+entra, el perfil recién creado **se borra**: si no, Windows se quedaría con una
+clave mala y reintentaría con ella solo cada vez que viera la red. Las redes
+802.1X y las WEP no se montan aquí: se abren los ajustes de Windows.
+
+**Para escribir la contraseña la isla coge el teclado**, igual que el buscador del
+menú Inicio, y lo devuelve al cerrar el panel.
+
+**El icono de red ya no dice "cable" estando por wifi** cuando hay adaptadores
+virtuales (Hyper-V, WSL, VirtualBox): esos son Ethernet y están "Up", pero no
+tienen puerta de enlace. Ahora cuentan solo las interfaces con salida.
+
+**Idioma del teclado.** Es de cada hilo, y el que importa es el de la ventana en
+la que escribes: la isla nunca se activa, así que se le pregunta a la ventana en
+primer plano y se le manda `WM_INPUTLANGCHANGEREQUEST`, lo mismo que Win+Espacio.
+Con dos entradas del mismo idioma (aquí: inglés con teclado de EE. UU. e inglés con
+teclado español) el código solo no basta, y salen como `EN·US` y `EN·ES`.
+
+**Test de velocidad** contra speed.cloudflare.com: sin clave ni cuenta, y sirve
+desde el nodo más cercano. Ping = la mejor de 7 peticiones vacías (la primera abre
+TLS y no cuenta). Bajada y subida con 4 conexiones en paralelo durante 7 s, sin
+contar el primer segundo (arranque de TCP). Medido aquí: 33 ms, 216 y 191 Mb/s.
+Gasta datos de verdad: en una fibra de 1 Gb, del orden de 1 GB por test.
+
+**Lo que no se probó a propósito**: conectarse a otra wifi y desconectarse,
+porque te habría dejado sin red a media sesión. Listar, escanear, las conexiones,
+el idioma y el test de velocidad sí se probaron contra este equipo.
