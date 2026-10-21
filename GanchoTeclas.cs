@@ -51,6 +51,7 @@ public sealed class GanchoTeclas : IDisposable
     const uint WM_QUIT = 0x0012;
 
     public const int VkWinIzq = 0x5B, VkWinDer = 0x5C, VkNeutra = 0xFF;
+    const int VkSilencio = 0xAD, VkBajar = 0xAE, VkSubir = 0xAF;
     const int VkEsc = 0x1B, VkCtrl = 0x11, VkShift = 0x10, VkAlt = 0x12, VkImprPant = 0x2C;
 
     // Marca en dwExtraInfo para reconocer lo que inyectamos nosotros: sin esto el
@@ -63,6 +64,8 @@ public sealed class GanchoTeclas : IDisposable
     // Lo que el hook quiere contarle a la interfaz. Se invocan desde el hilo del hook,
     // así que quien se suscriba tiene que saltar al hilo de la UI por su cuenta.
     public event Action? AbrirMenu;
+    // Una tecla de volumen: +1 subir, -1 bajar, 0 silenciar
+    public event Action<int>? TeclaVolumen;
 
     // Marca de cuándo soltaste la tecla, para poder medir lo que tarda el menú en
     // salir. Lo que se mide es de la tecla a la ventana colocada, sin la animación.
@@ -97,6 +100,10 @@ public sealed class GanchoTeclas : IDisposable
 
     // Permite apagar la intercepción sin desinstalar el hook (config en caliente)
     public bool Activo { get => _activo; set => _activo = value; }
+
+    // Las teclas de volumen son nuestras: ver el punto 0 del callback
+    volatile bool _volumen;
+    public bool Volumen { get => _volumen; set => _volumen = value; }
 
     // ---------- Arranque y parada ----------
     public void Instalar()
@@ -156,6 +163,18 @@ public sealed class GanchoTeclas : IDisposable
         bool abajo = msg is WM_KEYDOWN or WM_SYSKEYDOWN;
         bool arriba = msg is WM_KEYUP or WM_SYSKEYUP;
         uint vk = info.vkCode;
+
+        // 0) Las teclas de volumen. En Windows 11 el aviso de volumen del sistema no
+        //    se puede esconder (lo pinta el compositor, ver DECISIONES.md), así que
+        //    la única forma de que salga solo el de la isla es que la tecla no llegue
+        //    a Windows: nos la quedamos y el volumen lo cambiamos nosotros. Se trague
+        //    también la de soltar, o Windows vería un "soltar" sin su "pulsar". Si
+        //    NubeBar muere, el hook muere con ella y las teclas vuelven a lo de siempre.
+        if (_volumen && vk is VkSilencio or VkBajar or VkSubir)
+        {
+            if (abajo) TeclaVolumen?.Invoke(vk == VkSubir ? 1 : vk == VkBajar ? -1 : 0);
+            return (IntPtr)1;
+        }
 
         if (!_activo) return CallNextHookEx(_hook, codigo, wParam, lParam);
 

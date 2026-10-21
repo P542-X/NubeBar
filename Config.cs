@@ -51,6 +51,7 @@ public class Barra
     public bool AppsDelEscritorio { get; set; } = false;   // el carrusel, solo con las del escritorio virtual actual
     public List<string> AppsFijadas { get; set; } = new();  // apps siempre presentes en el carrusel
     public bool PulsoAudio { get; set; } = true;            // la isla respira con lo que suena (y aberra un poco)
+    public bool TeclasVolumen { get; set; } = true;         // las teclas de volumen las atiende la isla, sin el aviso de Windows
     public bool Arrastrable { get; set; } = true;           // se puede apartar con el ratón
     public double SegundosParaVolver { get; set; } = 1;     // tras dejarla, cuánto tarda en volver
     public List<string> OrdenApps { get; set; } = new();    // el orden que les has dado tú arrastrando

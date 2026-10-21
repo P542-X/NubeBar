@@ -643,3 +643,22 @@ Gasta datos de verdad: en una fibra de 1 Gb, del orden de 1 GB por test.
 **Lo que no se probó a propósito**: conectarse a otra wifi y desconectarse,
 porque te habría dejado sin red a media sesión. Listar, escanear, las conexiones,
 el idioma y el test de velocidad sí se probaron contra este equipo.
+
+## Las teclas de volumen, por fin sin el aviso de Windows
+
+Lo de la fase 3 sigue siendo verdad: en Windows 11 el aviso de volumen del sistema
+no es una ventana y no se puede esconder. Pero sí se puede evitar que salga: el
+hook de teclado de bajo nivel ya existía (tecla Windows), así que ahora también se
+queda las teclas de volumen (`VK_VOLUME_UP/DOWN/MUTE`) y no las deja llegar a
+Windows. El volumen lo cambiamos nosotros, de 2 en 2 como Windows, subir quita el
+silencio, y el aviso de la isla sale solo porque `VigilarVolumen` ve el cambio.
+
+Se traga también la de soltar, para que Windows no reciba un "soltar" sin su
+"pulsar". Es reversible por construcción: si NubeBar se cierra o muere, el hook
+muere con ella y las teclas vuelven a lo de siempre, aviso de Windows incluido.
+
+Límite: los botones de volumen de algunos auriculares (Jabra, por ejemplo) no van
+por el teclado sino por HID directo a Windows; esos seguirán sacando su aviso.
+
+Clave `Barra.TeclasVolumen` (true de serie), con interruptor en Ajustes > Isla.
+Probado con la tecla simulada: sale la barra en la isla y abajo no aparece nada.

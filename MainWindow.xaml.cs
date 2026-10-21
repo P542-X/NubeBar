@@ -370,7 +370,11 @@ public partial class MainWindow : Window
         if (!_cerrando) EncolarShell(() => Nativo.MostrarBarraWindows(mostrar, conIsla));
 
         AplicarAtajo();   // por si has cambiado AtajoVistaGeneral en caliente
-        if (_gancho != null) _gancho.Activo = _cfg.Inicio.TeclaWindows;
+        if (_gancho != null)
+        {
+            _gancho.Activo = _cfg.Inicio.TeclaWindows;
+            _gancho.Volumen = _cfg.Barra.TeclasVolumen;
+        }
     }
 
     int Px(double dip) =>

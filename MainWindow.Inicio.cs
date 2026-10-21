@@ -55,9 +55,26 @@ public partial class MainWindow
             // El hook avisa desde SU hilo: hay que saltar al de la interfaz.
             // El menú sale en la isla del monitor donde tengas el ratón.
             _gancho.AbrirMenu += () => Dispatcher.BeginInvoke(new Action(() => IslaDelRaton().MenuDesdeTecla()));
+            _gancho.TeclaVolumen += paso => Dispatcher.BeginInvoke(new Action(() => TeclaVolumen(paso)));
             _gancho.Instalar();
         }
         _gancho.Activo = _cfg.Inicio.TeclaWindows;
+        _gancho.Volumen = _cfg.Barra.TeclasVolumen;
+    }
+
+    // Lo mismo que haría Windows con la tecla (de 2 en 2, y subir quita el silencio),
+    // pero sin su aviso: el de la isla lo saca VigilarVolumen al ver el cambio
+    static void TeclaVolumen(int paso)
+    {
+        try
+        {
+            if (paso == 0) { Audio.Silenciar(!Audio.Silenciado); return; }
+            int v = Audio.Volumen();
+            if (v < 0) return;
+            Audio.PonerVolumen(v + paso * 2);
+            if (paso > 0 && Audio.Silenciado) Audio.Silenciar(false);
+        }
+        catch (Exception ex) { Log.Error("tecla de volumen", ex); }
     }
 
     // Win sola (o Ctrl+Esc): si el menú está abierto se cierra, y si no se abre.

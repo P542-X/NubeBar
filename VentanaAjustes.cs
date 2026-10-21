@@ -333,6 +333,9 @@ public sealed class VentanaAjustes : Window
         c.Children.Add(Interruptor("La isla respira con lo que suena",
                                    _arbol.Bandera("Barra", "PulsoAudio", true),
                                    v => _arbol.Poner("Barra", "PulsoAudio", v)));
+        c.Children.Add(Interruptor("Las teclas de volumen enseñan el aviso de la isla, no el de Windows",
+                                   _arbol.Bandera("Barra", "TeclasVolumen", true),
+                                   v => _arbol.Poner("Barra", "TeclasVolumen", v)));
 
         c.Children.Add(Rotulo("Mover la isla", true));
         c.Children.Add(Interruptor("Se puede apartar arrastrándola",

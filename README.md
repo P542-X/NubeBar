@@ -82,6 +82,8 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
   **por aplicación**, selector de salida de audio, Bluetooth con sus dispositivos
   emparejados y brillo por DDC/CI.
 - **Rueda sobre el altavoz** de la isla: sube y baja el volumen sin abrir nada.
+- **Teclas de volumen del teclado**: el aviso sale en la isla y no el de Windows
+  (`Barra.TeclasVolumen`, se apaga en Ajustes).
 - **Idioma del teclado**: si tienes más de una distribución puesta en Windows, sale
   su código (`ES`, `EN`…). Clic para pasar a la siguiente, como Win+Espacio, o
   rueda para ir y volver; en el centro de control, todas para elegir.
