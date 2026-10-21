@@ -946,7 +946,10 @@ public partial class MainWindow : Window
         HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center
     };
 
-    Button Boton(object contenido, string tip, Action accion)
+    // "levantar" = se levanta y crece un 8 % al pasar el ratón. En un botón ancho
+    // como una fila entera eso son 15 px por lado y se sale de la isla: esos lo
+    // apagan y levantan solo su icono (ver FilaWifi)
+    Button Boton(object contenido, string tip, Action accion, bool levantar = true)
     {
         var b = new Button
         {
@@ -954,7 +957,7 @@ public partial class MainWindow : Window
             Height = Math.Max(20, _cfg.Barra.Alto - 8)
         };
         b.Click += (_, _) => { accion(); Tick(); };
-        ConLevantado(b);          // se levanta un pelín al pasar el ratón
+        if (levantar) ConLevantado(b);
         return b;
     }
 }

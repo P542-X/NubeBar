@@ -68,6 +68,7 @@ public partial class MainWindow : Window
         columna.Children.Add(_redEstado);
 
         _redLista = new StackPanel();
+        _redLista.SizeChanged += (_, e) => { if (e.WidthChanged) AjustarFilasWifi(); };
         columna.Children.Add(new ScrollViewer
         {
             MaxHeight = 220,
@@ -193,7 +194,9 @@ public partial class MainWindow : Window
     FrameworkElement FilaWifi(Red.Wifi w)
     {
         var pila = new StackPanel();
-        var g = new Grid { Width = AnchoRed - 28 - 14 };
+        // El botón centra su contenido, así que la fila no se estira sola: se le da el
+        // ancho de la lista (en una isla ancha el panel mide más que AnchoRed)
+        var g = new Grid { Width = AnchoFilaWifi(), Tag = FilaWifiTag };
         g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(26) });
         g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(22) });
@@ -236,7 +239,11 @@ public partial class MainWindow : Window
             _ when Red.PideClave(w) => "Conectar (pide contraseña)",
             _ => "Conectar"
         };
-        var fila = Boton(g, tip, () => PulsarWifi(w));
+        // La fila entera no crece al pasar por encima (se salía de la isla por los
+        // lados): crece solo el icono del wifi, que tiene sitio en su columna
+        var fila = Boton(g, tip, () => PulsarWifi(w), levantar: false);
+        fila.MouseEnter += (_, _) => Levantar(icono, true);
+        fila.MouseLeave += (_, _) => Levantar(icono, false);
         fila.Height = 32;
         fila.Margin = new Thickness(-6, 0, 0, 0);
         fila.HorizontalAlignment = HorizontalAlignment.Left;
@@ -244,6 +251,20 @@ public partial class MainWindow : Window
 
         if (_redConClave?.Nombre == w.Nombre) pila.Children.Add(CajaClave(w));
         return pila;
+    }
+
+    const string FilaWifiTag = "filawifi";
+
+    // Lo que mide la lista menos el hueco de la barra de desplazamiento
+    double AnchoFilaWifi() =>
+        Math.Max(AnchoRed - 42, (_redLista?.ActualWidth ?? 0) - 22);
+
+    void AjustarFilasWifi()
+    {
+        if (_redLista == null) return;
+        foreach (var pila in _redLista.Children.OfType<StackPanel>())
+            foreach (var b in pila.Children.OfType<Button>())
+                if (b.Content is Grid { Tag: FilaWifiTag } g) g.Width = AnchoFilaWifi();
     }
 
     void PulsarWifi(Red.Wifi w)
