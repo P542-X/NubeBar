@@ -492,7 +492,7 @@ public sealed class VentanaAjustes : Window
 
         var izq = ListaModulos("Izquierda", _arbol.Lista("Modulos", "Izquierda", "inicio", "apps"));
         var cen = ListaModulos("Centro", _arbol.Lista("Modulos", "Centro", "reloj"));
-        var der = ListaModulos("Derecha", _arbol.Lista("Modulos", "Derecha", "cpu", "ram", "bateria", "fecha"));
+        var der = ListaModulos("Derecha", _arbol.Lista("Modulos", "Derecha", "cpu", "ram", "bateria", "control", "fecha"));
 
         Grid.SetColumn(izq.Caja, 0); Grid.SetColumn(cen.Caja, 1); Grid.SetColumn(der.Caja, 2);
         rejilla.Children.Add(izq.Caja); rejilla.Children.Add(cen.Caja); rejilla.Children.Add(der.Caja);

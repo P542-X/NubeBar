@@ -220,7 +220,7 @@ Listas de nombres; el orden es el orden en que salen.
 "Modulos": {
   "Izquierda": ["inicio", "apps"],
   "Centro":    ["reloj"],
-  "Derecha":   ["cpu", "ram", "bateria", "fecha"]
+  "Derecha":   ["cpu", "ram", "bateria", "control", "fecha"]
 }
 ```
 

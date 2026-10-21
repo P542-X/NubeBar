@@ -61,7 +61,9 @@ public class Modulos
 {
     public List<string> Izquierda { get; set; } = new() { "inicio", "apps" };
     public List<string> Centro { get; set; } = new() { "reloj" };
-    public List<string> Derecha { get; set; } = new() { "cpu", "ram", "bateria", "fecha" };
+    public List<string> Derecha { get; set; } = new() { "cpu", "ram", "bateria", "control", "fecha" };
+    // Ya se puso "control" una vez en una config de antes (ver Config.ControlDeSerie)
+    public bool ControlDeSerie { get; set; } = true;
 }
 
 public class Inicio
@@ -122,6 +124,7 @@ public class Config
             c.Modulos.Centro ??= new();
             c.Modulos.Derecha ??= new();
             c.Inicio.Fijadas ??= new();
+            ControlDeSerie(c);
             return c;
         }
         catch (Exception ex)
@@ -132,5 +135,36 @@ public class Config
             return null;
         }
 
+    }
+
+    // El módulo "control" (red, volumen, idioma del teclado) viene de serie. Las
+    // configs de antes tienen la lista de la derecha escrita entera, así que el
+    // valor por defecto no les llega nunca: se añade UNA vez, delante de la fecha,
+    // y se apunta. Si luego lo quitas en Ajustes, no vuelve a aparecer.
+    //
+    // Se escribe con ConfigArbol para no perder las claves que NubeBar no conoce.
+    // Guardar dispara la recarga en caliente, que lee ya la bandera puesta: no hay bucle.
+    static void ControlDeSerie(Config c)
+    {
+        try
+        {
+            var arbol = ConfigArbol.Cargar();
+            if (arbol.Bandera("Modulos", "ControlDeSerie", false)) return;
+
+            bool yaEsta = c.Modulos.Izquierda.Concat(c.Modulos.Centro).Concat(c.Modulos.Derecha)
+                           .Any(m => m.Equals("control", StringComparison.OrdinalIgnoreCase));
+            if (!yaEsta)
+            {
+                var der = c.Modulos.Derecha;
+                int fecha = der.FindIndex(m => m.Equals("fecha", StringComparison.OrdinalIgnoreCase));
+                der.Insert(fecha < 0 ? der.Count : fecha, "control");
+                arbol.PonerLista("Modulos", "Derecha", der);
+            }
+            arbol.Poner("Modulos", "ControlDeSerie", true);
+            c.Modulos.ControlDeSerie = true;
+            arbol.Guardar();
+            Log.Info(yaEsta ? "módulo control: ya estaba" : "módulo control añadido a la derecha (viene de serie)");
+        }
+        catch (Exception ex) { Log.Error("añadir el módulo control", ex); }
     }
 }
