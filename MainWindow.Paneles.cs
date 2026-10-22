@@ -91,8 +91,7 @@ public partial class MainWindow
         }
 
         contenido.Opacity = 0;
-        contenido.RenderTransform = new TranslateTransform { Y = Arriba ? -12 : 12 };
-        Cajon.Content = contenido;
+        Cajon.Content = contenido;      // atado ya al árbol: así mide con la fuente de la isla
 
         // El alto que pide quien abre el panel es una estimación hecha a mano, y
         // basta con que se quede corta por un píxel para que la última fila salga
@@ -104,6 +103,19 @@ public partial class MainWindow
         {
             contenido.Measure(new Size(ancho, double.PositiveInfinity));
             double pide = contenido.DesiredSize.Height + bordes;
+
+            // Y por mucho que necesite, la isla no puede crecer más de lo que cabe en
+            // la pantalla: lo que sobre se recorre por dentro con la rueda
+            double tope = AltoMaximoPanel();
+            if (pide > tope)
+            {
+                Log.Info($"panel {nombre}: necesita {pide:0} de alto y en la pantalla caben {tope:0}; se desplaza por dentro");
+                Cajon.Content = null;               // para poder cambiarle el padre
+                Cajon.Content = EnvolverConScroll(contenido, tope - bordes);
+                contenido = (FrameworkElement)Cajon.Content;
+                pide = tope;
+            }
+
             if (pide > alto)
             {
                 Log.Info($"panel {nombre}: pedía {alto:0} de alto pero necesita {pide:0}; se le da el que necesita");
@@ -112,6 +124,9 @@ public partial class MainWindow
             }
         }
         catch (Exception ex) { Log.Error("medir el panel", ex); }
+
+        contenido.Opacity = 0;
+        contenido.RenderTransform = new TranslateTransform { Y = Arriba ? -12 : 12 };
 
         double altoIsla = _cfg.Barra.Alto + alto;
         double anchoIsla = Math.Max(ancho, MedirAncho());
@@ -235,6 +250,22 @@ public partial class MainWindow
             double bordes = Isla.BorderThickness.Top + Isla.BorderThickness.Bottom;
             contenido.Measure(new Size(_panelAncho, double.PositiveInfinity));
             double alto = contenido.DesiredSize.Height + bordes;
+
+            // Lo que llega tarde (las wifis, el test de velocidad) puede pasarse del
+            // alto de la pantalla: mismo trato que al abrir, se desplaza por dentro
+            double tope = AltoMaximoPanel();
+            if (alto > tope)
+            {
+                if (contenido is ScrollViewer { Tag: TopeDePanel } ya) ya.MaxHeight = tope - bordes;
+                else
+                {
+                    Log.Info($"panel {nombre}: ha crecido hasta {alto:0} y caben {tope:0}; se desplaza por dentro");
+                    Cajon.Content = null;
+                    Cajon.Content = EnvolverConScroll(contenido, tope - bordes);
+                }
+                alto = tope;
+            }
+
             if (Math.Abs(alto - _panelAlto) < 1) return;
 
             bool crece = alto > _panelAlto;
@@ -248,6 +279,42 @@ public partial class MainWindow
             });
         }
         catch (Exception ex) { Log.Error("reajustar el panel", ex); }
+    }
+
+    // ---------- El tope de la pantalla ----------
+
+    // Lo máximo que puede medir un panel sin que la isla se salga del monitor. Sin
+    // esto, un panel largo (quince wifis, un menú Inicio en un portátil de 768 px)
+    // estiraba la isla hasta fuera de la pantalla y lo de abajo era inalcanzable.
+    double AltoMaximoPanel()
+    {
+        double pantalla = _monitor.Alto / _monitor.Escala;
+        return Math.Max(200, pantalla - _cfg.Barra.Alto - _cfg.Barra.Margen * 2 - 24);
+    }
+
+    const string TopeDePanel = "tope";
+
+    // El contenido que no cabe se mete en un ScrollViewer. La rueda se atiende a mano
+    // por lo mismo que en la lista de wifis: dentro hay botones y paneles de sobra como
+    // para que alguien se quede el evento y la lista no se moviera.
+    FrameworkElement EnvolverConScroll(FrameworkElement dentro, double alto)
+    {
+        dentro.RenderTransform = null;          // el que se anima ahora es el de fuera
+        var scroll = new ScrollViewer
+        {
+            MaxHeight = alto,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Content = dentro,
+            Tag = TopeDePanel
+        };
+        scroll.PreviewMouseWheel += (_, e) =>
+        {
+            if (scroll.ScrollableHeight <= 0) return;
+            scroll.ScrollToVerticalOffset(scroll.VerticalOffset - Math.Sign(e.Delta) * 60);
+            e.Handled = true;
+        };
+        return scroll;
     }
 
     // Al recargar el config en caliente cambian alto, posición y modo, así que las

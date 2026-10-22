@@ -756,6 +756,35 @@ antes que `Llenar()`, y por eso `_tira`/`_carrusel` se ponen a null ahí mismo: 
 quitas el módulo `apps`, el carrusel de la vez anterior ya no está en la isla y
 seguir apuntando a él dejaba los iconos en un panel huérfano.
 
+## Quince wifis no pueden convertir la isla en un muro
+
+Tres cosas distintas, las tres arregladas:
+
+**La isla se hacía enorme.** El panel mide lo que pide su contenido y nadie miraba
+el tamaño de la pantalla. Ahora hay un tope, `AltoMaximoPanel()` (la pantalla menos
+la isla y sus márgenes): lo que no quepa se mete en un `ScrollViewer` y se recorre
+por dentro, en vez de estirar la isla hasta salirse del monitor. Vale para todos los
+paneles, no solo el de red, y también para lo que llega tarde y lo hace crecer
+(`ReajustarPanel`). Y la lista de wifis, aparte, enseña cinco de golpe y guarda el
+resto para la rueda.
+
+**La rueda no movía la lista.** La atendemos a mano (`PreviewMouseWheel` en el
+propio `ScrollViewer`, marcando el evento) en vez de confiar en que llegue sola:
+cada fila es un `Button` dentro de paneles que la isla también vigila, y basta con
+que alguien se quede el evento para que no quede más remedio que arrastrar la barra
+a pulso. Si la lista cabe entera no se toca el evento, que siga su camino.
+
+**Tu red se perdía entre las de los vecinos.** El orden que da Windows es el suyo.
+Ahora salen primero las que ya conoces (tienen perfil guardado, y van en negrita) y
+dentro de cada grupo la que mejor llega. El título pasa a "Redes wifi · 12" cuando
+hay más de las que caben, para que se note que hay que bajar.
+
+Probado en este equipo con 4 redes a la vista y conexión por cable: el panel pide
+217 px de alto y las redes salen ordenadas (la conocida primero aunque llegue al
+27 %, y detrás 87 %, 36 % y 12 %). Lo que **no** se ha podido probar aquí es el
+desplazamiento con más de cinco redes ni el tope de pantalla: no hay tantas redes
+al alcance, y ningún panel llega a pedir los 1.362 px que caben en este monitor.
+
 ## Y las abiertas, igual que las fijadas
 
 Mismo problema que con las fijadas, y la misma solución: el carrusel vivía en la

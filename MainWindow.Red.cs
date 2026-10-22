@@ -17,8 +17,25 @@ public partial class MainWindow : Window
 {
     const string PanelRed = "red";
     const double AnchoRed = 420;
+    const double AltoFilaWifi = 32;
+    const int FilasWifiALaVista = 5;      // las demás, con la rueda
+
+    // Cuántas wifis se ven de golpe. Con quince redes de vecinos el panel crecía hasta
+    // medir media pantalla, y la isla pasaba de ser una isla a ser un muro: la lista
+    // tiene tope, y en una pantalla pequeña todavía menos. El resto está a una rueda.
+    double AltoListaWifi()
+    {
+        double pantalla = _monitor.Alto / _monitor.Escala;
+        // Lo que ocupa el panel SIN la lista (lo conectado, las cabeceras, el test de
+        // velocidad y el enlace a Windows), más la fila de módulos de la isla
+        double resto = 320 + _cfg.Barra.Alto + _cfg.Barra.Margen * 2;
+        double cabe = Math.Floor((pantalla - resto) / AltoFilaWifi) * AltoFilaWifi;
+        return Math.Clamp(cabe, AltoFilaWifi * 2, AltoFilaWifi * FilasWifiALaVista);
+    }
 
     StackPanel? _redConectadas, _redLista;
+    ScrollViewer? _redScroll;        // la ventanita por la que se ven las wifis
+    TextBlock? _redTitulo;           // "Redes wifi · 12"
     TextBlock? _redEstado;
     Red.Wifi? _redConClave;          // la red cuya fila tiene la caja de contraseña abierta
     bool _redConectando;
@@ -47,10 +64,10 @@ public partial class MainWindow : Window
         var cabecera = new Grid { Margin = new Thickness(0, 8, 0, 2) };
         cabecera.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         cabecera.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var titulo = Titulito("Redes wifi");
-        titulo.Margin = new Thickness(0);
-        titulo.VerticalAlignment = VerticalAlignment.Center;
-        cabecera.Children.Add(titulo);
+        _redTitulo = Titulito("Redes wifi");
+        _redTitulo.Margin = new Thickness(0);
+        _redTitulo.VerticalAlignment = VerticalAlignment.Center;
+        cabecera.Children.Add(_redTitulo);
         var buscar = Boton(Glifo(""), "Volver a buscar redes", () =>
         {
             Red.Escanear();
@@ -69,13 +86,24 @@ public partial class MainWindow : Window
 
         _redLista = new StackPanel();
         _redLista.SizeChanged += (_, e) => { if (e.WidthChanged) AjustarFilasWifi(); };
-        columna.Children.Add(new ScrollViewer
+        _redScroll = new ScrollViewer
         {
-            MaxHeight = 220,
+            MaxHeight = AltoListaWifi(),
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
             Content = _redLista
-        });
+        };
+        // La rueda se atiende a mano. El ScrollViewer ya lo haría solo, pero cada fila
+        // es un Button dentro de un panel que la isla también vigila, y bastaba con que
+        // alguien marcara el evento como manejado para que la lista no se moviera y
+        // hubiera que arrastrar la barra a pulso. Así baja seguro, y de fila en fila.
+        _redScroll.PreviewMouseWheel += (_, e) =>
+        {
+            if (_redScroll.ScrollableHeight <= 0) return;      // cabe entera: que la rueda siga su camino
+            _redScroll.ScrollToVerticalOffset(_redScroll.VerticalOffset - Math.Sign(e.Delta) * AltoFilaWifi * 2);
+            e.Handled = true;
+        };
+        columna.Children.Add(_redScroll);
 
         // --- Test de velocidad ---
         columna.Children.Add(Titulito("Velocidad"));
@@ -147,9 +175,18 @@ public partial class MainWindow : Window
             if (conexiones.Count == 0) _redConectadas.Children.Add(Tenue("Sin conexión"));
             foreach (var c in conexiones) _redConectadas.Children.Add(FilaConexion(c, wifis.FirstOrDefault(w => w.Conectada)));
 
-            // A la vista
+            // A la vista. El orden que da Windows es el suyo y tu red se perdía entre
+            // las de los vecinos: primero las que ya conoces (tienen perfil guardado) y
+            // dentro de cada grupo, la que mejor llega.
             _redLista.Children.Clear();
-            var visibles = wifis.Where(w => !w.Conectada && w.Senal > 0).ToList();
+            var visibles = wifis.Where(w => !w.Conectada && w.Senal > 0)
+                                .OrderByDescending(w => w.Perfil.Length > 0)
+                                .ThenByDescending(w => w.Senal)
+                                .ToList();
+            if (_redTitulo != null)
+                _redTitulo.Text = visibles.Count > FilasWifiALaVista
+                    ? $"Redes wifi · {visibles.Count}"      // que se vea que hay más abajo
+                    : "Redes wifi";
             if (visibles.Count == 0)
                 _redLista.Children.Add(Tenue(wifis.Count == 0 && conexiones.All(c => c.Tipo != Red.Tipo.Wifi)
                     ? "No hay tarjeta wifi, o está apagada"
@@ -234,7 +271,13 @@ public partial class MainWindow : Window
             Text = w.Nombre, Foreground = _texto, VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis
         };
-        if (w.Perfil.Length > 0) nombre.ToolTip = "Ya te has conectado antes";
+        // Las que ya conoces van primero y además en negrita: con la lista llena de
+        // redes de vecinos, la tuya se encuentra de un vistazo
+        if (w.Perfil.Length > 0)
+        {
+            nombre.FontWeight = FontWeights.SemiBold;
+            nombre.ToolTip = "Ya te has conectado antes";
+        }
         Grid.SetColumn(nombre, 1);
         g.Children.Add(nombre);
 
@@ -267,7 +310,7 @@ public partial class MainWindow : Window
         var fila = Boton(g, tip, () => PulsarWifi(w), levantar: false);
         fila.MouseEnter += (_, _) => Levantar(icono, true);
         fila.MouseLeave += (_, _) => Levantar(icono, false);
-        fila.Height = 32;
+        fila.Height = AltoFilaWifi;
         fila.Margin = new Thickness(-6, 0, 0, 0);
         fila.HorizontalAlignment = HorizontalAlignment.Left;
         pila.Children.Add(fila);

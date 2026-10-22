@@ -105,6 +105,10 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
   habías entrado antes, directo; si no, pide la contraseña ahí mismo. Si la
   contraseña no vale, no se queda guardada. Las redes de empresa (802.1X) se
   abren en los ajustes de Windows. Botón para desconectarse y para volver a buscar.
+- Primero salen **las que ya conoces** (en negrita) y después las demás por señal,
+  para que la tuya no se pierda entre las de los vecinos. Se ven cinco de golpe
+  y el resto con la rueda: así la isla no se convierte en un muro aunque haya
+  quince redes alrededor. El título dice cuántas hay en total.
 - **Test de velocidad** integrado: ping, bajada y subida contra
   speed.cloudflare.com, con las cifras moviéndose en vivo. Tarda unos 15 s.
 - Lo que tu equipo no admite no aparece: sin batería no hay icono de batería, y
