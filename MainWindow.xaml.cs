@@ -975,7 +975,8 @@ public partial class MainWindow : Window
             Content = contenido, ToolTip = tip, Foreground = _texto,
             Height = Math.Max(20, _cfg.Barra.Alto - 8)
         };
-        b.Click += (_, _) => { accion(); Tick(); };
+        // Soltar algo que venías arrastrando no es pulsar este botón (ver ClicDeArrastre)
+        b.Click += (_, _) => { if (ClicDeArrastre()) return; accion(); Tick(); };
         if (levantar) ConLevantado(b);
         return b;
     }

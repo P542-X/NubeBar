@@ -132,6 +132,7 @@ public partial class MainWindow : Window
             b.Opacity = 1;
             b.Cursor = null;
             Panel.SetZIndex(b, _zIndexAntes);
+            ApuntarArrastre();      // soltar el icono aquí no es pulsarlo
             GuardarOrden();
         }
 

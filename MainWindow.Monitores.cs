@@ -44,13 +44,24 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Mientras la estás arrastrando manda el ratón: aquí solo se ajusta el
-        // TAMAÑO, nunca la posición, o la isla se escaparía de debajo del cursor
-        // en cuanto se abriera un panel o cambiara el ancho.
-        if (_arrastrando)
+        // Mientras la estás arrastrando manda el ratón, y mientras siga fuera de
+        // sitio manda donde la dejaste: aquí solo se ajusta el TAMAÑO, nunca la
+        // posición.
+        //
+        // Lo segundo no estaba y es lo que la teletransportaba: cualquier cosa que
+        // recoloque la ventana (abrir o cerrar un panel, recargar el config) la
+        // devolvía de un salto a su sitio, sin la animación de vuelta. Y pasaba
+        // constantemente, porque al soltarla cogida de un icono se disparaba el
+        // clic de ese botón y lo que abría ya recolocaba la ventana.
+        //
+        // Ahora la isla solo vuelve a casa por un sitio: AnimarVuelta.
+        if (_arrastrando || _fueraDeSitio || _animandoVuelta != null)
         {
             var r = Nativo.Rectangulo(_self);
-            Nativo.Colocar(_self, r.Izq, r.Arr, m.Ancho, altoPx);
+            // Con la isla abajo, el filo que no se puede mover es el de abajo: si
+            // se respetara el de arriba, al abrir un panel la isla bajaría sola
+            int yy = Arriba ? r.Arr : r.Aba - altoPx;
+            Nativo.Colocar(_self, r.Izq, yy, m.Ancho, altoPx);
             Width = double.NaN;
             Height = double.NaN;
             return;

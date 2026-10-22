@@ -44,6 +44,12 @@ public partial class MainWindow : Window
         // GetAsyncKeyState, que funcionan esté el puntero donde esté.
         Isla.PreviewMouseLeftButtonDown += (_, e) =>
         {
+            // Cada pulsación empieza limpia, pase lo que pase después: si esto se
+            // quedara puesto de un arrastre anterior, el siguiente clic bueno
+            // sobre un botón se lo comería ClicDeArrastre()
+            _huboArrastre = false;
+            _marcaArrastre = 0;
+
             if (!_cfg.Barra.Arrastrable || _siguiendoRaton != null) return;
 
             // Si has cogido un icono del carrusel, lo que se mueve es el icono,
@@ -79,6 +85,7 @@ public partial class MainWindow : Window
                 _sinExpandir = false;
                 _fueraDeSitio = true;
                 Isla.Cursor = null;
+                ApuntarArrastre();      // que el botón de debajo no se tome esto por un clic
 
                 // Si ya no tienes el ratón encima, empieza la cuenta atrás. Si lo
                 // tienes, se espera a que la sueltes de verdad: no va a volverse
@@ -111,6 +118,32 @@ public partial class MainWindow : Window
         }
 
         MoverVentanaA(_raizX + (int)Math.Round(dx), _raizY + (int)Math.Round(dy));
+    }
+
+    // ---------- Soltar no es pulsar ----------
+    //
+    // Al soltar la isla, WPF le manda su Click al botón que había debajo del dedo
+    // cuando empezaste: cogerla por el icono de la vista general la abría, por el
+    // de una app te cambiaba a esa app, y por una app fijada y cerrada te la
+    // lanzaba. Encima, lo que se abría recolocaba la ventana y la isla se plantaba
+    // en su sitio de un salto, sin la animación de vuelta.
+    //
+    // Vale tanto para el arrastre de la isla como para el de un icono del carrusel:
+    // después de reordenar tampoco quieres acabar en esa app.
+    long _marcaArrastre;
+
+    void ApuntarArrastre() => _marcaArrastre = System.Diagnostics.Stopwatch.GetTimestamp();
+
+    bool ClicDeArrastre()
+    {
+        // El arrastre de la isla y el del icono se enteran de que has soltado en el
+        // siguiente fotograma, que puede llegar después del Click: por eso, además
+        // de las banderas, hay una marca de tiempo con un margen corto.
+        if (_huboArrastre || _llevaIcono != null) return true;
+        if (_marcaArrastre == 0) return false;
+        if (System.Diagnostics.Stopwatch.GetElapsedTime(_marcaArrastre).TotalMilliseconds < 250) return true;
+        _marcaArrastre = 0;
+        return false;
     }
 
     void DejarDeSeguir()
@@ -200,7 +233,6 @@ public partial class MainWindow : Window
         int desdeX = r.Izq, desdeY = r.Arr;
         if (desdeX == destinoX && desdeY == destinoY) return;
 
-        int ancho = r.Der - r.Izq, alto = r.Aba - r.Arr;
         var reloj = System.Diagnostics.Stopwatch.StartNew();
         const double ms = 520;
 
@@ -209,6 +241,12 @@ public partial class MainWindow : Window
 
         _animandoVuelta = (_, _) =>
         {
+            // El tamaño se vuelve a leer en cada fotograma y no se guarda del
+            // principio: por el camino puede abrirse o cerrarse un panel, y con la
+            // medida vieja la volveríamos a estirar o a encoger a cada paso
+            var ahora = Nativo.Rectangulo(_self);
+            int ancho = ahora.Der - ahora.Izq, alto = ahora.Aba - ahora.Arr;
+
             double t = Math.Min(1, reloj.Elapsed.TotalMilliseconds / ms);
             double k = curva.Ease(t);
             int x = (int)Math.Round(desdeX + (destinoX - desdeX) * k);

@@ -814,3 +814,48 @@ sale él solo. Ojo con el Bloc de notas de Windows 11 para probar estas cosas:
 `Start-Process notepad` lanza un puente que se muere enseguida y deja el programa de
 verdad corriendo como `Notepad` con otro pid, así que parecía que el icono se
 quedaba colgado cuando lo que pasaba es que la ventana seguía abierta.
+
+## Soltar la isla no es pulsar lo que tenías debajo
+
+Síntoma: cogiéndola de ciertos sitios (el icono de la vista general, un icono de
+app) la isla no hacía la animación de volver, se plantaba en su sitio de un salto.
+
+Eran **dos fallos encadenados**, y el log los enseña seguidos:
+
+```
+21:01:52.764 vista general: 3 ventanas…
+21:01:52.773 isla soltada en 54,643; se queda mientras sigas encima
+21:01:52.784 panel abierto: vista (436x108)
+```
+
+**Uno:** al soltar, WPF le manda su `Click` al botón que tenías debajo del dedo
+cuando empezaste. Cogerla por la vista general la abría, por un icono de app te
+cambiaba a esa app (o la lanzaba, si estaba fijada y cerrada). La isla se mueve con
+el cursor, así que el botón sigue debajo al soltar y el clic es "legítimo" para WPF.
+
+**Dos:** abrir un panel recoloca la ventana (`AjustarVentana` → `ColocarEnMonitor`),
+y ahí la posición solo se respetaba mientras `_arrastrando`. En cuanto soltabas,
+cualquier recolocación —un panel, cerrar un panel, una recarga del config— la
+devolvía a casa de un salto. El primer fallo disparaba el segundo todo el rato.
+
+Arreglo:
+- `ClicDeArrastre()`: un `Click` que es el final de un arrastre se ignora. Mira las
+  dos banderas (`_huboArrastre`, `_llevaIcono`) y además una marca de tiempo con
+  250 ms de margen, porque el arrastre se entera de que has soltado en el siguiente
+  fotograma compuesto, que puede llegar *después* del Click. Vale también para el
+  arrastre de iconos: después de reordenar tampoco quieres acabar en esa app. Y las
+  banderas se limpian al empezar cada pulsación, no al acabarla, para no comerse el
+  clic siguiente.
+- `ColocarEnMonitor` respeta la posición mientras la isla esté fuera de sitio o
+  volviendo, no solo mientras la llevas cogida: ahora la isla vuelve a casa por un
+  único sitio, `AnimarVuelta`. Con la barra abajo se conserva el filo de abajo, que
+  es el que no se puede mover (si no, abrir un panel la hacía bajar sola).
+- `AnimarVuelta` vuelve a leer el tamaño en cada fotograma en vez de guardárselo al
+  empezar: si por el camino se abre o se cierra un panel, ya no la estira o la
+  encoge a la medida vieja.
+
+Probado: se arrastra cogida del botón de la vista general y al soltar **no se abre
+nada** (antes salía `panel abierto: vista` en el log). La vuelta se ve en
+fotogramas intermedios (x≈1085 y x≈1175 camino de 1280), o sea que se anima de
+verdad. Y con la isla fuera de sitio se abre un panel y se queda donde la dejaste
+en vez de saltar a su sitio.
