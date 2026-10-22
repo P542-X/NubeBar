@@ -286,6 +286,19 @@ public static class Fuentes
     }
 
 
+    // System.ItemUrl viene como "file:C:/Users/…/cosa.txt" (y en un recurso de red,
+    // "file://servidor/sitio/…"). Se devuelve la ruta de Windows de toda la vida. Si
+    // el índice no da url (pasa con cosas que no son archivos: correo, contactos…),
+    // nos quedamos con la que había, que al menos sirve para enseñarla.
+    static string RutaDeItemUrl(string? url, string mostrada)
+    {
+        if (string.IsNullOrEmpty(url) || !url.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
+            return mostrada;
+        var resto = url[5..];
+        if (resto.StartsWith("//")) return @"\\" + resto[2..].Replace('/', '\\');
+        return resto.TrimStart('/').Replace('/', '\\');
+    }
+
     static List<Resultado> ConsultarIndice(string consulta, int tope, CancellationToken ct)
     {
         var salida = new List<Resultado>();
@@ -293,7 +306,14 @@ public static class Fuentes
         {
             var cadena = "Provider=Search.CollatorDSO;Extended Properties='Application=Windows'";
             var escapada = consulta.Replace("'", "''");
-            var sql = "SELECT TOP " + tope + " System.ItemPathDisplay, System.ItemNameDisplay, System.ItemType " +
+            // OJO con las columnas: System.ItemPathDisplay es la ruta PARA ENSEÑAR, y
+            // viene traducida al idioma de Windows ("C:\Usuarios\Spcar\Documentos\…",
+            // "…\Menú Inicio\Programas\…"). Esos nombres son de cara a la galería: en
+            // disco las carpetas se llaman Users, Documents y Start Menu, así que
+            // abrir con esa ruta fallaba con "no se encuentra el archivo". La ruta de
+            // verdad es System.ItemUrl.
+            var sql = "SELECT TOP " + tope + " System.ItemPathDisplay, System.ItemNameDisplay, " +
+                      "System.ItemType, System.ItemUrl " +
                       "FROM SystemIndex WHERE System.ItemNameDisplay LIKE '%" + escapada + "%' " +
                       "ORDER BY System.DateModified DESC";
 
@@ -306,15 +326,16 @@ public static class Fuentes
             while (lector.Read())
             {
                 if (ct.IsCancellationRequested) break;
-                var ruta = lector[0] as string ?? "";
-                var nombre = lector[1] as string ?? Path.GetFileName(ruta);
-                if (ruta.Length == 0) continue;
-                var r = ruta;
+                var mostrada = lector[0] as string ?? "";
+                var nombre = lector[1] as string ?? Path.GetFileName(mostrada);
+                var r = RutaDeItemUrl(lector[3] as string, mostrada);
+                if (r.Length == 0) continue;
                 salida.Add(new Resultado
                 {
                     Categoria = Categoria.Archivo,
                     Titulo = nombre,
-                    Detalle = Path.GetDirectoryName(r) ?? "",
+                    // La de enseñar sí es la traducida: es la que ves en el Explorador
+                    Detalle = Path.GetDirectoryName(mostrada.Length > 0 ? mostrada : r) ?? "",
                     Clave = "archivo:" + r,
                     IconoRuta = r,
                     Carpeta = Path.GetDirectoryName(r),

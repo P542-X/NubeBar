@@ -897,3 +897,35 @@ con el botón derecho. ManagedShell solo lo hace con el izquierdo y el central, 
 una app que contesta con su menú llama antes a `SetForegroundWindow` (es lo que
 manda Microsoft para los menús de bandeja): sin ese permiso, Windows se lo niega y
 el menú no sale.
+
+## El buscador daba rutas que no existen
+
+En el log aparecían siete intentos de abrir cosas que acababan en "el sistema no
+puede encontrar el archivo", y todas tenían la misma pinta:
+
+```
+ERROR en abrir C:\Usuarios\Spcar\Documentos\ola\IP Switcher Setup 1.0.0.exe
+ERROR en abrir C:\ProgramData\Microsoft\Windows\Menú Inicio\Programas\…
+```
+
+`C:\Usuarios`, `Documentos`, `Menú Inicio`: son los nombres **traducidos** que
+enseña el Explorador. En disco esas carpetas se llaman `Users`, `Documents` y
+`Start Menu`, siempre, sea cual sea el idioma de Windows. La consulta al índice
+pedía `System.ItemPathDisplay`, que es justo eso: la ruta para enseñar.
+
+La buena es `System.ItemUrl`. Comprobado contra el índice de este equipo:
+
+```
+mostrada : C:\Usuarios\Spcar\Documentos\ola\IP Switcher Setup 1.0.0.exe   (no existe)
+itemurl  : file:C:/Users/Spcar/Documents/ola/IP Switcher Setup 1.0.0.exe  (sí existe)
+```
+
+Ahora se piden las dos: la traducida se sigue enseñando debajo del resultado
+(es la que verías en el Explorador, y queda mejor), y la de verdad es la que se
+usa para abrir, para sacar el icono y para "abrir la ubicación" — que por lo mismo
+tampoco funcionaba: `Directory.Exists` decía que no sobre la ruta traducida y la
+opción se iba por el desagüe sin decir nada.
+
+`System.ItemUrl` viene como `file:C:/…` (y en un recurso de red, `file://servidor/…`),
+y lo que no sea `file:` no es un archivo: el índice también guarda correo y
+contactos, y ahí nos quedamos con lo que hubiera.
