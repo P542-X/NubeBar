@@ -20,6 +20,26 @@ public partial class MainWindow : Window
 
     static DispatcherTimer? _vigia;
 
+    // Escondida con el clic derecho. Es de todas las islas a la vez y solo la tecla
+    // Windows la devuelve: ni la pantalla completa ni el ratón en el borde la tocan.
+    static bool _escondidaAMano;
+
+    public static void EsconderAMano(bool esconder)
+    {
+        if (_escondidaAMano == esconder) return;
+        _escondidaAMano = esconder;
+        foreach (var i in Islas.ToList())
+        {
+            if (esconder) i.CerrarPanel();
+            i._asomada = false;
+            i._ratonEnElBorde = DateTime.MaxValue;
+            // Al volver, si su pantalla sigue con algo a pantalla completa, se queda
+            // fuera: el siguiente repaso la deja asomar como siempre con el ratón
+            i.Deslizar(esconder || i._escondidaPorPantalla);
+        }
+        Log.Info(esconder ? "isla escondida a mano (vuelve con Win)" : "isla de vuelta con la tecla Windows");
+    }
+
     const double MsAsomar = 300;   // cuánto hay que aguantar el ratón arriba para que asome
 
     // Un solo temporizador para todas las islas: lo monta la jefa y revisa a todas.
@@ -125,6 +145,7 @@ public partial class MainWindow : Window
 
     void RevisarPantallaCompleta()
     {
+        if (_escondidaAMano) return;
         if (!_cfg.Barra.OcultarEnPantallaCompleta)
         {
             if (_escondidaPorPantalla) { _escondidaPorPantalla = false; _asomada = false; Deslizar(false); }

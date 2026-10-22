@@ -82,6 +82,14 @@ public partial class MainWindow
     // pulsar Win se lo lleva, no abre un segundo menú.
     void MenuDesdeTecla()
     {
+        // Escondida a mano: la tecla solo la trae de vuelta, no abre el menú encima
+        if (_escondidaAMano)
+        {
+            _gancho!.Capturando = false;
+            VaciarCola(descartar: true);
+            EsconderAMano(false);
+            return;
+        }
         foreach (var otra in Islas.Where(i => i != this && i._panelAbierto == PanelInicio).ToList())
         {
             _gancho!.Capturando = false;

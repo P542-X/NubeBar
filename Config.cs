@@ -41,10 +41,10 @@ public class Barra
     public string Monitores { get; set; } = "todos";   // "todos" | "principal"
     public bool AppsPorMonitor { get; set; } = true;   // cada isla enseña las apps de SU monitor
     public bool OcultarEnPantallaCompleta { get; set; } = true;
-    // Una ventana maximizada también la echa. Va activado de serie: quien juega o ve
-    // un vídeo en ventana maximizada no tiene por qué ver la isla encima. A cambio,
-    // se aparta también al maximizar el navegador; se quita en Ajustes > Isla.
-    public bool OcultarConMaximizada { get; set; } = true;
+    // Una ventana maximizada también la echa. Ya no viene de serie: la isla iba y
+    // venía cada vez que pasabas de un Excel maximizado a otra cosa. Para quitarla
+    // de en medio está "Esconder la isla" en el clic derecho (vuelve con Win).
+    public bool OcultarConMaximizada { get; set; } = false;
     public bool Bandeja { get; set; } = true;        // iconos de la bandeja del sistema en la isla
     public int MaxBandeja { get; set; } = 0;         // cuántos se ven sin abrir el desplegable "^" (0 = solo el "^")
     public bool Notificaciones { get; set; } = true; // las notificaciones asoman en la isla

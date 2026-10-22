@@ -700,3 +700,24 @@ la bandeja) usa `System.Windows.Forms.Screen`, y sin `UseWindowsForms` esa DLL
 no viene en el paquete: `FileNotFoundException` a los 3 s de arrancar. Se activa
 WinForms en el proyecto y se le quitan los `using` globales para que no choquen
 con los de WPF.
+
+## Siempre a la vista, y esconderla a mano con el clic derecho
+
+Con `OcultarConMaximizada` de serie la isla iba y venía cada vez que pasabas de
+una ventana maximizada (un Calc, el navegador) a otra cosa: en el log salían
+decenas de "se esconde / vuelve" en pocos minutos. Ahora viene apagado y la isla
+se queda siempre. La pantalla completa de verdad (F11, un vídeo, un juego) la
+sigue apartando, como antes.
+
+Para quitarla de en medio cuando estorba: clic derecho → «Esconder la isla». Se
+va de todas las pantallas a la vez (`_escondidaAMano` es estático) y solo vuelve
+con la tecla Windows, que esa vez no abre el menú: solo la devuelve. Mientras
+está escondida a mano, ni la pantalla completa ni el ratón en el borde la tocan.
+La opción solo sale si la tecla Windows es nuestra (`Inicio.TeclaWindows`): sin
+el hook no habría forma de recuperarla salvo cerrando NubeBar.
+
+Límite conocido: con VMware Workstation delante, la tecla Windows no nos llega
+(abre el Inicio de Windows) y tampoco devuelve la isla. VMware se queda la tecla
+antes que nadie. Se probó a reenganchar nuestro hook en cada cambio de primer
+plano para ponernos los primeros en la cadena, y no cambió nada: no es cuestión
+del orden de los hooks. Se deja así; basta con cambiar a otra ventana.

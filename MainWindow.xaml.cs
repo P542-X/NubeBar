@@ -775,6 +775,8 @@ public partial class MainWindow : Window
         const double ancho = 250, altoFila = 34;
         var opciones = new List<(string Texto, Action Accion)>();
         opciones.AddRange(OpcionesDeCerrarTodas());
+        // Solo si la tecla Windows es nuestra: es lo único que la trae de vuelta
+        if (_cfg.Inicio.TeclaWindows) opciones.Add(("Esconder la isla", () => EsconderAMano(true)));
         opciones.Add(("Ajustes…", AbrirAjustes));
         opciones.Add(("Recargar el config", () =>
         {

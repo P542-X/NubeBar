@@ -43,6 +43,8 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
 - **Cerrar desde la isla**: clic derecho en un icono para cerrar esa app, o
   **forzar su cierre** como con «Finalizar tarea». Clic derecho en la isla para
   cerrarlas todas. Las tres piden confirmación antes de hacer nada.
+- **Esconder la isla**: clic derecho en la isla → «Esconder la isla» y se va de
+  todas las pantallas. Vuelve al pulsar la tecla Windows.
 - Vista general tipo Exposé con todas las ventanas, con atajo global.
 
 **El menú Inicio propio**
@@ -211,7 +213,7 @@ la isla se adapta sola. Las claves que no reconoce se conservan tal cual.
 | `Barra.Monitores` | `"todos"` | `"todos"` (una isla por pantalla) o `"principal"` |
 | `Barra.AppsPorMonitor` | `true` | Cada isla enseña solo las apps de su pantalla |
 | `Barra.OcultarEnPantallaCompleta` | `true` | La isla se esconde si algo ocupa su pantalla entera |
-| `Barra.OcultarConMaximizada` | `true` | Se esconde también con una ventana maximizada (juegos, vídeos) |
+| `Barra.OcultarConMaximizada` | `false` | Se esconde también con una ventana maximizada (juegos, vídeos) |
 | `Barra.Bandeja` | `true` | Traer los iconos de la bandeja del sistema (hace falta el módulo `bandeja`) |
 | `Barra.MaxBandeja` | `0` | Iconos de bandeja visibles antes del desplegable `^`; con `0`, solo el `^` (como los iconos ocultos de Windows) |
 | `Barra.Notificaciones` | `true` | Las notificaciones de Windows asoman en la isla |
