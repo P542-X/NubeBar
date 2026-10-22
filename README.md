@@ -219,7 +219,7 @@ la isla se adapta sola. Las claves que no reconoce se conservan tal cual.
 | `Barra.Notificaciones` | `true` | Las notificaciones de Windows asoman en la isla |
 | `Barra.NotificacionesSilenciadas` | `[]` | Trozos de identificador de app que no avisan (p. ej. `"Discord"`) |
 | `Barra.AppsDelEscritorio` | `false` | El carrusel, solo con las apps del escritorio virtual actual |
-| `Barra.AppsFijadas` | `[]` | Apps siempre presentes en el carrusel, en este orden. Rutas de ejecutable, o `shell:AppsFolder\<id>` para las de la Store |
+| `Barra.AppsFijadas` | `[]` | Apps siempre a la vista, en este orden. Con el módulo `fijadas` puesto se ven también con la isla recogida; si lo quitas, van en el carrusel. Rutas de ejecutable, o `shell:AppsFolder\<id>` para las de la Store |
 | `Barra.OrdenApps` | `[]` | El orden que les has dado arrastrando los iconos; se escribe solo |
 | `Barra.Arrastrable` | `true` | La isla se aparta arrastrándola, y los iconos se reordenan igual |
 | `Barra.SegundosParaVolver` | `1` | Tras quitarle el ratón de encima, cuánto tarda en volver a su sitio |
@@ -230,15 +230,22 @@ Listas de nombres; el orden es el orden en que salen.
 
 ```json
 "Modulos": {
-  "Izquierda": ["inicio", "apps"],
-  "Centro":    ["reloj"],
+  "Izquierda": ["inicio"],
+  "Centro":    ["fijadas", "apps", "reloj"],
   "Derecha":   ["cpu", "ram", "bateria", "bandeja", "control", "fecha"]
 }
 ```
 
-Disponibles: `inicio`, `apps`, `reloj`, `fecha`, `cpu`, `ram`, `bateria`, `musica`,
-`bandeja`, `control`, `escritorios`, `wallpaper`, `wallpaper-titulo`, `iconos`,
-`separador`.
+Disponibles: `inicio`, `apps`, `fijadas`, `reloj`, `fecha`, `cpu`, `ram`, `bateria`,
+`musica`, `bandeja`, `control`, `escritorios`, `wallpaper`, `wallpaper-titulo`,
+`iconos`, `separador`.
+
+La zona del **centro se ve siempre**, con la isla recogida o desplegada; la
+izquierda y la derecha solo al desplegarse. Por eso ahí viven las apps: `fijadas`
+(los iconos de `Barra.AppsFijadas`, estén abiertas o no) y `apps` (las que tienes
+abiertas ahora mismo). Están a un clic sin acercar el ratón, y no se mueven de
+sitio al desplegarse la isla, porque el centro es la única zona que no se desplaza.
+Si prefieres la isla pequeña en reposo, muévelos a la izquierda en Ajustes > Módulos.
 
 ### Menú Inicio
 

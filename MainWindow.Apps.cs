@@ -154,7 +154,9 @@ public partial class MainWindow
     // ================= Refresco =================
     void RefrescarApps()
     {
-        if (_tira == null || _carrusel == null) return;
+        // Sin carrusel todavía se puede estar enseñando algo: las fijadas tienen su
+        // propia tira (módulo "fijadas") y viven aunque "apps" no esté puesto
+        if ((_tira == null || _carrusel == null) && !FijasAparte) return;
 
         var activa = ActivaAjena();
 
@@ -194,13 +196,18 @@ public partial class MainWindow
         foreach (var f in fijadas)
             if (!ahora.ContainsKey(f)) ahora[f] = new List<IntPtr>();
 
+        // Sin módulo "apps" no hay dónde poner las que no están fijadas
+        if (_tira == null)
+            foreach (var clave in ahora.Keys.Where(k => !EstaFijada(k)).ToList())
+                ahora.Remove(clave);
+
         // Grupos que ya no existen: se encogen y se van
         foreach (var clave in _grupos.Keys.Where(k => !ahora.ContainsKey(k)).ToList())
         {
             var g = _grupos[clave];
             _grupos.Remove(clave);
             if (g.Boton is { } b)
-                AnimarSalida(b, () => { _tira.Children.Remove(b); TrasCambiarApps(); });
+                AnimarSalida(b, () => { (b.Parent as Panel)?.Children.Remove(b); TrasCambiarApps(); });
         }
 
         // Grupos nuevos y actualización de los que siguen.
@@ -232,6 +239,13 @@ public partial class MainWindow
                                        .Concat(ventanas.Where(h => !g.Ventanas.Contains(h)))
                                        .ToList();
                 g.Fijada = EstaFijada(clave);
+                // La acabas de fijar (o de quitar): su botón se cambia de tira sin
+                // perderlo, que es lo que pasaría si esperásemos a la recarga del config
+                if (g.Boton is { } bot && TiraDe(g) is { } suya && !ReferenceEquals(bot.Parent, suya))
+                {
+                    (bot.Parent as Panel)?.Children.Remove(bot);
+                    suya.Children.Add(bot);
+                }
                 ActualizarGrupo(g, activa);
                 continue;
             }
@@ -244,8 +258,10 @@ public partial class MainWindow
                 Lanzar = FijadaDeClave(clave)
             };
             _grupos[clave] = g;
-            CrearBotonGrupo(g);
-            _tira.Children.Add(g.Boton);
+            var tira = TiraDe(g);
+            if (tira == null) { _grupos.Remove(clave); continue; }
+            CrearBotonGrupo(g, enElCarrusel: ReferenceEquals(tira, _tira));
+            tira.Children.Add(g.Boton);
             AnimarEntrada(g.Boton!, _primeraCarga ? orden++ * 45 : 0);
             ActualizarGrupo(g, activa, inmediato: true);
         }
@@ -266,10 +282,15 @@ public partial class MainWindow
         TrasCambiarApps();
     }
 
+    // ¿En qué tira va este grupo? Las fijadas, en la que se ve también con la isla
+    // recogida (módulo "fijadas"); las demás, en el carrusel.
+    Panel? TiraDe(Grupo g) => g.Fijada && _tiraFijas != null ? _tiraFijas : _tira;
+
     // Tras añadir o quitar iconos hay que recalcular el ancho visible y el degradado
     void TrasCambiarApps()
     {
-        if (_carrusel == null || _tira == null) return;
+        OrdenarFijas();
+        if (_carrusel == null || _tira == null) { AjustarAncho(); return; }
         // Medir sin límite (no UpdateLayout, que fuerza una pasada entera cada segundo)
         _tira.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         _anchoTira = _tira.DesiredSize.Width;
@@ -281,7 +302,7 @@ public partial class MainWindow
         AjustarAncho();
     }
 
-    void CrearBotonGrupo(Grupo g)
+    void CrearBotonGrupo(Grupo g, bool enElCarrusel = true)
     {
         // Una app fijada y cerrada no tiene ventana de la que sacar el icono:
         // se lo pedimos al shell a partir de su ruta o de su AppUserModelId.
@@ -312,8 +333,9 @@ public partial class MainWindow
         // no suba hasta la isla y abra SU menú contextual en vez de este.
         g.Boton.MouseRightButtonUp += (_, e) => { e.Handled = true; MenuDeGrupo(g); };
 
-        // Y se puede coger y arrastrar para cambiarla de sitio en el carrusel
-        ConReordenado(g.Boton, g);
+        // Y se puede coger y arrastrar para cambiarla de sitio en el carrusel. En la
+        // tira de las fijas no: ahí el orden es el de Barra.AppsFijadas (Ajustes > Apps)
+        if (enElCarrusel) ConReordenado(g.Boton, g);
     }
 
     // Estado visual del grupo: cuántos puntos y de qué color

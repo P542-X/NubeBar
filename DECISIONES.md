@@ -721,3 +721,67 @@ Límite conocido: con VMware Workstation delante, la tecla Windows no nos llega
 antes que nadie. Se probó a reenganchar nuestro hook en cada cambio de primer
 plano para ponernos los primeros en la cadena, y no cambió nada: no es cuestión
 del orden de los hooks. Se deja así; basta con cambiar a otra ventana.
+
+## Las apps fijadas, a la vista con la isla recogida
+
+Fijar una app ya servía para tenerla siempre en el carrusel, pero el carrusel vive
+en la zona izquierda y esa zona **no existe con la isla recogida**: para llegar a tu
+app había que acercar el ratón, esperar a que se desplegara y entonces pulsar. Tres
+pasos para lo que en la barra de Windows es uno.
+
+Ahora las fijadas tienen su propio módulo, `fijadas`, que viene de serie y se ve
+siempre, recogida o no.
+
+**Va en el centro, pegado al reloj, y no a la izquierda con el carrusel.** Es
+geometría, no gusto: la isla crece y se encoge desde el centro, así que al
+desplegarse la zona izquierda se desplaza unos 350 px (medido en una captura con la
+config de aquí: la isla pasa de 120 px de ancho recogida a unos 850 expandida, y el
+borde izquierdo se va de 1220 a 865). El icono se escapaba de debajo del cursor
+justo cuando ibas a pulsarlo, que es la peor sensación posible. La columna del
+centro es `Auto` entre dos estrellas iguales, o sea que está centrada pase lo que
+pase: los iconos fijos no se mueven ni un píxel entre un estado y otro. Comprobado
+con capturas de los dos estados.
+
+**Un icono y no dos.** Con el módulo puesto, las fijadas salen del carrusel y viven
+en la tira nueva; si lo quitas de Ajustes > Módulos, vuelven al carrusel como antes.
+El botón es exactamente el mismo (`CrearBotonGrupo`), así que conserva los puntitos
+por ventana, la rayita de la activa, la mini lista y el menú del clic derecho. Lo
+único que no se hereda es el arrastrar para reordenar: en la tira fija el orden es
+el de `Barra.AppsFijadas`.
+
+**Cuidado con el orden de construcción:** los módulos se montan por zonas, izquierda
+primero, y el carrusel reparte los botones en cuanto nace. Si la tira de las fijas
+no existiera todavía, se los quedaría todos él. Por eso `PrepararFijas()` se llama
+antes que `Llenar()`, y por eso `_tira`/`_carrusel` se ponen a null ahí mismo: si
+quitas el módulo `apps`, el carrusel de la vez anterior ya no está en la isla y
+seguir apuntando a él dejaba los iconos en un panel huérfano.
+
+## Y las abiertas, igual que las fijadas
+
+Mismo problema que con las fijadas, y la misma solución: el carrusel vivía en la
+izquierda, que no existe con la isla recogida, así que para ver qué tienes abierto
+había que acercar el ratón. Ahora el módulo `apps` se muda al centro, detrás de las
+fijadas, y se ve siempre.
+
+No hizo falta código nuevo: la zona del centro ya era la que no se esconde (es la
+columna `Auto` del Grid, entre dos estrellas iguales), así que basta con mover el
+módulo de zona. Eso es lo bueno de que esto sean módulos colocables. La migración
+`AppsAlCentro` lo mueve **una vez** y respeta lo que decidas después; y si lo habías
+quitado del todo, no te lo devuelve: `MoverUnaVez` solo mueve lo que ya está puesto.
+
+El carrusel se lleva consigo todo lo suyo: `MaxApps`, la rueda con inercia, el
+degradado de los extremos y el botón de la vista general con su "+N". O sea que
+tener veinte ventanas abiertas no estira la isla sin fin: a partir de diez iconos,
+rueda.
+
+Lo que cambia, y hay que saberlo: **la isla en reposo ya no es pequeña**. Con dos
+fijadas y una app abierta mide 218 px de ancho (antes 120, el mínimo), y respira
+cada vez que abres o cierras algo, aunque con la misma animación de ancho de
+siempre. Quien prefiera la isla mínima solo tiene que devolver `apps` (y `fijadas`)
+a la izquierda desde Ajustes > Módulos.
+
+Probado abriendo y cerrando el Bloc de notas con la isla recogida: el icono entra y
+sale él solo. Ojo con el Bloc de notas de Windows 11 para probar estas cosas:
+`Start-Process notepad` lanza un puente que se muere enseguida y deja el programa de
+verdad corriendo como `Notepad` con otro pid, así que parecía que el icono se
+quedaba colgado cuando lo que pasaba es que la ventana seguía abierta.

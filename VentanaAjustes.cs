@@ -22,7 +22,7 @@ public sealed class VentanaAjustes : Window
     readonly DispatcherTimer _escritura = new() { Interval = TimeSpan.FromMilliseconds(120) };
     readonly List<string> _modulosDisponibles = new()
     {
-        "inicio", "apps", "reloj", "fecha", "cpu", "ram", "bateria",
+        "inicio", "apps", "fijadas", "reloj", "fecha", "cpu", "ram", "bateria", "musica",
         "wallpaper", "wallpaper-titulo", "iconos", "bandeja", "control", "escritorios", "separador"
     };
 
@@ -493,8 +493,8 @@ public sealed class VentanaAjustes : Window
         var rejilla = new Grid();
         for (int i = 0; i < 3; i++) rejilla.ColumnDefinitions.Add(new ColumnDefinition());
 
-        var izq = ListaModulos("Izquierda", _arbol.Lista("Modulos", "Izquierda", "inicio", "apps"));
-        var cen = ListaModulos("Centro", _arbol.Lista("Modulos", "Centro", "reloj"));
+        var izq = ListaModulos("Izquierda", _arbol.Lista("Modulos", "Izquierda", "inicio"));
+        var cen = ListaModulos("Centro", _arbol.Lista("Modulos", "Centro", "fijadas", "apps", "reloj"));
         var der = ListaModulos("Derecha", _arbol.Lista("Modulos", "Derecha", "cpu", "ram", "bateria", "bandeja", "control", "fecha"));
 
         Grid.SetColumn(izq.Caja, 0); Grid.SetColumn(cen.Caja, 1); Grid.SetColumn(der.Caja, 2);
@@ -685,9 +685,11 @@ public sealed class VentanaAjustes : Window
 
         c.Children.Add(Rotulo("Apps fijadas en la barra", true));
         c.Children.Add(ListaEditable("Barra", "AppsFijadas",
-            "Siempre visibles en el carrusel, abiertas o no, y en este orden. " +
-            "Una ruta de ejecutable por línea, o shell:AppsFolder\\<id> para las de la Store. " +
-            "Más cómodo: clic derecho sobre el icono de una app en la isla."));
+            "Siempre a la vista, abiertas o no, y en este orden. Con el módulo \"fijadas\" puesto " +
+            "(viene de serie, junto al reloj) se ven también con la isla recogida, sin acercar el ratón; " +
+            "si lo quitas, vuelven al carrusel. Una ruta de ejecutable por línea, o " +
+            "shell:AppsFolder\\<id> para las de la Store. Más cómodo: clic derecho sobre el icono " +
+            "de una app en la isla."));
         c.Children.Add(Interruptor("Agrupar las ventanas del mismo programa",
                                    _arbol.Bandera("Barra", "AgruparApps", true),
                                    v => _arbol.Poner("Barra", "AgruparApps", v)));

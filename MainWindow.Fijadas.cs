@@ -3,11 +3,22 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
 
 namespace NubeBar;
 
-// Apps fijadas en el carrusel: están siempre, abiertas o no, como en la barra
-// de tareas de Windows.
+// Apps fijadas: están siempre, abiertas o no, como en la barra de tareas de Windows.
+//
+// Y con el módulo "fijadas" puesto (viene de serie) no viven en el carrusel sino en
+// su propia tira, que se ve TAMBIÉN con la isla recogida: así las tienes a un clic
+// sin tener que acercar el ratón para desplegarla.
+//
+// Esa tira va en el CENTRO, pegada al reloj, y no a la izquierda con el carrusel.
+// El motivo es la geometría de la isla: crece y se encoge desde el centro, así que
+// la zona izquierda se desplaza casi 400 px al expandirse y el icono se escapaba de
+// debajo del cursor justo cuando ibas a pulsarlo. La columna del centro es "Auto"
+// entre dos estrellas iguales, o sea que está centrada siempre: los iconos fijos no
+// se mueven ni un píxel entre recogida y expandida.
 public partial class MainWindow : Window
 {
     // Lo que se guarda en el config es o una ruta de ejecutable o
@@ -31,6 +42,70 @@ public partial class MainWindow : Window
 
     bool EstaFijada(string claveGrupo) =>
         Fijadas.Any(f => ClaveDeFijada(f).Equals(claveGrupo, StringComparison.OrdinalIgnoreCase));
+
+    // ---------- La tira de las fijadas (módulo "fijadas") ----------
+
+    StackPanel? _tiraFijas;          // null si no tienes el módulo puesto
+
+    // ¿Tiene su propia tira, o van en el carrusel como antes?
+    bool FijasAparte => _tiraFijas != null;
+
+    // Se crea ANTES de montar los módulos, porque el carrusel ("apps") se construye
+    // primero (zona izquierda) y en cuanto se construye ya reparte los botones entre
+    // una tira y otra: si la de las fijas no existiera aún, se los quedaría todos.
+    void PrepararFijas()
+    {
+        bool puesto = _cfg.Modulos.Izquierda.Concat(_cfg.Modulos.Centro).Concat(_cfg.Modulos.Derecha)
+                          .Any(m => m.Equals("fijadas", StringComparison.OrdinalIgnoreCase));
+        _tiraFijas = puesto
+            ? new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Height = Math.Max(20, _cfg.Barra.Alto - 8),
+                Margin = new Thickness(0, 0, 4, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            }
+            : null;
+    }
+
+    UIElement ModuloFijas()
+    {
+        if (_tiraFijas == null) PrepararFijas();     // por si acaso: nunca debería pasar
+        // Puesto dos veces en el config (en dos zonas), WPF reventaría al añadir el
+        // mismo elemento a dos padres. Manda el primero y el segundo sale vacío.
+        if (_tiraFijas!.Parent != null)
+        {
+            Log.Info("el módulo \"fijadas\" está puesto más de una vez: solo cuenta el primero");
+            return new StackPanel();
+        }
+        return _tiraFijas;
+    }
+
+    // Los botones se van añadiendo según aparecen los grupos, así que el orden hay que
+    // ponerlo aquí: el que tú les has dado en Barra.AppsFijadas.
+    void OrdenarFijas()
+    {
+        if (_tiraFijas == null) return;
+        // Sin ninguna fijada, el módulo no debe ni descentrar el reloj
+        _tiraFijas.Margin = new Thickness(0, 0, _tiraFijas.Children.Count > 0 ? 4 : 0, 0);
+        if (_tiraFijas.Children.Count < 2) return;
+        var orden = Fijadas.Select(ClaveDeFijada).ToList();
+
+        int Puesto(Button b)
+        {
+            var g = _grupos.Values.FirstOrDefault(x => ReferenceEquals(x.Boton, b));
+            if (g == null) return int.MaxValue;
+            int i = orden.FindIndex(k => k.Equals(g.Exe, StringComparison.OrdinalIgnoreCase));
+            return i < 0 ? int.MaxValue : i;
+        }
+
+        var estan = _tiraFijas.Children.OfType<Button>().ToList();
+        var deben = estan.OrderBy(Puesto).ToList();
+        if (estan.SequenceEqual(deben)) return;
+
+        _tiraFijas.Children.Clear();
+        foreach (var b in deben) _tiraFijas.Children.Add(b);
+    }
 
     // ---------- Anclar y desanclar ----------
     // Se escribe con ConfigArbol para no perder las claves que NubeBar no conoce,

@@ -60,12 +60,14 @@ public class Barra
 
 public class Modulos
 {
-    public List<string> Izquierda { get; set; } = new() { "inicio", "apps" };
-    public List<string> Centro { get; set; } = new() { "reloj" };
+    public List<string> Izquierda { get; set; } = new() { "inicio" };
+    public List<string> Centro { get; set; } = new() { "fijadas", "apps", "reloj" };
     public List<string> Derecha { get; set; } = new() { "cpu", "ram", "bateria", "bandeja", "control", "fecha" };
-    // Ya se pusieron "control" y "bandeja" una vez en una config de antes (ver Config.ModulosDeSerie)
+    // Ya se tocaron una vez en una config de antes (ver Config.ModulosDeSerie)
     public bool ControlDeSerie { get; set; } = true;
     public bool BandejaDeSerie { get; set; } = true;
+    public bool FijadasDeSerie { get; set; } = true;
+    public bool AppsAlCentro { get; set; } = true;
 }
 
 public class Inicio
@@ -178,22 +180,81 @@ public class Config
                 c.Modulos.BandejaDeSerie = tocado = true;
             }
 
+            // "fijadas" (los iconos de las apps que has fijado) va en el CENTRO, delante
+            // del reloj, y no a la izquierda con el carrusel: el centro es la única zona
+            // que no se mueve al expandirse la isla, así que el icono se queda en el
+            // mismo sitio y se puede pulsar sin que se escape (ver MainWindow.Fijadas.cs)
+            if (!arbol.Bandera("Modulos", "FijadasDeSerie", false))
+            {
+                if (AnadirUnaVez(c, arbol, "fijadas", antesDe: "reloj", zona: "Centro"))
+                    Log.Info("módulo fijadas añadido al centro (viene de serie)");
+                arbol.Poner("Modulos", "FijadasDeSerie", true);
+                c.Modulos.FijadasDeSerie = tocado = true;
+            }
+
+            // Y el carrusel de apps abiertas se muda al centro por el mismo motivo que
+            // las fijadas: en la izquierda desaparecía con la isla recogida y había que
+            // desplegarla para ver qué tienes abierto. Detrás de las fijadas, como en la
+            // barra de tareas. Si lo devuelves a la izquierda, se queda donde lo pongas.
+            if (!arbol.Bandera("Modulos", "AppsAlCentro", false))
+            {
+                if (MoverUnaVez(c, arbol, "apps", zona: "Centro", antesDe: "reloj"))
+                    Log.Info("módulo apps movido al centro (así se ve con la isla recogida)");
+                arbol.Poner("Modulos", "AppsAlCentro", true);
+                c.Modulos.AppsAlCentro = tocado = true;
+            }
+
             if (tocado) arbol.Guardar();
         }
         catch (Exception ex) { Log.Error("añadir los módulos de serie", ex); }
     }
 
-    // Lo mete en la derecha delante de "antesDe" (o al final) si no está en ninguna
-    // zona. Devuelve si lo ha añadido.
-    static bool AnadirUnaVez(Config c, ConfigArbol arbol, string modulo, string antesDe)
+    // Lo mete en la zona que se le diga, delante de "antesDe" (o al final), si no está
+    // ya en ninguna de las tres. Devuelve si lo ha añadido.
+    static bool AnadirUnaVez(Config c, ConfigArbol arbol, string modulo, string antesDe, string zona = "Derecha")
     {
         bool yaEsta = c.Modulos.Izquierda.Concat(c.Modulos.Centro).Concat(c.Modulos.Derecha)
                        .Any(m => m.Equals(modulo, StringComparison.OrdinalIgnoreCase));
         if (yaEsta) return false;
-        var der = c.Modulos.Derecha;
-        int donde = der.FindIndex(m => m.Equals(antesDe, StringComparison.OrdinalIgnoreCase));
-        der.Insert(donde < 0 ? der.Count : donde, modulo);
-        arbol.PonerLista("Modulos", "Derecha", der);
+        var lista = zona switch
+        {
+            "Izquierda" => c.Modulos.Izquierda,
+            "Centro"    => c.Modulos.Centro,
+            _           => c.Modulos.Derecha
+        };
+        int donde = lista.FindIndex(m => m.Equals(antesDe, StringComparison.OrdinalIgnoreCase));
+        lista.Insert(donde < 0 ? lista.Count : donde, modulo);
+        arbol.PonerLista("Modulos", zona, lista);
+        return true;
+    }
+
+    // Lo cambia de zona, una vez. A diferencia de AnadirUnaVez, si no lo tienes puesto
+    // en ningún sitio NO se mete: lo habrás quitado tú y no es cosa nuestra devolverlo.
+    static bool MoverUnaVez(Config c, ConfigArbol arbol, string modulo, string zona, string antesDe)
+    {
+        var zonas = new (string Nombre, List<string> Lista)[]
+        {
+            ("Izquierda", c.Modulos.Izquierda),
+            ("Centro",    c.Modulos.Centro),
+            ("Derecha",   c.Modulos.Derecha)
+        };
+        var destino = zonas.First(z => z.Nombre == zona).Lista;
+
+        bool estaba = false;
+        foreach (var z in zonas)
+        {
+            if (ReferenceEquals(z.Lista, destino)) continue;
+            int i = z.Lista.FindIndex(m => m.Equals(modulo, StringComparison.OrdinalIgnoreCase));
+            if (i < 0) continue;
+            z.Lista.RemoveAt(i);
+            arbol.PonerLista("Modulos", z.Nombre, z.Lista);
+            estaba = true;
+        }
+        if (!estaba) return false;      // o no lo tienes, o ya estaba donde queremos
+
+        int donde = destino.FindIndex(m => m.Equals(antesDe, StringComparison.OrdinalIgnoreCase));
+        destino.Insert(donde < 0 ? destino.Count : donde, modulo);
+        arbol.PonerLista("Modulos", zona, destino);
         return true;
     }
 }

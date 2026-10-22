@@ -327,9 +327,25 @@ public partial class MainWindow : Window
         AjustarBrillo(t.BordeAcento, acento);
 
         _actualizadores.Clear();
+        // Los módulos se montan de cero: si has quitado "apps", el carrusel de la vez
+        // anterior ya no está en la isla y hay que olvidarlo (si sigue, ModuloApps lo
+        // vuelve a poner)
+        _tira = null;
+        _carrusel = null;
+        PrepararFijas();                    // la tira de las fijadas, antes que el carrusel
         Llenar(Izq, _cfg.Modulos.Izquierda);
         Llenar(Cen, _cfg.Modulos.Centro);
         Llenar(Der, _cfg.Modulos.Derecha);
+
+        // Con "fijadas" puesto y "apps" quitado no hay carrusel que refresque los
+        // grupos, pero las fijas siguen necesitando que alguien las pinte y les lleve
+        // la cuenta de ventanas abiertas
+        if (FijasAparte && _tira == null)
+        {
+            _grupos.Clear();
+            RefrescarApps();
+            _actualizadores.Add(RefrescarApps);
+        }
 
         // Primero el diseño de la isla y después el tamaño de la ventana: asignar
         // Window.Width/Height hace un SetWindowPos que bombea mensajes y provoca un
@@ -863,6 +879,7 @@ public partial class MainWindow : Window
     {
         "inicio"           => Boton(Texto("⊞", 16), "Inicio", AbrirMenuInicio),
         "apps"             => ModuloApps(),
+        "fijadas"          => ModuloFijas(),
         "reloj"            => Etiqueta(() => DateTime.Now.ToString("HH:mm"), animar: true),
         "fecha"            => Etiqueta(() => DateTime.Now.ToString("ddd d MMM"), animar: true),
         // "muestra" reserva el ancho del valor más largo para que la isla no respire
