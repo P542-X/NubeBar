@@ -159,6 +159,29 @@ static class Nativo
         return pid == _nuestroPid;
     }
 
+    // ¿Podemos siquiera mirar ese proceso? Si ni abrirlo con el permiso más flojo
+    // se puede, es de otro usuario (SYSTEM) o va elevado, y entonces Windows (UIPI)
+    // tampoco nos deja mandarle mensajes de ventana: sus iconos de bandeja no
+    // responden a nuestros clics y no hay forma de saberlo salvo preguntando esto.
+    public static bool ProcesoAlcanzable(int pid)
+    {
+        const uint QueryLimited = 0x1000;
+        var p = OpenProcess(QueryLimited, false, (uint)pid);
+        if (p == IntPtr.Zero) return false;
+        CloseHandle(p);
+        return true;
+    }
+
+    // Dejar que la app dueña de un icono pueda ponerse delante. Sin esto, cuando
+    // responde al clic con un menú o abriendo su ventana, Windows le niega el
+    // SetForegroundWindow y no se ve nada.
+    [DllImport("user32.dll")] static extern bool AllowSetForegroundWindow(int pid);
+
+    public static bool PermitirPrimerPlano(int pid)
+    {
+        try { return AllowSetForegroundWindow(pid); } catch { return false; }
+    }
+
     // La barra nunca roba el foco ni sale en Alt+Tab, así Wallpaper Engine
     // no la cuenta como "otra aplicación enfocada" y no se pausa al usarla
     public static void NoActivable(IntPtr h) =>

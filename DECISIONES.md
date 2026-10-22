@@ -859,3 +859,41 @@ nada** (antes salía `panel abierto: vista` en el log). La vuelta se ve en
 fotogramas intermedios (x≈1085 y x≈1175 camino de 1280), o sea que se anima de
 verdad. Y con la isla fuera de sitio se abre un panel y se queda donde la dejaste
 en vez de saltar a su sitio.
+
+## Los iconos de bandeja que no hacían nada
+
+Síntoma: algunos iconos de los ocultos ("^") no responden ni al clic ni al clic
+derecho. Otros sí. La primera sospecha era de permisos (una app como administrador,
+a la que Windows no nos deja mandar mensajes), y era **falsa**: se añadió una ficha
+al log con el dueño de cada icono y los trece eran alcanzables.
+
+Lo que lo delató fue otra columna de esa misma ficha:
+
+```
+Altavoces: 36%                 · pid 25192 · v4 · cb=0x0   · explorer.exe
+Seguridad de Windows           · pid 37368 · v4 · cb=0x0   · SecurityHealthSystray.exe
+NordVPN desconectado           · pid 12572 · v4 · cb=0x400 · NordVPN.exe
+Dispositivos Bluetooth         · pid 25192 · v4 · cb=0x403 · explorer.exe
+```
+
+**`cb` es el mensaje con el que se le habla a la app dueña del icono, y en dos de
+ellos vale 0.** Esos no son de ninguna app: son los iconos del sistema (el volumen,
+la red, la batería, el reloj, el escudo de Seguridad), que la barra de tareas de
+Windows dibuja y atiende por dentro; lo que se registra es solo el dibujo. Así que
+no había a quién reenviarle el clic: ManagedShell mandaba el mensaje 0 (WM_NULL),
+que es exactamente no hacer nada. Comprobado uno por uno: los de `cb` distinto de
+cero abren su menú (HyperX, NordVPN, Steam, Bluetooth), y los dos de `cb=0` no
+hacían nada, ni con un botón ni con el otro.
+
+Se reconocen por su GUID, que no cambia con el idioma de Windows (aquí salen como
+"Altavoces" y "Seguridad de Windows"), y ahora cada uno hace lo suyo: el volumen
+abre nuestro centro de control, la red nuestro panel de red, la batería el suyo, el
+escudo abre Seguridad de Windows y el reloj, la configuración de fecha y hora. Para
+uno desconocido con `cb=0`, se lanza su ejecutable, que es lo que haría el clic
+izquierdo de casi todos.
+
+De paso, al reenviar un clic ahora se llama a `AllowSetForegroundWindow` también
+con el botón derecho. ManagedShell solo lo hace con el izquierdo y el central, y
+una app que contesta con su menú llama antes a `SetForegroundWindow` (es lo que
+manda Microsoft para los menús de bandeja): sin ese permiso, Windows se lo niega y
+el menú no sale.

@@ -168,14 +168,76 @@ public partial class MainWindow : Window
         catch { }
     }
 
+    // ---------- Los iconos que no son de nadie ----------
+    //
+    // Unos cuantos iconos se registran SIN mensaje de respuesta (CallbackMessage = 0):
+    // el volumen, la red, la batería, el reloj y el escudo de Seguridad de Windows.
+    // No los pinta una app: los lleva la propia barra de tareas por dentro, y lo que
+    // se registra es solo el dibujo. O sea que no hay a quién mandarle el clic, y
+    // pulsarlos no hacía absolutamente nada, ni con el izquierdo ni con el derecho.
+    //
+    // Se reconocen por su GUID, que no cambia con el idioma de Windows (el nombre sí:
+    // aquí salen como "Altavoces" y "Seguridad de Windows"). A tres de ellos les
+    // damos nuestro propio panel, que para eso lo tenemos.
+    static readonly Guid GuidVolumen   = new("7820ae73-23e3-4229-82c1-e41cb67d5b9c");
+    static readonly Guid GuidRed       = new("7820ae74-23e3-4229-82c1-e41cb67d5b9c");
+    static readonly Guid GuidBateria   = new("7820ae75-23e3-4229-82c1-e41cb67d5b9c");
+    static readonly Guid GuidReloj     = new("7820ae76-23e3-4229-82c1-e41cb67d5b9c");
+    static readonly Guid GuidSeguridad = new("ba82e2dc-f405-47ad-b032-cf0faa0e3933");
+
+    void AccionPropia(NotifyIcon icono)
+    {
+        var g = icono.GUID;
+        string que =
+            g == GuidVolumen   ? "centro de control" :
+            g == GuidRed       ? "panel de red" :
+            g == GuidBateria   ? "panel de batería" :
+            g == GuidSeguridad ? "Seguridad de Windows" :
+            g == GuidReloj     ? "fecha y hora" : "la app dueña del icono";
+        Log.Info($"bandeja: \"{TipDe(icono).Split('\n')[0]}\" no admite clics (es de la barra de " +
+                 $"tareas de Windows, no de una app): se abre {que}");
+
+        if (g == GuidVolumen) { AbrirControl(); return; }
+        if (g == GuidRed) { AbrirRed(); return; }
+        if (g == GuidBateria) { AbrirBateria(); return; }
+        if (g == GuidSeguridad) { AbrirAjustes("windowsdefender:"); return; }
+        if (g == GuidReloj) { AbrirAjustes("ms-settings:dateandtime"); return; }
+
+        // Uno que no conocemos: al menos abrirle su app, que es lo que haría el
+        // clic izquierdo de casi todos
+        if (!string.IsNullOrWhiteSpace(icono.Path)) Fuentes.Lanzar(icono.Path);
+    }
+
     void Reenviar(NotifyIcon icono, MouseButton boton, bool abajo)
     {
         try
         {
+            // Sin mensaje de respuesta no hay nada que reenviar: ManagedShell mandaría
+            // el mensaje 0 (WM_NULL), que es como no hacer nada. Se hace lo nuestro, y
+            // solo al soltar, para no dispararlo dos veces por clic.
+            if (icono.CallbackMessage == 0)
+            {
+                if (!abajo) AccionPropia(icono);
+                return;
+            }
+            // Que la app pueda ponerse delante al responder. ManagedShell solo lo
+            // hace con el botón izquierdo y el central, así que al clic derecho le
+            // faltaba: una app que contesta con su menú llama a SetForegroundWindow
+            // antes de enseñarlo (es lo que manda Microsoft para los menús de
+            // bandeja), Windows se lo negaba y no salía nada.
+            int pid = Nativo.PidDe(icono.HWnd);
+            if (pid != 0) Nativo.PermitirPrimerPlano(pid);
+
             uint raton = MouseHelper.GetCursorPositionParam();
             int dobleClic = Nativo.TiempoDobleClic;
             if (abajo) icono.IconMouseDown(boton, raton, dobleClic);
             else icono.IconMouseUp(boton, raton, dobleClic);
+
+            // Si el dueño del icono es inalcanzable, el clic se ha ido al limbo:
+            // mejor decirlo que dejar al usuario pulsando un icono muerto.
+            if (!abajo && pid != 0 && !Nativo.ProcesoAlcanzable(pid))
+                Log.Info($"bandeja: \"{TipDe(icono).Split('\n')[0]}\" no recibe clics: su app (pid {pid}) " +
+                         "va como administrador o como SYSTEM y Windows no nos deja mandarle mensajes");
         }
         catch (Exception ex) { Log.Error("reenviar clic a la bandeja", ex); }
     }

@@ -76,6 +76,7 @@ static class Bandeja
                 var primera = Nativo.PrimeraBandeja();
                 Log.Info($"bandeja a los 8 s: {cuantos} iconos | nuestra ventana={nuestra} | " +
                          $"la que encuentra Windows={primera} | ¿ganamos?={nuestra == primera}");
+                foreach (var linea in Ficha()) Log.Info("  bandeja: " + linea);
             })), null, 8000, System.Threading.Timeout.Infinite);
         }
         catch (Exception ex)
@@ -112,6 +113,29 @@ static class Bandeja
                 { Left = (int)x, Top = (int)y, Right = (int)(x + ancho), Bottom = (int)(y + alto) };
         }
         catch { }
+    }
+
+    // Una línea por icono con lo que hace falta para entender por qué uno no
+    // responde a los clics: de qué proceso es, si podemos alcanzarlo y con qué
+    // versión del protocolo de bandeja se registró.
+    public static System.Collections.Generic.List<string> Ficha()
+    {
+        var filas = new System.Collections.Generic.List<string>();
+        try
+        {
+            foreach (var i in _shell?.NotificationArea?.TrayIcons ?? new ObservableCollection<NotifyIcon>())
+            {
+                int pid = Nativo.PidDe(i.HWnd);
+                bool alcanzable = pid != 0 && Nativo.ProcesoAlcanzable(pid);
+                string nombre = (i.Title ?? "").Split('\n')[0];
+                if (nombre.Length == 0) nombre = "(sin nombre)";
+                filas.Add($"{nombre} · pid {pid} · {(alcanzable ? "alcanzable" : "INALCANZABLE (admin o SYSTEM)")}" +
+                          $" · v{i.Version} · cb=0x{i.CallbackMessage:X} · {System.IO.Path.GetFileName(i.Path ?? "")}" +
+                          $" · guid={i.GUID}");
+            }
+        }
+        catch (Exception ex) { Log.Error("fichar los iconos de bandeja", ex); }
+        return filas;
     }
 
     public static string Resumen() =>
