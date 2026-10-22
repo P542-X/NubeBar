@@ -10,6 +10,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <!-- ManagedShell usa System.Windows.Forms.Screen en su FullScreenHelper (lo
+         monta la bandeja). Sin esto no viene en el paquete y salta un
+         FileNotFoundException al arrancar. Los using globales de WinForms se
+         quitan abajo para que no choquen con los de WPF (Application, Button…). -->
+    <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>NubeBar</RootNamespace>
     <AssemblyName>NubeBar</AssemblyName>
     <PlatformTarget>x64</PlatformTarget>
@@ -34,6 +39,11 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
 
   <ItemGroup>
     <!-- Para consultar el índice de Windows Search (Search.CollatorDSO) desde el buscador -->

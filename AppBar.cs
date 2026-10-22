@@ -77,7 +77,7 @@ static class AppBar
 
     public static void AutoOcultarBarraWindows(bool autoOcultar)
     {
-        var d = Datos(FindWindow("Shell_TrayWnd", null));
+        var d = Datos(Nativo.BarraDeExplorer());
 
         if (_estadoOriginal == null)
         {

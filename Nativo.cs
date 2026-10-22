@@ -66,6 +66,19 @@ static class Nativo
     // Con "" se exige que el título sea exactamente vacío; con null vale cualquiera.
     public static IntPtr PrimeraBandeja() => FindWindow("Shell_TrayWnd", null);
 
+    // La Shell_TrayWnd de Explorer, la de verdad. Con la bandeja encendida hay dos y
+    // la nuestra (la de ManagedShell) va primera en orden Z: FindWindow devolvería la
+    // nuestra, y entonces se escondía una ventana que ya está escondida mientras la
+    // de Explorer, cuando volvía a salir (al abrir un Excel, por ejemplo), se quedaba
+    // abajo a la vista sin que nadie la quitara.
+    public static IntPtr BarraDeExplorer()
+    {
+        var h = IntPtr.Zero;
+        while ((h = FindWindowEx(IntPtr.Zero, h, "Shell_TrayWnd", null)) != IntPtr.Zero)
+            if (!EsNuestra(h)) return h;
+        return IntPtr.Zero;
+    }
+
     [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Izq, Arr, Der, Aba; }
 
     [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out RECT r);
@@ -397,7 +410,7 @@ static class Nativo
     public static List<IntPtr> BarrasDeWindows()
     {
         var lista = new List<IntPtr>();
-        var principal = FindWindow("Shell_TrayWnd", null);
+        var principal = BarraDeExplorer();
         if (principal != IntPtr.Zero) lista.Add(principal);
 
         var h = IntPtr.Zero;

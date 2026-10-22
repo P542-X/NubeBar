@@ -683,3 +683,20 @@ puesto. Ahora viene de serie, igual que `control` (se añade una vez a las confi
 de antes, con su bandera `Modulos.BandejaDeSerie`), y `Barra.MaxBandeja` admite 0:
 solo el `^`, que despliega todas, como los iconos ocultos de Windows. A quien se le
 añade se le pone a 0; quien ya tenía la bandeja conserva lo suyo.
+## La barra de Windows volvía a salir abajo (por la bandeja de serie)
+
+Al poner la bandeja de serie, ManagedShell crea su propia `Shell_TrayWnd` y se
+pone la primera en orden Z (es justo lo que hace que los iconos nos lleguen a
+nosotros). Pero `BarrasDeWindows` y el auto-ocultar buscaban la barra con
+`FindWindow("Shell_TrayWnd")`, que ahora devuelve LA NUESTRA. El vigilante de
+150 ms miraba una ventana que ya estaba escondida, y cuando Explorer sacaba la
+suya (abriendo un Calc, por ejemplo) se quedaba abajo a la vista. Ahora
+`Nativo.BarraDeExplorer()` recorre todas las `Shell_TrayWnd` y se salta las de
+nuestro proceso. Probado: se fuerza la de Explorer a visible y a los 400 ms ya
+está escondida otra vez.
+
+Y de paso el error del arranque: el `FullScreenHelper` de ManagedShell (lo monta
+la bandeja) usa `System.Windows.Forms.Screen`, y sin `UseWindowsForms` esa DLL
+no viene en el paquete: `FileNotFoundException` a los 3 s de arrancar. Se activa
+WinForms en el proyecto y se le quitan los `using` globales para que no choquen
+con los de WPF.
