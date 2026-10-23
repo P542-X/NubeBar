@@ -111,15 +111,22 @@ var
   Exe: String;
   Codigo: Integer;
 begin
+  // ¿Hay algo que cerrar? El cerrojo de Instancia.cs dice la verdad, y preguntarlo
+  // ANTES no es una optimización: es obligatorio. Un exe anterior a --salir no
+  // entiende la bandera, y sin NubeBar en marcha se cree que lo abres de verdad y
+  // ARRANCA UNA ENTERA; con ewWaitUntilTerminated, el instalador se quedaba
+  // colgado esperándola para siempre. Pasó, y por eso esta línea va la primera.
+  if not CheckForMutexes('Local\NubeBar.UnaSola') then
+    Exit;
+
   Exe := ExpandConstant('{app}\NubeBar.exe');
   if FileExists(Exe) then
   begin
     Exec(Exe, '--salir', '', SW_HIDE, ewWaitUntilTerminated, Codigo);
     Sleep(500);
-    // No vale con que Exec haya ido bien: un exe de antes de --salir no entiende
-    // la bandera, ve que ya hay una NubeBar y se cierra él sin tocar nada, que
-    // también es "ir bien". Quien dice la verdad es el cerrojo de Instancia.cs:
-    // mientras exista, hay una NubeBar viva.
+    // Y tampoco vale con que Exec haya ido bien: ese mismo exe viejo, CON una
+    // NubeBar en marcha, ve que ya hay otra y se cierra él sin tocar nada — que
+    // también es "ir bien". Otra vez el cerrojo: mientras exista, sigue viva.
     if not CheckForMutexes('Local\NubeBar.UnaSola') then
       Exit;
   end;
