@@ -153,9 +153,21 @@ public partial class MainWindow : Window
 
         opciones.AddRange(OpcionesDeCierre(g));
 
-        const double ancho = 300, altoFila = 34;
-        AbrirPanel(PanelMenu, CrearMenuContextual(opciones.ToArray(), ancho, altoFila),
-                   ancho, opciones.Count * altoFila + 12);
+        // Mismo trato que la mini lista: este menú cuelga de un icono, así que se
+        // dibuja como una tarjeta pegada a él y no como una losa de lado a lado.
+        // El ancho lo manda la opción más larga, que aquí lleva el nombre del
+        // programa dentro ("Quitar Explorador de archivos de la nube").
+        const double altoFila = 34;
+        double ancho = Math.Clamp(opciones.Max(o => AnchoDeTexto(o.Item1)) + 48, 240, 460);
+
+        // El ancho deja de decidirlo la isla y lo decide el menú: dentro de la
+        // tarjeta, una pila estirada se saldría por los lados y el recorte se comería
+        // el principio de cada texto. El margen de la izquierda lo pone el recorte.
+        var menu = CrearMenuContextual(opciones.ToArray(), ancho, altoFila);
+        menu.Width = ancho;
+        menu.HorizontalAlignment = HorizontalAlignment.Left;
+
+        AbrirPanel(PanelMenu, menu, ancho, opciones.Count * altoFila + 12, ancla: g.Boton);
     }
 
     static string NombreDeClave(string clave)

@@ -42,6 +42,111 @@ public partial class MainWindow
         ColocarEnMonitor(altoIsla + _cfg.Barra.Margen * 2);
     }
 
+    // ---------- El cajón en forma de tarjeta ----------
+    //
+    // Un panel que cuelga de un icono del carrusel (la mini lista de ventanas de
+    // un programa con varias abiertas) no puede pedir "encoger": al estrecharse la
+    // isla, el icono se mueve de debajo del cursor, la isla cree que te has ido y
+    // cierra el panel justo cuando ibas a usarlo. Pero dejar el cajón a lo ancho de
+    // la isla pintaba una losa negra de punta a punta de la pantalla para escribir
+    // dos títulos de ventana, y quedaba fatal.
+    //
+    // La salida es no tocar las MEDIDAS y tocar solo lo que se dibuja: la isla sigue
+    // midiendo lo mismo —y por eso el icono no se mueve de debajo del cursor— pero un
+    // recorte deja a la vista, debajo de la barra, únicamente una tarjeta redondeada
+    // del ancho del panel y pegada a su icono. La tarjeta se mete por debajo del filo
+    // de la barra tanto como el radio de la isla, para que la unión de las dos formas
+    // no deje muescas y parezca una sola superficie con un saliente.
+    //
+    // El recorte también quita el ratón de lo que ya no se ve, y eso viene bien: el
+    // hueco negro de los lados dejaba la lista abierta aunque te hubieras ido lejos.
+    //
+    // El recorte se rehace en cada fotograma (Isla.SizeChanged salta con la
+    // animación de alto), así que la tarjeta se despliega y se repliega con la isla.
+    const double RadioTarjeta = 12;
+    FrameworkElement? _tarjetaAncla;        // el icono del que cuelga la tarjeta
+    FrameworkElement? _tarjetaContenido;    // lo que va dentro, para moverlo con ella
+    double _tarjetaAncho;
+
+    void RecortarCajon(FrameworkElement ancla, double ancho)
+    {
+        _tarjetaAncla = ancla;
+        _tarjetaAncho = ancho;
+        AplicarRecorteDelCajon();
+    }
+
+    void SinRecorteDelCajon()
+    {
+        if (_tarjetaAncla == null) return;
+        _tarjetaAncla = null;
+        _tarjetaContenido = null;
+        _tarjetaAncho = 0;
+        Isla.Clip = null;
+    }
+
+    // Dónde empieza la tarjeta, en coordenadas de la isla: centrada bajo su icono y
+    // sin salirse por ningún lado. Se recalcula en cada fotograma y no se apunta al
+    // abrir, porque la isla se expande DESDE EL CENTRO: mientras crece, el icono se
+    // mueve dentro de ella y una x de antes dejaba la tarjeta a medio camino. Con la
+    // isla recogida y más estrecha que el propio panel, directamente en la esquina.
+    double XdeTarjeta()
+    {
+        double w = Math.Min(_tarjetaAncho, Isla.ActualWidth);
+        double centro = Isla.ActualWidth / 2;
+        try
+        {
+            if (_tarjetaAncla is { IsVisible: true } ancla && ancla.ActualWidth > 0)
+                centro = ancla.TransformToAncestor(Isla).Transform(new Point(0, 0)).X + ancla.ActualWidth / 2;
+        }
+        catch { }
+        double borde = Math.Max(2, Isla.BorderThickness.Left);
+        return Math.Clamp(centro - w / 2, borde, Math.Max(borde, Isla.ActualWidth - w - borde));
+    }
+
+    void AplicarRecorteDelCajon()
+    {
+        if (_tarjetaAncla == null) { Isla.Clip = null; return; }
+        try
+        {
+            double ancho = Isla.ActualWidth, alto = Isla.ActualHeight;
+            if (ancho <= 0 || alto <= 0) return;
+
+            double radio = Isla.CornerRadius.TopLeft;
+            double barra = Math.Min(_cfg.Barra.Alto, alto);
+            double cajon = Math.Max(0, alto - barra);
+
+            // La barra de siempre, con sus esquinas de siempre
+            var fila = new RectangleGeometry(new Rect(0, Arriba ? 0 : cajon, ancho, barra), radio, radio);
+            if (cajon < 1) { Isla.Clip = fila; return; }     // aún no ha crecido: solo la barra
+
+            double w = Math.Min(_tarjetaAncho, ancho);
+            double x = XdeTarjeta();
+
+            // El contenido viaja con su tarjeta: el cajón empieza después del filo y
+            // del padding de la isla, así que lo que se le pone de margen es el resto
+            if (_tarjetaContenido != null)
+            {
+                var m = _tarjetaContenido.Margin;
+                double izq = Math.Max(0, x - Isla.Padding.Left - Isla.BorderThickness.Left);
+                if (Math.Abs(m.Left - izq) > 0.5)
+                    _tarjetaContenido.Margin = new Thickness(izq, m.Top, m.Right, m.Bottom);
+            }
+
+            // Lo que la tarjeta se mete en la barra. Nunca menos que su propio radio:
+            // si no, sus esquinas de arriba se quedan fuera de la fila y la unión deja
+            // dos muescas justo donde tiene que parecer que la tarjeta nace de la isla.
+            double solape = Math.Min(barra, Math.Max(RadioTarjeta, radio));
+            var tarjeta = new RectangleGeometry(
+                new Rect(x, Arriba ? barra - solape : 0, w, cajon + solape),
+                RadioTarjeta, RadioTarjeta);
+
+            var union = new CombinedGeometry(GeometryCombineMode.Union, fila, tarjeta);
+            union.Freeze();                                  // se rehace en cada fotograma
+            Isla.Clip = union;
+        }
+        catch (Exception ex) { Log.Error("recortar el cajón", ex); }
+    }
+
     // ---------- Abrir y cerrar ----------
 
     // Abre un panel dentro de la isla. Si ya había otro, lo sustituye con transición suave.
@@ -53,13 +158,17 @@ public partial class MainWindow
         return true;
     }
 
+    // Con "ancla" (el icono del que cuelga el panel) el cajón no se dibuja de punta a
+    // punta, sino como una tarjeta de "ancho" pegada a ese icono. Ver RecortarCajon.
     void AbrirPanel(string nombre, FrameworkElement contenido, double ancho, double alto,
-                    bool teclado = false, bool encoger = false)
+                    bool teclado = false, bool encoger = false, FrameworkElement? ancla = null)
     {
         bool habiaOtro = _panelAbierto != null;
         _panelAbierto = nombre;
         _panelAlto = alto;
         _panelAncho = ancho;
+
+        if (ancla != null) RecortarCajon(ancla, ancho); else SinRecorteDelCajon();
 
         // Si la isla estaba escondida por un juego o una ventana maximizada, aquí la
         // traemos de vuelta nosotros mismos. Esperar al vigilante de 150 ms y a que
@@ -124,6 +233,10 @@ public partial class MainWindow
             }
         }
         catch (Exception ex) { Log.Error("medir el panel", ex); }
+
+        // Ya sabemos qué elemento hay DE VERDAD en el cajón (puede haber acabado
+        // envuelto en un scroll): es el que la tarjeta tiene que llevar consigo
+        if (ancla != null) { _tarjetaContenido = contenido; AplicarRecorteDelCajon(); }
 
         contenido.Opacity = 0;
         contenido.RenderTransform = new TranslateTransform { Y = Arriba ? -12 : 12 };
@@ -199,6 +312,9 @@ public partial class MainWindow
         {
             if (_panelAbierto != null) return;          // ya se abrió otro por el camino
             Cajon.Content = null;
+            // El recorte se quita AQUÍ y no al empezar a cerrar: si no, la tarjeta
+            // desaparecía de golpe y lo que se plegaba era otra vez la losa entera
+            SinRecorteDelCajon();
             AjustarVentana(altoIsla);
             if (!Isla.IsMouseOver) Expandir(false);     // si el ratón ya no está, recogerse
         });
@@ -328,6 +444,7 @@ public partial class MainWindow
         _panelEncogido = false;
         _panelAlto = _panelAncho = 0;
         Cajon.Content = null;
+        SinRecorteDelCajon();
     }
 
     // ---------- Animación de alto ----------

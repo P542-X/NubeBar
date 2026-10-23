@@ -35,7 +35,9 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
 - Carrusel con las ventanas abiertas, agrupadas por programa, con rueda para
   desplazarse y un límite configurable de iconos visibles.
 - Clic para activar, clic en la que ya está delante para minimizarla, y una
-  mini lista para elegir entre las ventanas de un mismo programa.
+  mini lista para elegir entre las ventanas de un mismo programa. Sale como una
+  **tarjeta pegada a su icono**, del ancho del título más largo, no como una
+  franja de punta a punta de la pantalla.
 - **Apps fijadas**: clic derecho sobre un icono para anclarlo. Se quedan
   siempre, abiertas o no; cerradas se ven atenuadas y al pulsarlas se abren.
 - **Se reordenan arrastrándolas**: coges un icono dentro de la isla, lo llevas

@@ -108,6 +108,9 @@ public partial class MainWindow : Window
         Resources["Hover"] = _hover;
         Isla.Background = _fondo;
         Foreground = _texto;
+        // Mientras un panel se dibuja como tarjeta, el recorte se rehace con cada
+        // medida nueva: así la tarjeta crece y se pliega pegada a la animación
+        Isla.SizeChanged += (_, _) => AplicarRecorteDelCajon();
 
 
         Loaded += async (_, _) =>

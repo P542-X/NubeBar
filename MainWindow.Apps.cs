@@ -581,29 +581,39 @@ public partial class MainWindow
 
         var activa = ActivaAjena();
         int filas = Math.Min(MaxFilasMiniLista, g.Ventanas.Count);
-        double ancho = 320, alto = filas * 30 + 12;
+        double ancho = AnchoMiniLista(g), alto = filas * 30 + 12;
 
-        AbrirPanel("grupo:" + g.Exe, CrearMiniLista(g, activa), ancho, alto);
+        // Con "ancla", el cajón no se dibuja de punta a punta: solo la tarjeta de la
+        // lista, pegada a su icono. Sin esto, dos títulos de ventana abrían una losa
+        // negra de lado a lado de la pantalla, que es justo lo que no tiene que
+        // parecer un menú de dos líneas.
+        AbrirPanel("grupo:" + g.Exe, CrearMiniLista(g, activa, ancho), ancho, alto, ancla: g.Boton);
     }
 
     const int MaxFilasMiniLista = 8;
+    const double MargenMiniLista = 10;     // hueco del texto a cada lado de la tarjeta
 
-    FrameworkElement CrearMiniLista(Grupo g, IntPtr activa)
+    // Lo ancha que tiene que ser la tarjeta: lo que pida el título más largo, ni más
+    // ni menos. Un ancho fijo dejaba una tarjeta medio vacía con títulos cortos y
+    // recortaba los largos a la misma altura de siempre.
+    double AnchoMiniLista(Grupo g)
     {
-        // La lista cuelga justo debajo de su icono, no del borde de la isla
-        double x = 0;
-        try
-        {
-            if (g.Boton != null)
-                x = g.Boton.TransformToAncestor(Isla).Transform(new Point(0, 0)).X - Isla.Padding.Left;
-        }
-        catch { }
-        x = Math.Max(0, Math.Min(x, Math.Max(0, Isla.ActualWidth - 320 - Isla.Padding.Left * 2)));
+        double texto = 0;
+        foreach (var h in g.Ventanas.Take(MaxFilasMiniLista))
+            texto = Math.Max(texto, AnchoDeTexto(TituloDeFila(Nativo.Titulo(h))));
+        return Math.Clamp(Math.Ceiling(texto) + MargenMiniLista * 2 + 24, 180, 460);
+    }
 
+    static string TituloDeFila(string titulo) => titulo.Length > 48 ? titulo[..47] + "…" : titulo;
+
+    FrameworkElement CrearMiniLista(Grupo g, IntPtr activa, double ancho)
+    {
+        // El margen de la izquierda no se pone aquí: lo lleva el recorte del cajón,
+        // que coloca la tarjeta bajo su icono en cada fotograma (ver XdeTarjeta)
         var lista = new StackPanel
         {
-            Margin = new Thickness(x, 4, 0, 6),
-            Width = 320,
+            Margin = new Thickness(0, 4, 0, 6),
+            Width = ancho,
             HorizontalAlignment = HorizontalAlignment.Left
         };
         foreach (var h in g.Ventanas.Take(MaxFilasMiniLista))
@@ -611,13 +621,13 @@ public partial class MainWindow
             var titulo = Nativo.Titulo(h);
             var fila = new TextBlock
             {
-                Text = titulo.Length > 48 ? titulo[..47] + "…" : titulo,
+                Text = TituloDeFila(titulo),
                 Foreground = h == activa ? _acentoLegible : _texto,
                 Opacity = h == activa ? 1 : 0.8,
-                Margin = new Thickness(10, 0, 10, 0),
+                Margin = new Thickness(MargenMiniLista, 0, MargenMiniLista, 0),
                 VerticalAlignment = VerticalAlignment.Center,
                 TextTrimming = TextTrimming.CharacterEllipsis,
-                Width = 286
+                Width = Math.Max(40, ancho - MargenMiniLista * 2 - 24)
             };
             var boton = Boton(fila, titulo, () => { CerrarMiniLista(); PulsarVentana(h, g); });
             boton.ToolTip = null;   // el título ya está escrito en la propia fila

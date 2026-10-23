@@ -1090,3 +1090,44 @@ ido bien: un exe viejo no entiende la bandera, ve que ya hay una NubeBar y se
 cierra él sin tocar nada, que también es "ir bien". Quien dice la verdad es
 `CheckForMutexes('Local\NubeBar.UnaSola')`: mientras el cerrojo exista, hay una
 NubeBar viva.
+
+## La mini lista de ventanas ya no es una losa de punta a punta
+
+Pasar el ratón por un programa con varias ventanas abiertas (el Explorador, sin ir
+más lejos) abría su mini lista, y lo que salía debajo de la barra era **un bloque
+negro de lado a lado de la pantalla** para escribir dos títulos de ventana. Lo
+mismo con el menú del clic derecho sobre un icono.
+
+El motivo estaba escrito desde hacía tiempo en `AbrirPanel`: el cajón mide lo que
+mide la isla, y un panel puede pedir `encoger` para que la isla se estreche hasta
+su propio ancho, como hace el menú del clic derecho sobre la isla. Pero eso **no
+vale para un panel que cuelga de un icono del carrusel**: al encoger, la isla se
+recoge desde el centro, el icono se va de debajo del cursor, la isla cree que te
+has ido y cierra el panel justo cuando ibas a usarlo.
+
+Así que no se tocan las medidas, se toca lo que se DIBUJA. La isla sigue midiendo
+igual — el icono no se mueve ni un píxel — y un `Isla.Clip` deja a la vista, por
+debajo de la barra, solo una tarjeta redondeada:
+
+```
+union( fila de la barra entera , tarjeta del ancho del panel bajo su icono )
+```
+
+Tres detalles que no son opcionales:
+
+- **La tarjeta se mete dentro de la barra** tanto como el mayor entre el radio de
+  la isla y el suyo propio. Si solo se pegara por debajo, sus dos esquinas
+  superiores redondeadas dejarían una muesca justo en la unión, que es donde tiene
+  que parecer que la tarjeta nace de la isla.
+- **La x se recalcula en cada fotograma, no se apunta al abrir.** La isla crece
+  desde el centro: mientras se expande, el icono SE MUEVE dentro de ella. Con una x
+  de antes, la tarjeta se quedaba a medio camino — y si la isla estaba recogida y
+  era más estrecha que el propio panel, en la esquina. El `Isla.SizeChanged` dispara
+  el recálculo, así que la tarjeta se despliega y se pliega pegada a su icono.
+- **El recorte se quita al terminar de cerrar, no al empezar.** Quitándolo antes,
+  la tarjeta desaparecía de golpe y lo que se veía plegarse era otra vez la losa.
+
+De paso, el ancho deja de ser fijo (320 px para todo) y lo decide el título más
+largo, entre 180 y 460. Y el recorte quita el ratón de lo que ya no se ve, que
+también estaba mal: el hueco negro de los lados mantenía la lista abierta aunque
+te hubieras ido con el cursor al otro extremo de la pantalla.
