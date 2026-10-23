@@ -36,6 +36,17 @@ public partial class App : Application
             a.Handled = true;
         };
 
+        // "NubeBar.exe --salir": cierra la que esté en marcha y se va. Es como lo
+        // quita de en medio el instalador antes de tocar su exe, y sirve igual para
+        // un atajo o un script. No abre ninguna ventana.
+        if (e.Args.Length > 0 && e.Args[0] == Salir.Bandera)
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Salir.Pedir();
+            Shutdown(0);
+            return;
+        }
+
         if (e.Args.Length > 0 && e.Args[0] == Guardian.Bandera)
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -55,6 +66,18 @@ public partial class App : Application
         }
 
         MainWindow = NubeBar.MainWindow.Arrancar();
+
+        // Y a la escucha de "NubeBar.exe --salir". Se cierran TODAS las islas, no
+        // solo la jefa: con dos pantallas, cerrar la jefa deja viva la otra y el
+        // proceso no termina (ShutdownMode es OnLastWindowClose). La jefa va la
+        // última porque es la que desmonta lo global y devuelve las barras.
+        Instancia.EscucharSalida(() => Dispatcher.BeginInvoke(new Action(() =>
+        {
+            Log.Info("salida pedida desde fuera (--salir)");
+            foreach (var isla in NubeBar.MainWindow.Islas.ToList().Where(i => i != MainWindow))
+                isla.Close();
+            (MainWindow as Window)?.Close();
+        })));
     }
 
     protected override void OnExit(ExitEventArgs e)

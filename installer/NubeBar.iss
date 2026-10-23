@@ -91,25 +91,42 @@ Filename: "{app}\NubeBar.exe"; Description: "Abrir NubeBar ahora"; Flags: nowait
 
 // Cerrar NubeBar antes de tocar su exe. Importa más de lo que parece: NubeBar
 // esconde la barra de tareas de Windows mientras vive y la devuelve al cerrarse.
-// Quitarla de en medio a lo bruto y ya está dejaría al usuario sin ninguna barra.
+// Quitarla de en medio a lo bruto dejaría al usuario sin ninguna barra.
 //
-// Por eso van dos pasadas:
-//  1. taskkill SIN /F manda WM_CLOSE, que es como pulsar "Salir de NubeBar": se
-//     ejecuta su cierre limpio y las barras de Windows vuelven solas.
-//  2. Con /F, para lo que no tiene ventana y no se entera del WM_CLOSE: el
-//     guardián, que es el mismo exe con otro papel. Y si el cierre bueno hubiera
-//     fallado, matarlo es justo lo que el guardián está esperando para restaurar
-//     las barras él (Guardian.cs), así que la red de seguridad sigue puesta.
+// Lo hace ella misma, con "NubeBar.exe --salir", que espera al cierre bueno y, si
+// no llega, fuerza las cosas en el orden correcto y comprueba que las barras de
+// Windows han vuelto (Salir.cs). Aquí no se repite esa lógica: el que sabe cerrar
+// NubeBar es NubeBar.
+//
+// El intento anterior fue taskkill desde aquí y salió mal de dos maneras: sin /F
+// no encuentra las islas (son WS_EX_TOOLWINDOW, no son "la ventana principal" de
+// nadie) y no cierra nada; con /F se lleva por delante también al guardián, que
+// era justo quien tenía que devolver las barras. Resultado: ni barra de NubeBar ni
+// barra de Windows.
+//
+// El taskkill se queda SOLO para la actualización desde una versión vieja, cuyo
+// exe todavía no entiende --salir.
 procedure CerrarNubeBar();
 var
+  Exe: String;
   Codigo: Integer;
 begin
-  Exec(ExpandConstant('{sys}\taskkill.exe'), '/im NubeBar.exe',
-       '', SW_HIDE, ewWaitUntilTerminated, Codigo);
-  Sleep(2500);
+  Exe := ExpandConstant('{app}\NubeBar.exe');
+  if FileExists(Exe) then
+  begin
+    Exec(Exe, '--salir', '', SW_HIDE, ewWaitUntilTerminated, Codigo);
+    Sleep(500);
+    // No vale con que Exec haya ido bien: un exe de antes de --salir no entiende
+    // la bandera, ve que ya hay una NubeBar y se cierra él sin tocar nada, que
+    // también es "ir bien". Quien dice la verdad es el cerrojo de Instancia.cs:
+    // mientras exista, hay una NubeBar viva.
+    if not CheckForMutexes('Local\NubeBar.UnaSola') then
+      Exit;
+  end;
+
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/im NubeBar.exe /f',
        '', SW_HIDE, ewWaitUntilTerminated, Codigo);
-  Sleep(500);
+  Sleep(1500);
 end;
 
 // Instalar encima de una NubeBar en marcha: si no, el exe está bloqueado

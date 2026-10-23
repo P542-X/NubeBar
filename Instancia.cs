@@ -18,7 +18,22 @@ static class Instancia
 {
     const string Nombre = @"Local\NubeBar.UnaSola";
 
+    // "Cierra, por favor": un evento con nombre que la NubeBar en marcha está
+    // escuchando. Lo usa "NubeBar.exe --salir", que es como el instalador la quita
+    // de en medio antes de tocar su exe.
+    //
+    // Por qué hace falta y no basta con matarla: NubeBar esconde la barra de tareas
+    // de Windows mientras vive y la devuelve AL CERRARSE. Un taskkill /F deja al
+    // usuario sin ninguna barra (de eso va el guardián). Y un taskkill sin /F no
+    // vale: manda WM_CLOSE a las ventanas "normales" del proceso, y las islas son
+    // WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE, así que no encuentra ninguna y no cierra
+    // nada. Comprobado: el instalador se quedaba sin cerrarla y la barra de Windows
+    // no volvía.
+    const string NombreSalida = @"Local\NubeBar.Salir";
+
     static Mutex? _cerrojo;
+    static EventWaitHandle? _salida;
+    static RegisteredWaitHandle? _espera;
 
     public static bool SoyLaPrimera()
     {
@@ -43,8 +58,38 @@ static class Instancia
         }
     }
 
+    // La NubeBar de verdad se queda escuchando: cuando alguien señale el evento,
+    // "cerrar" se ejecuta en el hilo que se le diga (el de la interfaz).
+    public static void EscucharSalida(Action cerrar)
+    {
+        try
+        {
+            _salida = new EventWaitHandle(false, EventResetMode.ManualReset, NombreSalida);
+            _espera = ThreadPool.RegisterWaitForSingleObject(
+                _salida, (_, _) => cerrar(), null, Timeout.Infinite, executeOnlyOnce: true);
+        }
+        catch (Exception ex) { Log.Error("escuchar la petición de salida", ex); }
+    }
+
+    // Avisa a la que esté en marcha. false = no había ninguna escuchando.
+    public static bool PedirSalida()
+    {
+        try
+        {
+            using var e = EventWaitHandle.OpenExisting(NombreSalida);
+            e.Set();
+            return true;
+        }
+        catch (WaitHandleCannotBeOpenedException) { return false; }
+        catch (Exception ex) { Log.Error("pedir la salida", ex); return false; }
+    }
+
     public static void Soltar()
     {
+        try { _espera?.Unregister(null); } catch { }
+        _espera = null;
+        _salida?.Dispose();
+        _salida = null;
         try { _cerrojo?.ReleaseMutex(); } catch { }
         _cerrojo?.Dispose();
         _cerrojo = null;

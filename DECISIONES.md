@@ -1026,3 +1026,67 @@ leyendo igual.
 La lección no es sobre Wallpaper Engine: es que un sondeo periódico que arranca un
 proceso se paga cada vez, y aquí el apaño que ya existía (leer el config) estaba
 puesto DESPUÉS del camino caro en vez de antes.
+
+## Un instalador, y lo que costó cerrar NubeBar desde fuera
+
+El instalador (Inno Setup, `installer/NubeBar.iss`) es casi trivial: envuelve el
+exe autónomo, lo pone en `%LOCALAPPDATA%\Programs\NubeBar` y, como `app.manifest`
+no pide administrador, **no sale ninguna ventana de UAC**. Pedir admin para luego
+no usarlo solo sirve para asustar.
+
+Lo que no fue trivial fue cerrar NubeBar antes de tocar su exe. Tres intentos:
+
+**1. `AppMutex`.** Parecía lo elegante: reusar el mutex que ya tiene
+`Instancia.cs`. Pero `AppMutex` solo sabe PLANTARSE. Desinstalar con NubeBar
+abierta daba código de salida 1 y no desinstalaba nada:
+
+```
+codigo de salida del desinstalador: 1
+carpeta: True   lnk de arranque: True   procesos NubeBar vivos: 2
+```
+
+**2. `taskkill` desde el instalador.** Peor, y de dos maneras a la vez:
+
+- Sin `/F` manda WM_CLOSE a "la ventana principal" del proceso. Las islas son
+  `WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE`: no son la ventana principal de nadie, no
+  las encuentra, **no cierra nada**. En el log no aparecía ni una línea de cierre.
+- Con `/F` sí muere, pero `taskkill /IM NubeBar.exe` se lleva por delante también
+  **al guardián**, que es el mismo ejecutable con otro papel — y era justo quien
+  tenía que devolver la barra de tareas al morir la principal. Resultado medido:
+
+```
+barra de Windows -> visible=False autohide=True
+```
+
+Ni barra de NubeBar ni barra de Windows. El peor de los finales posibles, y por
+un instalador.
+
+**3. `NubeBar.exe --salir`** (`Salir.cs`), que es lo que hay. Quien sabe cerrar
+NubeBar es NubeBar:
+
+- Un evento con nombre (`Local\NubeBar.Salir`) que la que está en marcha escucha,
+  y que cierra todas las islas con la jefa la última, porque es la que desmonta lo
+  global. Que sean todas importa con dos pantallas: cerrando solo la jefa, la otra
+  mantiene vivo el proceso (`ShutdownMode` es `OnLastWindowClose`).
+- Si en 8 segundos no se ha ido, se mata — pero **de uno en uno y con un respiro
+  entre medias**, para que al morir la principal el guardián tenga su momento de
+  restaurar.
+- Y pase lo que pase, al final comprueba `Nativo.BarraWindowsVisible()` y la
+  devuelve él mismo si hace falta. Es el último recurso: no puede quedar en manos
+  de que alguien más se acuerde.
+
+Medido, con la barra de Windows escondida y NubeBar en marcha:
+
+```
+--salir: pedida la salida, esperando a que se cierre
+guardián: cierre limpio, me voy sin tocar nada
+cerrado. Barra de Windows visible=True
+--salir: cerrada por las buenas          (1 segundo, 0 procesos vivos)
+```
+
+El instalador solo llama a eso. El `taskkill` se queda únicamente para actualizar
+desde una versión anterior a `--salir`, y ni siquiera se fía de que `Exec` haya
+ido bien: un exe viejo no entiende la bandera, ve que ya hay una NubeBar y se
+cierra él sin tocar nada, que también es "ir bien". Quien dice la verdad es
+`CheckForMutexes('Local\NubeBar.UnaSola')`: mientras el cerrojo exista, hay una
+NubeBar viva.
