@@ -96,6 +96,15 @@ static class WallpaperEngine
     public static async Task<string?> WallpaperActual(int monitor)
     {
         if (!Abierto || Exe is not { } exe) return null;
+
+        // Su config.json PRIMERO. Esto se pregunta cada 15 segundos, y preguntárselo
+        // al cliente significa arrancar wallpaper32.exe (más su conhost) otras tantas
+        // veces: cuatro procesos por minuto, para siempre, y con el parpadeo de una
+        // ventanita que aparece y se va. Leer un fichero no abre nada y contesta lo
+        // mismo. Lanzar el cliente se queda de reserva para la instalación en la que
+        // ese config no se pueda leer.
+        if (DesdeSuConfig(monitor) is { } delConfig) return delConfig;
+
         var psi = Crear(exe, "getWallpaper", "-monitor", monitor.ToString());
         psi.RedirectStandardOutput = true;
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
@@ -114,11 +123,11 @@ static class WallpaperEngine
         }
         catch { }
 
-        // En Wallpaper Engine 2.8 "getWallpaper" no escribe nada por la salida estándar:
-        // el exe que lanzamos es solo un cliente que reenvía el comando a la instancia ya
-        // abierta. Se lee entonces de su propio config.json, que además es el fichero que
-        // ya vigilamos para enterarnos de los cambios de wallpaper.
-        return DesdeSuConfig(monitor);
+        // En Wallpaper Engine 2.8 "getWallpaper" tampoco escribe nada por la salida
+        // estándar: el exe que lanzamos es solo un cliente que reenvía el comando a la
+        // instancia ya abierta. O sea que por este camino no se saca nada y encima se
+        // paga un proceso — por eso el config va antes.
+        return null;
     }
 
     static string? DesdeSuConfig(int monitor)

@@ -991,3 +991,38 @@ Las tres, arregladas:
   erratas (`fotosop` → Photoshop, 0.52). Pero en relación al mejor sí se nota: con
   `cmd` quedan la consola y Git CMD, y se van las cuatro cosas que solo tenían una
   `c`, una `m` y una `d` desperdigadas por el nombre.
+
+## La ventanita blanca que parpadeaba cada tanto
+
+Aparecía una ventana pequeña un instante y se iba. Cazada con un vigilante que
+enumeraba las ventanas visibles cada 15 ms y apuntaba las que nacían y morían:
+
+```
+20:03:33.224   29 ms   clase=ConsoleWindowClass
+               titulo='KristjanSkutta.WallpaperEngine'
+```
+
+Una **consola** del cliente de Wallpaper Engine, 29 ms de vida, una cada **15
+segundos**. El reloj `_wpTimer` pregunta cada 15 s por el wallpaper actual, y
+`WallpaperActual` arrancaba `wallpaper32.exe -control getWallpaper` para
+preguntárselo. Cuatro procesos por minuto, para siempre.
+
+Y para nada: ese comando **no contesta** por la salida estándar (ya estaba escrito
+dos líneas más abajo, en el comentario del apaño), porque el exe que se lanza es
+solo un cliente que reenvía la orden a la instancia abierta. O sea que el proceso
+se arrancaba, no devolvía nada, y la respuesta acababa saliendo igualmente del
+`config.json` de Wallpaper Engine — el mismo fichero que ya vigila un
+`FileSystemWatcher` para enterarse de los cambios.
+
+`CreateNoWindow = true` no lo evitaba: eso suprime la consola que crea *Windows*
+al arrancar el proceso, no la que el propio programa se monta por su cuenta.
+
+Ahora se lee el `config.json` **primero**. Lanzar el cliente se queda de reserva
+para la instalación donde ese fichero no se pueda leer, y en la práctica no se
+lanza nunca. Comprobado: 75 segundos (cinco vueltas del reloj) sin un solo
+`wallpaper32` ni `conhost`, y el título y la paleta del wallpaper se siguen
+leyendo igual.
+
+La lección no es sobre Wallpaper Engine: es que un sondeo periódico que arranca un
+proceso se paga cada vez, y aquí el apaño que ya existía (leer el config) estaba
+puesto DESPUÉS del camino caro en vez de antes.
