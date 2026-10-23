@@ -1,7 +1,8 @@
 name: Release
 
-# Al subir una etiqueta v* se compila el exe autónomo y se publica como Release.
-# El exe NO vive en el repositorio: se construye aquí cada vez.
+# Al subir una etiqueta v* se compila el exe autónomo, se envuelve en un
+# instalador y se publican los dos como Release.
+# Ni el exe ni el instalador viven en el repositorio: se construyen aquí cada vez.
 on:
   push:
     tags:
@@ -24,6 +25,19 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # La etiqueta manda: v1.1.39 -> 1.1.39. Lanzado a mano no hay etiqueta
+      # (github.ref_name es la rama), así que se queda en 0.0.0.
+      - name: Sacar la versión de la etiqueta
+        shell: pwsh
+        run: |
+          $v = "${{ github.ref_name }}" -replace '^v', ''
+          if ($v -notmatch '^\d+\.\d+\.\d+$') {
+            Write-Host "«$v» no es una versión: se usa 0.0.0"
+            $v = "0.0.0"
+          }
+          Write-Host "versión: $v"
+          "VERSION=$v" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Restaurar
         run: dotnet restore -r win-x64
 
@@ -34,6 +48,7 @@ jobs:
           -p:PublishSingleFile=true
           -p:IncludeAllContentForSelfExtract=true
           -p:EnableCompressionInSingleFile=true
+          -p:Version=${{ env.VERSION }}
           --no-restore
           -o dist
 
@@ -47,20 +62,48 @@ jobs:
           if ($mb -lt 20) { throw "el exe pesa $mb MB: no parece autónomo" }
           if ($mb -gt 90) { throw "el exe pesa $mb MB: no se ha comprimido" }
 
-      - name: Guardarlo también como artefacto
+      - name: Preparar Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Construir el instalador
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            /DAppVersion=${{ env.VERSION }} `
+            "installer\NubeBar.iss"
+          $setup = "dist\NubeBar-Setup.exe"
+          if (-not (Test-Path $setup)) { throw "no se generó $setup" }
+          $mb = [math]::Round((Get-Item $setup).Length / 1MB, 1)
+          Write-Host "NubeBar-Setup.exe generado: $mb MB"
+          # El instalador lleva el exe dentro: si pesa mucho menos, no lo lleva
+          if ($mb -lt 20) { throw "el instalador pesa $mb MB: ¿lleva el exe dentro?" }
+
+      - name: Guardarlos también como artefacto
         uses: actions/upload-artifact@v4
         with:
           name: NubeBar-win-x64
-          path: dist/NubeBar.exe
+          path: |
+            dist/NubeBar.exe
+            dist/NubeBar-Setup.exe
 
       - name: Publicar la Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/NubeBar.exe
+          files: |
+            dist/NubeBar.exe
+            dist/NubeBar-Setup.exe
           generate_release_notes: true
           body: |
-            Ejecutable autónomo para Windows 11 (x64). No necesita instalar .NET.
+            Para Windows 11 (x64). No necesita instalar .NET.
 
-            Descarga `NubeBar.exe`, ábrelo y listo. La configuración se crea en
-            `%APPDATA%\NubeBar\config.json`.
+            - **`NubeBar-Setup.exe`** — el instalador. Recomendado: se instala para
+              tu usuario (sin pedir administrador), crea el acceso directo y deja
+              NubeBar lista para arrancar con Windows. Se quita desde
+              "Aplicaciones instaladas" como cualquier otro programa.
+            - **`NubeBar.exe`** — el ejecutable suelto, si prefieres no instalar
+              nada. Muévelo a una carpeta fija antes de abrirlo: si lo ejecutas
+              desde la descarga del navegador, Windows borra esa carpeta sola.
+
+            La configuración se crea en `%APPDATA%\NubeBar\config.json` y el
+            instalador no la toca, ni al actualizar ni al desinstalar.

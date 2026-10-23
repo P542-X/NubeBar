@@ -146,11 +146,25 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
 
 ## Instalar
 
-1. Descarga `NubeBar.exe` de la [última Release](../../releases/latest).
-2. Déjalo donde quieras y ábrelo. No necesita instalación ni .NET: lleva todo dentro.
-3. La primera vez se crea `%APPDATA%\NubeBar\config.json` con los valores por defecto.
+De la [última Release](../../releases/latest), con instalador o sin él:
 
-Para que arranque con Windows: **Ajustes → Sistema → Arrancar con Windows**.
+**Con instalador** — descarga `NubeBar-Setup.exe` y ábrelo. Se instala para tu
+usuario en `%LOCALAPPDATA%\Programs\NubeBar`, **sin pedir administrador**, y
+deja marcado que arranque con Windows (si no, te quedas sin barra en el
+siguiente reinicio). Se quita desde "Aplicaciones instaladas" como cualquier
+otro programa.
+
+**Sin instalador** — descarga `NubeBar.exe`, muévelo a una carpeta fija y ábrelo.
+No necesita .NET: lleva todo dentro. Ojo con abrirlo desde la descarga del
+navegador: Chrome y compañía lo ejecutan desde una carpeta temporal suya y la
+borran a los pocos segundos.
+
+En los dos casos, la primera vez se crea `%APPDATA%\NubeBar\config.json` con los
+valores por defecto, y el instalador no lo toca ni al actualizar ni al
+desinstalar.
+
+Para que arranque con Windows (o para que deje de hacerlo):
+**Ajustes → Sistema → Arrancar con Windows**.
 
 ## Compilar
 
