@@ -11,12 +11,11 @@
 ;    ventana de "¿permites que esta app haga cambios?". Pedir admin para luego
 ;    no necesitarlo solo sirve para asustar.
 ;
-; 2. AppMutex. NubeBar ya tiene un mutex con nombre para no arrancar dos veces
-;    (Instancia.cs). Reusarlo aquí hace que instalar encima de una NubeBar en
-;    marcha la cierre primero en vez de chocar con el exe bloqueado — y, sobre
-;    todo, que al desinstalar se cierre BIEN, que es cuando devuelve la barra de
-;    tareas de Windows. Si aun así quedara algo vivo, el taskkill de abajo lo
-;    remata y el guardián restaura las barras.
+; 2. NADA DE AppMutex: la cierra este script a mano. Lo primero que se probó fue
+;    AppMutex con el mutex que ya tiene Instancia.cs, y parecía lo elegante. Pero
+;    AppMutex solo sabe PLANTARSE: desinstalar con NubeBar abierta daba un bonito
+;    código de salida 1 y no desinstalaba nada. Lo que hace falta no es detectarla,
+;    es cerrarla — ver CerrarNubeBar más abajo.
 
 #ifndef AppVersion
   #define AppVersion "0.0.0"
@@ -45,9 +44,10 @@ DisableDirPage=auto
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 
-; Cerrar NubeBar antes de tocar su exe, al instalar y al desinstalar
-AppMutex=Local\NubeBar.UnaSola
-CloseApplications=yes
+; La cierra CerrarNubeBar (sección [Code]), no el Restart Manager: las islas son
+; ventanas WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW y no hay por qué fiarse de que las
+; encuentre
+CloseApplications=no
 RestartApplications=no
 
 ; Relativo a ESTE fichero, que vive en installer\: el instalador sale en dist\,
@@ -87,7 +87,41 @@ Name: "{userstartup}\NubeBar"; Filename: "{app}\NubeBar.exe"; Tasks: arranque
 [Run]
 Filename: "{app}\NubeBar.exe"; Description: "Abrir NubeBar ahora"; Flags: nowait postinstall skipifsilent
 
-[UninstallRun]
-; Red de seguridad por si el cierre limpio no llegó: matar el proceso deja al
-; guardián devolver la barra de tareas de Windows (Guardian.cs)
-Filename: "{sys}\taskkill.exe"; Parameters: "/im NubeBar.exe /f"; Flags: runhidden skipifdoesntexist; RunOnceId: "CerrarNubeBar"
+[Code]
+
+// Cerrar NubeBar antes de tocar su exe. Importa más de lo que parece: NubeBar
+// esconde la barra de tareas de Windows mientras vive y la devuelve al cerrarse.
+// Quitarla de en medio a lo bruto y ya está dejaría al usuario sin ninguna barra.
+//
+// Por eso van dos pasadas:
+//  1. taskkill SIN /F manda WM_CLOSE, que es como pulsar "Salir de NubeBar": se
+//     ejecuta su cierre limpio y las barras de Windows vuelven solas.
+//  2. Con /F, para lo que no tiene ventana y no se entera del WM_CLOSE: el
+//     guardián, que es el mismo exe con otro papel. Y si el cierre bueno hubiera
+//     fallado, matarlo es justo lo que el guardián está esperando para restaurar
+//     las barras él (Guardian.cs), así que la red de seguridad sigue puesta.
+procedure CerrarNubeBar();
+var
+  Codigo: Integer;
+begin
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/im NubeBar.exe',
+       '', SW_HIDE, ewWaitUntilTerminated, Codigo);
+  Sleep(2500);
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/im NubeBar.exe /f',
+       '', SW_HIDE, ewWaitUntilTerminated, Codigo);
+  Sleep(500);
+end;
+
+// Instalar encima de una NubeBar en marcha: si no, el exe está bloqueado
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  CerrarNubeBar();
+  Result := '';
+end;
+
+// Y al desinstalar, lo mismo y por el mismo motivo
+function InitializeUninstall(): Boolean;
+begin
+  CerrarNubeBar();
+  Result := True;
+end;
