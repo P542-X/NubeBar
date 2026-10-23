@@ -905,8 +905,23 @@ public partial class MainWindow : Window
                                   WallpaperEngine.Enviar(_iconosOcultos ? "hideIcons" : "showIcons");
                               }),
         "separador"        => new Border { Width = 1, Height = 16, Margin = new Thickness(6, 0, 6, 0), Background = _texto, Opacity = 0.3 },
-        _                  => Etiqueta(() => nombre)
+        _                  => ModuloDesconocido(nombre)
     };
+
+    // Un nombre de módulo que esta versión no conoce. Pasa de verdad: el config se
+    // migra solo y le añade módulos nuevos, así que un exe viejo se encuentra con
+    // "fijadas" puesto en el centro y antes lo escribía TAL CUAL, con lo que se leía
+    // la palabra "fijadas" suelta entre los iconos de la isla. Se apunta una vez en
+    // el log y se deja el hueco vacío, que es lo que menos estorba.
+    static readonly HashSet<string> _modulosDesconocidos = new(StringComparer.OrdinalIgnoreCase);
+
+    static UIElement ModuloDesconocido(string nombre)
+    {
+        if (_modulosDesconocidos.Add(nombre))
+            Log.Info($"módulo \"{nombre}\" desconocido en esta versión: se ignora " +
+                     "(el config lo habrá escrito una NubeBar más nueva)");
+        return new Border { Visibility = Visibility.Collapsed };
+    }
 
 
     // "muestra" = el texto más largo que llegará a mostrar este módulo. Se reserva su
