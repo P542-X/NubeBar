@@ -65,10 +65,162 @@ public static class Fuentes
         }
         catch (Exception ex) { Log.Error("índice de apps de la Store", ex); }
 
+        try { CargarOrdenes(encontradas); }
+        catch (Exception ex) { Log.Error("índice de herramientas de Windows", ex); }
+
         _apps = encontradas.Values.OrderBy(e => e.Nombre, StringComparer.CurrentCultureIgnoreCase).ToList();
         AppsListas = true;
-        Log.Info($"índice del buscador: {_apps.Count} aplicaciones");
+        Log.Info($"índice del buscador: {_apps.Count} aplicaciones y {_ordenes.Count} herramientas de Windows");
     });
+
+    // ---------- Herramientas de Windows ----------
+    //
+    // El menú Inicio NO tiene un acceso directo para casi nada de esto, y lo poco que
+    // tiene se llama como le da la gana: en un Windows en español la consola es
+    // "Símbolo del sistema" y en uno en inglés "Command Prompt". Escribiendo "cmd" no
+    // se parecía a ninguno de los dos (en "simbolo del sistema" no hay ni una 'c') y
+    // el buscador acababa ofreciendo el primer archivo llamado algo.cmd que encontraba
+    // el índice de Windows, que resultó ser un semver.cmd dentro de node_modules.
+    //
+    // Así que las herramientas van en una tabla con sus ALIAS: lo que uno teclea de
+    // verdad cuando las quiere. Un alias escrito entero gana a cualquier otra cosa.
+    public sealed record Orden(string Nombre, string Detalle, string Destino, string[] Alias);
+
+    static readonly Orden[] _ordenesPosibles =
+    {
+        new("Símbolo del sistema", "cmd.exe", "cmd.exe",
+            new[] { "cmd", "consola", "terminal", "command prompt", "simbolo del sistema", "msdos", "shell" }),
+        new("Windows PowerShell", "powershell.exe", "powershell.exe",
+            new[] { "powershell", "ps", "pwsh", "consola", "terminal" }),
+        new("Terminal de Windows", "wt.exe", "wt.exe",
+            new[] { "wt", "terminal", "windows terminal", "consola" }),
+        new("Administrador de tareas", "taskmgr.exe", "taskmgr.exe",
+            new[] { "taskmgr", "tareas", "procesos", "task manager", "administrador de tareas" }),
+        new("Explorador de archivos", "explorer.exe", "explorer.exe",
+            new[] { "explorer", "explorador", "archivos", "carpetas", "file explorer" }),
+        new("Editor del Registro", "regedit.exe", "regedit.exe",
+            new[] { "regedit", "registro", "registry", "registry editor" }),
+        new("Panel de control", "control.exe", "control.exe",
+            new[] { "control", "panel de control", "control panel" }),
+        new("Calculadora", "calc.exe", "calc.exe",
+            new[] { "calc", "calculadora", "calculator" }),
+        new("Bloc de notas", "notepad.exe", "notepad.exe",
+            new[] { "notepad", "bloc de notas", "notas", "txt" }),
+        new("Paint", "mspaint.exe", "mspaint.exe",
+            new[] { "paint", "mspaint", "dibujo" }),
+        new("Recortes", "snippingtool.exe", "snippingtool.exe",
+            new[] { "recortes", "recorte", "captura", "snipping tool", "snip" }),
+        new("Administrador de dispositivos", "devmgmt.msc", "devmgmt.msc",
+            new[] { "devmgmt", "dispositivos", "drivers", "device manager" }),
+        new("Administración de discos", "diskmgmt.msc", "diskmgmt.msc",
+            new[] { "diskmgmt", "discos", "particiones", "disk management" }),
+        new("Servicios", "services.msc", "services.msc",
+            new[] { "services", "servicios" }),
+        new("Visor de eventos", "eventvwr.msc", "eventvwr.msc",
+            new[] { "eventvwr", "eventos", "event viewer", "logs" }),
+        new("Configuración del sistema", "msconfig.exe", "msconfig.exe",
+            new[] { "msconfig", "arranque", "boot", "system configuration" }),
+        new("Información del sistema", "msinfo32.exe", "msinfo32.exe",
+            new[] { "msinfo32", "msinfo", "system information" }),
+        new("Monitor de recursos", "resmon.exe", "resmon.exe",
+            new[] { "resmon", "recursos", "resource monitor" }),
+        new("Liberador de espacio en disco", "cleanmgr.exe", "cleanmgr.exe",
+            new[] { "cleanmgr", "limpieza", "liberar espacio", "disk cleanup" }),
+        new("Conexión a Escritorio remoto", "mstsc.exe", "mstsc.exe",
+            new[] { "mstsc", "escritorio remoto", "rdp", "remote desktop" }),
+        new("Mapa de caracteres", "charmap.exe", "charmap.exe",
+            new[] { "charmap", "caracteres", "simbolos", "character map" }),
+        new("Editor de directivas de grupo", "gpedit.msc", "gpedit.msc",
+            new[] { "gpedit", "directivas", "group policy" })
+    };
+
+    // Las que de verdad existen en ESTE Windows, con los alias ya normalizados para
+    // no repetir el trabajo en cada tecla
+    sealed record OrdenViva(string Nombre, string Detalle, string Destino, string Icono, string[] Alias);
+
+    static List<OrdenViva> _ordenes = new();
+
+    static void CargarOrdenes(Dictionary<string, Entrada> apps)
+    {
+        var vivas = new List<OrdenViva>();
+        foreach (var o in _ordenesPosibles)
+        {
+            if (Localizar(o.Destino) is not { } ruta) continue;
+            vivas.Add(new OrdenViva(o.Nombre, o.Detalle, o.Destino, ruta,
+                                    o.Alias.Select(Parecido.Normalizar).ToArray()));
+        }
+        _ordenes = vivas;
+
+        // Y fuera los accesos directos del menú Inicio que son ESTA misma herramienta
+        // con otro nombre ("Command Prompt"): si no, en seis filas te salen dos veces
+        // la consola y se come el sitio de otra cosa.
+        var suyos = new HashSet<string>(vivas.SelectMany(v => v.Alias.Append(Parecido.Normalizar(v.Nombre))));
+        foreach (var clave in apps.Keys.ToList())
+            if (suyos.Contains(Parecido.Normalizar(clave)))
+                apps.Remove(clave);
+    }
+
+    // Dónde está de verdad: System32 primero (es donde vive casi todo) y si no, el
+    // PATH. Los alias de ejecución de la Store (wt.exe) son archivos de cero bytes
+    // en WindowsApps, que está en el PATH del usuario, así que también se encuentran.
+    static string? Localizar(string orden)
+    {
+        try
+        {
+            foreach (var carpeta in new[]
+            {
+                Environment.GetFolderPath(Environment.SpecialFolder.System),
+                Environment.GetFolderPath(Environment.SpecialFolder.Windows)
+            })
+            {
+                var r = Path.Combine(carpeta, orden);
+                if (File.Exists(r)) return r;
+            }
+            foreach (var carpeta in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';'))
+            {
+                if (carpeta.Length == 0) continue;
+                var r = Path.Combine(carpeta.Trim('"'), orden);
+                if (File.Exists(r)) return r;
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    public static IEnumerable<Resultado> Ordenes(string consultaNorm)
+    {
+        if (consultaNorm.Length == 0) yield break;
+
+        foreach (var o in _ordenes)
+        {
+            double p = Parecido.Puntuar(consultaNorm, o.Nombre);
+            bool exacta = false;
+            foreach (var a in o.Alias)
+            {
+                if (a == consultaNorm) { exacta = true; break; }
+                p = Math.Max(p, Parecido.Puntuar(consultaNorm, a));
+            }
+            // Haber escrito el alias ENTERO no es parecerse: es haberla pedido por su
+            // nombre. Por encima del 1.0 de un parecido perfecto, para que "cmd" ponga
+            // la consola la primera aunque tengas cien archivos .cmd por el disco.
+            if (exacta) p = 1.3;
+            if (p < 0.5) continue;
+
+            var destino = o.Destino;
+            var icono = o.Icono;
+            yield return new Resultado
+            {
+                Categoria = Categoria.App,
+                Titulo = o.Nombre,
+                Detalle = o.Detalle,
+                Clave = "orden:" + destino,
+                IconoRuta = icono,
+                Carpeta = Path.GetDirectoryName(icono),
+                Puntos = p,
+                Abrir = () => Lanzar(icono)
+            };
+        }
+    }
 
     // Enumera shell:AppsFolder por COM tardío, sin referencias extra
     static IEnumerable<(string Nombre, string Id)> AppsDeLaStore()
@@ -312,7 +464,13 @@ public static class Fuentes
             // disco las carpetas se llaman Users, Documents y Start Menu, así que
             // abrir con esa ruta fallaba con "no se encuentra el archivo". La ruta de
             // verdad es System.ItemUrl.
-            var sql = "SELECT TOP " + tope + " System.ItemPathDisplay, System.ItemNameDisplay, " +
+            // Se piden MUCHAS más de las que caben y se ordenan aquí por parecido.
+            // Pidiendo justo las que caben, ordenadas por fecha, lo que salía eran los
+            // cinco archivos más recientes que contuvieran el texto por algún sitio:
+            // escribiendo "cmd" aparecía un semver.cmd de node_modules y la consola no
+            // salía por ningún lado. La fecha sigue valiendo para elegir a quién mira
+            // el índice, pero quién SALE lo decide el parecido con el nombre.
+            var sql = "SELECT TOP " + (tope * 6) + " System.ItemPathDisplay, System.ItemNameDisplay, " +
                       "System.ItemType, System.ItemUrl " +
                       "FROM SystemIndex WHERE System.ItemNameDisplay LIKE '%" + escapada + "%' " +
                       "ORDER BY System.DateModified DESC";
@@ -321,6 +479,7 @@ public static class Fuentes
             try { cn.Open(); }
             catch (Exception ex) { Log.Info($"Windows Search: falla al conectar ({ex.GetType().Name}) {ex.Message}"); return salida; }
 
+            var norm = Parecido.Normalizar(consulta);
             using var cmd = new System.Data.OleDb.OleDbCommand(sql, cn);
             using var lector = cmd.ExecuteReader();
             while (lector.Read())
@@ -329,7 +488,11 @@ public static class Fuentes
                 var mostrada = lector[0] as string ?? "";
                 var nombre = lector[1] as string ?? Path.GetFileName(mostrada);
                 var r = RutaDeItemUrl(lector[3] as string, mostrada);
-                if (r.Length == 0) continue;
+                if (r.Length == 0 || EsTrastero(r)) continue;
+                // Un archivo nunca debería ganarle a una app que se parece lo mismo:
+                // casi siempre lo que buscas es el programa, no un fichero suelto
+                double p = Parecido.Puntuar(norm, nombre) * 0.72;
+                if (p < 0.4) continue;
                 salida.Add(new Resultado
                 {
                     Categoria = Categoria.Archivo,
@@ -339,16 +502,35 @@ public static class Fuentes
                     Clave = "archivo:" + r,
                     IconoRuta = r,
                     Carpeta = Path.GetDirectoryName(r),
-                    Puntos = Parecido.Puntuar(Parecido.Normalizar(consulta), nombre) * 0.8,
+                    Puntos = p,
                     Abrir = () => Lanzar(r)
                 });
             }
+            salida = salida.OrderByDescending(x => x.Puntos).Take(tope).ToList();
         }
         catch (Exception ex)
         {
             Log.Info($"Windows Search no disponible: {ex.GetType().Name} 0x{ex.HResult:X8} {ex.Message}");
         }
         return salida;
+    }
+
+    // Carpetas que el índice conoce y a nadie le interesa abrir desde el buscador:
+    // dependencias, cachés, temporales y la papelera. Son justo las que más archivos
+    // tienen y las que más ruido metían en una lista de seis filas.
+    static readonly string[] _trastero =
+    {
+        @"\node_modules\", @"\$recycle.bin\", @"\appdata\local\temp\", @"\appdata\local\packages\",
+        @"\.git\", @"\.cache\", @"\windows\winsxs\", @"\windows\installer\",
+        @"\appdata\roaming\npm\", @"\.venv\", @"\site-packages\"
+    };
+
+    static bool EsTrastero(string ruta)
+    {
+        var r = ruta.ToLowerInvariant();
+        foreach (var t in _trastero)
+            if (r.Contains(t, StringComparison.Ordinal)) return true;
+        return false;
     }
 }
 

@@ -929,3 +929,65 @@ opción se iba por el desagüe sin decir nada.
 `System.ItemUrl` viene como `file:C:/…` (y en un recurso de red, `file://servidor/…`),
 y lo que no sea `file:` no es un archivo: el índice también guarda correo y
 contactos, y ahí nos quedamos con lo que hubiera.
+
+## La palabra "fijadas" escrita en la isla
+
+El exe de la release v1.1.36 enseñaba la palabra `fijadas` suelta, en texto, justo
+antes de los iconos de las apps fijadas.
+
+No era un cartel ni un aviso: era el **nombre del módulo**. El selector de módulos
+tenía de caso por defecto `_ => Etiqueta(() => nombre)`, o sea "si no sé lo que es,
+lo escribo". Y pasó lo que tenía que pasar en cuanto el config y el exe se
+desincronizaron:
+
+- `Config.cs` migra el config solo y le añade `"fijadas"` al centro.
+- La release v1.1.36 es el commit `112fc61`, **anterior** al `cfecbe7` que añadió
+  el módulo `fijadas` al selector.
+
+Resultado: un config escrito por una NubeBar nueva y un exe que no conoce la
+palabra. El exe hacía lo que le habían dicho y la escribía.
+
+Ahora un módulo desconocido **no se escribe**: se apunta una vez en el log y se
+deja el hueco vacío. Escribir el nombre nunca fue una buena idea — no es un
+mensaje para nadie, y un exe viejo con un config nuevo no es un caso raro, es
+exactamente lo que pasa cada vez que alguien actualiza el config antes que el exe.
+
+## Escribir "cmd" no encontraba la consola
+
+Daba esto, del log de verdad:
+
+```
+ERROR en abrir C:\Usuarios\Spcar\Documentos\p5\node_modules\.bin\semver.cmd
+```
+
+Tres cosas a la vez:
+
+1. **El menú Inicio no tiene la consola.** Y lo que sí tiene se llama en cada
+   idioma de una manera: "Símbolo del sistema" en español, "Command Prompt" en
+   inglés. En `simbolo del sistema` no hay ni una `c`, así que el parecido con
+   `cmd` era cero; con `command prompt` salía 0.70 de subsecuencia.
+2. **Los archivos ganaban.** `semver.cmd` *contiene* `cmd` → 0.9 × 0.8 = **0.72**.
+   Más que la consola. Y la consulta al índice pedía las N más **recientes**, no
+   las que más se parecen, así que lo que salía era el último `.cmd` que alguien
+   hubiera tocado en un `node_modules`.
+3. **Veinte filas.** Con veinte huecos que rellenar daba igual lo flojo que fuera
+   un parecido: entraba.
+
+Las tres, arregladas:
+
+- Una tabla de **herramientas de Windows con alias** (`Fuentes.Ordenes`): cmd,
+  powershell, taskmgr, regedit, services.msc… cada una con lo que uno teclea de
+  verdad para buscarla. Escribir un alias **entero** vale 1.3, por encima del 1.0
+  de un parecido perfecto: pedir algo por su nombre no es parecerse, es pedirlo.
+  Solo entran las que existen en ese Windows (`gpedit.msc` no está en Home), y los
+  accesos directos del menú Inicio que son la misma herramienta con otro nombre se
+  quitan del índice, que si no salen dos consolas en seis filas.
+- El índice de archivos se consulta pidiendo **seis veces** lo que cabe y se ordena
+  aquí por parecido; se tiran las carpetas trastero (`node_modules`, temporales,
+  papelera, cachés) y los archivos pesan 0.72, que casi siempre lo que buscas es
+  el programa y no un fichero suelto.
+- **Seis filas**, y con listón relativo: se tira lo que no llegue al 60 % del mejor
+  resultado. Bajar el listón absoluto no valía, porque es el mismo que aguanta las
+  erratas (`fotosop` → Photoshop, 0.52). Pero en relación al mejor sí se nota: con
+  `cmd` quedan la consola y Git CMD, y se van las cuatro cosas que solo tenían una
+  `c`, una `m` y una `d` desperdigadas por el nombre.

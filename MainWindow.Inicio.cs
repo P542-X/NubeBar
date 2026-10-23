@@ -21,7 +21,10 @@ public partial class MainWindow
 {
     const string PanelInicio = "inicio";
     const double AnchoMenu = 660, AltoFila = 44, FilasVisibles = 9;
-    const int MaxFilas = 20;
+    // Seis y se acabó. Veinte filas era una lista para recorrer con la rueda, y un
+    // buscador no es para recorrerlo: o lo que quieres está arriba del todo o la
+    // puntuación está mal. Con seis, lo que sale tiene que ser lo bueno.
+    const int MaxFilas = 6;
 
     TextBox? _caja;
     StackPanel? _lista;
@@ -511,6 +514,7 @@ public partial class MainWindow
             {
                 if (Fuentes.Calculo(limpia) is { } calc) encontrados.Add(calc);
                 encontrados.AddRange(Fuentes.Apps(norm, 40));
+                encontrados.AddRange(Fuentes.Ordenes(norm));
                 encontrados.AddRange(VentanasAbiertas(norm));
                 encontrados.AddRange(Fuentes.Ajustes(norm));
                 if (AjustesDeLaNube(norm) is { } aj) encontrados.Add(aj);
@@ -519,7 +523,7 @@ public partial class MainWindow
         }
 
         foreach (var r in encontrados) r.Puntos += Uso.Empujon(r.Clave);
-        _resultados = encontrados.OrderByDescending(r => r.Puntos).ToList();
+        _resultados = Ordenar(encontrados);
         Pintar();
         reloj.Stop();
 
@@ -527,6 +531,27 @@ public partial class MainWindow
             Log.Info($"DIAG buscar \"{limpia}\": {_resultados.Count} resultados en {reloj.Elapsed.TotalMilliseconds:0.0} ms");
 
         ProgramarArchivos(limpia);
+    }
+
+    // Ordena y, si hay un ganador claro, tira lo que no le llega ni de lejos.
+    //
+    // Con seis filas el relleno se nota: escribiendo "cmd" salía el Símbolo del
+    // sistema el primero y detrás cuatro cosas que solo tienen las letras c, m y d
+    // desperdigadas por el nombre ("Blackmagic RAW Speed Test"). Bajar el liston del
+    // parecido no vale, porque es el mismo que aguanta las erratas ("fotosop" ->
+    // Photoshop). Lo que sí vale es mirarlo en relación al mejor: si uno saca mucho
+    // más que otro, el otro no es lo que buscabas.
+    //
+    // El liston lo pone el mejor de los resultados NORMALES: el cálculo y el comando
+    // valen 10 a propósito para ir siempre los primeros y no deben subirlo. Y la
+    // búsqueda en la web se queda siempre, que es la salida de emergencia.
+    static List<Resultado> Ordenar(List<Resultado> encontrados)
+    {
+        var orden = encontrados.OrderByDescending(r => r.Puntos).ToList();
+        double mejor = orden.Where(r => r.Puntos < 2).Select(r => r.Puntos).DefaultIfEmpty(0).Max();
+        if (mejor <= 0) return orden;
+        double liston = mejor * 0.6;
+        return orden.Where(r => r.Puntos >= liston || r.Categoria == Categoria.Web).ToList();
     }
 
     // La propia ventana de ajustes, buscable como cualquier otra cosa
@@ -599,7 +624,7 @@ public partial class MainWindow
                 if (cts.IsCancellationRequested || !t.IsCompletedSuccessfully) return;
                 if (_caja == null || _caja.Text.Trim() != consulta) return;   // ya has seguido escribiendo
                 foreach (var r in t.Result) r.Puntos += Uso.Empujon(r.Clave);
-                _resultados = _resultados.Concat(t.Result).OrderByDescending(r => r.Puntos).ToList();
+                _resultados = Ordenar(_resultados.Concat(t.Result).ToList());
                 Pintar();
             }, TaskScheduler.FromCurrentSynchronizationContext());
     }
