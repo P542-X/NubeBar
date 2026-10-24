@@ -85,7 +85,9 @@ public partial class MainWindow : Window
     static Duration Ms(double ms) => new(TimeSpan.FromMilliseconds(Animacion.Escalar(ms)));
 
     bool EsIsla => _cfg.Barra.Modo.Equals("isla", StringComparison.OrdinalIgnoreCase);
-    bool Arriba => !_cfg.Barra.Posicion.Equals("abajo", StringComparison.OrdinalIgnoreCase);
+    // Lo consulta medio proyecto. Pasa por PosicionEfectiva para que los bordes
+    // laterales (que cuelgan de la franja de arriba) no se tomen por "abajo".
+    bool Arriba => ArribaEfectivo;
 
     // ================= Una isla por monitor =================
     // Hay una ventana de estas por cada pantalla. La del monitor principal es la
@@ -179,7 +181,7 @@ public partial class MainWindow : Window
                      $"ventana L={Left} T={Top} {ActualWidth}x{ActualHeight} visible={IsVisible} | " +
                      $"isla {Isla.ActualWidth:0}x{Isla.ActualHeight:0} opacidad={Isla.Opacity:0.##} | " +
                      $"monitor ({_monitor.X},{_monitor.Y}) {_monitor.Ancho}x{_monitor.Alto} dpi={_monitor.Dpi} | " +
-                     $"MaxApps={MaxAppsEfectivo} | Modo={_cfg.Barra.Modo} | " +
+                     $"MaxApps={MaxAppsEfectivo} | {ResumenDelPanel()} | " +
                      $"Wallpaper Engine={WallpaperEngine.Exe ?? "no encontrado"}");
         };
         Closed += (_, _) =>
@@ -260,7 +262,7 @@ public partial class MainWindow : Window
             }
         if (Environment.GetEnvironmentVariable("NUBEBAR_DIAG") == "1")
             Log.Info($"DIAG tick [{_monitor.Dispositivo}] isla={Isla.ActualWidth:0.00} exp={_expandida} " +
-                     $"oculta={_escondidaPorPantalla} asomada={_asomada} | {ResumenGrupos()}");
+                     $"oculta={_recogida} asomada={_asomada} | {ResumenGrupos()}");
     }
 
     // ================= Tema y posición =================
@@ -389,7 +391,7 @@ public partial class MainWindow : Window
         Isla.BeginAnimation(HeightProperty, null);
         Isla.Height = b.Alto;
         Isla.BeginAnimation(WidthProperty, null);
-        Isla.HorizontalAlignment = EsIsla ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
+        Isla.HorizontalAlignment = AlineacionDeLaIsla();
         ColocarCajon();                     // alineación vertical, márgenes y orden de las filas
 
         _expandida = false;
@@ -402,8 +404,11 @@ public partial class MainWindow : Window
         ColocarEnMonitor(altoVentana);
 
         // Solo el modo barra reserva espacio; la isla flota encima de las ventanas, como en el iPhone.
+        // Y una barra que se autooculta tampoco lo reserva: reservar un hueco para algo
+        // que no está es justo lo que la gente quiere evitar al encender el autoocultar
+        // (en Plasma pasa lo mismo).
         // Esto va en el hilo de la ventana porque la AppBar se registra con nuestro propio hwnd.
-        if (!EsIsla && b.ReservarEspacio)
+        if (!EsIsla && b.ReservarEspacio && !PanelAutoOculta)
             AppBar.Registrar(_self, Arriba, (int)Math.Round(altoVentana * _monitor.Escala),
                              _monitor.X, _monitor.Y, _monitor.Ancho, _monitor.Alto);
         else AppBar.Quitar(_self);
@@ -427,6 +432,10 @@ public partial class MainWindow : Window
         // hay que volver a abrirla, o cada acción del modo edición (que guarda, y
         // guardar recarga) cerraría la isla en las narices de quien está editando.
         RestaurarEdicion();
+
+        // Y la visibilidad del panel: orden Z y autoocultar. Va al final porque
+        // depende de que la ventana ya esté colocada y la bandeja montada.
+        AplicarVisibilidad();
     }
 
     int Px(double dip) =>
@@ -521,8 +530,17 @@ public partial class MainWindow : Window
         double distancia = _cfg.Barra.Alto + _cfg.Barra.Margen * 2;
         var mover = new TranslateTransform();            // base Y = 0 (posición final)
         Isla.RenderTransform = mover;
-        mover.BeginAnimation(TranslateTransform.YProperty, Kf(Arriba ? -distancia : distancia, 0, 700, 0, Muelle));
+        _mover = mover;
         Isla.BeginAnimation(OpacityProperty, Kf(0, 1, 400));
+
+        // Con el autoocultar encendido su sitio es FUERA de la pantalla, no dentro
+        // (lo decide AplicarVisibilidad, que ya ha corrido en Aplicar). Caer con
+        // rebote y recogerse acto seguido se vería como un tic, y además la caída
+        // dejaría _mover.Y en 0 y la isla se quedaría a la vista marcada como
+        // recogida: entonces no volvería a esconderse hasta el siguiente cambio.
+        if (_recogida && !_asomada) { mover.Y = Arriba ? -distancia : distancia; return; }
+
+        mover.BeginAnimation(TranslateTransform.YProperty, Kf(Arriba ? -distancia : distancia, 0, 700, 0, Muelle));
     }
 
     // Ancho natural del contenido, medido sin límite para que las columnas "*" del

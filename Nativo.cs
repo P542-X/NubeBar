@@ -207,6 +207,17 @@ static class Nativo
     public static void Colocar(IntPtr h, int x, int y, int ancho, int alto) =>
         SetWindowPos(h, IntPtr.Zero, x, y, ancho, alto, 0x0010 | 0x0004);   // SWP_NOACTIVATE | SWP_NOZORDER
 
+    // ---------- Orden Z, para los modos de visibilidad del panel ----------
+    // El Topmost de WPF solo sabe "arriba del todo" o "como una ventana normal". Para
+    // "por-debajo" hay que mandarla al fondo a mano.
+    static readonly IntPtr HWND_BOTTOM = new(1);
+    static readonly IntPtr HWND_NOTOPMOST = new(-2);
+    const uint SWP_QUIETO = 0x0001 | 0x0002 | 0x0010;   // NOSIZE | NOMOVE | NOACTIVATE
+
+    public static void AlFondo(IntPtr h) => SetWindowPos(h, HWND_BOTTOM, 0, 0, 0, 0, SWP_QUIETO);
+
+    public static void NoSiempreEncima(IntPtr h) => SetWindowPos(h, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_QUIETO);
+
     // Traer al frente de verdad. Windows bloquea el cambio de primer plano a procesos
     // que no acaban de recibir entrada del usuario; el toque de Alt levanta ese bloqueo.
     public static bool ForzarPrimerPlano(IntPtr h)

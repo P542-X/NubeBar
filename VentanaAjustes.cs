@@ -43,6 +43,10 @@ public sealed class VentanaAjustes : Window
 
     TabControl _pestanas = new();
     readonly RegistroAjustes _modulos = new();
+
+    // El panel cuya geometria se edita aqui. Hoy solo hay uno; cuando haya varios,
+    // esta constante se convertira en el que este seleccionado.
+    const string Principal = "principal";
     Action? _revisarAtajo;        // comprobar el atajo guardado, cuando ya haya handle
     bool _guardado;
 
@@ -383,14 +387,19 @@ public sealed class VentanaAjustes : Window
     {
         var c = Columna();
         c.Children.Add(Rotulo("Forma", true));
-        c.Children.Add(Opciones("Modo", new[] { "isla", "barra" }, _arbol.Texto("Barra", "Modo", "isla"),
-                                v => _arbol.Poner("Barra", "Modo", v)));
-        c.Children.Add(Opciones("Posición", new[] { "arriba", "abajo" }, _arbol.Texto("Barra", "Posicion", "arriba"),
-                                v => _arbol.Poner("Barra", "Posicion", v)));
-        c.Children.Add(Deslizador("Alto", 24, 72, _arbol.Numero("Barra", "Alto", 38),
-                                  v => _arbol.Poner("Barra", "Alto", v)));
-        c.Children.Add(Deslizador("Margen", 0, 32, _arbol.Numero("Barra", "Margen", 8),
-                                  v => _arbol.Poner("Barra", "Margen", v)));
+        // La geometría se escribe en Paneles[principal], que es la autoridad desde B5.
+        // Las claves equivalentes de "Barra" ya no se leen: se derivan al cargar.
+        c.Children.Add(Opciones("Modo", new[] { "isla", "barra" }, _arbol.TextoDelPanel(Principal, "Modo", "isla"),
+                                v => _arbol.PonerDelPanel(Principal, "Modo", v)));
+        c.Children.Add(Opciones("Posición", PanelNube.Posiciones, _arbol.TextoDelPanel(Principal, "Posicion", "arriba"),
+                                v => _arbol.PonerDelPanel(Principal, "Posicion", v)));
+        c.Children.Add(Opciones("Visibilidad", PanelNube.Visibilidades,
+                                _arbol.TextoDelPanel(Principal, "Visibilidad", "siempre"),
+                                v => _arbol.PonerDelPanel(Principal, "Visibilidad", v)));
+        c.Children.Add(Deslizador("Grosor", 24, 72, _arbol.NumeroDelPanel(Principal, "Grosor", 38),
+                                  v => _arbol.PonerDelPanel(Principal, "Grosor", v)));
+        c.Children.Add(Deslizador("Margen", 0, 32, _arbol.NumeroDelPanel(Principal, "Margen", 8),
+                                  v => _arbol.PonerDelPanel(Principal, "Margen", v)));
         c.Children.Add(Deslizador("Radio de esquinas", 0, 36, _arbol.Numero("Tema", "Radio", 20),
                                   v => _arbol.Poner("Tema", "Radio", v)));
 
@@ -436,8 +445,8 @@ public sealed class VentanaAjustes : Window
 
         c.Children.Add(Rotulo("Pantallas", true));
         c.Children.Add(Opciones("Monitores", new[] { "todos", "principal" },
-                                _arbol.Texto("Barra", "Monitores", "todos"),
-                                v => _arbol.Poner("Barra", "Monitores", v)));
+                                _arbol.TextoDelPanel(Principal, "Monitores", "todos"),
+                                v => _arbol.PonerDelPanel(Principal, "Monitores", v)));
         c.Children.Add(Interruptor("Cada isla enseña las apps de su pantalla",
                                    _arbol.Bandera("Barra", "AppsPorMonitor", true),
                                    v => _arbol.Poner("Barra", "AppsPorMonitor", v)));
@@ -1099,8 +1108,8 @@ public sealed class VentanaAjustes : Window
                                    _arbol.Bandera("Barra", "OcultarBarraWindows", true),
                                    v => _arbol.Poner("Barra", "OcultarBarraWindows", v)));
         c.Children.Add(Interruptor("Reservar espacio en pantalla (solo en modo barra)",
-                                   _arbol.Bandera("Barra", "ReservarEspacio", true),
-                                   v => _arbol.Poner("Barra", "ReservarEspacio", v)));
+                                   _arbol.BanderaDelPanel(Principal, "ReservarEspacio", true),
+                                   v => _arbol.PonerDelPanel(Principal, "ReservarEspacio", v)));
 
         c.Children.Add(Rotulo("Archivos", true));
         c.Children.Add(BotonPlano("Abrir la carpeta del config", () =>

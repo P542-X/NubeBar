@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace NubeBar;
 
@@ -42,19 +43,26 @@ public class OpcionesWallpaper
 
 public class Barra
 {
+    // ---------- Geometría: DERIVADA, no editable ----------
+    // Desde B5 la autoridad de estas seis es Paneles[principal] (ver PanelNube y
+    // Config.MigrarYDerivarPaneles): se rellenan al cargar a partir del panel y no se
+    // escriben nunca en el fichero. Siguen aquí porque las leen sesenta y pico sitios
+    // y cambiarlos todos a la vez no habría comprado nada; lo que NO hay que hacer es
+    // guardarlas: se perderían al siguiente arranque.
     public string Modo { get; set; } = "isla";        // "isla" | "barra"
-    public string Posicion { get; set; } = "arriba";  // "arriba" | "abajo"
-    public double Alto { get; set; } = 38;
+    public string Posicion { get; set; } = "arriba";  // los cuatro bordes: ver PanelNube.Posiciones
+    public double Alto { get; set; } = 38;            // el "Grosor" del panel
     public double Margen { get; set; } = 8;
-    public bool OcultarBarraWindows { get; set; } = true;
     public bool ReservarEspacio { get; set; } = true;  // las ventanas maximizadas no la tapan
+    // ---------- Y de aquí abajo, lo que sí es suyo ----------
+    public bool OcultarBarraWindows { get; set; } = true;
     public int MaxApps { get; set; } = 10;             // iconos de apps visibles a la vez; el resto, con la rueda
     public bool AgruparApps { get; set; } = true;      // las ventanas del mismo programa, en un solo icono
     // Ctrl+Alt+Space estaba ocupado en el equipo de desarrollo y el registro fallaba
     // con el error 1409. Ctrl+Alt+W ("W de ventanas") sí está libre, y no choca con
     // Ctrl+Shift+Space, que en Visual Studio es la ayuda de parámetros.
     public string AtajoVistaGeneral { get; set; } = "Ctrl+Alt+W";       // abre la cuadrícula de ventanas
-    public string Monitores { get; set; } = "todos";   // "todos" | "principal"
+    public string Monitores { get; set; } = "todos";   // "todos" | "principal" (DERIVADA de Paneles, ver arriba)
     public bool AppsPorMonitor { get; set; } = true;   // cada isla enseña las apps de SU monitor
     public bool OcultarEnPantallaCompleta { get; set; } = true;
     // Una ventana maximizada también la echa. Ya no viene de serie: la isla iba y
@@ -109,33 +117,106 @@ public class Animaciones
     public bool RobotAlCambiarTema { get; set; } = true; // además, la primera vez que cambias de tema
 }
 
-// Un panel de la nube. De momento hay uno solo —el que describe la sección Barra—,
-// pero el modelo ya es una lista para que añadir un segundo panel, o uno lateral, no
-// obligue a tocar el config de nadie.
+// Un panel de la nube, y **la autoridad** de su geometría: borde, posición, grosor,
+// margen, visibilidad y en qué monitores sale. Es lo que vive en el config y lo que
+// reciben las escrituras; `Barra` se deriva de aquí al cargar (ver
+// Config.MigrarYDerivarPaneles) para que los sesenta y pico lectores de siempre no
+// tengan que cambiar.
 //
-// En esta fase Barra y Modulos siguen siendo la VERDAD y Paneles se deriva de ellos
-// al cargar (ver SincronizarPaneles). Lo nuevo lee de aquí; cuando existan paneles de
-// verdad se le da la vuelta a la autoridad y Barra pasa a derivarse de Paneles[0].
+// Es una lista porque el modelo admite varios paneles, aunque hoy solo se dibuje el
+// "principal": añadir un segundo no obligará a cambiar el config de nadie.
 public class PanelNube
 {
     public string Id { get; set; } = "principal";
     public bool Activo { get; set; } = true;
     public string Modo { get; set; } = "isla";          // "isla" (flotante) | "barra" (de lado a lado)
 
-    // "arriba" | "abajo" | "izquierda" | "derecha". Los dos laterales están en el
-    // modelo porque el documento los pide, pero todavía no se dibujan: MainWindow
-    // los trata como "arriba" y lo apunta en el log en vez de colocar mal la isla.
+    // Los cuatro bordes. "arriba" y "abajo" valen para los dos modos; "izquierda" y
+    // "derecha" solo para el modo isla, que se ancla a ese lado sin dejar de ser
+    // horizontal. Una BARRA vertical de verdad (zonas apiladas) es otra fase: aquí se
+    // avisa y se cae a "arriba" en vez de dibujar algo roto.
     public string Posicion { get; set; } = "arriba";
 
     public double Grosor { get; set; } = 38;            // alto si es horizontal, ancho si es vertical
     public double Margen { get; set; } = 8;
 
-    // Los cuatro modos de Plasma. Hoy solo "siempre" y "autoocultar" (que es lo que
-    // hace la isla al recogerse); los otros dos quedan declarados.
+    public static readonly string[] Posiciones = { "arriba", "abajo", "izquierda", "derecha" };
+    public static readonly string[] Visibilidades = { "siempre", "autoocultar", "ventanas-encima", "por-debajo" };
+
+    public static bool PosicionValida(string? p) =>
+        p != null && Posiciones.Any(x => x.Equals(p, StringComparison.OrdinalIgnoreCase));
+
+    public static bool VisibilidadValida(string? v) =>
+        v != null && Visibilidades.Any(x => x.Equals(v, StringComparison.OrdinalIgnoreCase));
+
+    // ¿El borde es uno de los laterales?
+    public static bool EsLateral(string? p) =>
+        p != null && (p.Equals("izquierda", StringComparison.OrdinalIgnoreCase)
+                   || p.Equals("derecha", StringComparison.OrdinalIgnoreCase));
+
+    // Los cuatro modos de Plasma, y lo que significa cada uno en el orden Z.
     public string Visibilidad { get; set; } = "siempre";  // "siempre" | "autoocultar" | "ventanas-encima" | "por-debajo"
+
+    // Las decisiones de visibilidad están aquí, fuera de la ventana, por dos razones:
+    // se pueden probar sin abrir nada, y así hay UN sitio donde está escrito qué hace
+    // cada modo en vez de cuatro ifes repartidos.
+    //
+    //   siempre          → por encima de todo
+    //   autoocultar      → por encima, pero recogida hasta que acercas el ratón
+    //   ventanas-encima  → una ventana normal: las demás pueden taparla
+    //   por-debajo       → al fondo del todo, como un widget del escritorio
+    static string Vis(string? v) => VisibilidadValida(v) ? v!.ToLowerInvariant() : "siempre";
+
+    public static bool PorEncima(string? v) => Vis(v) is "siempre" or "autoocultar";
+    public static bool AutoOculta(string? v) => Vis(v) == "autoocultar";
+    public static bool AlFondoDelTodo(string? v) => Vis(v) == "por-debajo";
+
+    // ¿Toca estar recogida (fuera de la pantalla, asomando con el ratón al borde)?
+    // Dos motivos distintos que acaban en el mismo deslizamiento: el autoocultar del
+    // panel, que se recoge siempre, y la pantalla completa de toda la vida.
+    //
+    // Lo pregunta MainWindow.RevisarPantallaCompleta, que no necesita saber cuál de
+    // los dos ha sido: le basta con si toca o no. El motivo solo va al log.
+    public static (bool Toca, string Motivo) TocaRecogerse(
+        string? visibilidad, bool ocultarEnPantallaCompleta, bool hayPantallaCompleta)
+    {
+        if (AutoOculta(visibilidad)) return (true, "autoocultar");
+        if (ocultarEnPantallaCompleta && hayPantallaCompleta) return (true, "pantalla completa");
+        return (false, "");
+    }
+
+    // ¿Puede esta nube recogerse alguna vez? Si no, no hay ni que mirar quién está a
+    // pantalla completa: se fuerza visible y se sale.
+    public static bool PuedeRecogerse(string? visibilidad, bool ocultarEnPantallaCompleta) =>
+        AutoOculta(visibilidad) || ocultarEnPantallaCompleta;
+
+    // El borde que de verdad se puede dibujar hoy. Los laterales anclan la ISLA a ese
+    // lado sin dejar de ser horizontal; una BARRA vertical de verdad (zonas apiladas,
+    // el cajón saliendo de lado) es otra fase, así que en modo barra se cae a "arriba"
+    // en vez de dibujar algo roto.
+    public static string BordeEfectivo(string? posicion, bool esIsla)
+    {
+        var p = PosicionValida(posicion) ? posicion!.ToLowerInvariant() : "arriba";
+        return EsLateral(p) && !esIsla ? "arriba" : p;
+    }
+
+    // ¿Cuelga del borde de arriba? Los laterales sí: la franja sigue siendo
+    // horizontal, solo cambia a qué lado se pega la isla dentro de ella.
+    public static bool CuelgaDeArriba(string? posicion, bool esIsla) =>
+        BordeEfectivo(posicion, esIsla) != "abajo";
 
     public bool ReservarEspacio { get; set; } = true;
     public string Monitores { get; set; } = "todos";      // "todos" | "principal"
+
+    // Las zonas del panel NO se guardan aquí: siguen viviendo en "Modulos", que es lo
+    // que edita la biblioteca y lo que el usuario reconoce en su config. Esto es una
+    // VISTA de aquellas listas (las mismas instancias, no copias), que rellena
+    // MigrarYDerivarPaneles al cargar.
+    //
+    // Sin el JsonIgnore se escribían las tres listas también dentro de Paneles, y al
+    // primer cambio en la biblioteca las dos copias dejaban de coincidir: justo el
+    // problema por el que se ha quitado la geometría de "Barra".
+    [JsonIgnore]
     public ZonasPanel Zonas { get; set; } = new();
 }
 
@@ -232,7 +313,7 @@ public class Config
             c.Animaciones ??= new();
             c.Paneles ??= new();
             ModulosDeSerie(c);
-            SincronizarPaneles(c);
+            if (MigrarYDerivarPaneles(c)) GuardarPanelesMigrados(c);
             return c;
         }
         catch (Exception ex)
@@ -245,31 +326,67 @@ public class Config
 
     }
 
-    // Paneles[0] se rellena con lo que digan Barra y Modulos, que en esta fase siguen
-    // siendo la verdad. Lo nuevo (el bucle que monta los widgets, y mañana el modo
-    // edición) lee de Paneles y no de los tres campos sueltos, así que cuando se le dé
-    // la vuelta a la autoridad no hay que volver a tocar a quien lee.
+    // ================= Paneles: la autoridad =================
     //
-    // No se escribe en disco: es una vista, no un dato. Si se guardara, el config
-    // tendría la misma información en dos sitios y acabarían discrepando.
-    static void SincronizarPaneles(Config c)
+    // Se le ha dado la vuelta a lo que decidió la fase A. Ahora **manda Paneles**: es
+    // lo que vive en el fichero, lo que reciben las escrituras y lo que define bordes,
+    // posición, grosor, visibilidad y en qué monitores sale la nube.
+    //
+    // Pero `Barra` no desaparece: se convierte en una VISTA DERIVADA en memoria, que
+    // se rehace en cada carga a partir de Paneles[0]. El motivo es práctico y vale la
+    // pena escribirlo: hay 64 lecturas de la geometría de Barra repartidas por once
+    // ficheros (EsIsla, Arriba, _cfg.Barra.Alto, la appbar, el arrastre, la pantalla
+    // completa…). Reescribirlas todas no habría dado ni una garantía nueva y habría
+    // puesto en riesgo cosas que llevan meses funcionando. Invertir la autoridad en el
+    // LÍMITE DE CARGA consigue lo mismo sin tocar a ningún lector.
+    //
+    // Lo que sí queda en Barra como suyo son los ajustes que no son del panel:
+    // MaxApps, AgruparApps, Bandeja, Notificaciones, AppsFijadas, PulsoAudio…
+    //
+    // Devuelve true si ha habido que MIGRAR (no existía Paneles): entonces hay que
+    // escribirlo en el fichero, que es lo que hace GuardarPanelesMigrados.
+    internal static bool MigrarYDerivarPaneles(Config c)
     {
+        bool migrado = false;
         try
         {
             var p = c.Paneles.FirstOrDefault(x => x.Id == "principal");
             if (p == null)
             {
-                p = new PanelNube { Id = "principal" };
+                // Primera vez con esta versión: el panel nace de lo que decía Barra,
+                // así que nadie nota el cambio.
+                p = new PanelNube
+                {
+                    Id = "principal",
+                    Activo = true,
+                    Modo = c.Barra.Modo,
+                    Posicion = c.Barra.Posicion,
+                    Grosor = c.Barra.Alto,
+                    Margen = c.Barra.Margen,
+                    ReservarEspacio = c.Barra.ReservarEspacio,
+                    Monitores = c.Barra.Monitores,
+                    Visibilidad = "siempre"
+                };
                 c.Paneles.Insert(0, p);
+                migrado = true;
+                Log.Info("Paneles no existía: migrado desde Barra " +
+                         $"(modo={p.Modo} posicion={p.Posicion} grosor={p.Grosor})");
             }
 
             p.Activo = true;
-            p.Modo = c.Barra.Modo;
-            p.Posicion = c.Barra.Posicion;
-            p.Grosor = c.Barra.Alto;
-            p.Margen = c.Barra.Margen;
-            p.ReservarEspacio = c.Barra.ReservarEspacio;
-            p.Monitores = c.Barra.Monitores;
+            if (!PanelNube.PosicionValida(p.Posicion))
+            {
+                Log.Info($"posición \"{p.Posicion}\" desconocida: se usa arriba");
+                p.Posicion = "arriba";
+            }
+            if (!PanelNube.VisibilidadValida(p.Visibilidad))
+            {
+                Log.Info($"visibilidad \"{p.Visibilidad}\" desconocida: se usa siempre");
+                p.Visibilidad = "siempre";
+            }
+
+            // Las zonas siguen viviendo en Modulos: son del usuario y las edita la
+            // biblioteca. El panel las referencia, no las copia.
             p.Zonas = new ZonasPanel
             {
                 Izquierda = c.Modulos.Izquierda,
@@ -277,8 +394,34 @@ public class Config
                 Derecha = c.Modulos.Derecha,
                 Ocultos = c.Modulos.Ocultos
             };
+
+            // Y ahora al revés que antes: Barra se deriva del panel.
+            c.Barra.Modo = p.Modo;
+            c.Barra.Posicion = p.Posicion;
+            c.Barra.Alto = p.Grosor;
+            c.Barra.Margen = p.Margen;
+            c.Barra.ReservarEspacio = p.ReservarEspacio;
+            c.Barra.Monitores = p.Monitores;
         }
-        catch (Exception ex) { Log.Error("sincronizar Paneles con Barra", ex); }
+        catch (Exception ex) { Log.Error("migrar y derivar Paneles", ex); }
+        return migrado;
+    }
+
+    // Escribe Paneles en el fichero y borra de Barra las claves que se ha llevado.
+    // Borrarlas es lo que evita tener la misma información en dos sitios: con las dos,
+    // el primero que editara "Barra.Alto" a mano no entendería por qué no pasa nada.
+    static void GuardarPanelesMigrados(Config c)
+    {
+        try
+        {
+            var arbol = ConfigArbol.Cargar();
+            arbol.PonerPaneles(c.Paneles);
+            foreach (var clave in new[] { "Modo", "Posicion", "Alto", "Margen", "ReservarEspacio", "Monitores" })
+                arbol.Quitar("Barra", clave);
+            arbol.Guardar();
+            Log.Info("Paneles guardado en el config; las claves de geometría salen de Barra");
+        }
+        catch (Exception ex) { Log.Error("guardar Paneles migrados", ex); }
     }
 
     // Los módulos "control" (red, volumen, idioma, batería) y "bandeja" (las apps en

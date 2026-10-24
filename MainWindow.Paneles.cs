@@ -174,7 +174,7 @@ public partial class MainWindow
         // traemos de vuelta nosotros mismos. Esperar al vigilante de 150 ms y a que
         // el primer plano cambie añadía casi medio segundo al abrir el menú con la
         // tecla Windows, y el juego puede no soltar el primer plano nunca.
-        if (_escondidaPorPantalla && !_asomada)
+        if (_recogida && !_asomada)
         {
             _asomada = true;
             _ratonEnElBorde = DateTime.MaxValue;

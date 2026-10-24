@@ -144,6 +144,87 @@ public sealed class ConfigArbol
         else Poner(seccion, clave, valor);
     }
 
+    // Los paneles, que son objetos y no claves sueltas. Se serializan enteros y se
+    // ponen en la raíz: es la única sección del config que no es un diccionario plano.
+    public void PonerPaneles(IEnumerable<PanelNube> paneles)
+    {
+        try
+        {
+            _raiz["Paneles"] = JsonSerializer.SerializeToNode(paneles, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch (Exception ex) { Log.Error("escribir Paneles en el config", ex); }
+    }
+
+    // Una clave de un panel por su id, sin tocar el resto. Lo usa la ventana de
+    // ajustes: escribir el panel entero desde ahí pisaría lo que no conoce.
+    public void PonerDelPanel(string id, string clave, JsonNode? valor)
+    {
+        try
+        {
+            if (_raiz["Paneles"] is not JsonArray lista)
+            {
+                lista = new JsonArray();
+                _raiz["Paneles"] = lista;
+            }
+            var panel = lista.OfType<JsonObject>()
+                             .FirstOrDefault(p => p["Id"]?.GetValue<string>() == id);
+            if (panel == null)
+            {
+                panel = new JsonObject { ["Id"] = id };
+                lista.Add(panel);
+            }
+            panel[clave] = valor;
+        }
+        catch (Exception ex) { Log.Error($"escribir Paneles[{id}].{clave}", ex); }
+    }
+
+    public void PonerDelPanel(string id, string clave, string valor) => PonerDelPanel(id, clave, JsonValue.Create(valor));
+    public void PonerDelPanel(string id, string clave, double valor) => PonerDelPanel(id, clave, JsonValue.Create(valor));
+    public void PonerDelPanel(string id, string clave, bool valor) => PonerDelPanel(id, clave, JsonValue.Create(valor));
+
+    // Y leerla, con su valor por defecto si el panel o la clave no están.
+    public string TextoDelPanel(string id, string clave, string porDefecto)
+    {
+        try
+        {
+            if (_raiz["Paneles"] is JsonArray lista)
+            {
+                var p = lista.OfType<JsonObject>().FirstOrDefault(x => x["Id"]?.GetValue<string>() == id);
+                if (p?[clave] is { } v) return v.GetValue<string>();
+            }
+        }
+        catch { }
+        return porDefecto;
+    }
+
+    public double NumeroDelPanel(string id, string clave, double porDefecto)
+    {
+        try
+        {
+            if (_raiz["Paneles"] is JsonArray lista)
+            {
+                var p = lista.OfType<JsonObject>().FirstOrDefault(x => x["Id"]?.GetValue<string>() == id);
+                if (p?[clave] is { } v) return v.GetValue<double>();
+            }
+        }
+        catch { }
+        return porDefecto;
+    }
+
+    public bool BanderaDelPanel(string id, string clave, bool porDefecto)
+    {
+        try
+        {
+            if (_raiz["Paneles"] is JsonArray lista)
+            {
+                var p = lista.OfType<JsonObject>().FirstOrDefault(x => x["Id"]?.GetValue<string>() == id);
+                if (p?[clave] is { } v) return v.GetValue<bool>();
+            }
+        }
+        catch { }
+        return porDefecto;
+    }
+
     public void PonerLista(string seccion, string clave, IEnumerable<string> valores)
     {
         var a = new JsonArray();

@@ -1229,6 +1229,9 @@ el código, y conviene que se sepa que son deliberadas.
 
 ## Fase A · `Paneles[]` se deriva, no se guarda
 
+> **Esto ya no es así.** En B5 la autoridad se invirtió: manda `Paneles[0]` y `Barra` es
+> la vista derivada. Ver «`PanelNube` manda de verdad» al final del documento.
+
 El modelo nuevo es una lista de paneles, con los cuatro bordes y los cuatro modos de
 visibilidad de Plasma. Pero en esta fase **`Barra` y `Modulos` siguen siendo la
 verdad** y `Paneles[0]` se rellena a partir de ellos al cargar
@@ -1491,3 +1494,121 @@ paso una zona vacía acepta igual que una llena.
 La marca de destino tampoco es hija del `StackPanel`: se pinta en un `Canvas` por
 encima. Siendo hija empujaba a los demás widgets, que al moverse cambiaban los puntos
 medios, que cambiaban el índice: temblaba. Nada se reordena hasta que sueltas.
+
+
+## Fase B · `PanelNube` manda de verdad, y la autoridad se invierte en el límite de carga
+
+En la Fase A `Paneles[]` se escribió como una **vista derivada** de `Barra`: nacía de
+ella en cada carga y no se guardaba. Era un modelo de mentira — el config seguía
+siendo `Barra` y el panel, un adorno. B5 le da la vuelta.
+
+### Por qué en el límite de carga y no sitio por sitio
+
+`Barra.Modo`, `Posicion`, `Alto`, `Margen`, `ReservarEspacio` y `Monitores` se leen en
+**64 sitios repartidos por 11 ficheros**: `EsIsla`, `Arriba`, el alto de la isla, la
+appbar, el arrastre, la pantalla completa, el recorte del cajón, las animaciones de
+entrada, la colocación en cada monitor… Cambiarlos todos a `PanelPrincipal.X` en la
+misma tanda que el modelo nuevo era pedir dos refactores a la vez, y el segundo tocaba
+cosas que llevan meses funcionando.
+
+Así que la autoridad se invierte **en el único sitio por el que pasa todo**:
+
+```csharp
+internal static bool MigrarYDerivarPaneles(Config c)   // Paneles[0] manda
+{
+    var p = c.Paneles.FirstOrDefault(x => x.Id == "principal");
+    if (p == null) { p = new PanelNube { … desde c.Barra … }; migrado = true; }
+    …validar Posicion y Visibilidad…
+    c.Barra.Modo = p.Modo;   c.Barra.Posicion = p.Posicion;
+    c.Barra.Alto = p.Grosor; c.Barra.Margen  = p.Margen;   // y las otras dos
+}
+```
+
+Los 64 lectores no se han tocado ni uno. Lo que leen sigue llamándose `_cfg.Barra.Alto`
+y vale lo mismo, solo que ahora **viene** del panel. Y las seis claves se **borran** de
+`Barra` en el fichero (`GuardarPanelesMigrados`): con las dos puestas, el primero que
+editase `Barra.Alto` a mano no entendería por qué no pasa nada.
+
+### La misma información en dos sitios, otra vez
+
+Al probar la migración sobre el config de verdad apareció el error clásico: `PanelNube`
+tiene una propiedad `Zonas`, y al serializar el panel se escribían **las tres listas de
+widgets también dentro de `Paneles`**, duplicando `Modulos`. Al primer cambio en la
+Biblioteca las dos copias dejaban de coincidir — exactamente el problema por el que se
+estaba quitando la geometría de `Barra`.
+
+`[JsonIgnore]` en `PanelNube.Zonas`. Las zonas siguen viviendo en `Modulos`, que es lo
+que edita la Biblioteca y lo que el usuario reconoce en su config; `Zonas` es una
+**vista** de aquellas listas —las mismas instancias, no copias— que rellena
+`MigrarYDerivarPaneles`. Hay una prueba que lo comprueba con `ReferenceEquals`.
+
+### Los cuatro bordes: lo que se puede hacer hoy y lo que no
+
+`arriba` y `abajo` ya estaban y valen en los dos modos. Los laterales **anclan la isla**
+a ese lado sin dejar de ser horizontal: es una colocación, no un giro.
+
+Una **barra vertical de verdad** —zonas apiladas, el cajón saliendo de lado, el menú
+Inicio de 860 px cabiendo ahí, la appbar con `ABE_LEFT`— es otra fase. Hacerla a medias
+dejaría la nube rota, así que en modo barra los laterales se avisan en el log una vez y
+se tratan como `arriba`. Es feo, pero es honesto y queda escrito en el log de arranque:
+
+```
+panel[principal] modo=barra borde=arriba (pedías izquierda) … alineación=Stretch
+```
+
+### Los cuatro modos de visibilidad, y el que no existía
+
+`siempre` y `ventanas-encima`/`por-debajo` son orden Z y se resuelven con `Topmost` y
+dos llamadas nuevas (`Nativo.AlFondo` → `HWND_BOTTOM`, `Nativo.NoSiempreEncima` →
+`HWND_NOTOPMOST`).
+
+`autoocultar` era el interesante: **no estaba implementado**. La primera versión se
+limitaba a llamar a `RevisarPantallaCompleta()`, que solo esconde la isla si hay algo a
+pantalla completa — o sea, no hacía nada. La maquinaria de recogerse y asomar por el
+borde ya existía y está probada; lo que faltaba era que tuviera **dos motivos** en vez
+de uno:
+
+```csharp
+public static (bool Toca, string Motivo) TocaRecogerse(
+    string? visibilidad, bool ocultarEnPantallaCompleta, bool hayPantallaCompleta)
+{
+    if (AutoOculta(visibilidad)) return (true, "autoocultar");
+    if (ocultarEnPantallaCompleta && hayPantallaCompleta) return (true, "pantalla completa");
+    return (false, "");
+}
+```
+
+Lo de abajo no distingue cuál ha sido: le basta saber si toca estar recogida. Así el
+asomar con el ratón en el borde, el no esconderse con un panel abierto y el quedarse
+asomada si tienes el puntero encima valen igual para el modo nuevo **sin repetir una
+línea**. El flag pasó a llamarse `_recogida` porque ya no es "escondida por pantalla
+completa". El motivo solo va al log.
+
+### Dos cosas que solo se ven al probarlo
+
+- **Reservar hueco para algo que no está.** Una barra con autoocultar registraba la
+  appbar igual, así que Windows le guardaba su franja y las ventanas maximizadas no la
+  usaban: justo lo que uno quiere evitar al encender el autoocultar. Ahora
+  `!EsIsla && ReservarEspacio && !PanelAutoOculta`. En Plasma pasa lo mismo.
+- **La animación de entrada deshacía la recogida.** `AnimarAparicion` hace caer la isla
+  desde fuera con rebote y **deja `_mover.Y` en 0**. Con autoocultar encendido,
+  `AplicarVisibilidad` ya la había recogido antes, y la caída la devolvía a la vista
+  marcada como recogida: se quedaba visible y no volvía a esconderse hasta el siguiente
+  cambio. Ahora, si nace recogida, su sitio es fuera y no se anima la entrada.
+
+### Las decisiones viven en `PanelNube`, no en la ventana
+
+`BordeEfectivo`, `CuelgaDeArriba`, `PorEncima`, `AutoOculta`, `AlFondoDelTodo`,
+`TocaRecogerse` y `PuedeRecogerse` son estáticas y puras. `MainWindow.Visibilidad.cs`
+solo las traduce a Win32 y a WPF. Dos ventajas: la tabla entera (4 bordes × 2 modos y 4
+visibilidades × pantalla completa) se prueba **sin abrir una ventana**, y hay un único
+sitio donde está escrito qué significa cada modo, en vez de cuatro ifes repartidos.
+
+### Lo que queda fuera
+
+- Barra **vertical** de verdad (zonas apiladas): es B6.
+- `ventanas-encima` y `por-debajo` **se pelean con el servicio de bandeja**, que manda
+  la nube por encima cada 100 ms. Se avisa en el log una vez y no se apaga la bandeja
+  por la espalda, que sería peor sorpresa.
+- Varios paneles a la vez: el modelo es una lista y `PanelPrincipal` ya es una
+  propiedad de la isla, pero hoy todas dibujan el mismo `"principal"`.

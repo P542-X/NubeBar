@@ -13,7 +13,7 @@ namespace NubeBar;
 // navegador). Se esconde SOLO la isla de esa pantalla; la de la otra sigue a lo suyo.
 public partial class MainWindow : Window
 {
-    bool _escondidaPorPantalla;   // el monitor tiene algo a pantalla completa
+    bool _recogida;   // el monitor tiene algo a pantalla completa
     bool _asomada;                // está asomando porque tienes el ratón en el borde
     DateTime _ratonEnElBorde = DateTime.MaxValue;
     TranslateTransform? _mover;
@@ -35,7 +35,7 @@ public partial class MainWindow : Window
             i._ratonEnElBorde = DateTime.MaxValue;
             // Al volver, si su pantalla sigue con algo a pantalla completa, se queda
             // fuera: el siguiente repaso la deja asomar como siempre con el ratón
-            i.Deslizar(esconder || i._escondidaPorPantalla);
+            i.Deslizar(esconder || i._recogida);
         }
         Log.Info(esconder ? "isla escondida a mano (vuelve con Win)" : "isla de vuelta con la tecla Windows");
     }
@@ -143,34 +143,51 @@ public partial class MainWindow : Window
                (Arriba ? p.Y < _monitor.Y + franja : p.Y > _monitor.Abajo - franja);
     }
 
+    // Dos motivos distintos para recogerse, y el mismo deslizamiento para los dos:
+    //
+    //   - el panel está en visibilidad "autoocultar": se recoge SIEMPRE, y asoma
+    //     cuando pegas el ratón al borde (es lo que hace el panel de Plasma);
+    //   - hay algo a pantalla completa y el config lo pide (lo de siempre).
+    //
+    // Lo de abajo no distingue cuál de los dos ha sido: le basta saber si toca estar
+    // recogida. Así el asomar por el borde, el no esconderse con un panel abierto y
+    // el quedarse asomada si tienes el ratón encima valen igual para el modo nuevo,
+    // sin repetir ni una línea.
+    // La regla está en PanelNube.TocaRecogerse (sin ventana, y por tanto probable);
+    // aquí solo se le dan los tres datos. HayPantallaCompleta se consulta al final a
+    // propósito: recorre ventanas y con el autoocultar encendido no hace falta.
+    (bool Toca, string Motivo) TocaRecogerse() =>
+        PanelNube.TocaRecogerse(VisibilidadPanel, _cfg.Barra.OcultarEnPantallaCompleta,
+                                !PanelAutoOculta && _cfg.Barra.OcultarEnPantallaCompleta && HayPantallaCompleta());
+
     void RevisarPantallaCompleta()
     {
         if (_escondidaAMano) return;
-        if (!_cfg.Barra.OcultarEnPantallaCompleta)
+        if (!PanelNube.PuedeRecogerse(VisibilidadPanel, _cfg.Barra.OcultarEnPantallaCompleta))
         {
-            if (_escondidaPorPantalla) { _escondidaPorPantalla = false; _asomada = false; Deslizar(false); }
+            if (_recogida) { _recogida = false; _asomada = false; Deslizar(false); }
             return;
         }
 
-        bool completa = HayPantallaCompleta();
+        var (recoger, motivo) = TocaRecogerse();
 
-        if (completa != _escondidaPorPantalla)
+        if (recoger != _recogida)
         {
-            _escondidaPorPantalla = completa;
+            _recogida = recoger;
             // Si justo cuando toca esconderse tienes el ratón encima de la isla, se
             // queda asomada. Pasaba al cerrar un panel: el primer plano volvía a la
             // ventana maximizada y la isla desaparecía debajo del puntero, que es
             // justo donde acababas de hacer clic.
-            _asomada = completa && RatonEnLaFranja();
+            _asomada = recoger && RatonEnLaFranja();
             _ratonEnElBorde = DateTime.MaxValue;
-            Deslizar(completa && !_asomada);
-            Log.Info($"pantalla completa en {_monitor.Dispositivo}: " +
-                     (completa ? _asomada ? "sí, pero la isla se queda asomada (tienes el ratón encima)"
-                                          : "sí, la isla se esconde"
-                               : "no, la isla vuelve"));
+            Deslizar(recoger && !_asomada);
+            Log.Info($"la isla de {_monitor.Dispositivo} " +
+                     (recoger ? _asomada ? $"tendría que recogerse ({motivo}), pero se queda asomada (tienes el ratón encima)"
+                                         : $"se recoge ({motivo})"
+                              : "vuelve"));
             return;
         }
-        if (!_escondidaPorPantalla) return;
+        if (!_recogida) return;
 
         // Escondida: el ratón pegado al borde durante 300 ms la hace asomar
         var p = Monitores.Raton();
