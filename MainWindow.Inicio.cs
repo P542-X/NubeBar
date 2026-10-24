@@ -187,6 +187,7 @@ public partial class MainWindow
         CapturarClicsFuera(false);
         _buscaArchivos?.Cancel();
         _esperaArchivos?.Stop();
+        OlvidarMenuDeApp();
         CerrarPanel();
     }
 
@@ -453,6 +454,15 @@ public partial class MainWindow
         Grid.SetRow(_pista, 2);
         raiz.Children.Add(_pista);
 
+        // La capa del menú del clic derecho, la última de todas: tiene que quedar por
+        // encima de la lista y de la portada (ver MainWindow.MenuApp.cs). Vive
+        // colapsada y no estorba hasta que se pide.
+        var capaMenu = CrearCapaMenuApp();
+        Grid.SetRow(capaMenu, 0);
+        Grid.SetRowSpan(capaMenu, 3);
+        raiz.Children.Add(capaMenu);
+
+        _raizMenu = raiz;
         return raiz;
     }
 
@@ -715,6 +725,25 @@ public partial class MainWindow
             if (i >= 0) { _seleccion = i; MoverMarca(); }
         };
         zona.MouseLeftButtonUp += (_, _) => Ejecutar(r, false);
+
+        // Clic derecho: el menú de ESTA aplicación. Se marca como manejado para que no
+        // suba hasta la isla y abra el suyo —el de cerrar aplicaciones y salir de
+        // NubeBar—, que no tiene nada que ver con lo que tienes bajo el puntero. El
+        // clic izquierdo sigue abriendo, igual que antes.
+        if (TieneMenuDeApp(r))
+            zona.MouseRightButtonUp += (_, e) =>
+            {
+                e.Handled = true;
+                int i = Visibles.FindIndex(x => ReferenceEquals(x, r));
+                if (i >= 0) { _seleccion = i; MoverMarca(); }
+                AbrirMenuDeApp(r, e.GetPosition(_raizMenu ?? (IInputElement)zona));
+            };
+        else
+            // Sin menú propio, pero tampoco el de la isla: un cálculo o una búsqueda
+            // en la web no tienen nada que ofrecer, y abrir ahí "Salir de NubeBar" es
+            // la clase de sorpresa que hace que no te fíes de un clic derecho.
+            zona.MouseRightButtonUp += (_, e) => e.Handled = true;
+
         return zona;
     }
 
@@ -765,6 +794,19 @@ public partial class MainWindow
     // ================= Teclado =================
     void CajaTecla(object remitente, KeyEventArgs e)
     {
+        // Con el menú de una aplicación abierto, las teclas son suyas: Esc lo cierra a
+        // él y no el buscador entero, y las flechas no mueven una marca que ahora mismo
+        // está detrás de una tarjeta.
+        if (MenuDeAppAbierto)
+        {
+            if (e.Key == Key.Escape) { CerrarMenuDeApp(); e.Handled = true; }
+            // Las flechas, Intro y Tab se comen: actuarían sobre una lista que ahora
+            // está detrás de la tarjeta y no se ve. Lo que se escriba sigue yendo a la
+            // caja, que es inofensivo y evita tener que acordarse de volver a ella.
+            else if (e.Key is Key.Down or Key.Up or Key.Enter or Key.Tab) e.Handled = true;
+            return;
+        }
+
         var visibles = Visibles;
         switch (e.Key)
         {

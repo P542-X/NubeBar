@@ -1739,3 +1739,101 @@ barra se quedaba apartada en una dirección que nadie iba a deshacer.
 - **Un solo panel.** `Paneles` es una lista desde B5 y `PanelPrincipal` ya es una
   propiedad de cada isla, pero hoy todas dibujan el mismo `"principal"`: no se puede
   tener una barra vertical a la izquierda y una isla arriba a la vez.
+
+
+## El clic derecho en un resultado de la búsqueda
+
+Hasta ahora el clic derecho sobre una fila del buscador subía hasta la isla y abría **su**
+menú: cerrar aplicaciones, editar la nube, salir de NubeBar. Nada de eso tiene que ver
+con la aplicación que tenías debajo del puntero, y «Salir de NubeBar» a dos píxeles de
+donde esperabas «Abrir ubicación» es la clase de sorpresa que hace que dejes de fiarte
+de un clic derecho.
+
+Ahora cada resultado saca el suyo: **Abrir**, **Ejecutar como administrador**, **Abrir
+ubicación del archivo**, **Propiedades** y **Cancelar**.
+
+### Por qué no es un `ContextMenu` ni un panel
+
+Un `ContextMenu` de WPF sería una cajita blanca del sistema que no pega con nada, y en
+una ventana `WS_EX_NOACTIVATE` con el foco siempre a medias.
+
+Y no puede ser un panel de la isla, que es como están hechos los otros menús: los
+paneles son de uno en uno, así que abrirlo **cerraría la búsqueda**, que es justo lo que
+estabas usando. Por eso es una capa dentro del propio panel del menú Inicio, por encima
+de la lista y de la portada, con un fondo transparente que se come los clics de fuera
+(un `Background` nulo los dejaría pasar a la lista y el menú no se cerraría al hacer clic
+al lado).
+
+La tarjeta se **mide antes de colocarse**: puesta a pelo donde pulsaste, un clic derecho
+en la última fila deja medio menú fuera del panel y el recorte del cajón se come las
+opciones de abajo.
+
+### Lo que no se puede hacer sale apagado, y dice por qué
+
+El menú no cambia de forma según la aplicación: las cuatro opciones están siempre, y las
+que no aplican salen en gris con el motivo en el tooltip. «Está en gris» sin decir por
+qué solo frustra.
+
+| | se activa cuando |
+|---|---|
+| Abrir | siempre |
+| Ejecutar como administrador | es un fichero **y** es ejecutable (`.exe .lnk .bat .cmd .com .msi .msc .ps1`) |
+| Abrir ubicación | es un fichero que está donde dice |
+| Propiedades | igual |
+
+Una app de la Store (`shell:AppsFolder\…`) no es un fichero suelto: lo único que se puede
+hacer con ella es abrirla, y las otras tres salen apagadas. Un `.txt` del índice de
+archivos tiene ubicación y propiedades pero no se eleva: «ejecutar como administrador» un
+documento no significa nada, y ofrecerlo sería mentir.
+
+### La elevación la pide Windows, y punto
+
+`Ejecutar como administrador` usa `UseShellExecute = true` con `Verb = "runas"`, que es
+exactamente lo que hace el Explorador: **el que saca el UAC es Windows**. Aquí no hay —ni
+va a haber— ningún atajo para saltárselo.
+
+Si el usuario dice que no, Windows devuelve `ERROR_CANCELLED` (1223). Eso **no es un
+fallo**: es una respuesta. Se apunta en el log como «elevación cancelada en el UAC» y no
+se reintenta ni se busca otra vía.
+
+### El detalle que habría dejado la opción muerta: los accesos directos
+
+`ShellExecute` con `runas` **sobre un `.lnk` no eleva**. El shell abre el acceso directo
+y el proceso de destino nace sin elevar, así que el UAC no sale y la opción parece no
+hacer nada. Y el índice de aplicaciones está lleno de `.lnk`: es lo que hay en el menú
+Inicio de Windows.
+
+Así que un `.lnk` se resuelve primero y lo que se eleva es su **destino**, con sus
+**argumentos**. Sin los argumentos, un acceso directo con parámetros —un
+`chrome.exe --profile-directory=…`— arrancaría otra cosa distinta de la que pulsaste.
+
+Se resuelve por COM tardío con `Shell.Application`, que es lo que ya usa el índice para
+enumerar la carpeta de la Store: nada de declarar `IShellLink` ni de añadir una
+referencia a Windows Script Host solo para esto. Si no se puede resolver, se avisa en el
+log y se intenta con el `.lnk` tal cual, que es lo peor que puede pasar: que Windows lo
+abra sin elevar.
+
+### Propiedades necesita bajar a `ShellExecuteEx`
+
+Esta no se puede hacer con `Process.Start`. El verbo `properties` necesita que el shell
+tenga la lista de IDs del elemento (`SEE_MASK_INVOKEIDLIST`); sin ella, `ShellExecute` no
+encuentra el verbo y no pasa nada en absoluto.
+
+El diálogo se abre **sin dueño** a propósito: la nube vive como `WS_EX_NOACTIVATE`, y un
+diálogo colgado de una ventana que no se activa puede quedarse detrás de todo.
+
+### Lo que sigue igual
+
+- **El clic izquierdo abre, como siempre.**
+- **El menú de la isla no se ha tocado**, y ya no lo abre un clic derecho en una fila:
+  el manejador marca el evento como atendido y no deja que suba.
+- **Las ventanas ya abiertas tampoco cambian**: esas tienen su menú en su icono del
+  carrusel (`MenuDeGrupo`), con cerrar, forzar el cierre y fijar, que es lo que se
+  espera de algo que ya está en marcha.
+- Un cálculo, un comando, un ajuste de Windows o la búsqueda en la web **no sacan menú**
+  —no tienen nada que ofrecer— pero tampoco dejan subir el clic a la isla.
+- Con el menú abierto, `Esc` lo cierra a **él** y no el buscador entero; las flechas,
+  `Intro` y `Tab` se comen, que actuarían sobre una lista que está detrás de la tarjeta.
+- Al cerrarse el buscador se olvidan las tres referencias de la capa: si no,
+  apuntarían a elementos que ya no están en ningún árbol y `MenuDeAppAbierto` seguiría
+  diciendo «sí».
