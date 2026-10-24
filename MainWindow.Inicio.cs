@@ -45,6 +45,24 @@ public partial class MainWindow
     double AltoCabecera => _cfg.Inicio.Saludo ? 58 : 0;
     double AltoMenu => AltoCabecera + 8 + 38 + 8 + AltoFila * FilasVisibles + 10;
 
+    // ---------- Y lo que de verdad cabe (C1) ----------
+    //
+    // En horizontal el menú se despliega desde la isla hacia el centro de la pantalla y
+    // tiene todo el ancho del monitor para él: 660 px siempre caben. Al lado de una
+    // barra VERTICAL no: hay que descontar la franja de la barra, su margen y la
+    // separación, y en una pantalla estrecha —o con un grosor grande— 660 ya no entran.
+    // Una tarjeta más ancha que ese hueco no se recorta: se queda fuera de la ventana y
+    // simplemente no se ve.
+    //
+    // Estas dos propiedades son lo único que cambia de medidas entre las dos
+    // orientaciones; el panel de dentro es el mismo y no se entera.
+    double AnchoMenuEfectivo => !Vertical ? AnchoMenu
+        : Math.Min(AnchoMenu, AnchoMaximoDeTarjeta(_monitor.Ancho / _monitor.Escala,
+                                                   Grosor, _cfg.Barra.Margen, SeparacionPanel));
+
+    double AltoMenuEfectivo => !Vertical ? AltoMenu
+        : Math.Min(AltoMenu, AltoMaximoDeTarjeta(_monitor.Alto / _monitor.Escala, _cfg.Barra.Margen));
+
     // ================= Tecla Windows =================
     // Hay un solo hook de teclado para todas las islas: lo monta la jefa y lo
     // comparten todas (viven en el mismo hilo de interfaz, así que no hay carrera)
@@ -161,9 +179,21 @@ public partial class MainWindow
     }
 
     // ================= Abrir y cerrar =================
+    // El botón "⊞" de la zona, para que la tarjeta salga a su lado y no en el medio de
+    // la pantalla. Si el módulo "inicio" no está puesto en ninguna zona, se queda en
+    // null y la tarjeta se centra, que es la salida razonable.
+    Button? _botonInicio;
+
+    internal UIElement ModuloInicio() => _botonInicio = Boton(Texto("⊞", 16), "Inicio", AbrirMenuInicio);
+
     void AbrirMenuInicio()
     {
-        if (!AlternarPanel(PanelInicio, CrearMenuInicio, AnchoMenu, AltoMenu, teclado: true)) return;
+        // En vertical la tarjeta se alinea con el botón de Inicio, como el lanzador de
+        // Plasma; en horizontal el ancla no se usa (el panel es el cajón de la isla y
+        // se despliega de punta a punta, igual que siempre).
+        if (!AlternarPanel(PanelInicio, CrearMenuInicio, AnchoMenuEfectivo, AltoMenuEfectivo,
+                           teclado: true, ancla: Vertical ? _botonInicio : null,
+                           scrollPropio: true)) return;
         _filtro = null;
         CapturarClicsFuera(true);
         Dispatcher.InvokeAsync(() =>
@@ -195,30 +225,69 @@ public partial class MainWindow
     // mismo a los pocos segundos y cerraba el menú solo mientras escribías. El criterio
     // bueno es el que pediste: un clic de verdad fuera. Se consigue capturando el ratón
     // en el subárbol de la isla, que es como se comportan los menús de Windows.
+    // Sobre QUIÉN se captura. En horizontal basta la isla: el panel es su cajón y vive
+    // dentro de ella. Con la barra vertical el panel es una tarjeta HERMANA de la isla
+    // (ver MainWindow.Vertical.cs), y capturar en la isla rompía el menú de dos formas a
+    // la vez: la captura en subárbol desviaba a la isla los clics de la tarjeta —así que
+    // la caja de búsqueda y las filas no recibían ninguno— y además contaban como "clic
+    // fuera", o sea que el primer clic en el buscador lo cerraba. Se captura en la raíz,
+    // que es el ancestro común de las dos superficies.
+    FrameworkElement SuperficieDeClics => Vertical ? Raiz : Isla;
+
+    FrameworkElement? _capturada;
+
     void CapturarClicsFuera(bool activar)
     {
         if (activar)
         {
-            Isla.PreviewMouseDown += ClicQuizaFuera;
-            Isla.PreviewMouseUp += RearmarCaptura;
-            Isla.LostMouseCapture += RecuperarCaptura;
-            Mouse.Capture(Isla, CaptureMode.SubTree);
+            var sobre = SuperficieDeClics;
+            _capturada = sobre;
+            sobre.PreviewMouseDown += ClicQuizaFuera;
+            sobre.PreviewMouseUp += RearmarCaptura;
+            sobre.LostMouseCapture += RecuperarCaptura;
+            Mouse.Capture(sobre, CaptureMode.SubTree);
         }
         else
         {
-            Isla.PreviewMouseDown -= ClicQuizaFuera;
-            Isla.PreviewMouseUp -= RearmarCaptura;
-            Isla.LostMouseCapture -= RecuperarCaptura;
-            if (ReferenceEquals(Mouse.Captured, Isla)) Mouse.Capture(null);
+            // Se suelta de DONDE se cogió y no de donde toque ahora: si el config
+            // cambiara de orientación con el menú abierto, quitar los manejadores de la
+            // otra superficie los dejaría puestos para siempre.
+            var sobre = _capturada ?? SuperficieDeClics;
+            sobre.PreviewMouseDown -= ClicQuizaFuera;
+            sobre.PreviewMouseUp -= RearmarCaptura;
+            sobre.LostMouseCapture -= RecuperarCaptura;
+            if (ReferenceEquals(Mouse.Captured, sobre)) Mouse.Capture(null);
+            _capturada = null;
+        }
+    }
+
+    // ¿Este punto cae dentro del menú? Con la barra vertical el menú son DOS
+    // superficies: la barra y su tarjeta. InputHitTest y no un rectángulo porque
+    // acierta hasta en las esquinas redondeadas.
+    bool DentroDelMenu(Point enPantalla)
+    {
+        if (Toca(Isla, enPantalla)) return true;
+        if (PanelFlotante.Visibility == Visibility.Visible && Toca(PanelFlotante, enPantalla)) return true;
+        return false;
+
+        static bool Toca(FrameworkElement e, Point pantalla)
+        {
+            try
+            {
+                if (e.ActualWidth <= 0 || e.ActualHeight <= 0) return false;
+                var p = e.PointFromScreen(pantalla);
+                if (p.X < 0 || p.Y < 0 || p.X > e.ActualWidth || p.Y > e.ActualHeight) return false;
+                return e.InputHitTest(p) != null;
+            }
+            catch { return false; }
         }
     }
 
     void ClicQuizaFuera(object remitente, MouseButtonEventArgs e)
     {
         if (_panelAbierto != PanelInicio) return;
-        var p = e.GetPosition(Isla);
-        bool dentro = p.X >= 0 && p.Y >= 0 && p.X <= Isla.ActualWidth && p.Y <= Isla.ActualHeight;
-        if (dentro) return;
+        var sobre = _capturada ?? SuperficieDeClics;
+        if (DentroDelMenu(sobre.PointToScreen(e.GetPosition(sobre)))) return;
         CerrarMenu();
         e.Handled = true;
     }
@@ -266,7 +335,9 @@ public partial class MainWindow
         try
         {
             var r = Monitores.Raton();
-            if (Isla.InputHitTest(Isla.PointFromScreen(new Point(r.X, r.Y))) != null) return;
+            // Las dos superficies, no solo la isla: con la barra vertical, un clic en
+            // la tarjeta del menú estaba "fuera de la isla" y lo cerraba.
+            if (DentroDelMenu(new Point(r.X, r.Y))) return;
             Log.Info("clic fuera del menú: se cierra");
             CerrarMenu();
         }
@@ -357,7 +428,10 @@ public partial class MainWindow
             // de pantalla (Win+Shift+S, Impr Pant) salía pero no te dejaba arrastrar
             // el recuadro. El clic de fuera lo sigue cazando el vigilante de 150 ms.
             if (!Nativo.EsNuestra(Nativo.Activa())) return;
-            Mouse.Capture(Isla, CaptureMode.SubTree);
+            // Sobre la misma superficie en la que se cogió (ver SuperficieDeClics): si
+            // aquí se volviera a la isla, en vertical se perderían otra vez los clics
+            // de la tarjeta.
+            Mouse.Capture(_capturada ?? SuperficieDeClics, CaptureMode.SubTree);
         }, DispatcherPriority.Input);
     }
 

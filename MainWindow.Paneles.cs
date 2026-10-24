@@ -151,17 +151,24 @@ public partial class MainWindow
 
     // Abre un panel dentro de la isla. Si ya había otro, lo sustituye con transición suave.
     // Devuelve false si el panel pedido ya estaba abierto (y entonces lo cierra: alternar).
-    bool AlternarPanel(string nombre, Func<FrameworkElement> crear, double ancho, double alto, bool teclado = false)
+    bool AlternarPanel(string nombre, Func<FrameworkElement> crear, double ancho, double alto,
+                       bool teclado = false, FrameworkElement? ancla = null, bool scrollPropio = false)
     {
         if (_panelAbierto == nombre) { CerrarPanel(); return false; }
-        AbrirPanel(nombre, crear(), ancho, alto, teclado);
+        AbrirPanel(nombre, crear(), ancho, alto, teclado, ancla: ancla, scrollPropio: scrollPropio);
         return true;
     }
 
     // Con "ancla" (el icono del que cuelga el panel) el cajón no se dibuja de punta a
     // punta, sino como una tarjeta de "ancho" pegada a ese icono. Ver RecortarCajon.
+    //
+    // "scrollPropio" solo lo mira el camino VERTICAL: dice que el panel ya se desplaza
+    // por dentro y que, si no cabe, hay que recortarle el alto en vez de envolverlo en
+    // otro scroll. El camino horizontal lo ignora a propósito, para que el menú Inicio
+    // de siempre se siga comportando exactamente igual que antes de C1.
     void AbrirPanel(string nombre, FrameworkElement contenido, double ancho, double alto,
-                    bool teclado = false, bool encoger = false, FrameworkElement? ancla = null)
+                    bool teclado = false, bool encoger = false, FrameworkElement? ancla = null,
+                    bool scrollPropio = false)
     {
         // En vertical el cajón no vale: la barra ya ocupa la pantalla de arriba abajo y
         // no tiene hacia dónde crecer. El panel sale flotando al lado (ver
@@ -170,7 +177,7 @@ public partial class MainWindow
         if (Vertical)
         {
             if (_panelAbierto != null) QuitarPanelFlotante();
-            AbrirPanelFlotante(nombre, contenido, ancho, alto, teclado, ancla);
+            AbrirPanelFlotante(nombre, contenido, ancho, alto, teclado, ancla, scrollPropio);
             return;
         }
 

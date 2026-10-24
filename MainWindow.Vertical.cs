@@ -54,6 +54,19 @@ public partial class MainWindow : Window
     internal static double AnchoConTarjeta(double grosor, double margen, double separacion, double anchoTarjeta) =>
         margen + grosor + margen + separacion + anchoTarjeta + margen;
 
+    // Y al revés: lo más ancha que puede ser una tarjeta sin salirse de la pantalla.
+    // Es la inversa exacta de AnchoConTarjeta, y hace falta porque el panel Inicio pide
+    // 660 px de ancho: en un portátil de 1366 con una barra de 56 eso cabe, pero en una
+    // pantalla estrecha o con un grosor grande no, y la tarjeta se quedaba cortada por
+    // el filo de la ventana (no por un recorte: simplemente fuera de ella).
+    internal static double AnchoMaximoDeTarjeta(double anchoPantalla, double grosor,
+                                                double margen, double separacion) =>
+        Math.Max(120, anchoPantalla - (margen + grosor + margen + separacion + margen));
+
+    // Lo más alta que puede ser sin salirse por arriba o por abajo
+    internal static double AltoMaximoDeTarjeta(double altoPantalla, double margen) =>
+        Math.Max(140, altoPantalla - margen * 2);
+
     // Dónde va la tarjeta dentro de esa ventana:
     //  - "Desplazado" es lo que se aparta del lado de la barra (el Margin que le toca
     //    por su lado, que es el izquierdo si la barra está a la izquierda y el derecho
@@ -197,34 +210,63 @@ public partial class MainWindow : Window
     // La tarjeta vive dentro de la MISMA ventana (que se ensancha para dejarle sitio):
     // una ventana nueva tendría que resolver otra vez el no robar foco, el orden Z, el
     // DPI y el guardián, y ya está todo resuelto aquí.
+    // `scrollPropio` lo pasan los paneles que ya se desplazan por dentro —el menú
+    // Inicio tiene su propio ScrollViewer para la lista de resultados—. A esos no hay
+    // que envolverlos en otro scroll: se les recorta el alto y su fila elástica se
+    // encarga. Envolverlos sería lo peor de los dos mundos: la caja de búsqueda se iría
+    // hacia arriba al desplazar la lista, y habría dos barras de desplazamiento.
     void AbrirPanelFlotante(string nombre, FrameworkElement contenido, double ancho, double alto,
-                            bool teclado, FrameworkElement? ancla)
+                            bool teclado, FrameworkElement? ancla, bool scrollPropio = false)
     {
+        // Lo primero, que quepa: la tarjeta vive dentro de la ventana, y una tarjeta más
+        // ancha que el hueco que le queda al lado de la barra no se recorta — se queda
+        // directamente fuera de la ventana y no se ve.
+        double anchoPantalla = _monitor.Ancho / _monitor.Escala;
+        double altoPantalla = _monitor.Alto / _monitor.Escala;
+        double topeAncho = AnchoMaximoDeTarjeta(anchoPantalla, Grosor, _cfg.Barra.Margen, SeparacionPanel);
+        double topeAlto = AltoMaximoDeTarjeta(altoPantalla, _cfg.Barra.Margen);
+
+        if (ancho > topeAncho)
+        {
+            Log.Info($"panel {nombre} (vertical): pedía {ancho:0} de ancho y al lado de la barra " +
+                     $"caben {topeAncho:0}; se estrecha");
+            ancho = topeAncho;
+        }
+
         _panelAbierto = nombre;
         _panelAncho = ancho;
         _anclaFlotante = ancla;
+        _panelScrollPropio = scrollPropio;
 
         VestirPanelFlotante();
         CajonFlotante.Content = contenido;
         PanelFlotante.Visibility = Visibility.Visible;
 
-        // Medir de verdad: el alto que pide quien abre el panel es una estimación, y en
-        // vertical el tope es la pantalla entera menos los márgenes.
+        // Medir de verdad: el alto que pide quien abre el panel es una estimación.
         double bordes = PanelFlotante.BorderThickness.Top + PanelFlotante.BorderThickness.Bottom;
-        double tope = Math.Max(200, _monitor.Alto / _monitor.Escala - _cfg.Barra.Margen * 2);
         try
         {
             contenido.Measure(new Size(ancho, double.PositiveInfinity));
             double pide = contenido.DesiredSize.Height + bordes;
-            if (pide > tope)
+
+            if (pide > topeAlto)
             {
-                Log.Info($"panel {nombre} (vertical): necesita {pide:0} y caben {tope:0}; se desplaza por dentro");
-                CajonFlotante.Content = null;
-                CajonFlotante.Content = EnvolverConScroll(contenido, tope - bordes);
-                contenido = (FrameworkElement)CajonFlotante.Content;
-                pide = tope;
+                if (scrollPropio)
+                {
+                    Log.Info($"panel {nombre} (vertical): pedía {pide:0} de alto y caben {topeAlto:0}; " +
+                             "se recorta y se desplaza con su propio scroll");
+                }
+                else
+                {
+                    Log.Info($"panel {nombre} (vertical): necesita {pide:0} y caben {topeAlto:0}; se desplaza por dentro");
+                    CajonFlotante.Content = null;
+                    CajonFlotante.Content = EnvolverConScroll(contenido, topeAlto - bordes);
+                    contenido = (FrameworkElement)CajonFlotante.Content;
+                }
+                pide = topeAlto;
             }
             if (pide > alto) alto = pide;
+            if (alto > topeAlto) alto = topeAlto;
         }
         catch (Exception ex) { Log.Error("medir el panel flotante", ex); }
 
@@ -290,13 +332,14 @@ public partial class MainWindow : Window
         try
         {
             double bordes = PanelFlotante.BorderThickness.Top + PanelFlotante.BorderThickness.Bottom;
-            double tope = Math.Max(200, _monitor.Alto / _monitor.Escala - _cfg.Barra.Margen * 2);
+            double tope = AltoMaximoDeTarjeta(_monitor.Alto / _monitor.Escala, _cfg.Barra.Margen);
             contenido.Measure(new Size(_panelAncho, double.PositiveInfinity));
             double alto = contenido.DesiredSize.Height + bordes;
 
             if (alto > tope)
             {
-                if (contenido is ScrollViewer { Tag: TopeDePanel } ya) ya.MaxHeight = tope - bordes;
+                if (_panelScrollPropio) { /* se desplaza él: solo se le recorta el alto */ }
+                else if (contenido is ScrollViewer { Tag: TopeDePanel } ya) ya.MaxHeight = tope - bordes;
                 else
                 {
                     Log.Info($"panel {nombre} (vertical): ha crecido hasta {alto:0} y caben {tope:0}; se desplaza por dentro");
@@ -318,6 +361,7 @@ public partial class MainWindow : Window
     }
 
     FrameworkElement? _anclaFlotante;
+    bool _panelScrollPropio;
 
     // La tarjeta se pega al lado de la barra y se alinea con el widget que la ha
     // abierto, sin salirse nunca de la pantalla. Si no hay widget (el menú Inicio con
@@ -371,6 +415,7 @@ public partial class MainWindow : Window
         PanelFlotante.BeginAnimation(HeightProperty, null);
         CajonFlotante.Content = null;
         _anclaFlotante = null;
+        _panelScrollPropio = false;
     }
 
     // ---------- El resumen para el log ----------

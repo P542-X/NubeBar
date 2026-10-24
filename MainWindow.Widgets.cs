@@ -63,7 +63,7 @@ public partial class MainWindow : Window, IAnfitrionWidget
 
         // ---------- Apps ----------
         R("inicio", "Inicio", "Abre el menú de aplicaciones", "", CategoriaWidget.Apps,
-          i => i.Boton(i.Texto("⊞", 16), "Inicio", i.AbrirMenuInicio), zona: "Izquierda");
+          i => i.ModuloInicio(), zona: "Izquierda");
 
         R("apps", "Apps abiertas", "El carrusel de ventanas, agrupadas por programa", "", CategoriaWidget.Apps,
           i => i.ModuloApps(), zona: "Centro");

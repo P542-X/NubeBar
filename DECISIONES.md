@@ -1837,3 +1837,108 @@ diálogo colgado de una ventana que no se activa puede quedarse detrás de todo.
 - Al cerrarse el buscador se olvidan las tres referencias de la capa: si no,
   apuntarían a elementos que ya no están en ningún árbol y `MenuDeAppAbierto` seguiría
   diciendo «sí».
+
+
+## Fase C · El menú Inicio al lado de una barra vertical
+
+B6 dejó la barra vertical con sus paneles saliendo en tarjeta al lado. El menú Inicio
+—que es el panel más grande y el único con foco de teclado, lista desplazable y su
+propio menú contextual dentro— entraba por ese mismo camino, y por eso parecía que ya
+funcionaba. No funcionaba: tenía un fallo que lo habría dejado inusable y dos medidas
+que no se habían pensado para un hueco estrecho.
+
+### El fallo: la captura del ratón solo conocía la isla
+
+El menú Inicio no se cierra al perder el foco —Wallpaper Engine se lo devuelve a sí
+mismo cada pocos segundos y lo cerraba mientras escribías—, sino con **un clic de verdad
+fuera**. Eso se consigue capturando el ratón en el subárbol de la isla, que es como se
+comportan los menús de Windows:
+
+```csharp
+Mouse.Capture(Isla, CaptureMode.SubTree);
+```
+
+En horizontal es correcto: el panel **es** el cajón de la isla y vive dentro de ella. En
+vertical el panel es una tarjeta **hermana** de la isla, y eso rompía el menú de dos
+formas a la vez:
+
+1. la captura en subárbol **desvía a la isla** los clics que caen fuera de su subárbol,
+   así que la caja de búsqueda y las filas de resultados no recibían ni uno;
+2. y además el comprobador los contaba como «clic fuera», porque medía contra el
+   rectángulo de `Isla`. O sea: **el primer clic en el buscador lo cerraba.**
+
+Se captura en `Raiz`, que es el ancestro común de las dos superficies, y el «¿estoy
+dentro?» pasó a ser una sola función que pregunta por las dos:
+
+```csharp
+FrameworkElement SuperficieDeClics => Vertical ? Raiz : Isla;
+
+bool DentroDelMenu(Point enPantalla)   // la barra Y su tarjeta
+```
+
+Había **tres** sitios que preguntaban solo por la isla: el manejador de la captura, el
+vigilante de 150 ms que caza el clic cuando Windows nos quita la captura, y el rearmado
+que la recupera (ese volvía a capturar en `Isla` aunque se hubiera cogido en `Raiz`, con
+lo que el fallo reaparecía al primer clic). Los tres pasan por la misma función.
+
+Y la captura se **suelta de donde se cogió**, no de donde toque ahora: si la orientación
+cambiara con el menú abierto, quitar los manejadores de la otra superficie los habría
+dejado puestos para siempre.
+
+### Las medidas: 660 px no caben en todas partes
+
+En horizontal el menú tiene el ancho entero del monitor para él y 660 px siempre caben.
+Al lado de una barra vertical hay que descontar la franja de la barra, su margen y la
+separación — y una tarjeta más ancha que ese hueco **no se recorta**: se queda fuera de
+la ventana y simplemente no se ve, porque la tarjeta vive dentro de la misma ventana que
+la barra.
+
+Así que `AnchoMaximoDeTarjeta` es la inversa exacta de `AnchoConTarjeta` (hay una prueba
+que las compone y comprueba que vuelve a salir el ancho de la pantalla), y el menú pide
+`Math.Min(660, lo que quepa)`. En un 2560 con barra de 38 quedan 2490 y pide 660; en un
+1024 al 150 % con barra de 72 quedan 579 y se estrecha a 579.
+
+Esto hay que mirarlo **en unidades de WPF y no en píxeles**: ese mismo 1024 al 150 % son
+683 de WPF. Hecha la cuenta en píxeles, los 660 habrían «cabido» y la tarjeta habría
+salido media pantalla fuera.
+
+El alto, igual: `AltoMaximoDeTarjeta` descuenta los dos márgenes, y las dos cuentas salen
+del monitor **de esa isla**, así que un portátil al lado de un 2560 da dos tarjetas
+distintas sin que ninguna mire la del otro.
+
+### Recortar no es envolver
+
+`AbrirPanelFlotante` ya sabía qué hacer con un panel que no cabe: envolverlo en un
+`ScrollViewer`. Para el menú Inicio eso es lo peor de los dos mundos — la caja de
+búsqueda se iría hacia arriba al desplazar la lista, y habría **dos** barras de
+desplazamiento, la de fuera y la de la lista.
+
+Pero el panel ya se desplaza por dentro: su raíz es un Grid de tres filas con la lista en
+la fila elástica. Lo que necesita es que le **recorten el alto**; de lo demás se encarga
+él. De ahí el `scrollPropio` de `AbrirPanel`, que solo mira el camino vertical: el
+horizontal lo ignora a propósito, para que el menú de siempre se comporte exactamente
+igual que antes de C1.
+
+### La tarjeta sale donde está el botón
+
+El menú salía centrado en la pantalla. Con una barra vertical y el botón «⊞» arriba
+—zona Izquierda es arriba— lo natural es que la tarjeta salga a su lado, como el lanzador
+de Plasma. Para eso hacía falta una referencia al botón, que se creaba en una lambda
+anónima del registro de widgets; ahora es `ModuloInicio()` y se guarda.
+
+Si el módulo «inicio» no está puesto en ninguna zona, la referencia se queda en null y la
+tarjeta se centra, que es la salida razonable. Y un botón arriba deja la tarjeta pegada
+al margen de arriba, no medio fuera: eso ya lo hacía el recorte de `SitioDeLaTarjeta`.
+
+### Lo que no se ha tocado
+
+- **El menú Inicio horizontal**, ni una línea de su comportamiento: mismas medidas
+  (`AnchoMenuEfectivo` devuelve 660 tal cual), mismo cajón, misma captura en la isla,
+  mismo envolver-en-scroll si no cabe.
+- **La búsqueda, las categorías, las fijadas y el menú contextual de aplicaciones** no
+  se enteran de la orientación: viven dentro del panel y el panel es el mismo objeto.
+  El menú contextual se coloca contra la raíz del panel, que en vertical es la tarjeta,
+  así que se recorta contra ella sin saberlo.
+- **El sistema de panel único**: la tarjeta sigue siendo *el* panel abierto. No hay dos.
+- Y sigue pendiente, a propósito, **rehacer el menú de 860 px para una columna**: hoy
+  sale como tarjeta ancha al lado, con su diseño horizontal de siempre.
