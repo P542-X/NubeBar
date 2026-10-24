@@ -1131,3 +1131,171 @@ De paso, el ancho deja de ser fijo (320 px para todo) y lo decide el título má
 largo, entre 180 y 460. Y el recorte quita el ratón de lo que ya no se ve, que
 también estaba mal: el hueco negro de los lados mantenía la lista abierta aunque
 te hubieras ido con el cursor al otro extremo de la pantalla.
+
+## Fase A · El reloj deja de ser un `case`
+
+El encargo era acercar NubeBar a KDE Plasma. La pieza que lo bloqueaba todo no era
+ninguna función que faltara, sino un `switch` de dieciséis casos en
+`MainWindow.xaml.cs` que decidía qué es un módulo. Mientras el reloj fuera un `case`
+y un widget de usuario fuera otra cosa, habría dos castas de widget y la de usuario
+sería siempre la pobre: no se puede escribir un modo edición que mueva "cosas que
+están en un switch".
+
+Así que esta fase no añade nada que se vea. Cambia por dónde entran los módulos.
+
+**Lo que se ha hecho.** Un contrato (`Widget.cs`), un registro (`RegistroWidgets.cs`)
+y los dieciocho módulos de casa registrados como adaptadores en
+`MainWindow.Widgets.cs`. Cada adaptador envuelve **la misma expresión** que tenía en
+el `switch`, sin tocarla: el reloj sigue siendo `Etiqueta(() =>
+DateTime.Now.ToString("HH:mm"), animar: true)`. Eso es lo que permite afirmar que no
+hay cambio de comportamiento.
+
+**Por qué el contrato expone tipos de WPF.** `IAnfitrionWidget` devuelve `Button` y
+`TextBlock` a secas. Envolverlos en una abstracción propia habría sido una capa de
+mentira: los widgets se dibujan con WPF y no hay un segundo backend al que mudarse.
+Lo que sí hace el contrato es que un widget **no vea a `MainWindow` entera**: pide
+colores, nivel de animación, un refresco por segundo y los cuatro ayudantes de
+construcción, y nada más.
+
+**Y por qué los de casa reciben `MainWindow` y no el anfitrión.** El carrusel habla
+con los grupos de ventanas y la bandeja con el servicio de iconos: eso no cabe en el
+contrato y no tiene sentido que quepa. `WidgetDeCasa` recibe la isla entera, y un
+widget de fuera no podrá. Esa diferencia se deja **marcada** en el código en vez de
+disimulada, porque es la que dice qué falta para que un widget de terceros pueda
+hacer lo que hace el carrusel.
+
+**Un widget roto ya no tumba la barra.** `CrearWidget` monta dentro de un `try`: si
+uno revienta, se apunta y se deja el hueco vacío. Antes no hacía falta porque los
+dieciséis módulos eran nuestros y un fallo ahí era un fallo que había que arreglar.
+Con código que no escribimos nosotros, que un widget malo deje al usuario sin barra
+de tareas no es una opción.
+
+**Los glifos de los descriptores están comprobados contra la fuente**, no elegidos a
+ojo. Los dieciocho (`U+E823` el reloj, `U+E787` la fecha, `U+E80F` el inicio… hasta
+`U+E76F` el separador) existen en `SegoeIcons.ttf` (Segoe Fluent Icons, 2033
+caracteres) **y también** en `segmdl2.ttf` (Segoe MDL2 Assets, 1833), que es el
+respaldo que ya declara `MainWindow.FuenteIconos`. Medido con
+`GlyphTypeface.CharacterToGlyphMap`, no supuesto.
+
+Como ninguno falla, **no se ha añadido código de respaldo**: haría falta el día que un
+widget de FUERA declare un glifo inventado, y el sitio de esa comprobación es quien lo
+dibuje —la biblioteca de la Fase B—, no el descriptor. Meter hoy un `GlifoSeguro()`
+que nadie llama sería la misma clase de código muerto que el `bool` sobrante de
+`RegistroAjustes`.
+
+Ojo: estos glifos **todavía no se pintan en ningún sitio**, son para la biblioteca. El
+único que sí se dibuja hoy es el `U+E890` del botón de iconos del escritorio, que es
+literalmente el que tenía el `switch`.
+
+## Fase A · Tres colores no son un tema
+
+Un tema eran `Fondo`, `Texto` y `Acento`. Con eso, cada trozo de la isla se apañaba:
+el centro de control mezclaba a ojo para sus filas, la vista general aclaraba el
+fondo por su cuenta y "atenuado" era un `Opacity = 0.6` escrito a mano en cada sitio.
+Un widget de fuera no puede hacer eso: necesita preguntar "¿de qué color pinto una
+fila?" y recibir una respuesta que valga en los seis temas de serie.
+
+`Roles.cs` define los roles y, lo importante, **deriva los que el tema no dé**: las
+superficies se sacan acercando el fondo al texto, y el texto atenuado acercando el
+texto al fondo. Por eso los seis temas que ya existían siguen pintando exactamente
+igual — no se les ha tocado ni un hex — y ganan roles gratis.
+
+`Secundario` y `Sistema`, si el tema calla, **son el propio acento** y no un naranja
+inventado: un tema que solo trae tres colores no debe estrenar colores que su autor
+no eligió. Los semánticos (positivo, aviso, negativo) sí tienen color propio aunque
+el tema calle, porque un "batería baja" tiene que seguir siendo rojo en Gruvbox.
+
+**La regla de las tintas.** Un color de relleno y un color de texto no son lo mismo.
+Cada acento tiene su pareja `…Tinta`, que es el mismo color pasado por
+`Contraste.Legible` contra el fondo de verdad. Esta idea ya estaba en el código
+(el `_cAcentoLegible` de `MainWindow`); aquí solo se ha generalizado.
+
+## Fase A · Las dos erratas de la paleta del documento
+
+La especificación da una paleta y pide, en el mismo documento, "contraste suficiente
+en temas claro y oscuro". Las dos cosas no se pueden cumplir a la vez tal cual:
+
+1. **"Texto principal `#172033`" sobre "fondo profundo `#101A2B`" da 1,1:1.** Es
+   invisible. El `#172033` es el texto de las superficies CLARAS (`#F4F7FA`), no el de
+   la isla, que es oscura. El tema `Nube` usa `#F4F7FA` como tinta, y el `#172033` se
+   queda para cuando haya superficies claras de verdad.
+2. **El coral `#E87562` sobre `#F4F7FA` da 2,7:1.** No sirve para texto. Sobre el
+   fondo profundo da 5,9:1 y ahí sí. Así que el coral se usa como **acento** —relleno,
+   filo, la rayita de la app activa— y cuando hace de texto sobre una superficie clara
+   pasa por `Roles.TintaSobre`, que lo profundiza hasta 4,5:1.
+
+Las dos quedan apuntadas aquí porque son correcciones **sobre el encargo**, no sobre
+el código, y conviene que se sepa que son deliberadas.
+
+## Fase A · `Paneles[]` se deriva, no se guarda
+
+El modelo nuevo es una lista de paneles, con los cuatro bordes y los cuatro modos de
+visibilidad de Plasma. Pero en esta fase **`Barra` y `Modulos` siguen siendo la
+verdad** y `Paneles[0]` se rellena a partir de ellos al cargar
+(`Config.SincronizarPaneles`).
+
+No se escribe en disco a propósito: es una vista, no un dato. Si se guardara, el
+config tendría la misma información en dos sitios y acabarían discrepando — y el
+primero que editara `config.json` a mano se encontraría con que cambiar `Barra.Alto`
+no hace nada porque manda `Paneles[0].Grosor`.
+
+Lo nuevo (el bucle que monta los widgets, y mañana el modo edición) lee de `Paneles`.
+Cuando existan paneles de verdad se le da la vuelta a la autoridad y es `Barra` la que
+se deriva, sin tener que tocar a quien lee.
+
+**Los laterales están en el modelo y no se dibujan todavía.** `Posicion` acepta
+`"izquierda"` y `"derecha"` porque el documento los pide, pero la isla los trata como
+`"arriba"`. Mejor eso que colocar la barra mal y en silencio.
+
+**Y los tres `StackPanel` del XAML siguen ahí.** De ellos cuelgan el ancho de la isla,
+la expansión y la entrada escalonada. Cambiarlos por un contenedor genérico en la
+misma tanda que el contrato de widget era meter dos refactores en uno. Lo que ya es
+colección es el RECORRIDO: quien rellena no sabe cuántas zonas hay ni cómo se llaman.
+
+## Fase A · El nivel de animación se aplica en dos sitios, no en treinta
+
+Hay unas treinta animaciones repartidas por el proyecto. Para que "completo,
+equilibrado y reducido" funcione no hace falta repasarlas: todas pasan por `Kf` (las
+de números) y por `Ms` (las de color), así que el tiempo se escala ahí.
+
+Funciona porque el código ya cumplía la regla de la casa: **el valor de verdad de
+cada propiedad se fija ANTES de animar, y la animación solo dibuja el camino**. Con
+el factor a cero no hay camino que dibujar y todo aparece ya en su sitio, sin saltos
+ni restos. Esa invariante, que estaba escrita para que un fallo no dejara la isla a
+medias, es la que hace que el modo reducido salga casi gratis.
+
+Los adornos puros —el icono que se levanta, el latido de una app que arranca, el
+destello del borde— no tienen estado que conservar, así que en "reducido" **ni se
+lanzan** (`Animacion.Adorno`), en vez de hacerlos instantáneos, que marearía igual.
+
+**`auto` viene de serie y pregunta a Windows** (`SystemParameters.ClientAreaAnimation`):
+quien ya ha pedido menos movimiento en Accesibilidad no tiene que volver a pedirlo
+aquí, que es lo que pide el documento sobre respetar la reducción de movimiento.
+
+**Lo que NO cubre.** Las animaciones de la plantilla del botón viven en el XAML
+(`MainWindow.xaml`): el fundido del hover y el encogido del 82 % al pulsar. No pasan
+por `Kf`, así que el nivel reducido no las apaga. El fundido es opacidad y no molesta;
+el encogido al pulsar sí es movimiento y queda pendiente.
+
+## Fase A · Cambiar de tema solo escribía cuatro claves
+
+Encontrado al meter los roles: `VentanaAjustes.AplicarTema` escribía `Fondo`, `Texto`,
+`Acento` y `Radio`, y nada más. Con roles eso tiene dos consecuencias malas: elegir
+`Nube` no traería su naranja ni su azul, y salir de `Nube` hacia Gruvbox **dejaría el
+naranja coral puesto para siempre**, sin que nadie entendiera de dónde sale.
+
+Arreglado con `ConfigArbol.PonerOQuitar`: un rol que el tema no trae se escribe
+**borrando la clave**, porque ausente significa "derívalo" y null no.
+
+De paso, la recarga de la página de colores usaba `_pestanas.Items[1]` —un número
+escrito a mano—. Ahora pregunta al registro por el id `"colores"`: con las páginas en
+un registro, el orden puede cambiar y ese `1` habría recargado la equivocada.
+
+## Fase A · La lista de módulos de Ajustes estaba escrita dos veces
+
+`VentanaAjustes` tenía su propia lista de dieciséis nombres a mano. Consecuencia real:
+`musica-caratula` y `musica-barras` funcionaban en la isla y estaban documentados en
+el README, pero no se podían elegir desde Ajustes porque se olvidaron en esa lista.
+
+Ahora sale de `RegistroWidgets.Ids`. Registrar un widget basta para que aparezca en
+los tres sitios: la isla, la lista de Ajustes y la biblioteca que vendrá.

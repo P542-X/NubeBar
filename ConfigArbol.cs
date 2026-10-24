@@ -115,6 +115,25 @@ public sealed class ConfigArbol
     public void Poner(string seccion, string clave, double valor) => Seccion(seccion)[clave] = valor;
     public void Poner(string seccion, string clave, bool valor) => Seccion(seccion)[clave] = valor;
 
+    // Borrar una clave, que no es lo mismo que ponerla a null.
+    //
+    // Hace falta para los roles de color: un tema que no trae Secundario quiere que se
+    // DERIVE, y eso se dice quitando la clave. Si al cambiar de Nube a Gruvbox se
+    // dejara el "Secundario": "#F29C65" puesto, Gruvbox se quedaría con el naranja de
+    // Nube para siempre y nadie entendería de dónde sale.
+    public void Quitar(string seccion, string clave)
+    {
+        try { Seccion(seccion).Remove(clave); }
+        catch (Exception ex) { Log.Error($"quitar {seccion}.{clave} del config", ex); }
+    }
+
+    // Pone el valor, o quita la clave si el valor viene a null.
+    public void PonerOQuitar(string seccion, string clave, string? valor)
+    {
+        if (valor == null) Quitar(seccion, clave);
+        else Poner(seccion, clave, valor);
+    }
+
     public void PonerLista(string seccion, string clave, IEnumerable<string> valores)
     {
         var a = new JsonArray();

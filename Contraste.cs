@@ -36,7 +36,9 @@ static class Contraste
         return (Math.Max(la, lb) + 0.05) / (Math.Min(la, lb) + 0.05);
     }
 
-    static Color Mezclar(Color a, Color b, double k) => Color.FromRgb(
+    // Pública porque Roles la usa para derivar las superficies y el texto atenuado
+    // a partir del fondo y del texto del tema.
+    public static Color Mezclar(Color a, Color b, double k) => Color.FromRgb(
         (byte)Math.Round(a.R + (b.R - a.R) * k),
         (byte)Math.Round(a.G + (b.G - a.G) * k),
         (byte)Math.Round(a.B + (b.B - a.B) * k));

@@ -20,17 +20,25 @@ public sealed class VentanaAjustes : Window
 {
     readonly ConfigArbol _arbol;
     readonly DispatcherTimer _escritura = new() { Interval = TimeSpan.FromMilliseconds(120) };
-    readonly List<string> _modulosDisponibles = new()
+    // La lista sale del registro de widgets, no escrita a mano: antes había que
+    // acordarse de añadir aquí cada módulo nuevo, y "musica-caratula" y
+    // "musica-barras" existían en la isla pero no se podían elegir desde aquí porque
+    // se olvidaron. Ahora registrar un widget basta para que salga en los tres sitios
+    // (la isla, esta lista y la biblioteca).
+    readonly List<string> _modulosDisponibles = ModulosDisponibles();
+
+    static List<string> ModulosDisponibles()
     {
-        "inicio", "apps", "fijadas", "reloj", "fecha", "cpu", "ram", "bateria", "musica",
-        "wallpaper", "wallpaper-titulo", "iconos", "bandeja", "control", "escritorios", "separador"
-    };
+        MainWindow.AsegurarWidgetsRegistrados();
+        return RegistroWidgets.Ids.ToList();
+    }
 
     SolidColorBrush _fondo = new(Color.FromRgb(0x16, 0x16, 0x1A));
     SolidColorBrush _texto = new(Colors.White);
     SolidColorBrush _acento = new(Color.FromRgb(0x7A, 0xA2, 0xF7));
 
     TabControl _pestanas = new();
+    readonly RegistroAjustes _modulos = new();
     Action? _revisarAtajo;        // comprobar el atajo guardado, cuando ya haya handle
     bool _guardado;
 
@@ -132,14 +140,30 @@ public sealed class VentanaAjustes : Window
         // Sin esto las pestañas salen con el estilo de Windows: blancas sobre blanco
         // y prácticamente ilegibles encima de un fondo oscuro
         _pestanas.ItemContainerStyle = EstiloPestana();
-        _pestanas.Items.Add(Pestana("Apariencia", SeccionApariencia()));
-        _pestanas.Items.Add(Pestana("Colores", SeccionColores()));
-        _pestanas.Items.Add(Pestana("Módulos", SeccionModulos()));
-        _pestanas.Items.Add(Pestana("Apps", SeccionApps()));
-        _pestanas.Items.Add(Pestana("Atajos", SeccionAtajos()));
-        _pestanas.Items.Add(Pestana("Inicio", SeccionInicio()));
-        _pestanas.Items.Add(Pestana("Wallpaper", SeccionWallpaper()));
-        _pestanas.Items.Add(Pestana("Sistema", SeccionSistema()));
+
+        // Las ocho secciones, por el registro. Siguen siendo los mismos métodos
+        // Seccion*(): lo que cambia es que ahora tienen id y palabras clave, que la
+        // ventana no sabe cuántas hay, y que recargar una no depende de acordarse de
+        // su número (ver AplicarTema, que antes usaba Items[1] a pelo).
+        _modulos.Registrar("apariencia", "Apariencia", "Aspecto", SeccionApariencia,
+                           "tema", "radio", "fuente", "tamaño", "opacidad", "animaciones", "movimiento");
+        _modulos.Registrar("colores", "Colores", "Aspecto", SeccionColores,
+                           "acento", "fondo", "texto", "paleta", "hsv", "wallpaper", "roles", "contraste");
+        _modulos.Registrar("modulos", "Módulos", "Panel", SeccionModulos,
+                           "widgets", "zonas", "izquierda", "centro", "derecha", "reloj", "bandeja");
+        _modulos.Registrar("apps", "Apps", "Panel", SeccionApps,
+                           "carrusel", "fijadas", "agrupar", "orden", "ventanas");
+        _modulos.Registrar("atajos", "Atajos", "Sistema", SeccionAtajos,
+                           "teclado", "combinación", "vista general", "teclas");
+        _modulos.Registrar("inicio", "Inicio", "Sistema", SeccionInicio,
+                           "menú", "buscador", "archivos", "web", "saludo", "tecla windows");
+        _modulos.Registrar("wallpaper", "Wallpaper", "Aspecto", SeccionWallpaper,
+                           "fondo", "wallpaper engine", "monitor", "paleta");
+        _modulos.Registrar("sistema", "Sistema", "Sistema", SeccionSistema,
+                           "arrancar", "windows", "notificaciones", "monitores", "diagnóstico");
+
+        foreach (var m in _modulos.Todos)
+            _pestanas.Items.Add(Pestana(m.Descriptor.Nombre, m.Construir()));
         Grid.SetRow(_pestanas, 1);
         rejilla.Children.Add(_pestanas);
 
@@ -329,6 +353,20 @@ public sealed class VentanaAjustes : Window
         c.Children.Add(Deslizador("Tamaño", 9, 22, _arbol.Numero("Tema", "TamanoFuente", 13),
                                   v => _arbol.Poner("Tema", "TamanoFuente", v)));
 
+        c.Children.Add(Rotulo("Movimiento", true));
+        // "auto" sigue a Windows (Accesibilidad > Efectos visuales > Efectos de
+        // animación): quien ya ha pedido menos movimiento en el sistema no tiene que
+        // volver a pedirlo aquí. Equilibrado no quita animaciones, las acorta.
+        c.Children.Add(Opciones("Animaciones", new[] { "auto", "completo", "equilibrado", "reducido" },
+                                _arbol.Texto("Animaciones", "Nivel", "auto"),
+                                v => _arbol.Poner("Animaciones", "Nivel", v)));
+        // La escena del robot todavía no existe (llega en la fase C). La opción se
+        // guarda ya para que quien la cambie no la pierda al actualizar, pero aquí no
+        // hay botón de vista previa: no habría nada que previsualizar.
+        c.Children.Add(Opciones("Escena de entrada", new[] { "primera-vez", "cada-inicio", "al-cambiar-tema", "nunca" },
+                                _arbol.Texto("Animaciones", "Robot", "primera-vez"),
+                                v => _arbol.Poner("Animaciones", "Robot", v)));
+
         c.Children.Add(Rotulo("Reacción al sonido", true));
         c.Children.Add(Interruptor("La isla respira con lo que suena",
                                    _arbol.Bandera("Barra", "PulsoAudio", true),
@@ -443,10 +481,34 @@ public sealed class VentanaAjustes : Window
         _arbol.Poner("Tema", "Texto", t.Texto);
         _arbol.Poner("Tema", "Acento", t.Acento);
         _arbol.Poner("Tema", "Radio", t.Radio);
+
+        // Y los roles de color. Van con PonerOQuitar porque un tema que NO trae un rol
+        // quiere que se derive, y eso se dice borrando la clave: si solo se escribieran
+        // los que vienen, pasar de Nube a Gruvbox dejaría el naranja y el azul nube de
+        // Nube puestos encima de Gruvbox para siempre.
+        _arbol.PonerOQuitar("Tema", "Superficie", t.Superficie);
+        _arbol.PonerOQuitar("Tema", "SuperficieAlta", t.SuperficieAlta);
+        _arbol.PonerOQuitar("Tema", "Borde", t.Borde);
+        _arbol.PonerOQuitar("Tema", "TextoAtenuado", t.TextoAtenuado);
+        _arbol.PonerOQuitar("Tema", "Secundario", t.Secundario);
+        _arbol.PonerOQuitar("Tema", "Sistema", t.Sistema);
+        _arbol.PonerOQuitar("Tema", "Positivo", t.Positivo);
+        _arbol.PonerOQuitar("Tema", "Aviso", t.Aviso);
+        _arbol.PonerOQuitar("Tema", "Negativo", t.Negativo);
+
         _arbol.Guardar();
-        // Los selectores se quedan con los valores viejos: se recarga la pestaña
+
+        // Los selectores se quedan con los valores viejos: se recarga la página de
+        // colores. Por id y no por Items[1]: con el registro, el orden de las páginas
+        // puede cambiar y un número escrito a mano recargaría la equivocada.
+        int donde = _modulos.Indice("colores");
+        if (donde < 0 || donde >= _pestanas.Items.Count)
+        {
+            Log.Info("no encuentro la página de colores para recargarla");
+            return;
+        }
         var i = _pestanas.SelectedIndex;
-        ((TabItem)_pestanas.Items[1]).Content = new ScrollViewer
+        ((TabItem)_pestanas.Items[donde]).Content = new ScrollViewer
         {
             Content = SeccionColores(),
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,

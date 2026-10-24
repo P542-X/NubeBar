@@ -31,6 +31,10 @@ public partial class MainWindow : Window
     readonly SolidColorBrush _acentoLegible = new(Colors.CornflowerBlue);
     Color _cTexto = Colors.White, _cAcento = Colors.CornflowerBlue, _cAcentoLegible = Colors.CornflowerBlue;
 
+    // Los colores del tema por rol, para que un widget pueda preguntar "¿de qué color
+    // pinto una fila?" sin mezclar a ojo. Se recalcula en AplicarTema.
+    Roles _roles = Roles.PorDefecto();
+
     readonly List<Action> _actualizadores = new();
     readonly DispatcherTimer _tick = new() { Interval = TimeSpan.FromSeconds(1) };
     readonly DispatcherTimer _recarga = new() { Interval = TimeSpan.FromMilliseconds(250) };
@@ -66,7 +70,9 @@ public partial class MainWindow : Window
     // plegaba casi entero en los primeros 80 ms y parecía un corte, no un cierre.
     // Comoda arranca despacio y acelera, que es como se dobla algo de verdad.
     static readonly IEasingFunction Comoda = new CubicEase { EasingMode = EasingMode.EaseInOut };
-    static Duration Ms(double ms) => new(TimeSpan.FromMilliseconds(ms));
+    // El otro embudo: las animaciones de COLOR piden una Duration, no keyframes. Se
+    // escala aquí por el mismo motivo que en Kf.
+    static Duration Ms(double ms) => new(TimeSpan.FromMilliseconds(Animacion.Escalar(ms)));
 
     bool EsIsla => _cfg.Barra.Modo.Equals("isla", StringComparison.OrdinalIgnoreCase);
     bool Arriba => !_cfg.Barra.Posicion.Equals("abajo", StringComparison.OrdinalIgnoreCase);
@@ -265,6 +271,10 @@ public partial class MainWindow : Window
         var b = _cfg.Barra;
         WallpaperEngine.RutaManual = _cfg.Wallpaper.Ruta;
 
+        // Antes de montar nada: el nivel de animación lo leen Kf y Ms, por los que
+        // pasa todo lo que se mueve, así que tiene que estar puesto ya.
+        Animacion.Elegir(_cfg.Animaciones.Nivel);
+
         Color fondo = Hex(t.Fondo, Colors.Black), texto = Hex(t.Texto, Colors.White), acento = Hex(t.Acento, Colors.CornflowerBlue);
         if (t.DesdeWallpaper && _paleta is { } p)
         {
@@ -313,6 +323,13 @@ public partial class MainWindow : Window
                      $"(origen: {(t.DesdeWallpaper && _paleta != null ? "wallpaper" : "config")})");
 
         _cTexto = texto; _cAcento = acento;
+
+        // Los roles se recalculan con los colores YA resueltos (con el wallpaper
+        // aplicado y el acento corregido), no con los del config en bruto: un widget
+        // que pregunte por Roles.Superficie tiene que recibir algo que pegue con lo
+        // que está pintado de verdad.
+        _roles = Roles.Desde(t, fondo, texto, acento);
+
         AnimarColor(_fondo, fondo);
         AnimarColor(_texto, texto);
         AnimarColor(_acento, acento);
@@ -336,9 +353,10 @@ public partial class MainWindow : Window
         _tira = null;
         _carrusel = null;
         PrepararFijas();                    // la tira de las fijadas, antes que el carrusel
-        Llenar(Izq, _cfg.Modulos.Izquierda);
-        Llenar(Cen, _cfg.Modulos.Centro);
-        Llenar(Der, _cfg.Modulos.Derecha);
+        // Antes eran tres llamadas con los tres campos del config. Ahora es un bucle
+        // sobre las zonas del panel, y cada widget se monta por el registro: ver
+        // MainWindow.Widgets.cs
+        LlenarZonas(PanelPrincipal);
 
         // Con "fijadas" puesto y "apps" quitado no hay carrusel que refresque los
         // grupos, pero las fijas siguen necesitando que alguien las pinte y les lleve
@@ -410,9 +428,24 @@ public partial class MainWindow : Window
     // solo dibuja el camino hasta él. Si una animación fallase, todo se vería igual, sin saltos.
 
     // Animación con espera inicial: se queda en "desde" durante "retardo" y luego va a "hasta"
+    //
+    // Por aquí pasan casi todas las animaciones de números de la isla, así que es el
+    // sitio donde se aplica el nivel de animación (ver Animacion.cs). Con el nivel en
+    // "reducido" el factor es 0 y se devuelve una animación de un solo fotograma en el
+    // valor final: nada se mueve, pero nadie se queda a medias.
     static DoubleAnimationUsingKeyFrames Kf(double desde, double hasta, double ms, double retardo = 0, IEasingFunction? curva = null)
     {
         var a = new DoubleAnimationUsingKeyFrames();
+
+        if (!Animacion.Hay)
+        {
+            a.KeyFrames.Add(new DiscreteDoubleKeyFrame(hasta, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+            return a;
+        }
+
+        ms = Animacion.Escalar(ms);
+        retardo = Animacion.Escalar(retardo);
+
         a.KeyFrames.Add(new DiscreteDoubleKeyFrame(desde, KeyTime.FromTimeSpan(TimeSpan.Zero)));
         if (retardo > 0) a.KeyFrames.Add(new DiscreteDoubleKeyFrame(desde, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(retardo))));
         a.KeyFrames.Add(new EasingDoubleKeyFrame(hasta, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(retardo + ms)), curva));
@@ -872,44 +905,14 @@ public partial class MainWindow : Window
     }
 
     // ================= Módulos =================
-    void Llenar(Panel panel, List<string> modulos)
-    {
-        panel.Children.Clear();
-        foreach (var m in modulos) panel.Children.Add(CrearModulo(m));
-    }
-
-    UIElement CrearModulo(string nombre) => nombre.ToLowerInvariant() switch
-    {
-        "inicio"           => Boton(Texto("⊞", 16), "Inicio", AbrirMenuInicio),
-        "apps"             => ModuloApps(),
-        "fijadas"          => ModuloFijas(),
-        "reloj"            => Etiqueta(() => DateTime.Now.ToString("HH:mm"), animar: true),
-        "fecha"            => Etiqueta(() => DateTime.Now.ToString("ddd d MMM"), animar: true),
-        // "muestra" reserva el ancho del valor más largo para que la isla no respire
-        // al pasar de "CPU 8%" a "CPU 11%" cada segundo
-        "cpu"              => Etiqueta(() => $"CPU {Nativo.Cpu()}%", muestra: "CPU 100%"),
-        "ram"              => Etiqueta(() => $"RAM {Nativo.Ram()}%", muestra: "RAM 100%"),
-        "bateria"          => Etiqueta(Nativo.Bateria, muestra: "BAT 100%"),
-        "musica"           => new StackPanel
-                              {
-                                  Orientation = Orientation.Horizontal,
-                                  Children = { ModuloCaratula(), ModuloBarras() }
-                              },
-        "musica-caratula"  => ModuloCaratula(),
-        "musica-barras"    => ModuloBarras(),
-        "wallpaper"        => ModuloWallpaper(),
-        "wallpaper-titulo" => Etiqueta(() => _wpTitulo ?? "", animar: true),
-        "bandeja"          => ModuloBandeja(),
-        "control"          => ModuloControl(),
-        "escritorios"      => ModuloEscritorios(),
-        "iconos"           => Boton(Glifo("\uE890"), "Mostrar / ocultar iconos del escritorio", () =>
-                              {
-                                  _iconosOcultos = !_iconosOcultos;
-                                  WallpaperEngine.Enviar(_iconosOcultos ? "hideIcons" : "showIcons");
-                              }),
-        "separador"        => new Border { Width = 1, Height = 16, Margin = new Thickness(6, 0, 6, 0), Background = _texto, Opacity = 0.3 },
-        _                  => ModuloDesconocido(nombre)
-    };
+    // El switch de dieciséis casos que había aquí se ha mudado a
+    // MainWindow.Widgets.cs, donde cada caso es ahora el cuerpo de un widget
+    // registrado. Las expresiones son las mismas, una a una; lo que cambia es que el
+    // reloj de casa y un widget de fuera se montan por la misma puerta (CrearWidget),
+    // y que un widget que reviente ya no se lleva la isla por delante.
+    //
+    // "muestra", en las etiquetas, reserva el ancho del valor más largo para que la
+    // isla no respire al pasar de "CPU 8%" a "CPU 11%" cada segundo.
 
     // Un nombre de módulo que esta versión no conoce. Pasa de verdad: el config se
     // migra solo y le añade módulos nuevos, así que un exe viejo se encuentra con

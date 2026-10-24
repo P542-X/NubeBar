@@ -16,6 +16,22 @@ public class Tema
     public bool DesdeWallpaper { get; set; } = false;          // colores sacados del wallpaper actual (tipo pywal)
     public bool EnviarColorAlWallpaper { get; set; } = false;  // manda tu Acento como "schemecolor" al wallpaper
     public bool BordeAcento { get; set; } = true;              // filo de 1 px y brillo suave del color de acento
+
+    // ---------- Roles de color (todos opcionales) ----------
+    // Un tema puede seguir siendo tres colores: lo que no se ponga aquí, Roles lo
+    // deriva del fondo y del texto. Así los seis temas de serie y los que ya tenga
+    // guardados el usuario pintan exactamente igual que antes de existir esto.
+    // Se ponen cuando el tema quiere mandar, como hace "Nube" con su naranja y su
+    // azul, que no se pueden sacar del fondo ni del acento.
+    public string? Superficie { get; set; }       // tarjetas y filas dentro de un panel
+    public string? SuperficieAlta { get; set; }   // lo que está bajo el ratón o elegido
+    public string? Borde { get; set; }            // separadores y filos
+    public string? TextoAtenuado { get; set; }    // segundo renglón, unidades, pistas
+    public string? Secundario { get; set; }       // detalles cálidos
+    public string? Sistema { get; set; }          // red, volumen, batería
+    public string? Positivo { get; set; }
+    public string? Aviso { get; set; }
+    public string? Negativo { get; set; }
 }
 
 public class OpcionesWallpaper
@@ -70,6 +86,68 @@ public class Modulos
     public bool AppsAlCentro { get; set; } = true;
 }
 
+// Nivel de animación y la escena de entrada.
+public class Animaciones
+{
+    // "auto" sigue a Windows (Accesibilidad > Efectos visuales > Efectos de
+    // animación): quien ha pedido menos movimiento en el sistema no tiene que
+    // volver a pedirlo aquí. "completo", "equilibrado" y "reducido" mandan sobre él.
+    public string Nivel { get; set; } = "auto";
+
+    // Cuándo se ve la escena del robot que pinta la pantalla.
+    // "primera-vez" | "cada-inicio" | "al-cambiar-tema" | "nunca"
+    public string Robot { get; set; } = "primera-vez";
+    public bool RobotVisto { get; set; } = false;        // lo escribe la propia escena al terminar
+    public bool RobotAlCambiarTema { get; set; } = true; // además, la primera vez que cambias de tema
+}
+
+// Un panel de la nube. De momento hay uno solo —el que describe la sección Barra—,
+// pero el modelo ya es una lista para que añadir un segundo panel, o uno lateral, no
+// obligue a tocar el config de nadie.
+//
+// En esta fase Barra y Modulos siguen siendo la VERDAD y Paneles se deriva de ellos
+// al cargar (ver SincronizarPaneles). Lo nuevo lee de aquí; cuando existan paneles de
+// verdad se le da la vuelta a la autoridad y Barra pasa a derivarse de Paneles[0].
+public class PanelNube
+{
+    public string Id { get; set; } = "principal";
+    public bool Activo { get; set; } = true;
+    public string Modo { get; set; } = "isla";          // "isla" (flotante) | "barra" (de lado a lado)
+
+    // "arriba" | "abajo" | "izquierda" | "derecha". Los dos laterales están en el
+    // modelo porque el documento los pide, pero todavía no se dibujan: MainWindow
+    // los trata como "arriba" y lo apunta en el log en vez de colocar mal la isla.
+    public string Posicion { get; set; } = "arriba";
+
+    public double Grosor { get; set; } = 38;            // alto si es horizontal, ancho si es vertical
+    public double Margen { get; set; } = 8;
+
+    // Los cuatro modos de Plasma. Hoy solo "siempre" y "autoocultar" (que es lo que
+    // hace la isla al recogerse); los otros dos quedan declarados.
+    public string Visibilidad { get; set; } = "siempre";  // "siempre" | "autoocultar" | "ventanas-encima" | "por-debajo"
+
+    public bool ReservarEspacio { get; set; } = true;
+    public string Monitores { get; set; } = "todos";      // "todos" | "principal"
+    public ZonasPanel Zonas { get; set; } = new();
+}
+
+// Las zonas de un panel, como colección y no como tres campos sueltos: así el bucle
+// que lo rellena no sabe cuántas hay ni cómo se llaman.
+public class ZonasPanel
+{
+    public List<string> Izquierda { get; set; } = new();
+    public List<string> Centro { get; set; } = new();
+    public List<string> Derecha { get; set; } = new();
+
+    // En el orden en que se pintan, con su nombre. Lo usa MainWindow.Llenar.
+    public IEnumerable<(string Nombre, List<string> Widgets)> Todas()
+    {
+        yield return ("Izquierda", Izquierda);
+        yield return ("Centro", Centro);
+        yield return ("Derecha", Derecha);
+    }
+}
+
 public class Inicio
 {
     public List<string> Fijadas { get; set; } = new();              // apps ancladas en el menú
@@ -86,6 +164,8 @@ public class Config
     public Modulos Modulos { get; set; } = new();
     public OpcionesWallpaper Wallpaper { get; set; } = new();
     public Inicio Inicio { get; set; } = new();
+    public Animaciones Animaciones { get; set; } = new();
+    public List<PanelNube> Paneles { get; set; } = new();
 
     public static string Carpeta =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NubeBar");
@@ -107,7 +187,12 @@ public class Config
             if (!File.Exists(Ruta))
             {
                 Directory.CreateDirectory(Carpeta);
-                File.WriteAllText(Ruta, JsonSerializer.Serialize(new Config(), Opc));
+                // Instalación nueva: entra con el tema Nube puesto. A quien ya tiene
+                // config.json no se le toca el tema, que es suyo.
+                var recien = new Config();
+                Temas.Aplicar(Temas.Nube, recien.Tema);
+                File.WriteAllText(Ruta, JsonSerializer.Serialize(recien, Opc));
+                Log.Info("config nuevo creado con el tema Nube");
             }
             var c = JsonSerializer.Deserialize<Config>(File.ReadAllText(Ruta), Opc);
             if (c == null) return null;
@@ -128,7 +213,10 @@ public class Config
             c.Modulos.Centro ??= new();
             c.Modulos.Derecha ??= new();
             c.Inicio.Fijadas ??= new();
+            c.Animaciones ??= new();
+            c.Paneles ??= new();
             ModulosDeSerie(c);
+            SincronizarPaneles(c);
             return c;
         }
         catch (Exception ex)
@@ -139,6 +227,41 @@ public class Config
             return null;
         }
 
+    }
+
+    // Paneles[0] se rellena con lo que digan Barra y Modulos, que en esta fase siguen
+    // siendo la verdad. Lo nuevo (el bucle que monta los widgets, y mañana el modo
+    // edición) lee de Paneles y no de los tres campos sueltos, así que cuando se le dé
+    // la vuelta a la autoridad no hay que volver a tocar a quien lee.
+    //
+    // No se escribe en disco: es una vista, no un dato. Si se guardara, el config
+    // tendría la misma información en dos sitios y acabarían discrepando.
+    static void SincronizarPaneles(Config c)
+    {
+        try
+        {
+            var p = c.Paneles.FirstOrDefault(x => x.Id == "principal");
+            if (p == null)
+            {
+                p = new PanelNube { Id = "principal" };
+                c.Paneles.Insert(0, p);
+            }
+
+            p.Activo = true;
+            p.Modo = c.Barra.Modo;
+            p.Posicion = c.Barra.Posicion;
+            p.Grosor = c.Barra.Alto;
+            p.Margen = c.Barra.Margen;
+            p.ReservarEspacio = c.Barra.ReservarEspacio;
+            p.Monitores = c.Barra.Monitores;
+            p.Zonas = new ZonasPanel
+            {
+                Izquierda = c.Modulos.Izquierda,
+                Centro = c.Modulos.Centro,
+                Derecha = c.Modulos.Derecha
+            };
+        }
+        catch (Exception ex) { Log.Error("sincronizar Paneles con Barra", ex); }
     }
 
     // Los módulos "control" (red, volumen, idioma, batería) y "bandeja" (las apps en

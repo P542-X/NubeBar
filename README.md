@@ -217,6 +217,42 @@ la isla se adapta sola. Las claves que no reconoce se conservan tal cual.
 | `Tema.EnviarColorAlWallpaper` | `false` | Manda tu acento a Wallpaper Engine como `schemecolor` |
 | `Tema.BordeAcento` | `true` | Filo de 1 px y halo suave del color de acento |
 
+En una instalación nueva el tema que entra es **Nube** (coral, naranja y azul nube
+sobre azul profundo). Si ya tienes `config.json`, tu tema no se toca.
+
+#### Roles de color
+
+Todos opcionales: lo que no pongas se **deriva** del fondo y del texto, así que un
+tema puede seguir siendo tres colores y nada cambia. Se ponen cuando el tema quiere
+mandar, como hace Nube con su naranja y su azul, que no se pueden sacar del acento.
+
+| Clave | Qué hace |
+|---|---|
+| `Tema.Superficie` | Tarjetas y filas dentro de un panel |
+| `Tema.SuperficieAlta` | Lo que está bajo el ratón o elegido |
+| `Tema.Borde` | Separadores y filos |
+| `Tema.TextoAtenuado` | Segundo renglón, unidades, pistas |
+| `Tema.Secundario` | Detalles cálidos; si falta, el propio acento |
+| `Tema.Sistema` | Red, volumen, batería; si falta, el propio acento |
+| `Tema.Positivo` | Verde de "todo bien" |
+| `Tema.Aviso` | Ámbar de "ojo" |
+| `Tema.Negativo` | Rojo de "esto va mal" |
+
+Cada acento tiene además su versión para **texto**, que no se configura: es el mismo
+color corregido para que se lea sobre el fondo de verdad (WCAG, 3,5:1 sobre la isla y
+4,5:1 sobre una superficie clara). Por eso un coral que vale de relleno se profundiza
+solo cuando hace de letra.
+
+### Animaciones
+
+| Clave | Por defecto | Qué hace |
+|---|---|---|
+| `Animaciones.Nivel` | `"auto"` | `"auto"` (sigue a Windows), `"completo"`, `"equilibrado"` (las acorta un 40 %) o `"reducido"` (sin movimiento) |
+| `Animaciones.Robot` | `"primera-vez"` | Cuándo se ve la escena de entrada: `"primera-vez"`, `"cada-inicio"`, `"al-cambiar-tema"` o `"nunca"`. La escena todavía no está implementada |
+
+Con `"auto"` se lee **Accesibilidad → Efectos visuales → Efectos de animación** de
+Windows: quien ya ha pedido menos movimiento ahí no tiene que volver a pedirlo aquí.
+
 ### Barra
 
 | Clave | Por defecto | Qué hace |
@@ -257,8 +293,17 @@ Listas de nombres; el orden es el orden en que salen.
 ```
 
 Disponibles: `inicio`, `apps`, `fijadas`, `reloj`, `fecha`, `cpu`, `ram`, `bateria`,
-`musica`, `bandeja`, `control`, `escritorios`, `wallpaper`, `wallpaper-titulo`,
-`iconos`, `separador`.
+`musica`, `musica-caratula`, `musica-barras`, `bandeja`, `control`, `escritorios`,
+`wallpaper`, `wallpaper-titulo`, `iconos`, `separador`.
+
+La lista sale del registro de widgets, así que es la misma en el config, en
+**Ajustes → Módulos** y en el log. `musica-caratula` y `musica-barras` son la carátula
+y las barras por separado, para quien no quiera las dos juntas.
+
+Hay además una clave `Paneles` reservada. **No se lee del fichero todavía**: se
+rellena sola a partir de `Barra` y `Modulos` cada vez que se carga la configuración, y
+existe para que añadir un segundo panel, o uno lateral, no obligue a cambiar el
+`config.json` de nadie. Editarla a mano no hace nada.
 
 La zona del **centro se ve siempre**, con la isla recogida o desplegada; la
 izquierda y la derecha solo al desplegarse. Por eso ahí viven las apps: `fijadas`
