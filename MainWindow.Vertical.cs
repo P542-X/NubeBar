@@ -199,28 +199,32 @@ public partial class MainWindow : Window
         Isla.Height = double.NaN;
     }
 
-    // ---------- Los paneles, flotando al lado ----------
+
+    // ---------- Los paneles, en una ventana superpuesta al lado ----------
     //
     // En horizontal el panel es el "cajón": la isla crece de alto y el panel se
-    // despliega desde dentro, como una sola superficie. En vertical eso no se puede:
-    // la barra ya va de arriba abajo y no tiene hacia dónde crecer. Así que el panel
-    // sale como una TARJETA aparte, pegada al lado de la barra, que es exactamente lo
-    // que hace Plasma — y encima es más sencillo que el recorte de la horizontal.
+    // despliega desde dentro, como una sola superficie. En vertical eso no se puede: la
+    // barra ya va de arriba abajo y no tiene hacia dónde crecer. Sale al lado.
     //
-    // La tarjeta vive dentro de la MISMA ventana (que se ensancha para dejarle sitio):
-    // una ventana nueva tendría que resolver otra vez el no robar foco, el orden Z, el
-    // DPI y el guardián, y ya está todo resuelto aquí.
-    // `scrollPropio` lo pasan los paneles que ya se desplazan por dentro —el menú
-    // Inicio tiene su propio ScrollViewer para la lista de resultados—. A esos no hay
-    // que envolverlos en otro scroll: se les recorta el alto y su fila elástica se
-    // encarga. Envolverlos sería lo peor de los dos mundos: la caja de búsqueda se iría
-    // hacia arriba al desplazar la lista, y habría dos barras de desplazamiento.
+    // Y sale en SU PROPIA VENTANA, no en un trozo de la ventana de la barra. El por qué
+    // —con los dos fallos que lo obligaron— está escrito en VentanaSuperpuesta.cs.
+    //
+    // `scrollPropio` lo pasan los paneles que ya se desplazan por dentro: el menú Inicio
+    // tiene su propio ScrollViewer para la lista. A esos se les recorta el alto y su
+    // fila elástica se encarga; envolverlos en otro scroll sería lo peor de los dos
+    // mundos (la caja de búsqueda subiéndose al desplazar, y dos barras).
+    VentanaSuperpuesta? _superpuesta;
+
+    public bool PanelSuperpuestoAbierto => _superpuesta is { IsVisible: true };
+
+    VentanaSuperpuesta Superpuesta() => _superpuesta ??= new VentanaSuperpuesta(this);
+
     void AbrirPanelFlotante(string nombre, FrameworkElement contenido, double ancho, double alto,
                             bool teclado, FrameworkElement? ancla, bool scrollPropio = false)
     {
-        // Lo primero, que quepa: la tarjeta vive dentro de la ventana, y una tarjeta más
-        // ancha que el hueco que le queda al lado de la barra no se recorta — se queda
-        // directamente fuera de la ventana y no se ve.
+        var v = Superpuesta();
+
+        // ---- 1. Lo que cabe, en unidades de WPF ----
         double anchoPantalla = _monitor.Ancho / _monitor.Escala;
         double altoPantalla = _monitor.Alto / _monitor.Escala;
         double topeAncho = AnchoMaximoDeTarjeta(anchoPantalla, Grosor, _cfg.Barra.Margen, SeparacionPanel);
@@ -238,12 +242,11 @@ public partial class MainWindow : Window
         _anclaFlotante = ancla;
         _panelScrollPropio = scrollPropio;
 
+        // ---- 2. Vestir y medir ----
         VestirPanelFlotante();
-        CajonFlotante.Content = contenido;
-        PanelFlotante.Visibility = Visibility.Visible;
+        v.Cajon.Content = contenido;
 
-        // Medir de verdad: el alto que pide quien abre el panel es una estimación.
-        double bordes = PanelFlotante.BorderThickness.Top + PanelFlotante.BorderThickness.Bottom;
+        double bordes = v.Tarjeta.BorderThickness.Top + v.Tarjeta.BorderThickness.Bottom;
         try
         {
             contenido.Measure(new Size(ancho, double.PositiveInfinity));
@@ -252,44 +255,47 @@ public partial class MainWindow : Window
             if (pide > topeAlto)
             {
                 if (scrollPropio)
-                {
                     Log.Info($"panel {nombre} (vertical): pedía {pide:0} de alto y caben {topeAlto:0}; " +
                              "se recorta y se desplaza con su propio scroll");
-                }
                 else
                 {
                     Log.Info($"panel {nombre} (vertical): necesita {pide:0} y caben {topeAlto:0}; se desplaza por dentro");
-                    CajonFlotante.Content = null;
-                    CajonFlotante.Content = EnvolverConScroll(contenido, topeAlto - bordes);
-                    contenido = (FrameworkElement)CajonFlotante.Content;
+                    v.Cajon.Content = null;
+                    v.Cajon.Content = EnvolverConScroll(contenido, topeAlto - bordes);
+                    contenido = (FrameworkElement)v.Cajon.Content;
                 }
                 pide = topeAlto;
             }
             if (pide > alto) alto = pide;
             if (alto > topeAlto) alto = topeAlto;
         }
-        catch (Exception ex) { Log.Error("medir el panel flotante", ex); }
+        catch (Exception ex) { Log.Error("medir el panel superpuesto", ex); }
 
         _panelAlto = alto;
-        PanelFlotante.Width = ancho;
-        PanelFlotante.Height = alto;
 
-        // La ventana primero, que es la que tiene que dar sitio a la tarjeta
-        ColocarEnMonitorVertical(GrosorVentanaAhora());
+        // ---- 3. Colocar en coordenadas de PANTALLA y elevar ----
+        // Se muestra antes de colocarla para que tenga hwnd; nace fuera de la vista
+        // (-32000) a propósito, así no se ve el salto.
+        if (!v.IsVisible) v.Show();
         ColocarPanelFlotante(ancla);
-        if (teclado) ActivarTeclado(true);
+        v.Elevar();
+        if (teclado) { _panelConTeclado = true; v.Teclado(true); }
 
-        // Entra deslizándose desde la barra, en la dirección en la que se abre
-        double desde = PegadaIzquierda ? -18 : 18;
-        var mover = new TranslateTransform { X = desde };
-        PanelFlotante.RenderTransform = mover;
-        PanelFlotante.Opacity = 1;
-        CajonFlotante.Opacity = 1;
-        mover.BeginAnimation(TranslateTransform.XProperty, Kf(desde, 0, 300, 0, Muelle));
-        mover.X = 0;
-        PanelFlotante.BeginAnimation(OpacityProperty, Kf(0, 1, 180));
+        // La barra ya no cambia de tamaño al abrir un panel, porque la tarjeta no vive
+        // dentro de su ventana. Se recoloca con su propio grosor por si venía de una
+        // vez en la que sí se ensanchó.
+        ColocarEnMonitorVertical(Grosor + _cfg.Barra.Margen * 2);
 
-        Log.Info($"panel abierto al lado: {nombre} ({ancho:0}x{alto:0}, teclado={teclado})");
+        // ---- 4. Entrar ----
+        // Solo fundido: con una ventana del tamaño exacto de la tarjeta, un
+        // desplazamiento la recortaría contra su propio filo.
+        v.Tarjeta.BeginAnimation(OpacityProperty, null);
+        v.Tarjeta.Opacity = 1;
+        v.Tarjeta.BeginAnimation(OpacityProperty, Kf(0, 1, 180));
+
+        var r = v.Rectangulo();
+        Log.Info($"panel abierto al lado: {nombre} ({ancho:0}x{alto:0}, teclado={teclado}) " +
+                 $"en ({r.Izq},{r.Arr})-({r.Der},{r.Aba})");
     }
 
     void CerrarPanelFlotante()
@@ -298,27 +304,23 @@ public partial class MainWindow : Window
         var nombre = _panelAbierto;
         _panelAbierto = null;
         _panelAlto = _panelAncho = 0;
-        if (_panelConTeclado) ActivarTeclado(false);
-
         _anclaFlotante = null;
-        if (CajonFlotante.Content is FrameworkElement viejo) viejo.IsHitTestVisible = false;
 
-        double hasta = PegadaIzquierda ? -14 : 14;
-        if (PanelFlotante.RenderTransform is TranslateTransform t)
-        {
-            t.BeginAnimation(TranslateTransform.XProperty, Kf(t.X, hasta, 220, 0, Comoda));
-            t.X = hasta;
-        }
-        var fundido = Kf(PanelFlotante.Opacity, 0, 200, 0, Comoda);
+        if (_panelConTeclado) { _panelConTeclado = false; _superpuesta?.Teclado(false); }
+
+        if (_superpuesta is not { } v) return;
+        if (v.Cajon.Content is FrameworkElement viejo) viejo.IsHitTestVisible = false;
+
+        var fundido = Kf(v.Tarjeta.Opacity, 0, 200, 0, Comoda);
         fundido.Completed += (_, _) =>
         {
             if (_panelAbierto != null) return;      // se abrió otro por el camino
-            PanelFlotante.Visibility = Visibility.Collapsed;
-            CajonFlotante.Content = null;
-            if (Vertical) ColocarEnMonitorVertical(GrosorVentanaAhora());
+            // Esconder la ventana es lo que devuelve el orden Z: deja de estar en la
+            // pila, y el de la barra no se ha tocado en ningún momento.
+            QuitarPanelFlotante();
         };
-        PanelFlotante.Opacity = 0;
-        PanelFlotante.BeginAnimation(OpacityProperty, fundido);
+        v.Tarjeta.Opacity = 0;
+        v.Tarjeta.BeginAnimation(OpacityProperty, fundido);
 
         Log.Info($"panel cerrado al lado: {nombre}");
     }
@@ -328,10 +330,11 @@ public partial class MainWindow : Window
     // crece o encoge a lo que ahora necesita, sin moverse de sitio.
     void ReajustarPanelFlotante(string nombre)
     {
-        if (_panelAbierto != nombre || CajonFlotante.Content is not FrameworkElement contenido) return;
+        if (_panelAbierto != nombre || _superpuesta is not { } v) return;
+        if (v.Cajon.Content is not FrameworkElement contenido) return;
         try
         {
-            double bordes = PanelFlotante.BorderThickness.Top + PanelFlotante.BorderThickness.Bottom;
+            double bordes = v.Tarjeta.BorderThickness.Top + v.Tarjeta.BorderThickness.Bottom;
             double tope = AltoMaximoDeTarjeta(_monitor.Alto / _monitor.Escala, _cfg.Barra.Margen);
             contenido.Measure(new Size(_panelAncho, double.PositiveInfinity));
             double alto = contenido.DesiredSize.Height + bordes;
@@ -343,77 +346,101 @@ public partial class MainWindow : Window
                 else
                 {
                     Log.Info($"panel {nombre} (vertical): ha crecido hasta {alto:0} y caben {tope:0}; se desplaza por dentro");
-                    CajonFlotante.Content = null;
-                    CajonFlotante.Content = EnvolverConScroll(contenido, tope - bordes);
+                    v.Cajon.Content = null;
+                    v.Cajon.Content = EnvolverConScroll(contenido, tope - bordes);
                 }
                 alto = tope;
             }
             if (Math.Abs(alto - _panelAlto) < 1) return;
 
-            double antes = _panelAlto;
             _panelAlto = alto;
-            PanelFlotante.BeginAnimation(HeightProperty, null);
-            PanelFlotante.Height = alto;
-            PanelFlotante.BeginAnimation(HeightProperty, Kf(antes, alto, 220, 0, Suave));
             ColocarPanelFlotante(_anclaFlotante);
         }
-        catch (Exception ex) { Log.Error("reajustar el panel flotante", ex); }
+        catch (Exception ex) { Log.Error("reajustar el panel superpuesto", ex); }
     }
 
     FrameworkElement? _anclaFlotante;
     bool _panelScrollPropio;
 
-    // La tarjeta se pega al lado de la barra y se alinea con el widget que la ha
-    // abierto, sin salirse nunca de la pantalla. Si no hay widget (el menú Inicio con
-    // la tecla Windows, por ejemplo), se centra.
+    // ---------- El rectángulo, en coordenadas de pantalla ----------
+    //
+    // Esta es la diferencia de fondo con lo que había: ya no se pone un Margin dentro de
+    // otra ventana confiando en que la ventana sea bastante grande. Se calcula el
+    // rectángulo final en PÍXELES DE PANTALLA, se recorta contra el área útil del
+    // monitor y se coloca la ventana ahí. Así no hay ningún contenedor que pueda
+    // cortarlo, y no depende del tamaño de la ventana de la barra.
     void ColocarPanelFlotante(FrameworkElement? ancla)
     {
-        double altoPantalla = _monitor.Alto / _monitor.Escala;
+        if (_superpuesta is not { } v) return;
 
+        var m = _monitor;
+        double escala = m.Escala;
+        double altoPantalla = m.Alto / escala;
+
+        // El centro del widget que lo ha abierto, en unidades de pantalla
         double? centro = null;
         try
         {
             if (ancla is { IsVisible: true } a && a.ActualHeight > 0)
-                centro = a.TransformToAncestor(Raiz).Transform(new Point(0, 0)).Y + a.ActualHeight / 2;
+            {
+                var p = a.PointToScreen(new Point(0, a.ActualHeight / 2));
+                centro = (p.Y - m.Y) / escala;
+            }
         }
         catch { }
 
         var (desplazado, y) = SitioDeLaTarjeta(_cfg.Barra.Margen, Grosor, SeparacionPanel,
                                                altoPantalla, _panelAlto, centro);
 
-        // La ventana crece hacia DENTRO de la pantalla: con la barra a la izquierda la
-        // tarjeta va después de la franja; con la barra a la derecha, la ventana se ha
-        // ensanchado hacia la izquierda y la tarjeta ocupa ese trozo nuevo. Por eso se
-        // ancla a SU lado y lo que se desplaza es su propio margen.
-        PanelFlotante.HorizontalAlignment = PegadaIzquierda ? HorizontalAlignment.Left : HorizontalAlignment.Right;
-        PanelFlotante.VerticalAlignment = VerticalAlignment.Top;
-        PanelFlotante.Margin = PegadaIzquierda
-            ? new Thickness(desplazado, y, 0, 0)
-            : new Thickness(0, y, desplazado, 0);
+        // A la derecha de la barra si está a la izquierda, y a su izquierda si está a la
+        // derecha: el panel sale siempre hacia DENTRO de la pantalla.
+        int anchoPx = Math.Max(1, (int)Math.Round(_panelAncho * escala));
+        int altoPx = Math.Max(1, (int)Math.Round(_panelAlto * escala));
+        int despPx = (int)Math.Round(desplazado * escala);
+        int x = PegadaIzquierda ? m.X + despPx : m.Derecha - despPx - anchoPx;
+        int yPx = m.Y + (int)Math.Round(y * escala);
+
+        // Y recortado al área útil, que es lo que impide que asome por un filo. Si
+        // viniera degenerada (pasa mientras el shell recalcula el área de trabajo),
+        // manda el monitor entero antes que colocar la ventana en cualquier sitio.
+        int utilX = m.TrabajoAncho > 0 ? m.TrabajoX : m.X;
+        int utilY = m.TrabajoAlto > 0 ? m.TrabajoY : m.Y;
+        int utilDer = m.TrabajoAncho > 0 ? m.TrabajoX + m.TrabajoAncho : m.Derecha;
+        int utilAba = m.TrabajoAlto > 0 ? m.TrabajoY + m.TrabajoAlto : m.Abajo;
+        // El área útil puede excluir nuestra propia franja reservada, y el panel tiene
+        // derecho a ocuparla: para el recorte se cuenta el monitor por el lado de la
+        // barra y el área útil por los otros tres.
+        if (PegadaIzquierda) utilX = Math.Min(utilX, m.X); else utilDer = Math.Max(utilDer, m.Derecha);
+
+        x = Math.Clamp(x, utilX, Math.Max(utilX, utilDer - anchoPx));
+        yPx = Math.Clamp(yPx, utilY, Math.Max(utilY, utilAba - altoPx));
+
+        v.Colocar(x, yPx, anchoPx, altoPx);
     }
 
     // La tarjeta se viste como la isla: mismo fondo, mismo filo de acento, mismas
-    // esquinas. Se hace aquí y no en AplicarTema porque los pinceles son fijos y
-    // animados (ver AnimarColor): basta asignarlos una vez y ya cambian de color solos.
+    // esquinas. Los pinceles son fijos y animados (ver AnimarColor), así que basta
+    // asignarlos y ya cambian de color solos al cambiar de tema.
     void VestirPanelFlotante()
     {
-        PanelFlotante.Background = _fondo;
-        PanelFlotante.BorderBrush = _acento;
-        PanelFlotante.BorderThickness = Isla.BorderThickness;
-        PanelFlotante.CornerRadius = Isla.CornerRadius;
-        PanelFlotante.Padding = new Thickness(0);
+        if (_superpuesta is not { } v) return;
+        v.Tarjeta.Background = _fondo;
+        v.Tarjeta.BorderBrush = _acento;
+        v.Tarjeta.BorderThickness = Isla.BorderThickness;
+        v.Tarjeta.CornerRadius = Isla.CornerRadius;
+        v.Tarjeta.Padding = new Thickness(0);
     }
 
-    // Al recargar el config o al cambiar de orientación, la tarjeta se va sin
-    // animación: sus medidas ya no valen.
+    // Al recargar el config, al cambiar de orientación o al terminar de cerrarse: la
+    // ventana se esconde —eso devuelve el orden Z— y se vacía.
     void QuitarPanelFlotante()
     {
-        PanelFlotante.BeginAnimation(OpacityProperty, null);
-        PanelFlotante.Visibility = Visibility.Collapsed;
-        PanelFlotante.Opacity = 1;
-        PanelFlotante.RenderTransform = null;
-        PanelFlotante.BeginAnimation(HeightProperty, null);
-        CajonFlotante.Content = null;
+        if (_superpuesta is not { } v) return;
+        if (_panelConTeclado) { _panelConTeclado = false; v.Teclado(false); }
+        v.Tarjeta.BeginAnimation(OpacityProperty, null);
+        v.Tarjeta.Opacity = 1;
+        v.Cajon.Content = null;
+        if (v.IsVisible) v.Hide();
         _anclaFlotante = null;
         _panelScrollPropio = false;
     }

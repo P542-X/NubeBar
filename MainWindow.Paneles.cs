@@ -301,7 +301,7 @@ public partial class MainWindow
         // La tarjeta se cierra sola, con su propia animación: se mira si está a la
         // vista y no si estamos en vertical, para que un cambio de orientación con un
         // panel abierto no deje la tarjeta colgada.
-        if (PanelFlotante.Visibility == Visibility.Visible) { CerrarPanelFlotante(); return; }
+        if (PanelSuperpuestoAbierto) { CerrarPanelFlotante(); return; }
 
         var nombre = _panelAbierto;
         bool pequeno = _panelAlto < 220;
@@ -367,11 +367,11 @@ public partial class MainWindow
         {
             var r = Monitores.Raton();
             if (Isla.InputHitTest(Isla.PointFromScreen(new Point(r.X, r.Y))) != null) return;
-            // Con la barra vertical el panel vive FUERA de la isla, en su tarjeta: sin
-            // esto, el primer clic dentro del propio panel contaba como "clic fuera"
-            // y lo cerraba justo cuando ibas a usarlo.
-            if (PanelFlotante.Visibility == Visibility.Visible &&
-                PanelFlotante.InputHitTest(PanelFlotante.PointFromScreen(new Point(r.X, r.Y))) != null) return;
+            // Con la barra vertical el panel vive en SU PROPIA VENTANA, fuera de la
+            // isla: sin esto, el primer clic dentro del propio panel contaba como "clic
+            // fuera" y lo cerraba justo cuando ibas a usarlo. Se pregunta por el
+            // rectángulo de pantalla de esa ventana, no por un hit-test de la isla.
+            if (_superpuesta is { } sup && sup.Contiene(r.X, r.Y)) return;
             // Un desplegable (la salida de audio), un tooltip o la ventana de ajustes
             // son ventanas NUESTRAS aparte de la isla: elegir algo en ellos no es "fuera"
             var bajo = Monitores.VentanaBajoElRaton();
@@ -389,7 +389,7 @@ public partial class MainWindow
     void ReajustarPanel(string nombre)
     {
         if (_panelAbierto != nombre) return;
-        if (PanelFlotante.Visibility == Visibility.Visible) { ReajustarPanelFlotante(nombre); return; }
+        if (PanelSuperpuestoAbierto) { ReajustarPanelFlotante(nombre); return; }
         if (Cajon.Content is not FrameworkElement contenido) return;
         try
         {

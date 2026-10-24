@@ -1942,3 +1942,81 @@ al margen de arriba, no medio fuera: eso ya lo hacía el recorte de `SitioDeLaTa
 - **El sistema de panel único**: la tarjeta sigue siendo *el* panel abierto. No hay dos.
 - Y sigue pendiente, a propósito, **rehacer el menú de 860 px para una columna**: hoy
   sale como tarjeta ancha al lado, con su diseño horizontal de siempre.
+
+
+### Corrección de C1 · el panel pasa a ser una ventana superpuesta
+
+La prueba visual de C1 encontró dos cosas en modo barra vertical: el panel Inicio salía
+**cortado** y quedaba **por detrás de la aplicación activa**. Las dos tienen la misma
+raíz, y la raíz es de diseño, no un despiste.
+
+#### Lo que estaba mal de fondo
+
+La tarjeta del panel era un hermano de la isla **dentro de la misma ventana**, y la
+ventana se ensanchaba de 54 a 730 px para dejarle sitio. Eso ataba el panel a dos cosas
+que no son suyas:
+
+1. **A que la ventana siguiera ancha.** Cualquiera que recoloque la ventana con el grosor
+   de la BARRA —no el del panel— la devuelve a 54 px, y entonces la tarjeta no se
+   recorta: se queda fuera de la ventana y desaparece. Y en modo barra esa ventana es
+   además una **appbar registrada**: el shell se cree con derecho a recolocarla cuando
+   recalcula el área de trabajo, que es justo lo que pasa al cambiar de posición, al
+   esconder la barra de Windows o al salir de pantalla completa.
+
+2. **A que el orden Z de la barra le valiera.** Y no le vale: la barra puede estar en
+   `ventanas-encima` o `por-debajo` **a propósito**, y un lanzador abierto tiene que
+   verse por encima de todo igual. Dentro de la misma ventana no hay forma de que uno
+   esté encima y el otro no — eso es, literalmente, el segundo fallo.
+
+#### Lo que se ha hecho
+
+El panel vive en su propia ventana (`VentanaSuperpuesta`), sin borde, transparente,
+fuera de Alt+Tab, **dueña la isla** —si fuera suelta mantendría viva la aplicación al
+cerrar la isla, porque `ShutdownMode` es `OnLastWindowClose`, y NubeBar no terminaría
+nunca—. Y:
+
+- **el rectángulo se calcula en coordenadas de pantalla**, en píxeles, y se recorta
+  contra el área útil del monitor. Ya no se pone un `Margin` dentro de otra ventana
+  confiando en que la ventana sea bastante grande;
+- **la tarjeta se estira para llenar la ventana**: el rectángulo en píxeles es la
+  autoridad y el contenido se adapta a la escala que WPF le dé en ese monitor. Al revés
+  —fijar el contenido en unidades de WPF— es lo que se descuadra al cambiar de pantalla;
+- **se eleva mientras está abierto** (`SetWindowPos` con `HWND_TOPMOST`; `Topmost` solo
+  no basta si otra ventana topmost se puso después) y al esconderse deja el orden Z como
+  estaba, **sin tocar el de la barra**;
+- **la barra ya no cambia de tamaño** al abrir un panel. Esa es la parte que mata el
+  primer fallo de raíz: no hay ningún ancho que se pueda perder;
+- el **teclado** lo pide la ventana del panel, no la isla: el buscador vive dentro de
+  ella. Al cerrar devuelve el foco a donde estaba.
+
+Y no es un `Popup` de WPF porque un Popup coloca y dimensiona en unidades de WPF —lo que
+no sirve con dos monitores a distinto DPI, el mismo motivo por el que la isla se coloca
+con `SetWindowPos`— y su orden Z lo decide él. Aquí hay que mandar en los dos.
+
+#### La captura del ratón ya no cruza ventanas
+
+En C1 se capturaba en la raíz para que el clic de la tarjeta llegase. Con la tarjeta en
+otra ventana eso **no puede funcionar**: la captura de WPF no cruza ventanas. Así que en
+vertical no se captura nada y el clic de fuera lo caza el vigilante de 150 ms, que
+trabaja en coordenadas de pantalla y ya sabía apañárselas cuando Windows nos quita la
+captura. El «¿estoy dentro?» pregunta por el **rectángulo de pantalla** de la ventana del
+panel, no por un hit-test dentro de la isla.
+
+#### Lo que medí, y lo que no pude medir
+
+Honestamente: **no conseguí reproducir los dos síntomas con instrumentación.** Puse una
+terminal maximizada delante, le di el primer plano y abrí el lanzador desde el código,
+apuntando los rectángulos reales y preguntando a `WindowFromPoint` quién gana cada
+píxel; con el C1 de entonces la tarjeta salía en su sitio y ganaba el píxel del centro.
+
+De paso aprendí que **mi propia sonda era mala**: probé las cuatro esquinas, y las
+esquinas de una tarjeta redondeada en una ventana por capas son píxeles transparentes,
+así que `WindowFromPoint` devuelve —con razón— lo que hay detrás. Daba «tapada» siempre.
+Con cinco sondas por dentro (centro y 20/80 % de cada eje) el resultado es inequívoco.
+
+Lo que sí quedó medido, y es lo que importa: con la barra en `por-debajo` o
+`ventanas-encima` —es decir, con la ventana de la barra **sin** TOPMOST— el panel gana
+sus cinco sondas por encima de un `cmd` maximizado. **Eso antes era imposible por
+construcción**, y encaja con lo que viste: durante la sesión estuviste cambiando de modo
+de visibilidad, y en cualquiera de esos dos el panel quedaba debajo de la terminal, que
+además lo tapaba en parte.

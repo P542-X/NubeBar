@@ -225,34 +225,34 @@ public partial class MainWindow
     // mismo a los pocos segundos y cerraba el menú solo mientras escribías. El criterio
     // bueno es el que pediste: un clic de verdad fuera. Se consigue capturando el ratón
     // en el subárbol de la isla, que es como se comportan los menús de Windows.
-    // Sobre QUIÉN se captura. En horizontal basta la isla: el panel es su cajón y vive
-    // dentro de ella. Con la barra vertical el panel es una tarjeta HERMANA de la isla
-    // (ver MainWindow.Vertical.cs), y capturar en la isla rompía el menú de dos formas a
-    // la vez: la captura en subárbol desviaba a la isla los clics de la tarjeta —así que
-    // la caja de búsqueda y las filas no recibían ninguno— y además contaban como "clic
-    // fuera", o sea que el primer clic en el buscador lo cerraba. Se captura en la raíz,
-    // que es el ancestro común de las dos superficies.
-    FrameworkElement SuperficieDeClics => Vertical ? Raiz : Isla;
-
+    // La captura del ratón es de la isla, y solo sirve cuando el panel vive DENTRO de
+    // ella: es el caso horizontal. Con la barra vertical el menú está en otra ventana, y
+    // la captura de WPF no cruza ventanas — capturarla en la isla desviaba allí los
+    // clics de la tarjeta (la caja de búsqueda y las filas no recibían ninguno) y encima
+    // los contaba como "clic fuera", así que el primer clic en el buscador lo cerraba.
+    //
+    // Para ese caso no se captura nada: el clic de fuera lo caza igual el vigilante de
+    // 150 ms, que trabaja en coordenadas de PANTALLA y ya sabía apañárselas cuando
+    // Windows nos quita la captura (ver VigilarClicFueraDelMenu).
     FrameworkElement? _capturada;
 
     void CapturarClicsFuera(bool activar)
     {
         if (activar)
         {
-            var sobre = SuperficieDeClics;
-            _capturada = sobre;
-            sobre.PreviewMouseDown += ClicQuizaFuera;
-            sobre.PreviewMouseUp += RearmarCaptura;
-            sobre.LostMouseCapture += RecuperarCaptura;
-            Mouse.Capture(sobre, CaptureMode.SubTree);
+            if (Vertical) return;
+            _capturada = Isla;
+            Isla.PreviewMouseDown += ClicQuizaFuera;
+            Isla.PreviewMouseUp += RearmarCaptura;
+            Isla.LostMouseCapture += RecuperarCaptura;
+            Mouse.Capture(Isla, CaptureMode.SubTree);
         }
         else
         {
             // Se suelta de DONDE se cogió y no de donde toque ahora: si el config
             // cambiara de orientación con el menú abierto, quitar los manejadores de la
             // otra superficie los dejaría puestos para siempre.
-            var sobre = _capturada ?? SuperficieDeClics;
+            if (_capturada is not { } sobre) return;
             sobre.PreviewMouseDown -= ClicQuizaFuera;
             sobre.PreviewMouseUp -= RearmarCaptura;
             sobre.LostMouseCapture -= RecuperarCaptura;
@@ -267,7 +267,9 @@ public partial class MainWindow
     bool DentroDelMenu(Point enPantalla)
     {
         if (Toca(Isla, enPantalla)) return true;
-        if (PanelFlotante.Visibility == Visibility.Visible && Toca(PanelFlotante, enPantalla)) return true;
+        // Con la barra vertical el menú vive en su propia ventana superpuesta: lo que
+        // cuenta es su rectángulo de PANTALLA, no un hit-test dentro de la isla.
+        if (_superpuesta is { } sup && sup.Contiene((int)enPantalla.X, (int)enPantalla.Y)) return true;
         return false;
 
         static bool Toca(FrameworkElement e, Point pantalla)
@@ -286,7 +288,7 @@ public partial class MainWindow
     void ClicQuizaFuera(object remitente, MouseButtonEventArgs e)
     {
         if (_panelAbierto != PanelInicio) return;
-        var sobre = _capturada ?? SuperficieDeClics;
+        var sobre = _capturada ?? Isla;
         if (DentroDelMenu(sobre.PointToScreen(e.GetPosition(sobre)))) return;
         CerrarMenu();
         e.Handled = true;
@@ -428,10 +430,9 @@ public partial class MainWindow
             // de pantalla (Win+Shift+S, Impr Pant) salía pero no te dejaba arrastrar
             // el recuadro. El clic de fuera lo sigue cazando el vigilante de 150 ms.
             if (!Nativo.EsNuestra(Nativo.Activa())) return;
-            // Sobre la misma superficie en la que se cogió (ver SuperficieDeClics): si
-            // aquí se volviera a la isla, en vertical se perderían otra vez los clics
-            // de la tarjeta.
-            Mouse.Capture(_capturada ?? SuperficieDeClics, CaptureMode.SubTree);
+            // Solo se recupera si se cogió: en vertical no se captura nada (ver
+            // CapturarClicsFuera), y volver a capturar aquí reintroduciría el fallo.
+            if (_capturada is { } sobre) Mouse.Capture(sobre, CaptureMode.SubTree);
         }, DispatcherPriority.Input);
     }
 

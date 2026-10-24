@@ -23,11 +23,11 @@
          Como el Border recorta a sus bordes, animar Isla.Height hace que el panel se
          despliegue desde dentro de la isla en vez de aparecer como una ventana nueva.
          Con Posicion="abajo" se intercambian las filas (ver ColocarCajon). -->
-    <!-- Una sola celda: la isla manda y se coloca con sus propias alineaciones. El
-         "PanelFlotante" solo se usa en la barra VERTICAL, donde el cajón de dentro no
-         vale: ahí la barra ya ocupa la pantalla de arriba abajo y no puede crecer más,
-         así que el panel sale como una tarjeta aparte, al lado (ver
-         MainWindow.Vertical.cs). En horizontal está Collapsed y no estorba. -->
+    <!-- Una sola celda: la isla manda y se coloca con sus propias alineaciones.
+         El panel de la barra VERTICAL no está aquí: vive en su propia ventana
+         superpuesta (ver VentanaSuperpuesta.cs), porque metido en esta ventana
+         dependía de que la franja de 54 px se ensanchara y de que el orden Z de la
+         barra le valiera, y ninguna de las dos cosas se cumple siempre. -->
     <Grid x:Name="Raiz">
         <Border x:Name="Isla" Padding="10,0" MinWidth="120" ClipToBounds="True" Opacity="0"
                 VerticalAlignment="Top"
@@ -60,11 +60,6 @@
                 <!-- El cajón: aquí dentro van la mini lista, la vista general y el menú Inicio -->
                 <ContentPresenter x:Name="Cajon" Grid.Row="1"/>
             </Grid>
-        </Border>
-
-        <Border x:Name="PanelFlotante" Visibility="Collapsed" ClipToBounds="True"
-                HorizontalAlignment="Left" VerticalAlignment="Top">
-            <ContentPresenter x:Name="CajonFlotante"/>
         </Border>
     </Grid>
 </Window>
