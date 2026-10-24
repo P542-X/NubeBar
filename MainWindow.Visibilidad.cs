@@ -84,7 +84,9 @@ public partial class MainWindow : Window
     // encima de las ventanas, como en el iPhone. Y una barra que se autooculta tampoco,
     // que reservar sitio para algo que no está es lo que uno quiere evitar al
     // encender el autoocultar (en Plasma pasa lo mismo).
-    bool ReservaHueco => !EsIsla && PanelPrincipal.ReservarEspacio && !PanelAutoOculta;
+    // Barra.ReservarEspacio ya viene resuelto de la carga (con el defecto de la
+    // orientación aplicado si no lo has elegido): ver PanelNube.ReservaEfectiva.
+    bool ReservaHueco => !EsIsla && _cfg.Barra.ReservarEspacio && !PanelAutoOculta;
 
     // Para el log de arranque: en una línea, qué panel ha salido de verdad. Antes solo
     // se apuntaba "Modo=isla", que a partir de B5 ya no dice casi nada.

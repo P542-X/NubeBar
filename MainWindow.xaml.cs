@@ -999,24 +999,51 @@ public partial class MainWindow : Window
 
     // "muestra" = el texto más largo que llegará a mostrar este módulo. Se reserva su
     // ancho para que el contenido cambiante no haga respirar a la isla cada segundo.
-    TextBlock Etiqueta(Func<string> valor, bool animar = false, string? muestra = null)
+    //
+    // "vertical" es cómo se escribe el mismo dato cuando la barra es una COLUMNA: la
+    // hora en dos líneas, "CPU" sobre su porcentaje. Lo dice cada widget porque por
+    // dónde se parte un texto depende de lo que significa, y adivinarlo en un sitio
+    // común (¿por el espacio?, ¿por los dos puntos?) sale mal al primer caso raro.
+    TextBlock Etiqueta(Func<string> valor, bool animar = false, string? muestra = null,
+                       Func<string>? vertical = null)
     {
+        bool v = Vertical;
         var tb = new TextBlock
         {
-            Margin = new Thickness(6, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
             Visibility = Visibility.Collapsed
         };
         // Cifras de ancho fijo: si no, un "1" ocupa menos que un "8" y el texto baila
         Typography.SetNumeralAlignment(tb, FontNumeralAlignment.Tabular);
-        if (muestra != null) tb.MinWidth = AnchoDeTexto(muestra);
+
+        if (v)
+        {
+            // El margen va en el eje en el que se separan los módulos. Puesto en
+            // horizontal (6 a cada lado) se comía 12 px de una columna de 38, que es
+            // exactamente lo que cortaba la hora: "00:05" mide 34 y le quedaban 36.
+            tb.Margin = new Thickness(0, 6, 0, 6);
+            tb.HorizontalAlignment = HorizontalAlignment.Center;
+            tb.TextAlignment = TextAlignment.Center;
+            // Las tres redes que impiden que se recorte: parte por donde pueda, nunca
+            // mide más que la columna, y si aun así no cabe, se encoge.
+            tb.TextWrapping = TextWrapping.Wrap;
+            tb.MaxWidth = AnchoUtilDeLaColumna;
+            // Nada de MinWidth: lo que no sobra en una columna es justamente ancho.
+        }
+        else
+        {
+            tb.Margin = new Thickness(6, 0, 6, 0);
+            if (muestra != null) tb.MinWidth = AnchoDeTexto(muestra);
+        }
 
         void Act()
         {
-            var nuevo = valor();
+            var nuevo = (v && vertical != null ? vertical() : valor()) ?? "";
             if (nuevo == tb.Text) return;
             bool habia = tb.Text.Length > 0;
             tb.Text = nuevo;
             tb.Visibility = nuevo.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+            if (v) EncajarEnLaColumna(tb);
             if (animar && habia) DeslizarTexto(tb);   // el minuto entra desde abajo
         }
         Act();
@@ -1024,20 +1051,48 @@ public partial class MainWindow : Window
         return tb;
     }
 
+    // Lo que de verdad le queda a un widget a lo ancho de la columna: el grosor menos
+    // el filo de acento por los dos lados.
+    double AnchoUtilDeLaColumna => Math.Max(16, _cfg.Barra.Alto - Isla.BorderThickness.Left * 2);
+
+    // La última red contra el recorte: si una línea sigue sin caber —"100%" no se puede
+    // partir, y con el grosor al mínimo tampoco cabe entero— se baja el tamaño de letra
+    // hasta que quepa. Encoger se lee; recortar, no.
+    void EncajarEnLaColumna(TextBlock tb)
+    {
+        try
+        {
+            tb.FontSize = FontSize;                 // siempre desde el tamaño del tema
+            if (tb.Text.Length == 0) return;
+
+            double disponible = AnchoUtilDeLaColumna;
+            double mayor = 0;
+            foreach (var linea in tb.Text.Split('\n'))
+                mayor = Math.Max(mayor, AnchoDeTexto(linea, tb.FontSize));
+
+            if (mayor <= disponible || mayor <= 0) return;
+            tb.FontSize = Math.Max(7, Math.Floor(tb.FontSize * disponible / mayor));
+        }
+        catch { }
+    }
+
     // Ancho que ocuparía ese texto con la fuente y el tamaño actuales del tema
-    double AnchoDeTexto(string texto)
+    double AnchoDeTexto(string texto) => AnchoDeTexto(texto, FontSize);
+
+    // Y con un tamaño concreto, que es lo que hace falta para encogerlo hasta que quepa
+    double AnchoDeTexto(string texto, double tamano)
     {
         try
         {
             double ppp = VisualTreeHelper.GetDpi(this).PixelsPerDip;
             var tipo = new Typeface(FontFamily, FontStyle, FontWeight, FontStretch);
             return new FormattedText(texto, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
-                                     tipo, FontSize, Brushes.Black, ppp).Width;
+                                     tipo, tamano, Brushes.Black, ppp).Width;
         }
         catch (Exception ex)
         {
             Log.Error("medir texto", ex);
-            return texto.Length * FontSize * 0.6;   // aproximación, mejor eso que nada
+            return texto.Length * tamano * 0.6;   // aproximación, mejor eso que nada
         }
     }
 

@@ -226,7 +226,29 @@ public class PanelNube
         return CuelgaDeArriba(posicion) ? 1u : 3u;
     }
 
-    public bool ReservarEspacio { get; set; } = true;
+    // ¿Le pedimos a Windows que nos guarde la franja (appbar)? Son TRES estados y no
+    // dos, y la diferencia importa:
+    //
+    //   null  → no lo has elegido: decide la orientación (ver ReservaPorDefecto)
+    //   true  → lo has elegido: resérvala, como la barra de tareas
+    //   false → lo has elegido: no la reserves, que las ventanas pasen por debajo
+    //
+    // Hacía falta el tercer estado porque el valor heredado era `true` y en modo ISLA
+    // no hacía nada: llevaba ahí sin efecto desde siempre, y al pasar a barra vertical
+    // se activó solo y convirtió la nube en una barra de tareas que nadie había pedido.
+    // Un bool no sabe distinguir "lo quiero" de "venía puesto".
+    public bool? ReservarEspacio { get; set; }
+
+    // Horizontal de lado a lado: reservar es lo normal, como cualquier barra.
+    // Vertical: NO, porque lo que se espera de una barra lateral es que flote por
+    // encima de las ventanas. Quien quiera lo contrario lo enciende en Ajustes, y
+    // entonces ya es una elección y se respeta.
+    public static bool ReservaPorDefecto(string? modo, string? posicion) =>
+        EsBarra(modo) && !EsVertical(modo, posicion);
+
+    public static bool ReservaEfectiva(bool? elegido, string? modo, string? posicion) =>
+        elegido ?? ReservaPorDefecto(modo, posicion);
+
     public string Monitores { get; set; } = "todos";      // "todos" | "principal"
 
     // Las zonas del panel NO se guardan aquí: siguen viviendo en "Modulos", que es lo
@@ -384,7 +406,10 @@ public class Config
                     Posicion = c.Barra.Posicion,
                     Grosor = c.Barra.Alto,
                     Margen = c.Barra.Margen,
-                    ReservarEspacio = c.Barra.ReservarEspacio,
+                    // Sin elegir a propósito: el `true` de Barra era el valor de serie
+                    // y en modo isla no hacía nada, así que no significa "lo quiero".
+                    // Decide la orientación (ver PanelNube.ReservaPorDefecto).
+                    ReservarEspacio = null,
                     Monitores = c.Barra.Monitores,
                     Visibilidad = "siempre"
                 };
@@ -421,7 +446,10 @@ public class Config
             c.Barra.Posicion = p.Posicion;
             c.Barra.Alto = p.Grosor;
             c.Barra.Margen = p.Margen;
-            c.Barra.ReservarEspacio = p.ReservarEspacio;
+            // Barra.ReservarEspacio es un bool de toda la vida y lo leen otros sitios:
+            // aquí se le da la respuesta YA RESUELTA, con el defecto de la orientación
+            // aplicado si el usuario no ha elegido.
+            c.Barra.ReservarEspacio = PanelNube.ReservaEfectiva(p.ReservarEspacio, p.Modo, p.Posicion);
             c.Barra.Monitores = p.Monitores;
         }
         catch (Exception ex) { Log.Error("migrar y derivar Paneles", ex); }

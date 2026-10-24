@@ -150,7 +150,14 @@ public sealed class ConfigArbol
     {
         try
         {
-            _raiz["Paneles"] = JsonSerializer.SerializeToNode(paneles, new JsonSerializerOptions { WriteIndented = true });
+            // Lo que no se ha elegido NO se escribe: `ReservarEspacio` es un bool? y un
+            // null en el fichero se leería igual, pero dejarlo escrito convierte "no lo
+            // he elegido" en algo que parece una decisión al abrir el config a mano.
+            _raiz["Paneles"] = JsonSerializer.SerializeToNode(paneles, new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+            });
         }
         catch (Exception ex) { Log.Error("escribir Paneles en el config", ex); }
     }

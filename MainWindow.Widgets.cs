@@ -55,11 +55,17 @@ public partial class MainWindow : Window, IAnfitrionWidget
                    new DescriptorWidget(id, nombre, desc, glifo, cat, zona, repetible), crear));
 
         // ---------- Reloj ----------
-        R("reloj", "Reloj", "La hora, en horas y minutos", "", CategoriaWidget.Reloj,
-          i => i.Etiqueta(() => DateTime.Now.ToString("HH:mm"), animar: true), zona: "Centro");
+        // Cada etiqueta dice cómo se escribe APILADA: en una columna de 38 px no cabe
+        // "00:05" de una pieza, y partirlo por su sitio es cosa de quien sabe lo que
+        // significa. La hora va como en el panel de Plasma: las horas sobre los minutos.
+        R("reloj", "Reloj", "La hora, en horas y minutos", "", CategoriaWidget.Reloj,
+          i => i.Etiqueta(() => DateTime.Now.ToString("HH:mm"), animar: true,
+                          vertical: () => DateTime.Now.ToString("HH") + Salto + DateTime.Now.ToString("mm")),
+          zona: "Centro");
 
-        R("fecha", "Fecha", "El día de la semana, el día y el mes", "", CategoriaWidget.Reloj,
-          i => i.Etiqueta(() => DateTime.Now.ToString("ddd d MMM"), animar: true));
+        R("fecha", "Fecha", "El día de la semana, el día y el mes", "", CategoriaWidget.Reloj,
+          i => i.Etiqueta(() => DateTime.Now.ToString("ddd d MMM"), animar: true,
+                          vertical: () => DateTime.Now.ToString("ddd") + Salto + DateTime.Now.ToString("d MMM")));
 
         // ---------- Apps ----------
         R("inicio", "Inicio", "Abre el menú de aplicaciones", "", CategoriaWidget.Apps,
@@ -75,14 +81,20 @@ public partial class MainWindow : Window, IAnfitrionWidget
           i => i.ModuloEscritorios());
 
         // ---------- Sistema ----------
-        R("cpu", "CPU", "Porcentaje de uso del procesador", "", CategoriaWidget.Sistema,
-          i => i.Etiqueta(() => $"CPU {Nativo.Cpu()}%", muestra: "CPU 100%"));
+        // Mismo criterio que el reloj: el rótulo sobre la cifra. "CPU 100%" mide 56 px
+        // y no cabe en una columna ni subiendo el grosor a 56; partido, cada línea mide
+        // menos de 30 y cabe hasta con el grosor al mínimo.
+        R("cpu", "CPU", "Porcentaje de uso del procesador", "", CategoriaWidget.Sistema,
+          i => i.Etiqueta(() => $"CPU {Nativo.Cpu()}%", muestra: "CPU 100%",
+                          vertical: () => "CPU" + Salto + $"{Nativo.Cpu()}%"));
 
-        R("ram", "Memoria", "Porcentaje de memoria en uso", "", CategoriaWidget.Sistema,
-          i => i.Etiqueta(() => $"RAM {Nativo.Ram()}%", muestra: "RAM 100%"));
+        R("ram", "Memoria", "Porcentaje de memoria en uso", "", CategoriaWidget.Sistema,
+          i => i.Etiqueta(() => $"RAM {Nativo.Ram()}%", muestra: "RAM 100%",
+                          vertical: () => "RAM" + Salto + $"{Nativo.Ram()}%"));
 
-        R("bateria", "Batería", "Carga de la batería; no sale si el equipo no tiene", "", CategoriaWidget.Sistema,
-          i => i.Etiqueta(Nativo.Bateria, muestra: "BAT 100%"));
+        R("bateria", "Batería", "Carga de la batería; no sale si el equipo no tiene", "", CategoriaWidget.Sistema,
+          i => i.Etiqueta(Nativo.Bateria, muestra: "BAT 100%",
+                          vertical: () => EnDosLineas(Nativo.Bateria())));
 
         R("bandeja", "Bandeja", "Los iconos de las apps en segundo plano", "", CategoriaWidget.Sistema,
           i => i.ModuloBandeja());
@@ -125,6 +137,32 @@ public partial class MainWindow : Window, IAnfitrionWidget
         Log.Info($"widgets registrados: {RegistroWidgets.Todos.Count}");
     }
 
+
+    // ---------- Escribir apilado ----------
+    //
+    // El salto de línea de los formatos verticales. Como constante y no suelto en cada
+    // registro por un motivo tonto pero real: escrito a mano dentro de una cadena de
+    // formato de fecha es un carácter literal que nadie espera ahí, y escrito en medio
+    // de una expresión se pierde entre comillas al editar el fichero.
+    internal const string Salto = "\n";
+
+    // Para lo que no tiene un sitio evidente por donde partirse: se corta por el último
+    // espacio que deje las dos mitades más parejas. "BAT 100%" sale "BAT" sobre "100%";
+    // un título de wallpaper largo se parte por la mitad y el resto lo arregla el
+    // ajuste de línea de la propia etiqueta.
+    internal static string EnDosLineas(string texto)
+    {
+        if (string.IsNullOrWhiteSpace(texto) || texto.Contains('\n')) return texto;
+
+        int mejor = -1;
+        double objetivo = texto.Length / 2.0;
+        for (int i = 0; i < texto.Length; i++)
+        {
+            if (texto[i] != ' ') continue;
+            if (mejor < 0 || Math.Abs(i - objetivo) < Math.Abs(mejor - objetivo)) mejor = i;
+        }
+        return mejor < 0 ? texto : texto[..mejor] + Salto + texto[(mejor + 1)..];
+    }
     // ================= El separador =================
     //
     // Una rayita vertical entre grupos de widgets. No hace nada más, y justo por eso

@@ -2020,3 +2020,92 @@ sus cinco sondas por encima de un `cmd` maximizado. **Eso antes era imposible po
 construcción**, y encaja con lo que viste: durante la sesión estuviste cambiando de modo
 de visibilidad, y en cualquiera de esos dos el panel quedaba debajo de la terminal, que
 además lo tapaba en parte.
+
+
+### B6 · El texto en una columna, y quién decide si se reserva hueco
+
+Dos cosas que solo se ven usando la barra vertical de verdad: la hora salía cortada, y
+la barra se comportaba como una barra de tareas en vez de flotar sobre las ventanas.
+
+#### 1. El margen estaba en el eje equivocado
+
+`Etiqueta()` le ponía a todo texto `Margin(6,0,6,0)`. En una barra horizontal eso es la
+separación entre módulos y está bien. En una columna de 38 px se come **12 px de los
+38**, y la cuenta sale justo al revés de lo que hace falta:
+
+```
+grosor 38 → útil 36   "00:05" mide 34 + 12 de margen = 46   → cortado
+grosor 48 → útil 46                                     46   → justo al límite, cortado igual
+grosor 56 → útil 54                                     46   → cabe, por los pelos
+```
+
+Por eso subir el grosor no lo arreglaba: hasta ~56 no empezaba a caber, y `RAM 7,8 GB`
+no cabía ni a 72. Lo que lo cortaba era el `ClipToBounds` de la barra, que es el peor
+resultado posible: no avisa, no se puede leer y parece que falta un dígito.
+
+Ahora el margen va en el eje en el que se separan los módulos (`0,6,0,6` en vertical) y
+eso solo ya libera los 12 px.
+
+#### 2. Partir un texto es cosa de quien sabe lo que significa
+
+Con el margen arreglado, `00:05` cabe en 38 por 2 px. Eso no es un diseño, es suerte.
+
+Así que cada etiqueta declara **cómo se escribe apilada**, y lo dice el widget y no un
+sitio común: por dónde se parte un texto depende de lo que significa, y adivinarlo
+(¿por el espacio?, ¿por los dos puntos?) sale mal al primer caso raro.
+
+| | horizontal | vertical |
+|---|---|---|
+| reloj | `00:05` | `00` / `05` — como el panel de Plasma |
+| fecha | `dom 25 oct` | `dom` / `25 oct` |
+| CPU | `CPU 19%` | `CPU` / `19%` |
+| RAM | `RAM 56%` | `RAM` / `56%` |
+| batería | `BAT 85%` | `BAT` / `85%` (parte por el espacio más centrado) |
+
+Y para lo que no tiene formato propio —el título del wallpaper, que es texto libre— hay
+tres redes puestas en la propia etiqueta: **parte** por donde pueda (`TextWrapping`),
+**nunca mide más** que la columna (`MaxWidth`), y si aun así no cabe —`100%` no se puede
+partir— **se encoge** la letra hasta que quepa. Encoger se lee; recortar, no.
+
+El `muestra` que reserva el ancho del texto más largo solo se aplica en horizontal: en
+una columna, lo que no sobra es justamente ancho.
+
+#### 3. Un bool no sabía distinguir "lo quiero" de "venía puesto"
+
+`ReservarEspacio` valía `true` de serie, y **en modo isla no hace nada** (la isla nunca
+reserva). Llevaba ahí sin efecto desde siempre. Al pasar a barra vertical se activó solo
+y convirtió la nube en una barra de tareas que nadie había pedido: Windows le guardaba
+la franja y las ventanas se apartaban en vez de pasar por debajo.
+
+El problema no era el valor, era que **no se podía saber si alguien lo había elegido**.
+Ahora son tres estados:
+
+```
+null  → no lo has elegido: decide la orientación
+true  → lo has elegido: resérvala, como la barra de tareas
+false → lo has elegido: no la reserves, que las ventanas pasen por debajo
+```
+
+Y el defecto por orientación es el que se espera de cada forma: una barra **horizontal**
+reserva su franja como cualquier barra; una **vertical** no, porque lo que se espera de
+una barra lateral es que flote por encima. La migración desde un config viejo escribe
+`null` a propósito: aquel `true` era el valor de serie, no una decisión.
+
+Lo que no se ha elegido **no se escribe** en el fichero. Un `null` se leería igual, pero
+dejarlo escrito convierte "no lo he elegido" en algo que parece una decisión al abrir el
+config a mano. Tocar el interruptor en Ajustes es lo que lo convierte en elección, y
+entonces manda sobre el defecto — en los dos sentidos.
+
+#### Medido
+
+Los once textos de la barra, en los cuatro grosores (38, 48, 56, 72) y en los dos lados:
+**0 se salen** en los ocho casos. Y el cuadro de la reserva, leyendo el área de trabajo
+que Windows publica:
+
+```
+isla/arriba                         (0,0)-(2560,1440)   no reserva
+barra/arriba        (sin elegir)    (0,54)-(2560,1440)  reserva   ← horizontal intacto
+barra/izquierda     (sin elegir)    (0,0)-(2560,1440)   no reserva ← las apps pasan por debajo
+barra/izquierda + ReservarEspacio:true  (54,0)-(2560,1440)  reserva ← la opción sigue estando
+barra/izquierda + autoocultar       (0,0)-(2560,1440)   no reserva
+```
