@@ -84,6 +84,14 @@ public class Modulos
     public bool BandejaDeSerie { get; set; } = true;
     public bool FijadasDeSerie { get; set; } = true;
     public bool AppsAlCentro { get; set; } = true;
+
+    // Widgets puestos en una zona pero que NO se dibujan.
+    //
+    // Ocultar y quitar no son lo mismo, y por eso hacen falta dos sitios: quitar un
+    // widget lo saca de su zona y pierde dónde estaba; ocultarlo lo deja en su sitio
+    // y con su configuración, y al volver a mostrarlo reaparece donde estaba, no al
+    // final. Es la diferencia entre "esto hoy no lo quiero ver" y "esto fuera".
+    public List<string> Ocultos { get; set; } = new();
 }
 
 // Nivel de animación y la escena de entrada.
@@ -138,6 +146,13 @@ public class ZonasPanel
     public List<string> Izquierda { get; set; } = new();
     public List<string> Centro { get; set; } = new();
     public List<string> Derecha { get; set; } = new();
+
+    // Los que están puestos pero no se dibujan (ver Modulos.Ocultos). Van aparte de
+    // las zonas a propósito: el widget conserva su sitio mientras está oculto.
+    public List<string> Ocultos { get; set; } = new();
+
+    public bool Oculto(string id) =>
+        Ocultos.Any(o => o.Equals(id, StringComparison.OrdinalIgnoreCase));
 
     // En el orden en que se pintan, con su nombre. Lo usa MainWindow.Llenar.
     public IEnumerable<(string Nombre, List<string> Widgets)> Todas()
@@ -213,6 +228,7 @@ public class Config
             c.Modulos.Centro ??= new();
             c.Modulos.Derecha ??= new();
             c.Inicio.Fijadas ??= new();
+            c.Modulos.Ocultos ??= new();
             c.Animaciones ??= new();
             c.Paneles ??= new();
             ModulosDeSerie(c);
@@ -258,7 +274,8 @@ public class Config
             {
                 Izquierda = c.Modulos.Izquierda,
                 Centro = c.Modulos.Centro,
-                Derecha = c.Modulos.Derecha
+                Derecha = c.Modulos.Derecha,
+                Ocultos = c.Modulos.Ocultos
             };
         }
         catch (Exception ex) { Log.Error("sincronizar Paneles con Barra", ex); }

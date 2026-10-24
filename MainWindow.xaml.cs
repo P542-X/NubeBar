@@ -35,6 +35,16 @@ public partial class MainWindow : Window
     // pinto una fila?" sin mezclar a ojo. Se recalcula en AplicarTema.
     Roles _roles = Roles.PorDefecto();
 
+    // Y sus pinceles, con el mismo truco que los de arriba: el pincel es fijo y lo que
+    // cambia es su Color, animado. Por eso al cambiar de tema TODO lo que los use se
+    // tiñe solo y en suave, sin volver a montar nada.
+    //
+    // Antes esto no existía y cada sitio se hacía su propio
+    // `new SolidColorBrush(FromArgb(0x33, _cTexto…))`: veinticinco mezclas a ojo, cada
+    // una con su alfa, y ninguna cambiaba de color hasta que se remontaba el panel.
+    readonly SolidColorBrush _superficie = new(), _superficieAlta = new(), _borde = new(), _elegido = new(),
+                             _textoAtenuado = new(), _secundario = new(), _sistema = new();
+
     readonly List<Action> _actualizadores = new();
     readonly DispatcherTimer _tick = new() { Interval = TimeSpan.FromSeconds(1) };
     readonly DispatcherTimer _recarga = new() { Interval = TimeSpan.FromMilliseconds(250) };
@@ -275,6 +285,11 @@ public partial class MainWindow : Window
         // pasa todo lo que se mueve, así que tiene que estar puesto ya.
         Animacion.Elegir(_cfg.Animaciones.Nivel);
 
+        // Y con él, el estilo de los botones, que también depende del nivel. Va aquí y
+        // no en el constructor porque los botones se vuelven a crear unas líneas más
+        // abajo (LlenarZonas): así cambiar el nivel en caliente se ve en el acto.
+        Resources[typeof(Button)] = EstiloBoton();
+
         Color fondo = Hex(t.Fondo, Colors.Black), texto = Hex(t.Texto, Colors.White), acento = Hex(t.Acento, Colors.CornflowerBlue);
         if (t.DesdeWallpaper && _paleta is { } p)
         {
@@ -334,7 +349,19 @@ public partial class MainWindow : Window
         AnimarColor(_texto, texto);
         AnimarColor(_acento, acento);
         AnimarColor(_acentoLegible, _cAcentoLegible);
-        AnimarColor(_hover, Color.FromArgb(0x30, texto.R, texto.G, texto.B));
+
+        // El hover es, conceptualmente, la superficie elevada: lo que hay bajo el
+        // ratón. Antes era un 0x30 del texto escrito aquí a mano; ahora lo decide el
+        // tema, así que Nube puede tener un hover azulado en vez de un gris del texto.
+        AnimarColor(_hover, _roles.SuperficieAlta);
+
+        AnimarColor(_superficie, _roles.Superficie);
+        AnimarColor(_elegido, _roles.Seleccion);
+        AnimarColor(_superficieAlta, _roles.SuperficieAlta);
+        AnimarColor(_borde, _roles.Borde);
+        AnimarColor(_textoAtenuado, _roles.TextoAtenuado);
+        AnimarColor(_secundario, _roles.SecundarioTinta);
+        AnimarColor(_sistema, _roles.SistemaTinta);
 
         Isla.CornerRadius = new CornerRadius(t.Radio);
         FontFamily = new FontFamily(t.Fuente);

@@ -176,7 +176,7 @@ public partial class MainWindow
             BorderThickness = new Thickness(esActiva ? 1 : 0),
             BorderBrush = _acentoLegible,
             Background = esActiva
-                ? new SolidColorBrush(Color.FromArgb(0x22, _cAcentoLegible.R, _cAcentoLegible.G, _cAcentoLegible.B))
+                ? _elegido
                 : Brushes.Transparent
         };
 

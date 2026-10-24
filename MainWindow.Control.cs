@@ -283,7 +283,7 @@ public partial class MainWindow : Window
         filaRed.Children.Add(irRed);
         columna.Children.Add(filaRed);
 
-        var estadoBt = new TextBlock { Foreground = _texto, Opacity = 0.7, Margin = new Thickness(0, 8, 0, 0), Text = "Bluetooth: …" };
+        var estadoBt = new TextBlock { Foreground = _textoAtenuado, Margin = new Thickness(0, 8, 0, 0), Text = "Bluetooth: …" };
         columna.Children.Add(estadoBt);
         var listaBt = new StackPanel();
         columna.Children.Add(listaBt);

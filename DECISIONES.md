@@ -1299,3 +1299,93 @@ el README, pero no se podían elegir desde Ajustes porque se olvidaron en esa li
 
 Ahora sale de `RegistroWidgets.Ids`. Registrar un widget basta para que aparezca en
 los tres sitios: la isla, la lista de Ajustes y la biblioteca que vendrá.
+
+## Fase B · El 82 % que no obedecía, y en qué se diferencian Reducido y Desactivado
+
+La Fase A dejó apuntado un cabo suelto: el encogido al 82 % al pulsar un botón, y el
+fundido del fondo al pasar el ratón, vivían en los storyboards de `MainWindow.xaml` y
+no pasaban por `Kf`, así que el nivel de animación no los tocaba. En "reducido" el
+botón seguía encogiéndose igual.
+
+**Por qué no bastaba con escalar la Duration.** Un storyboard escrito dentro de un
+`ControlTemplate` se congela cuando la plantilla se aplica: su `Duration` ya no se
+puede cambiar, ni con `DynamicResource`. La única salida era construir el estilo desde
+código, que es lo que hace ahora `MainWindow.Botones.cs`. Se vuelve a montar en cada
+`AplicarTema`, que es también cuando se vuelven a crear los botones, así que cambiar el
+nivel en caliente se ve en el acto. Hay precedente en la casa: `VentanaAjustes` ya
+construía su `EstiloPestana()` igual.
+
+**Geometría y fundidos son cosas distintas.** Mover, crecer y encoger obliga a medir y
+redibujar en cada fotograma; un cambio de opacidad solo mezcla. Por eso ahora hay dos
+factores en vez de uno:
+
+| Nivel | Geometría | Fundidos | Encogido al pulsar | Rebote |
+|---|---|---|---|---|
+| Completo | ×1,0 | ×1,0 | sí | sí |
+| Equilibrado | ×0,6 | ×0,6 | sí | **no** |
+| Reducido | **×0** | ×0,25 | **no** | no |
+| Desactivado | ×0 | **×0** | no | no |
+
+Y aquí está lo que de otro modo habría sido un fallo: **si "reducido" y "desactivado"
+compartieran factor, serían el mismo nivel con dos nombres.** La diferencia real es
+que Reducido conserva el fundido del hover, muy corto (37 ms), para que al pasar el
+ratón por un botón siga habiendo respuesta sin que nada se mueva; y Desactivado no
+tiene ninguno. Más aún: en Desactivado el disparador del ratón **no usa un storyboard
+de cero milisegundos**, usa un `Setter`. Así no queda ninguna transición que mirar, que
+es literalmente lo que se ha pedido, y además se puede demostrar leyendo el árbol de
+disparadores en vez de cronometrando.
+
+El rebote (`BackEase`) se va ya en Equilibrado, antes que el encogido: es la parte que
+más se nota de las dos, porque el botón se pasa de largo y vuelve.
+
+**La regla de la casa se mantiene**, y aquí hizo falta decirla explícitamente: las
+animaciones del estilo llevan `FillBehavior.HoldEnd` para que, pase lo que pase, la
+propiedad se quede en su valor final y no vuelva sola al de la plantilla.
+
+## Fase B · El separador, que era el widget más tonto y tenía tres fallos
+
+Una rayita vertical entre grupos. No hace nada más, y precisamente por eso nadie lo
+había mirado: estaba escrito en una línea dentro del registro de widgets y tenía tres
+cosas mal que solo salen cuando alguien lo pone de verdad.
+
+**1. No decía cómo alinearse.** Un `Border` nace con `VerticalAlignment.Stretch`, y con
+un `Height` fijo eso deja la posición en manos de cómo WPF resuelve un «estírate» que
+no se puede cumplir. Funcionaba de casualidad mientras todos sus vecinos de zona
+midieran lo mismo. Ahora lo dice: `Center`.
+
+**2. Su alto era un `16` escrito a mano** que no sabía nada de `Barra.Alto`. Con la
+barra fina la raya ocupaba casi toda la altura; con la barra gruesa era un muñón. Y lo
+peor: si algún vecino hacía la fila más alta que `Barra.Alto`, la raya se centraba en
+la FILA y no en la isla, y el `ClipToBounds` de la isla se le comía un trozo. Ahora
+sale de la altura de la barra (`Alto × 0,42`, acotado), con `MaxHeight` además de
+`Height` para que no pueda pasarse aunque alguien ponga un `Alto` raro.
+
+Los números: 38 → 16 px (exactamente lo de siempre, así que a quien ya lo tuviera
+puesto no le cambia nada), 24 → 10 px, 56 → 24 px.
+
+**3. Su color era `_texto` con `Opacity = 0.3`**, otra mezcla a ojo de las que quitó la
+fase B1. Un separador es un borde: le toca el rol `Borde`. De paso se vuelve temable —
+en Nube es azulado (`#33415C`) en vez de un gris del texto.
+
+Y `SnapsToDevicePixels` + `UseLayoutRounding`, porque una línea de 1 px que cae entre
+píxeles con DPI no entero sale gris y borrosa en vez de nítida.
+
+**Medido, no supuesto.** Con la barra en modo barra y dos separadores puestos a la vez,
+midiendo los píxeles de la captura:
+
+| `Barra.Alto` | isla | raya | centro raya | desvío |
+|---|---|---|---|---|
+| 24 | y 8..31, centro 19,5 | 10 px | 19,5 | 0 |
+| 38 | y 8..45, centro 26,5 | 16 px | 26,5 | 0 |
+| 56 | y 8..63, centro 35,5 | 24 px | 35,5 | 0 |
+
+Las dos rayas en cada caso, dentro de la isla y sin recorte. Y lo mismo con los cuatro
+niveles de animación y con los temas negro, Nube, Gruvbox y Nord: dos rayas de 16 px
+centradas en 26,5 en los siete casos.
+
+**Lo que no pude reproducir.** El informe original decía «demasiado abajo y parcialmente
+cortado». Con `Alto = 38` en modo barra la raya sale centrada y entera, también antes
+del arreglo. Lo que sí es cierto es que la alineación dependía de la casualidad y el
+alto no respetaba la barra, que son las dos condiciones que producen exactamente ese
+síntoma en cuanto una zona crece más que la fila. Queda arreglado el mecanismo aunque
+no haya podido ver el caso concreto.

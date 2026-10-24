@@ -379,7 +379,7 @@ public partial class MainWindow
             Height = 38,
             Padding = new Thickness(12, 0, 12, 0),
             VerticalContentAlignment = VerticalAlignment.Center,
-            Background = new SolidColorBrush(Color.FromArgb(0x24, _cTexto.R, _cTexto.G, _cTexto.B)),
+            Background = _superficie,
             Foreground = _texto,
             CaretBrush = _acentoLegible,
             BorderThickness = new Thickness(0),
@@ -411,7 +411,7 @@ public partial class MainWindow
         {
             Height = AltoFila - 4,
             CornerRadius = new CornerRadius(8),
-            Background = new SolidColorBrush(Color.FromArgb(0x33, _cAcentoLegible.R, _cAcentoLegible.G, _cAcentoLegible.B)),
+            Background = _elegido,
             BorderBrush = _acentoLegible,
             BorderThickness = new Thickness(1),
             HorizontalAlignment = HorizontalAlignment.Stretch,

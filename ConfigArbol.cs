@@ -15,18 +15,28 @@ public sealed class ConfigArbol
     JsonObject _raiz;
     readonly string _original;
 
-    public static string RutaCopia => Config.Ruta + ".bak";
+    // Sobre qué fichero trabaja este árbol. Casi siempre es el config de verdad, pero
+    // no tiene por qué: así se puede abrir un paquete de tema, o un config de prueba,
+    // sin tocar el del usuario. Antes la ruta estaba escrita dentro de cada método y
+    // no había manera de apuntar a otro sitio.
+    readonly string _ruta;
 
-    ConfigArbol(JsonObject raiz, string original)
+    public string Ruta => _ruta;
+    public string RutaCopia => _ruta + ".bak";
+
+    ConfigArbol(JsonObject raiz, string original, string ruta)
     {
         _raiz = raiz;
         _original = original;
+        _ruta = ruta;
     }
 
-    public static ConfigArbol Cargar()
+    public static ConfigArbol Cargar(string? ruta = null)
     {
+        ruta ??= Config.Ruta;
+        string copiaDe = ruta + ".bak";
         string texto = "";
-        try { if (File.Exists(Config.Ruta)) texto = File.ReadAllText(Config.Ruta); }
+        try { if (File.Exists(ruta)) texto = File.ReadAllText(ruta); }
         catch (Exception ex) { Log.Error("leer config para ajustes", ex); }
 
         JsonObject? raiz = null;
@@ -47,28 +57,28 @@ public sealed class ConfigArbol
         {
             try
             {
-                var apartado = Config.Ruta + ".roto-" + DateTime.Now.ToString("yyyyMMdd-HHmmss");
-                File.Copy(Config.Ruta, apartado, true);
+                var apartado = ruta + ".roto-" + DateTime.Now.ToString("yyyyMMdd-HHmmss");
+                File.Copy(ruta, apartado, true);
                 Log.Info("config ilegible: se guarda tal cual en " + apartado);
             }
             catch (Exception ex) { Log.Error("apartar el config roto", ex); }
 
             try
             {
-                if (File.Exists(RutaCopia))
+                if (File.Exists(copiaDe))
                 {
-                    var copia = File.ReadAllText(RutaCopia);
+                    var copia = File.ReadAllText(copiaDe);
                     if (JsonNode.Parse(copia) is JsonObject buena)
                     {
-                        Log.Info("se recupera la copia de seguridad " + RutaCopia);
-                        return new ConfigArbol(buena, copia);
+                        Log.Info("se recupera la copia de seguridad " + copiaDe);
+                        return new ConfigArbol(buena, copia, ruta);
                     }
                 }
             }
             catch (Exception ex) { Log.Error("recuperar la copia del config", ex); }
         }
 
-        return new ConfigArbol(raiz ?? new JsonObject(), texto);
+        return new ConfigArbol(raiz ?? new JsonObject(), texto, ruta);
 
     }
 
@@ -174,7 +184,7 @@ public sealed class ConfigArbol
     {
         try
         {
-            EscribirAtomico(Config.Ruta, Serializar(), RutaCopia);
+            EscribirAtomico(_ruta, Serializar(), RutaCopia);
         }
         catch (Exception ex) { Log.Error("guardar config", ex); }
     }
@@ -198,7 +208,7 @@ public sealed class ConfigArbol
     {
         try
         {
-            if (_original.Length > 0) EscribirAtomico(Config.Ruta, _original, RutaCopia);
+            if (_original.Length > 0) EscribirAtomico(_ruta, _original, RutaCopia);
         }
         catch (Exception ex) { Log.Error("revertir config", ex); }
     }

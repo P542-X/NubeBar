@@ -36,8 +36,7 @@ public partial class MainWindow
         };
         var fecha = new TextBlock
         {
-            Foreground = _texto,
-            Opacity = 0.5,
+            Foreground = _textoAtenuado,
             FontSize = FontSize - 1,
             Margin = new Thickness(0, 2, 0, 0)
         };
@@ -87,19 +86,19 @@ public partial class MainWindow
             CornerRadius = new CornerRadius(8),
             ClipToBounds = true,
             Margin = new Thickness(0, 0, 12, 0),
-            Background = new SolidColorBrush(Color.FromArgb(0x22, _cTexto.R, _cTexto.G, _cTexto.B))
+            Background = _superficie
         };
         var img = new Image { Stretch = Stretch.UniformToFill };
         caratula.Child = img;
 
         var titulo = new TextBlock { Foreground = _texto, FontSize = FontSize + 1, TextTrimming = TextTrimming.CharacterEllipsis };
-        var artista = new TextBlock { Foreground = _texto, Opacity = 0.55, FontSize = FontSize - 1, TextTrimming = TextTrimming.CharacterEllipsis };
+        var artista = new TextBlock { Foreground = _textoAtenuado, FontSize = FontSize - 1, TextTrimming = TextTrimming.CharacterEllipsis };
 
         var barra = new Border
         {
             Height = 3,
             CornerRadius = new CornerRadius(1.5),
-            Background = new SolidColorBrush(Color.FromArgb(0x33, _cTexto.R, _cTexto.G, _cTexto.B)),
+            Background = _superficieAlta,
             Margin = new Thickness(0, 7, 0, 0),
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
@@ -222,8 +221,8 @@ public partial class MainWindow
             bool on = false;
             try { on = encendido(); } catch { }
             marco.Background = on
-                ? new SolidColorBrush(Color.FromArgb(0x33, _cAcento.R, _cAcento.G, _cAcento.B))
-                : new SolidColorBrush(Color.FromArgb(0x14, _cTexto.R, _cTexto.G, _cTexto.B));
+                ? _elegido
+                : _superficie;
             marco.BorderBrush = on ? _acento : Brushes.Transparent;
             icono.Foreground = on ? _acento : _texto;
             etiqueta.Foreground = on ? _acento : _texto;
@@ -256,7 +255,7 @@ public partial class MainWindow
 
     UIElement ConGrafica(string nombre, Grafica g, Func<string> valor)
     {
-        var titulo = new TextBlock { Text = nombre, Foreground = _texto, Opacity = 0.6, FontSize = FontSize - 2 };
+        var titulo = new TextBlock { Text = nombre, Foreground = _textoAtenuado, FontSize = FontSize - 2 };
         var numero = new TextBlock { Foreground = _acento, FontSize = FontSize + 2, HorizontalAlignment = HorizontalAlignment.Right };
         Typography.SetNumeralAlignment(numero, FontNumeralAlignment.Tabular);
 
@@ -287,13 +286,13 @@ public partial class MainWindow
             CornerRadius = new CornerRadius(6),
             ClipToBounds = true,
             Margin = new Thickness(0, 0, 12, 0),
-            Background = new SolidColorBrush(Color.FromArgb(0x22, _cTexto.R, _cTexto.G, _cTexto.B))
+            Background = _superficie
         };
         var img = new Image { Stretch = Stretch.UniformToFill };
         mini.Child = img;
 
         var titulo = new TextBlock { Foreground = _texto, TextTrimming = TextTrimming.CharacterEllipsis };
-        var pie = new TextBlock { Text = "Wallpaper actual", Foreground = _texto, Opacity = 0.5, FontSize = FontSize - 2 };
+        var pie = new TextBlock { Text = "Wallpaper actual", Foreground = _textoAtenuado, FontSize = FontSize - 2 };
         var textos = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         textos.Children.Add(titulo);
         textos.Children.Add(pie);
@@ -358,9 +357,8 @@ public partial class MainWindow
             var nombre = new TextBlock
             {
                 Text = Path.GetFileNameWithoutExtension(ruta),
-                Foreground = _texto,
+                Foreground = _textoAtenuado,
                 FontSize = FontSize - 3,
-                Opacity = 0.75,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 MaxWidth = 80,
@@ -455,7 +453,7 @@ public partial class MainWindow
     {
         Child = dentro,
         CornerRadius = new CornerRadius(12),
-        Background = new SolidColorBrush(Color.FromArgb(0x14, _cTexto.R, _cTexto.G, _cTexto.B)),
+        Background = _superficie,
         Padding = new Thickness(10, 9, 10, 9),
         Margin = new Thickness(0, 0, 0, 8)
     };

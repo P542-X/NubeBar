@@ -20,6 +20,24 @@ public static class RegistroWidgets
 
     public static IEnumerable<string> Ids => _orden.Select(w => w.Descriptor.Id);
 
+    // Quién sabe rellenar el registro, para que quien lo USA no tenga que saberlo.
+    //
+    // Hasta ahora la biblioteca llamaba a MainWindow.AsegurarWidgetsRegistrados(), y
+    // eso la ataba a la isla: no se podía construir sin levantar media aplicación. Con
+    // esto, MainWindow deja aquí su iniciador al arrancar y los demás solo piden
+    // Asegurar(). El registro deja de depender de quién lo llena.
+    static Action? _iniciador;
+
+    public static void AlIniciar(Action iniciador) => _iniciador = iniciador;
+
+    public static void Asegurar()
+    {
+        var i = _iniciador;
+        if (i == null) return;
+        _iniciador = null;      // una sola vez, y sin reentrar si el iniciador registra
+        i();
+    }
+
     public static void Registrar(IWidget w)
     {
         var id = w.Descriptor.Id;

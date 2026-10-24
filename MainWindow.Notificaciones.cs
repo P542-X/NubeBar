@@ -97,7 +97,7 @@ public partial class MainWindow : Window
         if (a.Texto.Length > 0)
             pila.Children.Add(new TextBlock
             {
-                Text = a.Texto, Foreground = _texto, Opacity = 0.7, FontSize = 11,
+                Text = a.Texto, Foreground = _textoAtenuado, FontSize = 11,
                 TextTrimming = TextTrimming.CharacterEllipsis
             });
         Grid.SetColumn(pila, 1);

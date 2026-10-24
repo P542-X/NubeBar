@@ -3,7 +3,8 @@ using System.Windows;
 
 namespace NubeBar;
 
-public enum NivelAnimacion { Completo, Equilibrado, Reducido }
+// El orden importa: de más a menos movimiento, y se compara con <= en varios sitios.
+public enum NivelAnimacion { Completo, Equilibrado, Reducido, Desactivado }
 
 // Cuánto se mueve la isla.
 //
@@ -21,8 +22,10 @@ public static class Animacion
 {
     public static NivelAnimacion Nivel { get; private set; } = NivelAnimacion.Completo;
 
-    // Equilibrado no quita animaciones, las acorta: se nota igual de vivo y responde
-    // antes. Reducido las deja en cero.
+    // ---------- Geometría: lo que se mueve, crece o encoge ----------
+    // Es lo caro: obliga a medir y a redibujar en cada fotograma. Equilibrado no la
+    // quita, la acorta. Reducido y Desactivado la dejan en cero, y entonces el valor
+    // final se fija igual pero sin recorrer el camino.
     public static double Factor => Nivel switch
     {
         NivelAnimacion.Completo => 1.0,
@@ -30,13 +33,37 @@ public static class Animacion
         _ => 0.0
     };
 
-    // ¿Se lanzan los adornos que solo son adorno?
+    public static bool Hay => Factor > 0;
+    public static double Escalar(double ms) => ms * Factor;
+
+    // ---------- Fundidos: los cambios de opacidad ----------
+    // No son geometría: no miden ni mueven nada, solo mezclan. Por eso Reducido SÍ los
+    // conserva, muy cortos, para que al pasar el ratón por un botón siga habiendo una
+    // respuesta; y Desactivado no, porque ahí lo que se pide es que todo aparezca ya
+    // en su estado final.
+    //
+    // Esta es la diferencia de verdad entre Reducido y Desactivado: sin ella los dos
+    // niveles serían el mismo botón con dos nombres.
+    public static double FactorFundido => Nivel switch
+    {
+        NivelAnimacion.Completo => 1.0,
+        NivelAnimacion.Equilibrado => 0.6,
+        NivelAnimacion.Reducido => 0.25,
+        _ => 0.0
+    };
+
+    public static bool HayFundido => FactorFundido > 0;
+    public static double EscalarFundido(double ms) => ms * FactorFundido;
+
+    // ---------- Adornos ----------
+    // El icono que se levanta, el latido de una app que arranca, el destello del
+    // borde: no tienen estado que conservar, así que fuera de Completo ni se lanzan.
     public static bool Adorno => Nivel == NivelAnimacion.Completo;
 
-    // ¿Hay movimiento, del tipo que sea?
-    public static bool Hay => Factor > 0;
-
-    public static double Escalar(double ms) => ms * Factor;
+    // ¿El botón se encoge al pulsarlo? Es geometría, y en Equilibrado va más corto y
+    // sin el rebote, que es la parte que más se nota.
+    public static bool Encogido => Nivel <= NivelAnimacion.Equilibrado;
+    public static bool Rebote => Nivel == NivelAnimacion.Completo;
 
     // Lo que diga el config. "auto" pregunta a Windows: quien ya ha pedido menos
     // movimiento en Accesibilidad > Efectos visuales no tiene que volver a pedirlo
@@ -50,6 +77,7 @@ public static class Animacion
             "completo" => NivelAnimacion.Completo,
             "equilibrado" => NivelAnimacion.Equilibrado,
             "reducido" => NivelAnimacion.Reducido,
+            "desactivado" => NivelAnimacion.Desactivado,
             "auto" => DesdeWindows(),
             _ => Avisar(valor)
         };
@@ -73,7 +101,7 @@ public static class Animacion
     static NivelAnimacion Avisar(string? valor)
     {
         Log.Info($"nivel de animación \"{valor}\" desconocido: se usa auto " +
-                 "(valores: auto, completo, equilibrado, reducido)");
+                 "(valores: auto, completo, equilibrado, reducido, desactivado)");
         return DesdeWindows();
     }
 }

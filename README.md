@@ -247,7 +247,7 @@ solo cuando hace de letra.
 
 | Clave | Por defecto | Qué hace |
 |---|---|---|
-| `Animaciones.Nivel` | `"auto"` | `"auto"` (sigue a Windows), `"completo"`, `"equilibrado"` (las acorta un 40 %) o `"reducido"` (sin movimiento) |
+| `Animaciones.Nivel` | `"auto"` | `"auto"` (sigue a Windows), `"completo"`, `"equilibrado"` (las acorta un 40 % y quita el rebote), `"reducido"` (sin movimiento, pero con fundidos muy cortos) o `"desactivado"` (sin nada: ni movimiento ni fundidos) |
 | `Animaciones.Robot` | `"primera-vez"` | Cuándo se ve la escena de entrada: `"primera-vez"`, `"cada-inicio"`, `"al-cambiar-tema"` o `"nunca"`. La escena todavía no está implementada |
 
 Con `"auto"` se lee **Accesibilidad → Efectos visuales → Efectos de animación** de

@@ -41,7 +41,7 @@ public partial class MainWindow : Window
         var canal = new Border
         {
             Height = 6, CornerRadius = new CornerRadius(3), Margin = new Thickness(0, 10, 0, 0),
-            Background = new SolidColorBrush(Color.FromArgb(0x33, _cTexto.R, _cTexto.G, _cTexto.B))
+            Background = _superficieAlta
         };
         var lleno = new Border
         {

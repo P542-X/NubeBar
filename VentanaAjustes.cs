@@ -36,6 +36,10 @@ public sealed class VentanaAjustes : Window
     SolidColorBrush _fondo = new(Color.FromRgb(0x16, 0x16, 0x1A));
     SolidColorBrush _texto = new(Colors.White);
     SolidColorBrush _acento = new(Color.FromRgb(0x7A, 0xA2, 0xF7));
+    SolidColorBrush _superficie = new(Color.FromArgb(0x1E, 255, 255, 255));
+    SolidColorBrush _superficieAlta = new(Color.FromArgb(0x33, 255, 255, 255));
+    SolidColorBrush _textoAtenuado = new(Color.FromRgb(0xA0, 0xA0, 0xA0));
+    Roles _roles = Roles.PorDefecto();
 
     TabControl _pestanas = new();
     readonly RegistroAjustes _modulos = new();
@@ -91,9 +95,54 @@ public sealed class VentanaAjustes : Window
 
     void LeerColoresDelTema()
     {
-        _fondo = new SolidColorBrush(Opaco(Hex(_arbol.Texto("Tema", "Fondo", "#E6000000"), Color.FromRgb(0x16, 0x16, 0x1A))));
-        _texto = new SolidColorBrush(Hex(_arbol.Texto("Tema", "Texto", "#FFFFFF"), Colors.White));
-        _acento = new SolidColorBrush(Hex(_arbol.Texto("Tema", "Acento", "#7AA2F7"), Color.FromRgb(0x7A, 0xA2, 0xF7)));
+        // El fondo de esta ventana es OPACO a propósito, aunque el tema traiga alfa:
+        // es una ventana normal, no la isla.
+        var fondo  = Opaco(Hex(_arbol.Texto("Tema", "Fondo", "#E6000000"), Color.FromRgb(0x16, 0x16, 0x1A)));
+        var texto  = Hex(_arbol.Texto("Tema", "Texto", "#FFFFFF"), Colors.White);
+        var acento = Hex(_arbol.Texto("Tema", "Acento", "#7AA2F7"), Color.FromRgb(0x7A, 0xA2, 0xF7));
+
+        _fondo = new SolidColorBrush(fondo);
+        _texto = new SolidColorBrush(texto);
+        _acento = new SolidColorBrush(acento);
+
+        // Los mismos roles que la isla, calculados aquí porque esta ventana lee el
+        // árbol del config y no el Config ya cargado (así la vista previa es en vivo).
+        //
+        // Antes, los fondos de esta ventana eran blancos fijos
+        // —`FromArgb(0x18, 255, 255, 255)`— escritos ocho veces. Con un tema claro eso
+        // es un velo blanco sobre blanco: invisible. Ahora salen del color de texto
+        // del tema, así que funcionan igual en claro y en oscuro.
+        _roles = Roles.Desde(TemaDelArbol(), fondo, texto, acento);
+        _superficie = new SolidColorBrush(_roles.Superficie);
+        _superficieAlta = new SolidColorBrush(_roles.SuperficieAlta);
+        _textoAtenuado = new SolidColorBrush(_roles.TextoAtenuado);
+    }
+
+    // Un Tema con lo que haya en el árbol, para poder pedirle los roles. Las claves de
+    // rol que no estén quedan vacías, y Roles las deriva.
+    Tema TemaDelArbol()
+    {
+        string? Opcional(string clave)
+        {
+            var v = _arbol.Texto("Tema", clave, "");
+            return string.IsNullOrWhiteSpace(v) ? null : v;
+        }
+        return new Tema
+        {
+            Fondo = _arbol.Texto("Tema", "Fondo", "#E6000000"),
+            Texto = _arbol.Texto("Tema", "Texto", "#FFFFFF"),
+            Acento = _arbol.Texto("Tema", "Acento", "#7AA2F7"),
+            Radio = _arbol.Numero("Tema", "Radio", 20),
+            Superficie = Opcional("Superficie"),
+            SuperficieAlta = Opcional("SuperficieAlta"),
+            Borde = Opcional("Borde"),
+            TextoAtenuado = Opcional("TextoAtenuado"),
+            Secundario = Opcional("Secundario"),
+            Sistema = Opcional("Sistema"),
+            Positivo = Opcional("Positivo"),
+            Aviso = Opcional("Aviso"),
+            Negativo = Opcional("Negativo")
+        };
     }
 
     static Color Opaco(Color c) => Color.FromRgb(c.R, c.G, c.B);
@@ -151,6 +200,8 @@ public sealed class VentanaAjustes : Window
                            "acento", "fondo", "texto", "paleta", "hsv", "wallpaper", "roles", "contraste");
         _modulos.Registrar("modulos", "Módulos", "Panel", SeccionModulos,
                            "widgets", "zonas", "izquierda", "centro", "derecha", "reloj", "bandeja");
+        _modulos.Registrar("biblioteca", "Biblioteca", "Panel", SeccionBiblioteca,
+                           "widgets", "añadir", "ocultar", "quitar", "catálogo", "buscar");
         _modulos.Registrar("apps", "Apps", "Panel", SeccionApps,
                            "carrusel", "fijadas", "agrupar", "orden", "ventanas");
         _modulos.Registrar("atajos", "Atajos", "Sistema", SeccionAtajos,
@@ -207,7 +258,7 @@ public sealed class VentanaAjustes : Window
 
         var encima = new Trigger { Property = TabItem.IsMouseOverProperty, Value = true };
         encima.Setters.Add(new Setter(Border.BackgroundProperty,
-                                      new SolidColorBrush(Color.FromArgb(0x18, 255, 255, 255)), "marco"));
+                                      _superficie, "marco"));
         plantilla.Triggers.Add(encima);
 
         var estilo = new Style(typeof(TabItem));
@@ -252,7 +303,7 @@ public sealed class VentanaAjustes : Window
             Margin = new Thickness(8, 0, 0, 0),
             Padding = new Thickness(18, 7, 18, 7),
             Foreground = destacado ? Brushes.Black : _texto,
-            Background = destacado ? _acento : new SolidColorBrush(Color.FromArgb(0x22, 255, 255, 255)),
+            Background = destacado ? _acento : _superficieAlta,
             BorderThickness = new Thickness(0),
             Cursor = Cursors.Hand
         };
@@ -357,7 +408,7 @@ public sealed class VentanaAjustes : Window
         // "auto" sigue a Windows (Accesibilidad > Efectos visuales > Efectos de
         // animación): quien ya ha pedido menos movimiento en el sistema no tiene que
         // volver a pedirlo aquí. Equilibrado no quita animaciones, las acorta.
-        c.Children.Add(Opciones("Animaciones", new[] { "auto", "completo", "equilibrado", "reducido" },
+        c.Children.Add(Opciones("Animaciones", new[] { "auto", "completo", "equilibrado", "reducido", "desactivado" },
                                 _arbol.Texto("Animaciones", "Nivel", "auto"),
                                 v => _arbol.Poner("Animaciones", "Nivel", v)));
         // La escena del robot todavía no existe (llega en la fase C). La opción se
@@ -465,7 +516,7 @@ public sealed class VentanaAjustes : Window
             Content = caja,
             Margin = new Thickness(0, 0, 10, 10),
             Padding = new Thickness(10, 8, 10, 8),
-            Background = new SolidColorBrush(Color.FromArgb(0x1C, 255, 255, 255)),
+            Background = _superficie,
             BorderBrush = _acento,
             BorderThickness = new Thickness(1),
             Foreground = _texto,
@@ -547,6 +598,31 @@ public sealed class VentanaAjustes : Window
         Avisar("Tema importado: " + tema.Nombre, false);
     }
 
+    // La biblioteca de widgets. La construye Biblioteca.cs, que no sabe nada de esta
+    // ventana: así el modo edición de la isla podrá usar la misma sin tocarla.
+    //
+    // Cada acción escribe en el árbol y guarda en el acto (no con el temporizador de
+    // 120 ms de los deslizadores): añadir o quitar un widget no es arrastrar un valor,
+    // es una decisión, y quien la toma espera verla en la isla ya. La recarga en
+    // caliente hace el resto.
+    UIElement SeccionBiblioteca()
+    {
+        var c = Columna();
+        c.Children.Add(Rotulo("Biblioteca de widgets", true));
+        c.Children.Add(new TextBlock
+        {
+            Text = "Lo que puedes poner en la nube. Ocultar conserva el sitio del widget; " +
+                   "quitar lo devuelve aquí.",
+            Foreground = _textoAtenuado,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 10)
+        });
+
+        var biblioteca = new Biblioteca(_arbol, _roles, () => { _escritura.Stop(); _arbol.Guardar(); }, _modulos);
+        c.Children.Add(biblioteca.Construir());
+        return c;
+    }
+
     UIElement SeccionModulos()
     {
         var c = Columna();
@@ -582,7 +658,7 @@ public sealed class VentanaAjustes : Window
                 Content = etiqueta,
                 Margin = new Thickness(0, 0, 6, 6),
                 Padding = new Thickness(10, 4, 10, 4),
-                Background = new SolidColorBrush(Color.FromArgb(0x1C, 255, 255, 255)),
+                Background = _superficie,
                 Foreground = _texto,
                 BorderThickness = new Thickness(0),
                 Cursor = Cursors.Hand
@@ -594,7 +670,7 @@ public sealed class VentanaAjustes : Window
         c.Children.Add(new TextBlock
         {
             Text = "Doble clic en un módulo de una columna para quitarlo.",
-            Foreground = _texto, Opacity = 0.5, Margin = new Thickness(0, 6, 0, 0)
+            Foreground = _textoAtenuado, Margin = new Thickness(0, 6, 0, 0)
         });
         return c;
     }
@@ -612,7 +688,7 @@ public sealed class VentanaAjustes : Window
         r.Lista = new ListBox
         {
             Height = 190,
-            Background = new SolidColorBrush(Color.FromArgb(0x18, 255, 255, 255)),
+            Background = _superficie,
             Foreground = _texto,
             BorderThickness = new Thickness(0),
             AllowDrop = true
@@ -682,7 +758,7 @@ public sealed class VentanaAjustes : Window
         var lista = new ListBox
         {
             Height = 120,
-            Background = new SolidColorBrush(Color.FromArgb(0x18, 255, 255, 255)),
+            Background = _superficie,
             Foreground = _texto, BorderThickness = new Thickness(0)
         };
         foreach (var f in _arbol.Lista(seccion, clave)) lista.Items.Add(f);
@@ -692,7 +768,7 @@ public sealed class VentanaAjustes : Window
             Height = 28, Margin = new Thickness(0, 6, 0, 0),
             Padding = new Thickness(8, 0, 8, 0),
             VerticalContentAlignment = VerticalAlignment.Center,
-            Background = new SolidColorBrush(Color.FromArgb(0x22, 255, 255, 255)),
+            Background = _superficieAlta,
             Foreground = _texto, BorderThickness = new Thickness(0)
         };
         void Volcar() { _arbol.PonerLista(seccion, clave, lista.Items.Cast<string>()); Cambio(); }
@@ -729,7 +805,7 @@ public sealed class VentanaAjustes : Window
         c.Children.Add(fila);
         c.Children.Add(new TextBlock
         {
-            Text = ayuda, Foreground = _texto, Opacity = 0.45,
+            Text = ayuda, Foreground = _textoAtenuado,
             TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0)
         });
         return c;
@@ -771,7 +847,7 @@ public sealed class VentanaAjustes : Window
             Height = 30,
             Padding = new Thickness(8, 0, 8, 0),
             VerticalContentAlignment = VerticalAlignment.Center,
-            Background = new SolidColorBrush(Color.FromArgb(0x22, 255, 255, 255)),
+            Background = _superficieAlta,
             Foreground = _texto,
             BorderThickness = new Thickness(0),
             Cursor = Cursors.Hand
@@ -817,7 +893,7 @@ public sealed class VentanaAjustes : Window
             Text = "Aviso: una combinación que YA tenga otra aplicación no se puede teclear aquí, " +
                    "porque Windows se la entrega a esa aplicación y nunca llega a este campo. " +
                    "Por eso la que está guardada se comprueba sola al entrar en esta pestaña.",
-            Foreground = _texto, Opacity = 0.5, Margin = new Thickness(0, 10, 0, 0), TextWrapping = TextWrapping.Wrap
+            Foreground = _textoAtenuado, Margin = new Thickness(0, 10, 0, 0), TextWrapping = TextWrapping.Wrap
         });
 
         // Comprobar la que ya está guardada es justamente donde avisar sirve de algo,
@@ -879,7 +955,7 @@ public sealed class VentanaAjustes : Window
             Text = _arbol.Texto("Inicio", "BuscadorWeb", "https://www.google.com/search?q="),
             Height = 28, Padding = new Thickness(8, 0, 8, 0),
             VerticalContentAlignment = VerticalAlignment.Center,
-            Background = new SolidColorBrush(Color.FromArgb(0x22, 255, 255, 255)),
+            Background = _superficieAlta,
             Foreground = _texto, BorderThickness = new Thickness(0)
         };
         web.TextChanged += (_, _) => { _arbol.Poner("Inicio", "BuscadorWeb", web.Text); Cambio(); };
@@ -889,7 +965,7 @@ public sealed class VentanaAjustes : Window
         var lista = new ListBox
         {
             Height = 130,
-            Background = new SolidColorBrush(Color.FromArgb(0x18, 255, 255, 255)),
+            Background = _superficie,
             Foreground = _texto, BorderThickness = new Thickness(0)
         };
         foreach (var f in _arbol.Lista("Inicio", "Fijadas")) lista.Items.Add(f);
@@ -899,7 +975,7 @@ public sealed class VentanaAjustes : Window
             Height = 28, Margin = new Thickness(0, 6, 0, 0),
             Padding = new Thickness(8, 0, 8, 0),
             VerticalContentAlignment = VerticalAlignment.Center,
-            Background = new SolidColorBrush(Color.FromArgb(0x22, 255, 255, 255)),
+            Background = _superficieAlta,
             Foreground = _texto, BorderThickness = new Thickness(0)
         };
         void Volcar() { _arbol.PonerLista("Inicio", "Fijadas", lista.Items.Cast<string>()); Cambio(); }
@@ -933,7 +1009,7 @@ public sealed class VentanaAjustes : Window
             Text = _arbol.Texto("Wallpaper", "Ruta", "") ?? "",
             Height = 28, Padding = new Thickness(8, 0, 8, 0),
             VerticalContentAlignment = VerticalAlignment.Center,
-            Background = new SolidColorBrush(Color.FromArgb(0x22, 255, 255, 255)),
+            Background = _superficieAlta,
             Foreground = _texto, BorderThickness = new Thickness(0)
         };
         ruta.TextChanged += (_, _) => { _arbol.Poner("Wallpaper", "Ruta", ruta.Text); Cambio(); };
@@ -943,7 +1019,7 @@ public sealed class VentanaAjustes : Window
         c.Children.Add(new TextBlock
         {
             Text = detectada != null ? "Detectado solo en: " + detectada : "No se ha detectado Wallpaper Engine",
-            Foreground = _texto, Opacity = 0.55, TextWrapping = TextWrapping.Wrap,
+            Foreground = _textoAtenuado, TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 6, 0, 0)
         });
         if (detectada != null)
@@ -962,7 +1038,7 @@ public sealed class VentanaAjustes : Window
         var c = Columna();
         c.Children.Add(Rotulo("Arranque", true));
 
-        var estado = new TextBlock { Foreground = _texto, Opacity = 0.6, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0) };
+        var estado = new TextBlock { Foreground = _textoAtenuado, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0) };
         estado.Text = Arranque.Activo ? "Ahora mismo sí arranca con Windows." : "Ahora mismo no arranca con Windows.";
 
         c.Children.Add(Interruptor("Arrancar con Windows", Arranque.Activo, v =>
@@ -1003,7 +1079,7 @@ public sealed class VentanaAjustes : Window
         {
             Text = string.Join(Environment.NewLine, silenciadas),
             AcceptsReturn = true, MinHeight = 56, MaxHeight = 110,
-            Background = new SolidColorBrush(Color.FromArgb(0x22, 255, 255, 255)),
+            Background = _superficieAlta,
             Foreground = _texto, BorderBrush = _acento, BorderThickness = new Thickness(1),
             Padding = new Thickness(6), Margin = new Thickness(0, 4, 0, 0),
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto

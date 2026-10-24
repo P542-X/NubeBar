@@ -25,10 +25,16 @@ namespace NubeBar;
 public sealed class Roles
 {
     // ---------- Superficies ----------
+    // Superficie y SuperficieAlta se PINTAN y pueden venir translúcidas (es lo normal
+    // cuando se derivan). Sus parejas "Solida" son lo que se VE una vez compuestas
+    // sobre el fondo de la isla, y son las que hay que usar para MEDIR contraste: un
+    // color con alfa no tiene luminancia propia hasta que se sabe qué hay detrás.
     public Color Fondo { get; init; }            // la isla o el panel, con su transparencia
     public Color FondoOpaco { get; init; }        // el mismo sin alfa: para medir contraste
     public Color Superficie { get; init; }        // una tarjeta o una fila DENTRO de un panel
+    public Color SuperficieSolida { get; init; }
     public Color SuperficieAlta { get; init; }    // el elemento bajo el ratón o el elegido
+    public Color SuperficieAltaSolida { get; init; }
     public Color Borde { get; init; }             // separadores y filos
 
     // ---------- Tinta ----------
@@ -38,6 +44,12 @@ public sealed class Roles
     // ---------- Acentos ----------
     public Color Acento { get; init; }            // relleno, filo, la rayita de la app activa
     public Color AcentoTinta { get; init; }       // el acento cuando hace de TEXTO
+
+    // El fondo de lo que está ELEGIDO: la wifi a la que estás conectado, la app
+    // marcada en el menú. Es un velo del acento, no el acento a secas, porque encima
+    // tiene que poder leerse texto.
+    public Color Seleccion { get; init; }
+    public Color SeleccionSolida { get; init; }
     public Color Secundario { get; init; }        // el naranja del tema Nube: detalles cálidos
     public Color SecundarioTinta { get; init; }
     public Color Sistema { get; init; }           // el azul nube: red, volumen, batería
@@ -79,11 +91,20 @@ public sealed class Roles
     {
         var fondoOpaco = Color.FromRgb(fondo.R, fondo.G, fondo.B);
 
-        // Las superficies se sacan acercando el fondo al texto, no aclarando a ciegas:
-        // así funciona igual en un tema oscuro (sube) y en uno claro (baja).
-        var superficie     = Leer(t.Superficie)     ?? Contraste.Mezclar(fondoOpaco, texto, 0.07);
-        var superficieAlta = Leer(t.SuperficieAlta) ?? Contraste.Mezclar(fondoOpaco, texto, 0.14);
-        var borde          = Leer(t.Borde)          ?? Contraste.Mezclar(fondoOpaco, texto, 0.22);
+        // Las superficies derivadas son un VELO TRANSLÚCIDO del color de texto, no un
+        // color opaco. Es exactamente lo que el código venía haciendo a mano por todas
+        // partes —`FromArgb(0x14 / 0x22 / 0x33, _cTexto…)`— y es lo que hace que una
+        // fila de un panel deje pasar un poco el fondo de pantalla, igual que la isla.
+        //
+        // Si se derivaran opacas, los seis temas de siempre cambiarían de aspecto el
+        // día que empezaran a usar roles, que es justo lo que no puede pasar. Un tema
+        // que las declare manda, y puede darlas opacas: el tema Nube lo hace.
+        var superficie     = Leer(t.Superficie)     ?? Velo(texto, VeloSuperficie);
+        var superficieAlta = Leer(t.SuperficieAlta) ?? Velo(texto, VeloAlta);
+        var borde          = Leer(t.Borde)          ?? Velo(texto, VeloBorde);
+
+        // El texto atenuado sí es opaco: es tinta, y bajarle el alfa lo dejaría
+        // dependiendo del fondo de pantalla para poder leerse.
         var atenuado       = Leer(t.TextoAtenuado)  ?? Contraste.Mezclar(texto, fondoOpaco, 0.35);
 
         // Secundario y Sistema, si el tema no los da, son el propio acento: así un tema
@@ -102,7 +123,9 @@ public sealed class Roles
             Fondo = fondo,
             FondoOpaco = fondoOpaco,
             Superficie = superficie,
+            SuperficieSolida = Aplanar(superficie, fondoOpaco),
             SuperficieAlta = superficieAlta,
+            SuperficieAltaSolida = Aplanar(superficieAlta, fondoOpaco),
             Borde = borde,
 
             Texto = texto,
@@ -110,6 +133,8 @@ public sealed class Roles
 
             Acento = acento,
             AcentoTinta = Contraste.Legible(acento, fondoOpaco),
+            Seleccion = Velo(acento, VeloSeleccion),
+            SeleccionSolida = Aplanar(Velo(acento, VeloSeleccion), fondoOpaco),
             Secundario = secundario,
             SecundarioTinta = Contraste.Legible(secundario, fondoOpaco),
             Sistema = sistema,
@@ -125,6 +150,19 @@ public sealed class Roles
             Radio = t.Radio
         };
     }
+
+    // Los alfas de los velos derivados. No son números redondos por capricho: son los
+    // que el código ya usaba a mano (0x14 y 0x22 para una fila, 0x33 para la fila bajo
+    // el ratón), promediados, para que los temas de siempre no cambien de aspecto.
+    const byte VeloSuperficie = 0x1E, VeloAlta = 0x33, VeloBorde = 0x3A, VeloSeleccion = 0x33;
+
+    static Color Velo(Color sobre, byte alfa) => Color.FromArgb(alfa, sobre.R, sobre.G, sobre.B);
+
+    // Lo que se ve de verdad cuando ese color se pinta encima del fondo: si es opaco,
+    // él mismo; si trae alfa, el resultado de componerlo. Hace falta para medir
+    // contraste, porque un #1EFFFFFF no se "lee" claro ni oscuro por sí solo.
+    static Color Aplanar(Color c, Color fondo) =>
+        c.A == 0xFF ? c : Contraste.Mezclar(fondo, Color.FromRgb(c.R, c.G, c.B), c.A / 255.0);
 
     // Un hex del config, o null si no está puesto o está mal escrito. Un color mal
     // escrito no puede tumbar el arranque: se deriva y se apunta.

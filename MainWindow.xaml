@@ -7,79 +7,10 @@
 
     <Window.Resources>
         <SolidColorBrush x:Key="Hover" Color="#30FFFFFF"/>
-        <Style TargetType="Button">
-            <Setter Property="Margin" Value="2,0"/>
-            <Setter Property="Padding" Value="6,0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Grid Background="Transparent">
-                            <!-- Fondo del hover: aparece y desaparece con fundido -->
-                            <Border x:Name="bg" Background="{DynamicResource Hover}" CornerRadius="8" Opacity="0"/>
-                            <ContentPresenter x:Name="cp" Margin="{TemplateBinding Padding}"
-                                              HorizontalAlignment="Center" VerticalAlignment="Center"
-                                              RenderTransformOrigin="0.5,0.5">
-                                <ContentPresenter.RenderTransform>
-                                    <ScaleTransform/>
-                                </ContentPresenter.RenderTransform>
-                            </ContentPresenter>
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Trigger.EnterActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="bg" Storyboard.TargetProperty="Opacity"
-                                                             To="1" Duration="0:0:0.15"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.EnterActions>
-                                <Trigger.ExitActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="bg" Storyboard.TargetProperty="Opacity"
-                                                             To="0" Duration="0:0:0.3"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.ExitActions>
-                            </Trigger>
-                            <!-- Al pulsar: se encoge un poco y rebota -->
-                            <Trigger Property="IsPressed" Value="True">
-                                <Trigger.EnterActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="cp" To="0.82" Duration="0:0:0.08"
-                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"/>
-                                            <DoubleAnimation Storyboard.TargetName="cp" To="0.82" Duration="0:0:0.08"
-                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.EnterActions>
-                                <Trigger.ExitActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="cp" To="1" Duration="0:0:0.35"
-                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)">
-                                                <DoubleAnimation.EasingFunction>
-                                                    <BackEase EasingMode="EaseOut" Amplitude="0.6"/>
-                                                </DoubleAnimation.EasingFunction>
-                                            </DoubleAnimation>
-                                            <DoubleAnimation Storyboard.TargetName="cp" To="1" Duration="0:0:0.35"
-                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)">
-                                                <DoubleAnimation.EasingFunction>
-                                                    <BackEase EasingMode="EaseOut" Amplitude="0.6"/>
-                                                </DoubleAnimation.EasingFunction>
-                                            </DoubleAnimation>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.ExitActions>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+        <!-- El estilo de los botones ya no está aquí: se construye en
+             MainWindow.Botones.cs, porque sus animaciones tienen que poder cambiar
+             con el nivel de animación y una Duration escrita en XAML se congela
+             dentro de la plantilla. -->
     </Window.Resources>
 
     <!-- La ventana ocupa todo el ancho y es transparente (los clics la atraviesan);

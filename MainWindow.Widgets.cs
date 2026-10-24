@@ -34,6 +34,12 @@ public partial class MainWindow : Window, IAnfitrionWidget
     // ================= Registro de los widgets de casa =================
     static bool _widgetsRegistrados;
 
+    // La isla le dice al registro QUIÉN sabe llenarlo, y así quien lo usa (la
+    // biblioteca, y mañana el modo edición) solo tiene que pedir Asegurar() sin
+    // depender de MainWindow. Se ejecuta la primera vez que alguien toca esta clase,
+    // que en la aplicación de verdad es siempre antes de que haya interfaz.
+    static MainWindow() => RegistroWidgets.AlIniciar(AsegurarWidgetsRegistrados);
+
     // Se llama antes de rellenar por primera vez, y también desde la ventana de
     // ajustes: si se abriera antes de que ninguna isla haya montado sus zonas, la
     // lista de módulos disponibles saldría vacía. Idempotente: con dos monitores hay
@@ -114,13 +120,57 @@ public partial class MainWindow : Window, IAnfitrionWidget
 
         // ---------- Útiles ----------
         R("separador", "Separador", "Una rayita para separar grupos de widgets", "", CategoriaWidget.Util,
-          i => new Border
-          {
-              Width = 1, Height = 16, Margin = new Thickness(6, 0, 6, 0),
-              Background = i._texto, Opacity = 0.3
-          }, repetible: true);
+          i => i.Separador(), repetible: true);
 
         Log.Info($"widgets registrados: {RegistroWidgets.Todos.Count}");
+    }
+
+    // ================= El separador =================
+    //
+    // Una rayita vertical entre grupos de widgets. No hace nada más, y justo por eso
+    // tenía tres cosas mal que no se notaban hasta que alguien lo ponía:
+    //
+    //  1. **No decía cómo alinearse.** Un Border nace con VerticalAlignment.Stretch, y
+    //     con un Height fijo eso deja la posición en manos de cómo WPF resuelve un
+    //     "estírate" que no se puede cumplir. Funcionaba de casualidad mientras todos
+    //     sus vecinos midieran lo mismo. Ahora lo dice: Center.
+    //
+    //  2. **Su alto era un 16 escrito a mano**, que no sabía nada de Barra.Alto. Con la
+    //     barra fina la raya ocupaba casi todo; con la barra gruesa era un muñón. Y si
+    //     algún vecino hacía la fila más alta que Barra.Alto, la raya se centraba en la
+    //     FILA y no en la isla, y el recorte de Isla (ClipToBounds) se le comía un
+    //     trozo. Ahora sale del alto de la barra y nunca puede pasarse de ella.
+    //
+    //  3. **Su color era _texto con Opacity 0.3**, otra mezcla a ojo de las que quitó
+    //     la fase B1. Un separador es un borde: le toca el rol Borde, que además lo
+    //     hace temable (en Nube es azulado, no gris).
+    //
+    // MaxHeight además de Height: aunque alguien ponga un Barra.Alto raro, la raya no
+    // puede crecer más que el hueco y provocar el recorte otra vez.
+    internal UIElement Separador()
+    {
+        double alto = AltoSeparador(_cfg.Barra.Alto);
+        return new Border
+        {
+            Width = 1,
+            Height = alto,
+            MaxHeight = alto,
+            Margin = new Thickness(6, 0, 6, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Background = _borde,
+            // Una línea de 1 px entre píxeles sale gris y borrosa con DPI no entero
+            SnapsToDevicePixels = true,
+            UseLayoutRounding = true
+        };
+    }
+
+    // Proporción, no número mágico: 16 px con la barra de 38 (lo de siempre), y de ahí
+    // escala. El mínimo es para que no desaparezca con una barra muy fina; el máximo,
+    // para que siempre quepa con holgura dentro de la fila.
+    internal static double AltoSeparador(double altoBarra)
+    {
+        double alto = Math.Round(altoBarra * 0.42);
+        return Math.Clamp(alto, 8, Math.Max(8, altoBarra - 8));
     }
 
     // ================= Rellenar las zonas =================
@@ -170,7 +220,14 @@ public partial class MainWindow : Window, IAnfitrionWidget
                 continue;
             }
             destino.Children.Clear();
-            foreach (var id in widgets) destino.Children.Add(CrearWidget(id));
+            foreach (var id in widgets)
+            {
+                // Oculto no es quitado: el id sigue en su zona y en su sitio, solo que
+                // hoy no se dibuja. Así, al volver a mostrarlo, reaparece donde estaba
+                // y no al final de la fila.
+                if (panel.Zonas.Oculto(id)) continue;
+                destino.Children.Add(CrearWidget(id));
+            }
         }
     }
 

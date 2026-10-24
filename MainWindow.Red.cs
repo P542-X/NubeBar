@@ -147,7 +147,7 @@ public partial class MainWindow : Window
 
     TextBlock Tenue(string texto) => new()
     {
-        Text = texto, Foreground = _texto, Opacity = 0.55, FontSize = 11,
+        Text = texto, Foreground = _textoAtenuado, FontSize = 11,
         TextTrimming = TextTrimming.CharacterEllipsis
     };
 
@@ -292,7 +292,7 @@ public partial class MainWindow : Window
 
         var senal = new TextBlock
         {
-            Text = $"{w.Senal}%", Foreground = _texto, Opacity = 0.6, FontSize = 11,
+            Text = $"{w.Senal}%", Foreground = _textoAtenuado, FontSize = 11,
             HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center
         };
         Grid.SetColumn(senal, 3);
@@ -358,7 +358,7 @@ public partial class MainWindow : Window
             Height = 28,
             Padding = new Thickness(8, 0, 8, 0),
             VerticalContentAlignment = VerticalAlignment.Center,
-            Background = new SolidColorBrush(Color.FromArgb(0x24, _cTexto.R, _cTexto.G, _cTexto.B)),
+            Background = _superficie,
             Foreground = _texto,
             CaretBrush = _acentoLegible,
             BorderThickness = new Thickness(0),
