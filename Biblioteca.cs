@@ -30,18 +30,23 @@ public sealed class Biblioteca
     readonly Action _alCambiar;          // guardar y repintar
     readonly RegistroAjustes? _ajustes;  // para el "¿buscabas un ajuste?" del estado vacío
 
+    // Si viene puesta, lo que se añada cae AQUÍ en vez de en la zona preferida del
+    // descriptor. La pone el "+" de una zona concreta del modo edición.
+    readonly string? _zonaDestino;
+
     string _busqueda = "";
     CategoriaWidget? _categoria;         // null = todas
 
     readonly StackPanel _lista = new();
     readonly Panel _raiz = new StackPanel();
 
-    public Biblioteca(ConfigArbol arbol, Roles roles, Action alCambiar, RegistroAjustes? ajustes = null)
+    public Biblioteca(ConfigArbol arbol, Roles roles, Action alCambiar, RegistroAjustes? ajustes = null, string? zonaDestino = null)
     {
         _arbol = arbol;
         _roles = roles;
         _alCambiar = alCambiar;
         _ajustes = ajustes;
+        _zonaDestino = zonaDestino;
         RegistroWidgets.Asegurar();
     }
 
@@ -55,94 +60,24 @@ public sealed class Biblioteca
     SolidColorBrush Borde => P(_roles.Borde);
 
     // ================= Lo que hay puesto =================
-    static readonly string[] Zonas = { "Izquierda", "Centro", "Derecha" };
+    // Las reglas (dónde cae lo que se añade, qué pasa con los repetibles, que ocultar
+    // conserve el sitio) viven en ZonasWidgets, no aquí: el modo edición de la isla
+    // usa las mismas, y si cada uno llevara su copia acabarían discrepando.
+    static readonly string[] Zonas = ZonasWidgets.Nombres;
 
-    List<string> EnZona(string zona) => _arbol.Lista("Modulos", zona);
-    List<string> Ocultos() => _arbol.Lista("Modulos", "Ocultos");
+    ZonasWidgets Z => new(_arbol);
 
-    bool EstaOculto(string id) => Ocultos().Any(o => o.Equals(id, StringComparison.OrdinalIgnoreCase));
-
-    // En qué zona está, o null. Si está repetido devuelve la primera.
-    string? DondeEsta(string id)
-    {
-        foreach (var z in Zonas)
-            if (EnZona(z).Any(m => m.Equals(id, StringComparison.OrdinalIgnoreCase))) return z;
-        return null;
-    }
-
-    int CuantosHay(string id) =>
-        Zonas.Sum(z => EnZona(z).Count(m => m.Equals(id, StringComparison.OrdinalIgnoreCase)));
+    List<string> EnZona(string zona) => Z.De(zona);
+    bool EstaOculto(string id) => Z.EstaOculto(id);
+    string? DondeEsta(string id) => Z.DondeEsta(id);
+    int CuantosHay(string id) => Z.CuantosHay(id);
 
     // ================= Acciones =================
 
-    void Anadir(IWidget w)
-    {
-        var d = w.Descriptor;
-
-        // La regla del contrato: si no es repetible y ya está, no se añade otro. El
-        // botón ya sale apagado, pero se comprueba igual aquí porque esto también lo
-        // llamará el modo edición y no quiero que la regla viva en la interfaz.
-        if (!d.Repetible && CuantosHay(d.Id) > 0)
-        {
-            Log.Info($"el widget \"{d.Id}\" no admite más de uno: no se añade otro");
-            return;
-        }
-
-        var zona = Zonas.Contains(d.ZonaPreferida) ? d.ZonaPreferida : "Derecha";
-        var lista = EnZona(zona);
-        lista.Add(d.Id);
-        _arbol.PonerLista("Modulos", zona, lista);
-
-        // Si se vuelve a añadir algo que estaba oculto, lo lógico es verlo.
-        Mostrar(d.Id, guardar: false);
-
-        Log.Info($"widget \"{d.Id}\" añadido a {zona}");
-        Cambiado();
-    }
-
-    void Quitar(string id)
-    {
-        foreach (var z in Zonas)
-        {
-            var lista = EnZona(z);
-            // La ÚLTIMA, no la primera: con un widget repetible (el separador), quitar
-            // debe deshacer el último que pusiste, que es lo que uno espera.
-            int i = lista.FindLastIndex(m => m.Equals(id, StringComparison.OrdinalIgnoreCase));
-            if (i < 0) continue;
-            lista.RemoveAt(i);
-            _arbol.PonerLista("Modulos", z, lista);
-            Log.Info($"widget \"{id}\" quitado de {z}");
-            break;
-        }
-        // Si era el último, ya no tiene sentido que siga en la lista de ocultos
-        if (CuantosHay(id) == 0) Mostrar(id, guardar: false);
-        Cambiado();
-    }
-
-    void Ocultar(string id)
-    {
-        var o = Ocultos();
-        if (!o.Any(x => x.Equals(id, StringComparison.OrdinalIgnoreCase)))
-        {
-            o.Add(id);
-            _arbol.PonerLista("Modulos", "Ocultos", o);
-            Log.Info($"widget \"{id}\" oculto (conserva su sitio)");
-        }
-        Cambiado();
-    }
-
-    void Mostrar(string id, bool guardar = true)
-    {
-        var o = Ocultos();
-        int antes = o.Count;
-        o.RemoveAll(x => x.Equals(id, StringComparison.OrdinalIgnoreCase));
-        if (o.Count != antes)
-        {
-            _arbol.PonerLista("Modulos", "Ocultos", o);
-            Log.Info($"widget \"{id}\" vuelve a verse");
-        }
-        if (guardar) Cambiado();
-    }
+    void Anadir(IWidget w) { Z.Anadir(w.Descriptor, _zonaDestino); Cambiado(); }
+    void Quitar(string id) { Z.Quitar(id); Cambiado(); }
+    void Ocultar(string id) { Z.Ocultar(id); Cambiado(); }
+    void Mostrar(string id) { Z.Mostrar(id); Cambiado(); }
 
     void Cambiado()
     {
@@ -274,10 +209,7 @@ public sealed class Biblioteca
         if (_lista.Children.Count == 0) _lista.Children.Add(Vacio());
     }
 
-    IEnumerable<string> Desconocidos() =>
-        Zonas.SelectMany(EnZona)
-             .Where(id => !RegistroWidgets.Existe(id))
-             .Distinct(StringComparer.OrdinalIgnoreCase);
+    IEnumerable<string> Desconocidos() => Z.Desconocidos();
 
     Border Ficha(IWidget w)
     {

@@ -373,27 +373,10 @@ public partial class MainWindow : Window
         Isla.BorderThickness = new Thickness(t.BordeAcento ? 1 : 0);
         AjustarBrillo(t.BordeAcento, acento);
 
-        _actualizadores.Clear();
-        // Los módulos se montan de cero: si has quitado "apps", el carrusel de la vez
-        // anterior ya no está en la isla y hay que olvidarlo (si sigue, ModuloApps lo
-        // vuelve a poner)
-        _tira = null;
-        _carrusel = null;
-        PrepararFijas();                    // la tira de las fijadas, antes que el carrusel
-        // Antes eran tres llamadas con los tres campos del config. Ahora es un bucle
-        // sobre las zonas del panel, y cada widget se monta por el registro: ver
-        // MainWindow.Widgets.cs
-        LlenarZonas(PanelPrincipal);
-
-        // Con "fijadas" puesto y "apps" quitado no hay carrusel que refresque los
-        // grupos, pero las fijas siguen necesitando que alguien las pinte y les lleve
-        // la cuenta de ventanas abiertas
-        if (FijasAparte && _tira == null)
-        {
-            _grupos.Clear();
-            RefrescarApps();
-            _actualizadores.Add(RefrescarApps);
-        }
+        // Montar las zonas es más que rellenarlas: ver RemontarZonas, que es el ÚNICO
+        // sitio desde el que se hace. El modo edición llamaba antes a LlenarZonas a
+        // secas y se saltaba este preámbulo, lo que hacía desaparecer las fijadas.
+        RemontarZonas();
 
         // Primero el diseño de la isla y después el tamaño de la ventana: asignar
         // Window.Width/Height hace un SetWindowPos que bombea mensajes y provoca un
@@ -439,6 +422,11 @@ public partial class MainWindow : Window
             _gancho.Activo = _cfg.Inicio.TeclaWindows;
             _gancho.Volumen = _cfg.Barra.TeclasVolumen;
         }
+
+        // Lo último: aquí arriba la isla se ha dejado recogida. Si se está editando,
+        // hay que volver a abrirla, o cada acción del modo edición (que guarda, y
+        // guardar recarga) cerraría la isla en las narices de quien está editando.
+        RestaurarEdicion();
     }
 
     int Px(double dip) =>
@@ -602,6 +590,10 @@ public partial class MainWindow : Window
     void Expandir(bool abrir, bool forzar = false)
     {
         if (!EsIsla || abrir == _expandida) return;
+        // Editando, la isla se queda abierta pase lo que pase: si se recogiera a
+        // mitad de un arrastre no habría dónde soltar el widget. Solo Editar(false),
+        // que pasa forzar, puede cerrarla.
+        if (!abrir && EdicionAnclada && !forzar) return;
         if (abrir && _sinExpandir) return;     // la tienes cogida: no se abre mientras la llevas
         // Con un panel estrecho abierto, volver a pasar el ratón NO la re-expande:
         // la isla crecería y el panel se quedaría descuadrado dentro, con el
@@ -856,6 +848,7 @@ public partial class MainWindow : Window
         opciones.AddRange(OpcionesDeCerrarTodas());
         // Solo si la tecla Windows es nuestra: es lo único que la trae de vuelta
         if (_cfg.Inicio.TeclaWindows) opciones.Add(("Esconder la isla", () => EsconderAMano(true)));
+        opciones.Add((_editando ? "Salir de la edición" : "Editar la nube", AlternarEdicion));
         opciones.Add(("Ajustes…", AbrirAjustes));
         opciones.Add(("Recargar el config", () =>
         {

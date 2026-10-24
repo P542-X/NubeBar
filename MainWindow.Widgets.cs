@@ -206,9 +206,61 @@ public partial class MainWindow : Window, IAnfitrionWidget
         yield return ("Derecha", Der);
     }
 
+    // Montar las zonas de cero. Es el ÚNICO sitio desde el que se hace, y tiene que
+    // serlo: rellenar no es solo meter widgets en los StackPanel.
+    //
+    // Aquí estuvo el fallo de las fijadas desapareciendo. El modo edición llamaba a
+    // LlenarZonas directamente y se saltaba este preámbulo. Y resulta que importa:
+    //
+    //   · PrepararFijas() crea una tira NUEVA. Sin ella se reutiliza la de antes, y
+    //     como el cromo del modo edición la había metido dentro de un Grid, al
+    //     remontar ese Grid quedaba huérfano pero SEGUÍA siendo su Parent. La guarda
+    //     de ModuloFijas ("puesto más de una vez") lo tomaba por un duplicado y
+    //     devolvía un panel vacío: adiós a las apps fijadas.
+    //   · _actualizadores.Clear() evita que cada entrada y salida del modo edición
+    //     deje otra tanda de refrescos apuntando a elementos que ya no existen.
+    //   · _tira y _carrusel a null: si quitas "apps", el carrusel de la vez anterior
+    //     ya no está en la isla y hay que olvidarlo.
+    void RemontarZonas()
+    {
+        _actualizadores.Clear();
+        _tira = null;
+        _carrusel = null;
+        PrepararFijas();                    // la tira de las fijadas, antes que el carrusel
+
+        LlenarZonas(PanelPrincipal);
+
+        // Con "fijadas" puesto y "apps" quitado no hay carrusel que refresque los
+        // grupos, pero las fijas siguen necesitando que alguien las pinte y les lleve
+        // la cuenta de ventanas abiertas
+        if (FijasAparte && _tira == null)
+        {
+            _grupos.Clear();
+            RefrescarApps();
+            _actualizadores.Add(RefrescarApps);
+        }
+
+        ApuntarLoMontado();
+    }
+
+    // Una línea por remonte con lo que ha quedado dibujado en cada zona. Cuesta nada y
+    // es lo que permite comprobar, leyendo el log, que entrar y salir de edición
+    // veinte veces no se come ningún widget.
+    void ApuntarLoMontado()
+    {
+        try
+        {
+            var partes = ZonasDibujables()
+                .Select(z => $"{z.Nombre[..3]}={z.Destino?.Children.Count ?? 0}");
+            Log.Info($"zonas montadas ({(_editando ? "edición" : "normal")}): {string.Join(" ", partes)}");
+        }
+        catch { }
+    }
+
     void LlenarZonas(PanelNube panel)
     {
         AsegurarWidgetsRegistrados();
+        MarcarZonas(_editando);
 
         var destinos = ZonasDibujables().ToDictionary(z => z.Nombre, z => z.Destino, StringComparer.OrdinalIgnoreCase);
 
@@ -220,14 +272,28 @@ public partial class MainWindow : Window, IAnfitrionWidget
                 continue;
             }
             destino.Children.Clear();
-            foreach (var id in widgets)
+            // Qué se dibuja lo decide ZonasWidgets.ADibujar, no este bucle: así la
+            // regla es una sola, está escrita en un sitio sin interfaz y se puede
+            // comprobar. El índice que se le pasa al cromo es el de la ZONA, no el de
+            // esta lista, porque quitar tiene que retirar la instancia exacta.
+            var aDibujar = ZonasWidgets.ADibujar(widgets, panel.Zonas.Ocultos, _editando);
+            foreach (var (id, oculto) in aDibujar)
             {
-                // Oculto no es quitado: el id sigue en su zona y en su sitio, solo que
-                // hoy no se dibuja. Así, al volver a mostrarlo, reaparece donde estaba
-                // y no al final de la fila.
-                if (panel.Zonas.Oculto(id)) continue;
-                destino.Children.Add(CrearWidget(id));
+                int i = widgets.FindIndex(m => m.Equals(id, StringComparison.OrdinalIgnoreCase));
+                var w = CrearWidget(id);
+                if (_editando)
+                {
+                    if (oculto) w.Opacity = 0.35;
+                    // El índice importa: con un widget repetible (dos separadores) hay
+                    // que poder quitar EL QUE TIENES DELANTE, no "uno de los que se
+                    // llaman así".
+                    w = ConChromeDeEdicion(w, id, nombre, i, oculto);
+                }
+                destino.Children.Add(w);
             }
+
+            // Y al final de cada zona, el "+" para añadir ahí mismo. Solo editando.
+            if (_editando) destino.Children.Add(BotonAnadirWidgets(nombre));
         }
     }
 

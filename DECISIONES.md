@@ -1389,3 +1389,105 @@ del arreglo. Lo que sí es cierto es que la alineación dependía de la casualid
 alto no respetaba la barra, que son las dos condiciones que producen exactamente ese
 síntoma en cuanto una zona crece más que la fila. Queda arreglado el mecanismo aunque
 no haya podido ver el caso concreto.
+
+## Fase B · El modo edición, y las tres cosas que me enseñó esta isla
+
+El modo edición de la isla: entras desde el clic derecho, la isla se queda abierta,
+cada widget se ve como un bloque y se puede ocultar, quitar, mover entre zonas y
+añadir desde la biblioteca. Al salir, todo vuelve a ser exactamente lo de antes.
+
+Lo interesante no es el modo. Son los tres fallos que salieron por el camino, porque
+los tres son del tipo que se repite.
+
+### 1. Las apps fijadas desaparecían: la tira huérfana
+
+**Qué pasaba.** A veces, al entrar o salir del modo edición, las apps fijadas del
+Centro se esfumaban.
+
+**Por qué.** `ModuloFijas()` no construye nada: devuelve una instancia cacheada,
+`_tiraFijas`, y se protege de que el módulo esté puesto en dos zonas a la vez así:
+
+```csharp
+if (_tiraFijas!.Parent != null) { /* "puesto más de una vez" */ return new StackPanel(); }
+```
+
+El cromo del modo edición mete cada widget dentro de un `Grid`. Al remontar las
+zonas, `destino.Children.Clear()` quita el `Border` del cromo de la zona — **pero ese
+`Grid` sigue existiendo, huérfano, y sigue siendo el `Parent` de la tira**. La guarda
+lo tomaba por un duplicado y devolvía un panel vacío.
+
+**La raíz, que era mía.** `Editar()` llamaba a `LlenarZonas` a secas. En el camino
+normal, `AplicarTema` hace antes un preámbulo que yo me salté, y que importa:
+`PrepararFijas()` crea una tira NUEVA (con lo que el `Parent` huérfano deja de
+existir), `_tira` y `_carrusel` se ponen a null, y `_actualizadores` se vacía.
+
+**El arreglo.** Un único punto de montaje, `RemontarZonas()`, con el preámbulo
+completo, llamado tanto por `AplicarTema` como por `Editar`. **Nadie llama ya a
+`LlenarZonas` por su cuenta**, y ese es el punto: el fallo no fue olvidar una línea,
+fue que había dos formas de montar las zonas y solo una era correcta.
+
+De paso se cerró una fuga que nadie había visto: `_actualizadores` no se limpiaba al
+entrar y salir de edición, así que cada ciclo dejaba otra tanda de refrescos
+apuntando a elementos muertos.
+
+Y la regla de qué se dibuja se sacó a `ZonasWidgets.ADibujar(ids, ocultos, editando)`:
+estática, compartida y sin interfaz, para poder comprobarla sin abrir una ventana.
+Son las veinte comprobaciones de las seis reglas (entrar no toca el config, los no
+ocultos se dibujan siempre, los fijados mantienen su sitio, 25 ciclos sin perder
+nada, ids duplicados).
+
+### 2. La captura de ratón no sirve en esta ventana
+
+El arrastre de widgets no empezaba. El log lo dejó claro: llegaban el `down` y los
+`move`, **el `up` no llegaba nunca**.
+
+La isla vive con `WS_EX_NOACTIVATE` y no toma el foco jamás. En esas condiciones la
+captura de WPF se pierde en silencio y el enrutado del `MouseLeftButtonUp` no es de
+fiar.
+
+Y la respuesta estaba en el fichero de al lado: **`MainWindow.Arrastre.cs` —el
+arrastre de la isla, que funciona desde hace meses— no usa captura ni eventos de
+soltar.** Lee el botón con `Nativo.BotonIzquierdoPulsado()` desde un bucle de
+`CompositionTarget.Rendering`. El arrastre de widgets hace ahora lo mismo.
+
+La lección no es sobre WPF: **antes de inventar un mecanismo, mirar si el proyecto ya
+resolvió ese problema.** Lo había resuelto, y mejor.
+
+Hubo además una regresión propia de esto: un manejador de `LostMouseCapture` que
+llamaba a limpiar el estado. Como la captura se toma en la fase TÚNEL y cualquier
+`ButtonBase` bajo el puntero toma la suya en la fase BURBUJA —justo después—, el
+estado se borraba entre el `down` y el primer `move`. Ya no hay captura que perder.
+
+### 3. Un Border con Opacity 0 sigue recibiendo clics
+
+El velo del cromo —el fondo que se enciende al pasar el ratón— cubría el bloque
+entero con `Opacity = 0`. En WPF eso **no** lo hace transparente al ratón: seguía
+comiéndose los clics, y el único sitio por donde agarrar un widget era el filo del
+borde. Lleva `IsHitTestVisible = false`.
+
+Lo mismo con los botones de acción: estaban **centrados**, justo donde uno agarra el
+bloque. Ahora van al borde derecho y solo reciben clics cuando el ratón está sobre su
+bloque.
+
+### Lo que el modo edición NO hace
+
+- **No llama a `Aplicar()`**: eso rehace la appbar, la barra de Windows y el atajo
+  global, y entrar a colocar widgets no tiene por qué tocar nada de eso.
+- **No guarda si no cambia nada**: soltar un widget donde ya estaba devuelve `false`
+  en `Mover()` y no se reescribe el fichero. Sin eso, un arrastre sin efecto
+  reescribía el config, disparaba la recarga en caliente y la isla parpadeaba entera.
+- **No pide el teclado para la biblioteca**: el modo ya lo tiene activo, y si el panel
+  lo pidiera por su cuenta, `CerrarPanelAlRecargar` lo apagaría al cerrarse y Esc
+  dejaría de sacarte del modo edición.
+
+### Las zonas se eligen por columna, no por contenido
+
+El Grid de la isla es `* | Auto | *`, pero `Izq` se alinea a la izquierda y `Der` a la
+derecha: **cada StackPanel mide lo que miden sus widgets, no lo que mide su columna**.
+Decidir la zona de destino por el contenido dejaba la mitad de la isla sin dueño, y
+soltar ahí cancelaba el arrastre. Ahora manda la columna, que sí llena la isla — y de
+paso una zona vacía acepta igual que una llena.
+
+La marca de destino tampoco es hija del `StackPanel`: se pinta en un `Canvas` por
+encima. Siendo hija empujaba a los demás widgets, que al moverse cambiaban los puntos
+medios, que cambiaban el índice: temblaba. Nada se reordena hasta que sueltas.

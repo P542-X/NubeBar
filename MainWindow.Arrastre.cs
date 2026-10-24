@@ -52,6 +52,10 @@ public partial class MainWindow : Window
 
             if (!_cfg.Barra.Arrastrable || _siguiendoRaton != null) return;
 
+            // Editando, lo que se coge es un widget, no la isla. Si no cediera aqui,
+            // arrastrar un bloque moveria la barra entera por la pantalla.
+            if (EdicionAnclada) return;
+
             // Si has cogido un icono del carrusel, lo que se mueve es el icono,
             // no la isla entera. Cada arrastre con lo suyo.
             if (EsDelCarrusel(e.OriginalSource)) return;
