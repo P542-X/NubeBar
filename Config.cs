@@ -131,10 +131,11 @@ public class PanelNube
     public bool Activo { get; set; } = true;
     public string Modo { get; set; } = "isla";          // "isla" (flotante) | "barra" (de lado a lado)
 
-    // Los cuatro bordes. "arriba" y "abajo" valen para los dos modos; "izquierda" y
-    // "derecha" solo para el modo isla, que se ancla a ese lado sin dejar de ser
-    // horizontal. Una BARRA vertical de verdad (zonas apiladas) es otra fase: aquí se
-    // avisa y se cae a "arriba" en vez de dibujar algo roto.
+    // Los cuatro bordes, válidos los cuatro en los dos modos. Lo que cambia no es si
+    // valen, sino qué significan:
+    //
+    //   modo isla  + lateral → la isla se ANCLA a ese lado, horizontal como siempre
+    //   modo barra + lateral → barra VERTICAL de verdad, con las zonas apiladas (B6)
     public string Posicion { get; set; } = "arriba";
 
     public double Grosor { get; set; } = 38;            // alto si es horizontal, ancho si es vertical
@@ -190,20 +191,40 @@ public class PanelNube
     public static bool PuedeRecogerse(string? visibilidad, bool ocultarEnPantallaCompleta) =>
         AutoOculta(visibilidad) || ocultarEnPantallaCompleta;
 
-    // El borde que de verdad se puede dibujar hoy. Los laterales anclan la ISLA a ese
-    // lado sin dejar de ser horizontal; una BARRA vertical de verdad (zonas apiladas,
-    // el cajón saliendo de lado) es otra fase, así que en modo barra se cae a "arriba"
-    // en vez de dibujar algo roto.
-    public static string BordeEfectivo(string? posicion, bool esIsla)
-    {
-        var p = PosicionValida(posicion) ? posicion!.ToLowerInvariant() : "arriba";
-        return EsLateral(p) && !esIsla ? "arriba" : p;
-    }
+    // ---------- Orientación ----------
+    //
+    // Desde B6 los cuatro bordes se dibujan de verdad, así que esto ya no recorta
+    // nada: solo pone el borde en minúsculas y cambia por "arriba" lo que no conozca.
+    public static string BordeEfectivo(string? posicion) =>
+        PosicionValida(posicion) ? posicion!.ToLowerInvariant() : "arriba";
 
-    // ¿Cuelga del borde de arriba? Los laterales sí: la franja sigue siendo
-    // horizontal, solo cambia a qué lado se pega la isla dentro de ella.
-    public static bool CuelgaDeArriba(string? posicion, bool esIsla) =>
-        BordeEfectivo(posicion, esIsla) != "abajo";
+    public static bool EsBarra(string? modo) =>
+        modo != null && modo.Equals("barra", StringComparison.OrdinalIgnoreCase);
+
+    // **La pregunta de B6.** Una barra pegada a un lateral es una barra VERTICAL: la
+    // ventana es una columna de alto completo, las zonas se apilan y los paneles salen
+    // flotando al lado. Una ISLA pegada a un lateral sigue siendo horizontal y solo
+    // se ancla a ese lado (eso es B5 y no cambia).
+    public static bool EsVertical(string? modo, string? posicion) =>
+        EsBarra(modo) && EsLateral(BordeEfectivo(posicion));
+
+    public static bool PegadaAlaIzquierda(string? posicion) =>
+        BordeEfectivo(posicion).Equals("izquierda", StringComparison.OrdinalIgnoreCase);
+
+    // ¿Cuelga del borde de arriba? Es la pregunta de los sesenta lectores de siempre y
+    // solo tiene sentido en horizontal. En vertical la ventana ocupa la pantalla de
+    // arriba abajo, así que la respuesta da igual y se queda en "sí".
+    public static bool CuelgaDeArriba(string? posicion) =>
+        BordeEfectivo(posicion) != "abajo";
+
+    // El borde de la appbar (ABE_LEFT=0, ABE_TOP=1, ABE_RIGHT=2, ABE_BOTTOM=3). Es el
+    // mismo número que usa Windows, y aquí sale del borde del panel y del modo: una
+    // isla anclada a la izquierda reserva —si reservara— por arriba, no por el lado.
+    public static uint BordeAppBar(string? modo, string? posicion)
+    {
+        if (EsVertical(modo, posicion)) return PegadaAlaIzquierda(posicion) ? 0u : 2u;
+        return CuelgaDeArriba(posicion) ? 1u : 3u;
+    }
 
     public bool ReservarEspacio { get; set; } = true;
     public string Monitores { get; set; } = "todos";      // "todos" | "principal"

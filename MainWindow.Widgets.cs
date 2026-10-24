@@ -149,13 +149,20 @@ public partial class MainWindow : Window, IAnfitrionWidget
     // puede crecer más que el hueco y provocar el recorte otra vez.
     internal UIElement Separador()
     {
-        double alto = AltoSeparador(_cfg.Barra.Alto);
+        double largo = AltoSeparador(_cfg.Barra.Alto);
+
+        // Y un cuarto detalle, de B6: en la barra VERTICAL la rayita va tumbada. Un
+        // separador separa en la dirección en la que se apilan los widgets, así que
+        // las dos medidas y los dos márgenes se cambian de sitio.
+        bool v = Vertical;
         return new Border
         {
-            Width = 1,
-            Height = alto,
-            MaxHeight = alto,
-            Margin = new Thickness(6, 0, 6, 0),
+            Width = v ? largo : 1,
+            Height = v ? 1 : largo,
+            MaxWidth = v ? largo : double.PositiveInfinity,
+            MaxHeight = v ? double.PositiveInfinity : largo,
+            Margin = v ? new Thickness(0, 6, 0, 6) : new Thickness(6, 0, 6, 0),
+            HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             Background = _borde,
             // Una línea de 1 px entre píxeles sale gris y borrosa con DPI no entero

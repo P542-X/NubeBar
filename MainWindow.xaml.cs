@@ -375,6 +375,11 @@ public partial class MainWindow : Window
         Isla.BorderThickness = new Thickness(t.BordeAcento ? 1 : 0);
         AjustarBrillo(t.BordeAcento, acento);
 
+        // La orientación va ANTES de montar las zonas: los widgets se construyen según
+        // ella (el separador es una raya a lo ancho o a lo alto, el carrusel se apila o
+        // se tumba), y montarlos primero habría dejado la mitad girada.
+        OrientarZonas();
+
         // Montar las zonas es más que rellenarlas: ver RemontarZonas, que es el ÚNICO
         // sitio desde el que se hace. El modo edición llamaba antes a LlenarZonas a
         // secas y se saltaba este preámbulo, lo que hacía desaparecer las fijadas.
@@ -387,29 +392,47 @@ public partial class MainWindow : Window
         // Recargar el config con un panel abierto lo cierra: sus medidas ya no valen
         CerrarPanelAlRecargar();
 
-        Contenido.Height = b.Alto;          // la fila de los módulos no cambia aunque crezca el cajón
-        Isla.BeginAnimation(HeightProperty, null);
-        Isla.Height = b.Alto;
-        Isla.BeginAnimation(WidthProperty, null);
-        Isla.HorizontalAlignment = AlineacionDeLaIsla();
-        ColocarCajon();                     // alineación vertical, márgenes y orden de las filas
+        double grosorVentana = b.Alto + b.Margen * 2;
 
-        _expandida = false;
-        FijarLados(!EsIsla);
-        // En modo isla el ancho siempre va fijado a mano (ver AnimarAncho); en modo barra, automático
-        Isla.Width = EsIsla ? MedirAncho() : double.NaN;
+        if (Vertical)
+        {
+            // La barra vertical no tiene nada que medir ni que expandir: su grosor lo
+            // fija el config y su largo es la pantalla. Todo lo de la isla horizontal
+            // (MedirAncho, Expandir, el cajón de dentro) se queda quieto, que ya está
+            // apagado en modo barra.
+            Contenido.Height = double.NaN;
+            Contenido.Width = double.NaN;
+            ColocarBarraVertical();
+            _expandida = false;
+            FijarLados(true);
+            ColocarEnMonitorVertical(grosorVentana);
+        }
+        else
+        {
+            ColocarBarraHorizontal();
+            Contenido.Height = b.Alto;      // la fila de los módulos no cambia aunque crezca el cajón
+            Contenido.Width = double.NaN;
+            Isla.BeginAnimation(HeightProperty, null);
+            Isla.Height = b.Alto;
+            Isla.BeginAnimation(WidthProperty, null);
+            Isla.HorizontalAlignment = AlineacionDeLaIsla();
+            ColocarCajon();                 // alineación vertical, márgenes y orden de las filas
 
-        // La ventana es una franja transparente de todo el ancho de SU monitor
-        double altoVentana = b.Alto + b.Margen * 2;
-        ColocarEnMonitor(altoVentana);
+            _expandida = false;
+            FijarLados(!EsIsla);
+            // En modo isla el ancho siempre va fijado a mano (ver AnimarAncho); en modo barra, automático
+            Isla.Width = EsIsla ? MedirAncho() : double.NaN;
 
-        // Solo el modo barra reserva espacio; la isla flota encima de las ventanas, como en el iPhone.
-        // Y una barra que se autooculta tampoco lo reserva: reservar un hueco para algo
-        // que no está es justo lo que la gente quiere evitar al encender el autoocultar
-        // (en Plasma pasa lo mismo).
+            // La ventana es una franja transparente de todo el ancho de SU monitor
+            ColocarEnMonitor(grosorVentana);
+        }
+
         // Esto va en el hilo de la ventana porque la AppBar se registra con nuestro propio hwnd.
-        if (!EsIsla && b.ReservarEspacio && !PanelAutoOculta)
-            AppBar.Registrar(_self, Arriba, (int)Math.Round(altoVentana * _monitor.Escala),
+        // El borde lo decide PanelNube.BordeAppBar: con la barra vertical es ABE_LEFT o
+        // ABE_RIGHT y lo que se reserva es ANCHO, no alto.
+        if (ReservaHueco)
+            AppBar.Registrar(_self, PanelNube.BordeAppBar(b.Modo, PosicionEfectiva),
+                             (int)Math.Round(grosorVentana * _monitor.Escala),
                              _monitor.X, _monitor.Y, _monitor.Ancho, _monitor.Alto);
         else AppBar.Quitar(_self);
 
@@ -528,19 +551,25 @@ public partial class MainWindow : Window
     void AnimarAparicion()
     {
         double distancia = _cfg.Barra.Alto + _cfg.Barra.Margen * 2;
-        var mover = new TranslateTransform();            // base Y = 0 (posición final)
+        var mover = new TranslateTransform();            // base 0 = posición final
         Isla.RenderTransform = mover;
         _mover = mover;
         Isla.BeginAnimation(OpacityProperty, Kf(0, 1, 400));
 
+        // Entra por su propio borde: la horizontal cae de arriba (o sube de abajo) y la
+        // vertical entra desde su lado.
+        bool v = Vertical;
+        var eje = v ? TranslateTransform.XProperty : TranslateTransform.YProperty;
+        double desde = (v ? PegadaIzquierda : Arriba) ? -distancia : distancia;
+
         // Con el autoocultar encendido su sitio es FUERA de la pantalla, no dentro
         // (lo decide AplicarVisibilidad, que ya ha corrido en Aplicar). Caer con
         // rebote y recogerse acto seguido se vería como un tic, y además la caída
-        // dejaría _mover.Y en 0 y la isla se quedaría a la vista marcada como
+        // dejaría el transform en 0 y la isla se quedaría a la vista marcada como
         // recogida: entonces no volvería a esconderse hasta el siguiente cambio.
-        if (_recogida && !_asomada) { mover.Y = Arriba ? -distancia : distancia; return; }
+        if (_recogida && !_asomada) { if (v) mover.X = desde; else mover.Y = desde; return; }
 
-        mover.BeginAnimation(TranslateTransform.YProperty, Kf(Arriba ? -distancia : distancia, 0, 700, 0, Muelle));
+        mover.BeginAnimation(eje, Kf(desde, 0, 700, 0, Muelle));
     }
 
     // Ancho natural del contenido, medido sin límite para que las columnas "*" del

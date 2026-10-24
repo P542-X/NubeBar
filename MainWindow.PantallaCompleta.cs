@@ -131,16 +131,37 @@ public partial class MainWindow : Window
     }
 
 
-    // ¿Está el ratón dentro de la franja donde vive la isla? Se mide con el alto
-    // de la barra, no con ActualHeight: con un panel abierto ActualHeight es el del
-    // panel entero y la franja saldría enorme.
+    // ¿Está el ratón dentro de la franja donde vive la isla? Se mide con el GROSOR de
+    // la barra, no con ActualWidth/Height: con un panel abierto la ventana es mucho
+    // más grande y la franja saldría enorme.
+    //
+    // En vertical la franja es una columna pegada a su lado, no una fila: es la misma
+    // cuenta con los dos ejes cambiados de sitio.
     bool RatonEnLaFranja()
     {
         var p = Monitores.Raton();
-        double altoDip = _cfg.Barra.Alto + _cfg.Barra.Margen * 2;
-        int franja = (int)Math.Round(altoDip * _monitor.Escala);
+        double grosorDip = _cfg.Barra.Alto + _cfg.Barra.Margen * 2;
+        int franja = (int)Math.Round(grosorDip * _monitor.Escala);
+
+        if (Vertical)
+            return p.Y >= _monitor.Y && p.Y < _monitor.Abajo &&
+                   (PegadaIzquierda ? p.X < _monitor.X + franja : p.X > _monitor.Derecha - franja);
+
         return p.X >= _monitor.X && p.X < _monitor.Derecha &&
                (Arriba ? p.Y < _monitor.Y + franja : p.Y > _monitor.Abajo - franja);
+    }
+
+    // El filo de la pantalla por el que la barra asoma: los 2-3 px donde hay que dejar
+    // el ratón para que vuelva. Mismo criterio, con el eje que toque.
+    bool RatonEnElFilo()
+    {
+        var p = Monitores.Raton();
+        if (Vertical)
+            return p.Y >= _monitor.Y && p.Y < _monitor.Abajo &&
+                   (PegadaIzquierda ? p.X <= _monitor.X + 2 : p.X >= _monitor.Derecha - 3);
+
+        return p.X >= _monitor.X && p.X < _monitor.Derecha &&
+               (Arriba ? p.Y <= _monitor.Y + 2 : p.Y >= _monitor.Abajo - 3);
     }
 
     // Dos motivos distintos para recogerse, y el mismo deslizamiento para los dos:
@@ -189,10 +210,8 @@ public partial class MainWindow : Window
         }
         if (!_recogida) return;
 
-        // Escondida: el ratón pegado al borde durante 300 ms la hace asomar
-        var p = Monitores.Raton();
-        bool enElBorde = p.X >= _monitor.X && p.X < _monitor.Derecha &&
-                         (Arriba ? p.Y <= _monitor.Y + 2 : p.Y >= _monitor.Abajo - 3);
+        // Escondida: el ratón pegado al filo durante 300 ms la hace asomar
+        bool enElBorde = RatonEnElFilo();
 
         if (!_asomada)
         {
@@ -218,10 +237,21 @@ public partial class MainWindow : Window
     // ---------- La animación ----------
     // Igual que el resto: el valor real de la propiedad es siempre el estado final y
     // la animación solo dibuja el camino. Si fallara, la isla quedaría donde toca.
+    // Se va por SU borde: la horizontal por arriba o por abajo moviéndose en Y, la
+    // vertical por su lado moviéndose en X. Es el mismo deslizamiento con el eje
+    // cambiado, y por eso el autoocultar y la pantalla completa funcionan igual en los
+    // cuatro bordes sin una línea de más en quien los decide.
     void Deslizar(bool fuera)
     {
-        double distancia = ActualHeight > 0 ? ActualHeight : _cfg.Barra.Alto + _cfg.Barra.Margen * 2;
-        double destino = fuera ? (Arriba ? -distancia : distancia) : 0;
+        bool v = Vertical;
+        var eje = v ? TranslateTransform.XProperty : TranslateTransform.YProperty;
+        double propio = _cfg.Barra.Alto + _cfg.Barra.Margen * 2;
+        double medida = v ? ActualWidth : ActualHeight;
+        // Con un panel abierto la ventana es mucho más grande que la franja: lo que hay
+        // que apartar es la BARRA, así que nunca más que su propio grosor.
+        double distancia = medida > 0 ? Math.Min(medida, propio) : propio;
+        bool haciaAtras = v ? PegadaIzquierda : Arriba;
+        double destino = fuera ? (haciaAtras ? -distancia : distancia) : 0;
 
         if (_mover == null || Isla.RenderTransform is not TranslateTransform t || t != _mover)
         {
@@ -229,10 +259,14 @@ public partial class MainWindow : Window
             if (_mover == null) { _mover = new TranslateTransform(); Isla.RenderTransform = _mover; }
         }
 
-        double desde = _mover.Y;
-        _mover.BeginAnimation(TranslateTransform.YProperty, null);
-        _mover.Y = destino;
-        _mover.BeginAnimation(TranslateTransform.YProperty,
-                              Kf(desde, destino, 260, 0, Suave));
+        // Al cambiar de orientación en caliente el otro eje tiene que volver a cero, o
+        // la barra se queda apartada en una dirección que ya no se usa.
+        if (v && Math.Abs(_mover.Y) > 0.01) { _mover.BeginAnimation(TranslateTransform.YProperty, null); _mover.Y = 0; }
+        if (!v && Math.Abs(_mover.X) > 0.01) { _mover.BeginAnimation(TranslateTransform.XProperty, null); _mover.X = 0; }
+
+        double desde = v ? _mover.X : _mover.Y;
+        _mover.BeginAnimation(eje, null);
+        if (v) _mover.X = destino; else _mover.Y = destino;
+        _mover.BeginAnimation(eje, Kf(desde, destino, 260, 0, Suave));
     }
 }

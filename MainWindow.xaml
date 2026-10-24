@@ -23,32 +23,48 @@
          Como el Border recorta a sus bordes, animar Isla.Height hace que el panel se
          despliegue desde dentro de la isla en vez de aparecer como una ventana nueva.
          Con Posicion="abajo" se intercambian las filas (ver ColocarCajon). -->
-    <Border x:Name="Isla" Padding="10,0" MinWidth="120" ClipToBounds="True" Opacity="0"
-            VerticalAlignment="Top"
-            MouseEnter="Isla_MouseEnter" MouseLeave="Isla_MouseLeave"
-            MouseRightButtonUp="Isla_Salir" MouseDown="Isla_MouseDown">
-        <Grid x:Name="Cuerpo">
-            <Grid.RowDefinitions>
-                <RowDefinition x:Name="FilaIsla" Height="Auto"/>
-                <RowDefinition x:Name="FilaCajon" Height="*"/>
-            </Grid.RowDefinitions>
+    <!-- Una sola celda: la isla manda y se coloca con sus propias alineaciones. El
+         "PanelFlotante" solo se usa en la barra VERTICAL, donde el cajón de dentro no
+         vale: ahí la barra ya ocupa la pantalla de arriba abajo y no puede crecer más,
+         así que el panel sale como una tarjeta aparte, al lado (ver
+         MainWindow.Vertical.cs). En horizontal está Collapsed y no estorba. -->
+    <Grid x:Name="Raiz">
+        <Border x:Name="Isla" Padding="10,0" MinWidth="120" ClipToBounds="True" Opacity="0"
+                VerticalAlignment="Top"
+                MouseEnter="Isla_MouseEnter" MouseLeave="Isla_MouseLeave"
+                MouseRightButtonUp="Isla_Salir" MouseDown="Isla_MouseDown">
+            <Grid x:Name="Cuerpo">
+                <Grid.RowDefinitions>
+                    <RowDefinition x:Name="FilaIsla" Height="Auto"/>
+                    <RowDefinition x:Name="FilaCajon" Height="*"/>
+                </Grid.RowDefinitions>
 
-            <Grid x:Name="Contenido" Grid.Row="0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <StackPanel x:Name="Izq" Grid.Column="0" Orientation="Horizontal"
-                            HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                <StackPanel x:Name="Cen" Grid.Column="1" Orientation="Horizontal" Margin="8,0"
-                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                <StackPanel x:Name="Der" Grid.Column="2" Orientation="Horizontal"
-                            HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                <!-- Las tres zonas. En horizontal el Grid tiene columnas * Auto * y los
+                     StackPanel van en fila; en vertical se le cambian por FILAS y los
+                     StackPanel se apilan (ver OrientarZonas). Por eso cada uno lleva
+                     puestos Grid.Column Y Grid.Row: el que no se usa vale 0 y da igual. -->
+                <Grid x:Name="Contenido" Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel x:Name="Izq" Grid.Column="0" Orientation="Horizontal"
+                                HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                    <StackPanel x:Name="Cen" Grid.Column="1" Orientation="Horizontal" Margin="8,0"
+                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <StackPanel x:Name="Der" Grid.Column="2" Orientation="Horizontal"
+                                HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+
+                <!-- El cajón: aquí dentro van la mini lista, la vista general y el menú Inicio -->
+                <ContentPresenter x:Name="Cajon" Grid.Row="1"/>
             </Grid>
+        </Border>
 
-            <!-- El cajón: aquí dentro van la mini lista, la vista general y el menú Inicio -->
-            <ContentPresenter x:Name="Cajon" Grid.Row="1"/>
-        </Grid>
-    </Border>
+        <Border x:Name="PanelFlotante" Visibility="Collapsed" ClipToBounds="True"
+                HorizontalAlignment="Left" VerticalAlignment="Top">
+            <ContentPresenter x:Name="CajonFlotante"/>
+        </Border>
+    </Grid>
 </Window>

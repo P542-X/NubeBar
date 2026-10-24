@@ -425,21 +425,35 @@ public partial class MainWindow : Window
     //
     // Por COLUMNA del Grid, no por el contenido de cada zona: así la superficie de
     // destino llena la isla y una zona vacía acepta igual que una llena.
+    // Con la barra VERTICAL las zonas son filas y se mide en Y. Es la misma cuenta con
+    // los ejes cambiados de sitio, así que el arrastre entre zonas, la marca de destino
+    // y el resaltado valen igual en las dos orientaciones sin duplicar nada.
+    static readonly string[] NombresDeZona = { "Izquierda", "Centro", "Derecha" };
+
+    // "A lo largo" es el eje en el que se apilan los widgets; "a lo ancho", el otro.
+    double ALoLargo(Point p) => Vertical ? p.Y : p.X;
+    double ALoAncho(Point p) => Vertical ? p.X : p.Y;
+    double LargoContenido => Vertical ? Contenido.ActualHeight : Contenido.ActualWidth;
+    double AnchoContenido => Vertical ? Contenido.ActualWidth : Contenido.ActualHeight;
+    // Lo que mide un bloque en el eje en el que se apila
+    double LargoDel(FrameworkElement e) => Vertical ? e.ActualHeight : e.ActualWidth;
+
     string? ZonaEn(Point enContenido)
     {
-        if (enContenido.Y < -16 || enContenido.Y > Contenido.ActualHeight + 16) return null;
-        double x = enContenido.X;
-        if (x < 0 || x > Contenido.ActualWidth) return null;
+        if (ALoAncho(enContenido) < -16 || ALoAncho(enContenido) > AnchoContenido + 16) return null;
+        double a = ALoLargo(enContenido);
+        if (a < 0 || a > LargoContenido) return null;
 
         double acumulado = 0;
-        var nombres = new[] { "Izquierda", "Centro", "Derecha" };
-        for (int c = 0; c < Contenido.ColumnDefinitions.Count && c < nombres.Length; c++)
+        int tramos = Vertical ? Contenido.RowDefinitions.Count : Contenido.ColumnDefinitions.Count;
+        for (int c = 0; c < tramos && c < NombresDeZona.Length; c++)
         {
-            double ancho = Contenido.ColumnDefinitions[c].ActualWidth;
-            if (x >= acumulado && x < acumulado + ancho) return nombres[c];
-            acumulado += ancho;
+            double largo = Vertical ? Contenido.RowDefinitions[c].ActualHeight
+                                    : Contenido.ColumnDefinitions[c].ActualWidth;
+            if (a >= acumulado && a < acumulado + largo) return NombresDeZona[c];
+            acumulado += largo;
         }
-        return nombres[^1];     // el filo derecho cuenta como la última zona
+        return NombresDeZona[^1];     // el filo del final cuenta como la última zona
     }
 
     // ---------- Dónde caería dentro de esa zona ----------
@@ -459,9 +473,11 @@ public partial class MainWindow : Window
         foreach (var hijo in panel.Children.OfType<FrameworkElement>())
         {
             if (ReferenceEquals(hijo, _bloqueLlevado)) continue;   // el que llevas no cuenta
-            if (hijo.ActualWidth <= 0) continue;
-            double medio = hijo.TranslatePoint(new Point(hijo.ActualWidth / 2, 0), Contenido).X;
-            if (enContenido.X < medio) break;
+            double largo = LargoDel(hijo);
+            if (largo <= 0) continue;
+            var centro = Vertical ? new Point(0, largo / 2) : new Point(largo / 2, 0);
+            double medio = ALoLargo(hijo.TranslatePoint(centro, Contenido));
+            if (ALoLargo(enContenido) < medio) break;
             i++;
         }
         return (zona, i);
@@ -474,48 +490,67 @@ public partial class MainWindow : Window
         ResaltarZona(d?.Zona);
         if (d == null) { QuitarMarca(); return; }
 
-        double x = XdeLaMarca(d.Value.Zona, d.Value.Indice);
-        if (double.IsNaN(x)) { QuitarMarca(); return; }
+        double a = XdeLaMarca(d.Value.Zona, d.Value.Indice);
+        if (double.IsNaN(a)) { QuitarMarca(); return; }
 
         if (_capaMarca == null) return;
+        bool v = Vertical;
         if (_marcaDestino == null)
         {
+            // En vertical la marca va tumbada: separa lo que se apila, igual que el
+            // separador. Y se centra en el otro eje.
+            double largo = Math.Max(12, _cfg.Barra.Alto - 12);
             _marcaDestino = new Border
             {
-                Width = 2,
-                Height = Math.Max(12, _cfg.Barra.Alto - 12),
+                Width = v ? largo : 2,
+                Height = v ? 2 : largo,
                 Background = _acento,
                 CornerRadius = new CornerRadius(1)
             };
             _capaMarca.Children.Add(_marcaDestino);
-            Canvas.SetTop(_marcaDestino, Math.Max(0, (Contenido.ActualHeight - _marcaDestino.Height) / 2));
         }
-        Canvas.SetLeft(_marcaDestino, x - 1);
+        if (v)
+        {
+            Canvas.SetLeft(_marcaDestino, Math.Max(0, (Contenido.ActualWidth - _marcaDestino.Width) / 2));
+            Canvas.SetTop(_marcaDestino, a - 1);
+        }
+        else
+        {
+            Canvas.SetTop(_marcaDestino, Math.Max(0, (Contenido.ActualHeight - _marcaDestino.Height) / 2));
+            Canvas.SetLeft(_marcaDestino, a - 1);
+        }
     }
 
-    // La x donde debe caer la marca: el filo izquierdo del bloque que ocuparía esa
-    // posición, o el derecho del último si va al final. NaN si no se puede saber.
+    // Dónde debe caer la marca EN EL EJE EN QUE SE APILAN los widgets: el filo de
+    // entrada del bloque que ocuparía esa posición, o el de salida del último si va al
+    // final. NaN si no se puede saber.
     double XdeLaMarca(string zona, int indice)
     {
         var panel = ZonasDibujables().FirstOrDefault(z => string.Equals(z.Nombre, zona, StringComparison.OrdinalIgnoreCase)).Destino;
         if (panel == null) return double.NaN;
 
         var bloques = panel.Children.OfType<FrameworkElement>()
-                           .Where(h => !ReferenceEquals(h, _bloqueLlevado) && h.ActualWidth > 0)
+                           .Where(h => !ReferenceEquals(h, _bloqueLlevado) && LargoDel(h) > 0)
                            .ToList();
 
+        // Zona vacía: la marca va al principio de su columna (o de su fila)
         if (bloques.Count == 0)
         {
-            // Zona vacía: la marca va al principio de su columna
-            try { return panel.TranslatePoint(new Point(0, 0), Contenido).X; }
+            try { return ALoLargo(panel.TranslatePoint(new Point(0, 0), Contenido)); }
             catch { return double.NaN; }
         }
 
         try
         {
-            if (indice <= 0) return bloques[0].TranslatePoint(new Point(0, 0), Contenido).X;
-            if (indice >= bloques.Count) return bloques[^1].TranslatePoint(new Point(bloques[^1].ActualWidth, 0), Contenido).X;
-            return bloques[indice].TranslatePoint(new Point(0, 0), Contenido).X;
+            if (indice <= 0) return ALoLargo(bloques[0].TranslatePoint(new Point(0, 0), Contenido));
+            if (indice >= bloques.Count)
+            {
+                var ultimo = bloques[^1];
+                double largo = LargoDel(ultimo);
+                var filo = Vertical ? new Point(0, largo) : new Point(largo, 0);
+                return ALoLargo(ultimo.TranslatePoint(filo, Contenido));
+            }
+            return ALoLargo(bloques[indice].TranslatePoint(new Point(0, 0), Contenido));
         }
         catch { return double.NaN; }
     }
@@ -549,8 +584,11 @@ public partial class MainWindow : Window
 
         if (!editando) return;
 
-        var nombres = new[] { "Izquierda", "Centro", "Derecha" };
-        for (int c = 0; c < nombres.Length && c < Contenido.ColumnDefinitions.Count; c++)
+        // Con la barra vertical las zonas son filas: el fondo ocupa SU FILA entera.
+        bool v = Vertical;
+        var nombres = NombresDeZona;
+        int tramos = v ? Contenido.RowDefinitions.Count : Contenido.ColumnDefinitions.Count;
+        for (int c = 0; c < nombres.Length && c < tramos; c++)
         {
             var fondo = new Border
             {
@@ -562,14 +600,22 @@ public partial class MainWindow : Window
                 IsHitTestVisible = false,          // decide ZonaEn(), no el hit-test
                 ToolTip = nombres[c]
             };
-            Grid.SetColumn(fondo, c);
+            if (v) Grid.SetRow(fondo, c); else Grid.SetColumn(fondo, c);
             Contenido.Children.Insert(0, fondo);   // al fondo, detrás de los widgets
             _fondosZona[nombres[c]] = fondo;
         }
 
         _capaMarca = new Canvas { IsHitTestVisible = false };
-        Grid.SetColumn(_capaMarca, 0);
-        Grid.SetColumnSpan(_capaMarca, Math.Max(1, Contenido.ColumnDefinitions.Count));
+        if (v)
+        {
+            Grid.SetRow(_capaMarca, 0);
+            Grid.SetRowSpan(_capaMarca, Math.Max(1, tramos));
+        }
+        else
+        {
+            Grid.SetColumn(_capaMarca, 0);
+            Grid.SetColumnSpan(_capaMarca, Math.Max(1, tramos));
+        }
         Contenido.Children.Add(_capaMarca);        // el último: por encima de todo
     }
 

@@ -393,6 +393,14 @@ public sealed class VentanaAjustes : Window
                                 v => _arbol.PonerDelPanel(Principal, "Modo", v)));
         c.Children.Add(Opciones("Posición", PanelNube.Posiciones, _arbol.TextoDelPanel(Principal, "Posicion", "arriba"),
                                 v => _arbol.PonerDelPanel(Principal, "Posicion", v)));
+        // Los cuatro bordes valen en los dos modos, pero no significan lo mismo, y eso
+        // no se adivina de un desplegable con cuatro palabras.
+        var pista = Rotulo("En «izquierda» y «derecha», el modo barra se vuelve una barra vertical " +
+                           "con las zonas apiladas; el modo isla solo se ancla a ese lado.");
+        pista.TextWrapping = TextWrapping.Wrap;
+        pista.Opacity = 0.55;
+        pista.Margin = new Thickness(0, 0, 0, 4);
+        c.Children.Add(pista);
         c.Children.Add(Opciones("Visibilidad", PanelNube.Visibilidades,
                                 _arbol.TextoDelPanel(Principal, "Visibilidad", "siempre"),
                                 v => _arbol.PonerDelPanel(Principal, "Visibilidad", v)));

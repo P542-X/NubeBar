@@ -61,52 +61,40 @@ public partial class MainWindow : Window
 
     // ---------- Los cuatro bordes ----------
     //
-    // "arriba" y "abajo" son los de siempre y valen en los dos modos. "izquierda" y
-    // "derecha" anclan la isla a ese lado; en modo barra todavía no existen y se avisa
-    // una vez (ver PanelNube.BordeEfectivo).
-    public string PosicionEfectiva
-    {
-        get
-        {
-            var pedida = PanelPrincipal.Posicion ?? "arriba";
-            var real = PanelNube.BordeEfectivo(pedida, EsIsla);
+    // Desde B6 los cuatro se dibujan de verdad y esto ya no recorta nada. Lo que
+    // cambia según el modo no es si el borde vale, sino qué significa: una ISLA en un
+    // lateral se ancla a ese lado y sigue siendo horizontal (B5); una BARRA en un
+    // lateral es vertical de verdad (ver MainWindow.Vertical.cs).
+    public string PosicionEfectiva => PanelNube.BordeEfectivo(PanelPrincipal.Posicion);
 
-            if (!real.Equals(pedida, StringComparison.OrdinalIgnoreCase) && !_avisadoLateralEnBarra)
-            {
-                _avisadoLateralEnBarra = true;
-                Log.Info($"posición \"{pedida}\" en modo barra todavía no existe (hace falta una barra " +
-                         $"vertical con las zonas apiladas): se coloca {real}");
-            }
-            return real;
-        }
-    }
-
-    bool _avisadoLateralEnBarra;
-
-    // Dónde se pega la isla dentro de su franja. Con los bordes de arriba y abajo
-    // manda EsIsla (centrada) o el modo barra (estirada); con los laterales, se ancla
-    // al lado que toque.
+    // Dónde se pega la isla dentro de su franja. Solo tiene sentido en horizontal: en
+    // vertical la barra se estira de arriba abajo y la pega ColocarBarraVertical.
     HorizontalAlignment AlineacionDeLaIsla()
     {
         var p = PosicionEfectiva;
+        if (Vertical) return PegadaIzquierda ? HorizontalAlignment.Left : HorizontalAlignment.Right;
         if (p.Equals("izquierda", StringComparison.OrdinalIgnoreCase)) return HorizontalAlignment.Left;
         if (p.Equals("derecha", StringComparison.OrdinalIgnoreCase)) return HorizontalAlignment.Right;
         return EsIsla ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
     }
 
-    bool ArribaEfectivo => PanelNube.CuelgaDeArriba(PanelPrincipal.Posicion, EsIsla);
+    bool ArribaEfectivo => PanelNube.CuelgaDeArriba(PanelPrincipal.Posicion);
+
+    // ¿Le pedimos a Windows que nos guarde la franja? Solo el modo barra: la isla flota
+    // encima de las ventanas, como en el iPhone. Y una barra que se autooculta tampoco,
+    // que reservar sitio para algo que no está es lo que uno quiere evitar al
+    // encender el autoocultar (en Plasma pasa lo mismo).
+    bool ReservaHueco => !EsIsla && PanelPrincipal.ReservarEspacio && !PanelAutoOculta;
 
     // Para el log de arranque: en una línea, qué panel ha salido de verdad. Antes solo
     // se apuntaba "Modo=isla", que a partir de B5 ya no dice casi nada.
     string ResumenDelPanel()
     {
         var p = PanelPrincipal;
-        string borde = PosicionEfectiva;
-        string pedido = (p.Posicion ?? "arriba").ToLowerInvariant();
-        return $"panel[{p.Id}] modo={p.Modo} borde={borde}" +
-               (borde == pedido ? "" : $" (pedías {pedido})") +
+        return $"panel[{p.Id}] modo={p.Modo} borde={PosicionEfectiva} " +
+               $"orientación={(Vertical ? "vertical" : "horizontal")}" +
                $" grosor={p.Grosor:0} margen={p.Margen:0} visibilidad={VisibilidadPanel}" +
-               $" alineación={AlineacionDeLaIsla()} reserva={(!EsIsla && p.ReservarEspacio && !PanelAutoOculta ? "sí" : "no")}" +
-               (_recogida ? " [recogida]" : "");
+               $" alineación={AlineacionDeLaIsla()} reserva={(ReservaHueco ? "sí" : "no")}" +
+               (_recogida ? " [recogida]" : "") + ResumenVertical();
     }
 }

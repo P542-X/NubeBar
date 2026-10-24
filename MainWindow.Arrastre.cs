@@ -52,6 +52,13 @@ public partial class MainWindow : Window
 
             if (!_cfg.Barra.Arrastrable || _siguiendoRaton != null) return;
 
+            // La barra vertical no se aparta con el ratón. No es un olvido: es una
+            // franja reservada pegada a su lado, como la barra de Windows, y toda la
+            // maquinaria de apartarla y devolverla (CasaDeLaVentana, AnimarVuelta, el
+            // filo que no se puede mover) está escrita en el eje de la horizontal.
+            // Media función aquí se vería como un fallo; esto se ve como una decisión.
+            if (Vertical) return;
+
             // Editando, lo que se coge es un widget, no la isla. Si no cediera aqui,
             // arrastrar un bloque moveria la barra entera por la pantalla.
             if (EdicionAnclada) return;

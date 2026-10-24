@@ -75,10 +75,39 @@ public partial class MainWindow
     DispatcherTimer? _tiempoMiniLista;
     Grupo? _grupoSenalado;
 
-    double _anchoTira;                     // ancho natural de la fila entera, medido
+    double _anchoTira;                     // largo natural de la tira entera, medido
 
     double AnchoVisible => Math.Max(AnchoIcono, MaxAppsEfectivo * AnchoIcono);
     double DesplazamientoMaximo => Math.Max(0, _anchoTira - AnchoVisible);
+
+    // ---------- El eje de la tira ----------
+    //
+    // El carrusel es una tira más larga que el hueco que se le da, desplazándose por
+    // dentro de una ventanita. En la barra horizontal eso pasa en X y lo que se mide es
+    // el ancho; en la vertical, en Y y lo que se mide es el alto.
+    //
+    // Estos cinco accesos son los ÚNICOS sitios que lo saben. El resto del carrusel
+    // —la rueda, la inercia, el desvanecido de los extremos, traer a la vista la app
+    // que se acaba de activar— está escrito una sola vez y vale para los dos.
+    DependencyProperty EjeTira => Vertical ? TranslateTransform.YProperty : TranslateTransform.XProperty;
+
+    double Desplazado => _desplazamiento == null ? 0
+                       : Vertical ? _desplazamiento.Y : _desplazamiento.X;
+
+    void PonerDesplazado(double v)
+    {
+        if (_desplazamiento == null) return;
+        if (Vertical) _desplazamiento.Y = v; else _desplazamiento.X = v;
+    }
+
+    // El largo de la ventanita por la que se ve la tira
+    double LargoCarrusel => _carrusel == null ? 0 : Vertical ? _carrusel.Height : _carrusel.Width;
+
+    void PonerLargoCarrusel(double v)
+    {
+        if (_carrusel == null) return;
+        if (Vertical) _carrusel.Height = v; else _carrusel.Width = v;
+    }
 
     // Para el log de diagnóstico: qué grupos hay, en qué orden y con cuántas ventanas
     string ResumenGrupos()
@@ -102,16 +131,20 @@ public partial class MainWindow
         double x0 = -1;
         try { if (_carrusel != null) x0 = Left + _carrusel.TransformToAncestor(this).Transform(new Point(0, 0)).X; }
         catch { }
-        return $"tira={_anchoTira:0} visible={_carrusel?.Width:0} x0={x0:0} " +
-               $"desp={_desplazamiento?.X:0} [{string.Join(" ", nombres)}]{detalle}";
+        return $"tira={_anchoTira:0} visible={LargoCarrusel:0} x0={x0:0} " +
+               $"desp={Desplazado:0} [{string.Join(" ", nombres)}]{detalle}";
     }
 
     // ================= Construcción =================
     UIElement ModuloApps()
     {
-        double altoBoton = Math.Max(20, _cfg.Barra.Alto - 8);
+        bool v = Vertical;
+        double grosorBoton = Math.Max(20, _cfg.Barra.Alto - 8);
 
-        _tira = new StackPanel { Orientation = Orientation.Horizontal, Height = altoBoton };
+        // En vertical la tira se apila y lo que se fija es su ANCHO; en horizontal va
+        // tumbada y lo que se fija es su alto. De ahí para abajo, lo mismo.
+        _tira = new StackPanel { Orientation = v ? Orientation.Vertical : Orientation.Horizontal };
+        if (v) _tira.Width = grosorBoton; else _tira.Height = grosorBoton;
         _desplazamiento = new TranslateTransform();
         _tira.RenderTransform = _desplazamiento;
 
@@ -120,18 +153,19 @@ public partial class MainWindow
         // la recorta EN SUS PROPIAS COORDENADAS, y al desplazarla solo quedaba visible
         // el trocito final. El Canvas da sitio infinito a sus hijos y no los recorta;
         // el recorte bueno, el de la ventanita que se ve, lo hace el Border.
-        var lienzo = new Canvas { Height = altoBoton };
+        var lienzo = new Canvas();
+        if (v) lienzo.Width = grosorBoton; else lienzo.Height = grosorBoton;
         lienzo.Children.Add(_tira);
 
         _carrusel = new Border
         {
             ClipToBounds = true,
             Child = lienzo,
-            Height = altoBoton,
-            HorizontalAlignment = HorizontalAlignment.Left,
-            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = v ? HorizontalAlignment.Center : HorizontalAlignment.Left,
+            VerticalAlignment = v ? VerticalAlignment.Top : VerticalAlignment.Center,
             Background = Brushes.Transparent     // para que la rueda llegue aunque sobre hueco
         };
+        if (v) _carrusel.Width = grosorBoton; else _carrusel.Height = grosorBoton;
         _carrusel.MouseWheel += Carrusel_Rueda;
         _carrusel.SizeChanged += (_, _) => PintarDesvanecido();
 
@@ -146,7 +180,7 @@ public partial class MainWindow
         // dentro se desplazaría con la rueda y dejaría de estar a mano
         return new StackPanel
         {
-            Orientation = Orientation.Horizontal,
+            Orientation = v ? Orientation.Vertical : Orientation.Horizontal,
             Children = { _carrusel, CrearBotonVista() }
         };
     }
@@ -293,9 +327,9 @@ public partial class MainWindow
         if (_carrusel == null || _tira == null) { AjustarAncho(); return; }
         // Medir sin límite (no UpdateLayout, que fuerza una pasada entera cada segundo)
         _tira.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        _anchoTira = _tira.DesiredSize.Width;
+        _anchoTira = Vertical ? _tira.DesiredSize.Height : _tira.DesiredSize.Width;
         _tira.InvalidateMeasure();
-        _carrusel.Width = Math.Min(_anchoTira, AnchoVisible);
+        PonerLargoCarrusel(Math.Min(_anchoTira, AnchoVisible));
         LimitarDesplazamiento();
         PintarDesvanecido();
         ActualizarBotonVista();
@@ -491,14 +525,15 @@ public partial class MainWindow
     void DeslizarA(double destino, double ms)
     {
         if (_desplazamiento == null) return;
-        double ahora = _desplazamiento.X;
-        _desplazamiento.BeginAnimation(TranslateTransform.XProperty, null);
-        _desplazamiento.X = destino;
+        var eje = EjeTira;
+        double ahora = Desplazado;
+        _desplazamiento.BeginAnimation(eje, null);
+        PonerDesplazado(destino);
         if (Math.Abs(ahora - destino) < 0.5) { PintarDesvanecido(); return; }
 
         var anim = Kf(ahora, destino, ms, 0, Suave);
         anim.Completed += (_, _) => PintarDesvanecido();
-        _desplazamiento.BeginAnimation(TranslateTransform.XProperty, anim);
+        _desplazamiento.BeginAnimation(eje, anim);
         PintarDesvanecido();
     }
 
@@ -512,14 +547,16 @@ public partial class MainWindow
         int i = _tira.Children.IndexOf(g.Boton);
         if (i < 0) return;
 
-        double izquierda = i * AnchoIcono;
-        double derecha = izquierda + AnchoIcono;
-        double visibleIzq = -_objetivoDesplazamiento;
-        double visibleDer = visibleIzq + _carrusel.Width;
+        // "Antes" y "después" en el eje de la tira: a la izquierda y a la derecha si
+        // está tumbada, arriba y abajo si está apilada. La cuenta es la misma.
+        double antes = i * AnchoIcono;
+        double despues = antes + AnchoIcono;
+        double visibleDesde = -_objetivoDesplazamiento;
+        double visibleHasta = visibleDesde + LargoCarrusel;
 
         double destino = _objetivoDesplazamiento;
-        if (izquierda < visibleIzq) destino = -izquierda;
-        else if (derecha > visibleDer) destino = -(derecha - _carrusel.Width);
+        if (antes < visibleDesde) destino = -antes;
+        else if (despues > visibleHasta) destino = -(despues - LargoCarrusel);
         else return;
 
         _objetivoDesplazamiento = destino;
@@ -530,20 +567,27 @@ public partial class MainWindow
     // Los extremos se difuminan solo por el lado donde quedan apps sin ver
     void PintarDesvanecido()
     {
-        if (_carrusel == null || _carrusel.Width <= 0 || double.IsNaN(_carrusel.Width)) return;
+        double largo = LargoCarrusel;
+        if (_carrusel == null || largo <= 0 || double.IsNaN(largo)) return;
 
-        bool hayIzquierda = _desplazamiento != null && _desplazamiento.X < -0.5;
-        bool hayDerecha = _desplazamiento != null && _desplazamiento.X > -DesplazamientoMaximo + 0.5;
+        bool hayAntes = _desplazamiento != null && Desplazado < -0.5;
+        bool hayDespues = _desplazamiento != null && Desplazado > -DesplazamientoMaximo + 0.5;
 
         if (Environment.GetEnvironmentVariable("NUBEBAR_SINMASCARA") == "1") { _carrusel.OpacityMask = null; return; }
-        if (!hayIzquierda && !hayDerecha) { _carrusel.OpacityMask = null; return; }
+        if (!hayAntes && !hayDespues) { _carrusel.OpacityMask = null; return; }
 
-        double borde = Math.Min(DesvanecidoBorde / _carrusel.Width, 0.45);
-        var mascara = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 0) };
-        mascara.GradientStops.Add(new GradientStop(hayIzquierda ? Colors.Transparent : Colors.Black, 0));
+        // El degradado va en el eje de la tira: de izquierda a derecha si está tumbada,
+        // de arriba abajo si está apilada.
+        double borde = Math.Min(DesvanecidoBorde / largo, 0.45);
+        var mascara = new LinearGradientBrush
+        {
+            StartPoint = new Point(0, 0),
+            EndPoint = Vertical ? new Point(0, 1) : new Point(1, 0)
+        };
+        mascara.GradientStops.Add(new GradientStop(hayAntes ? Colors.Transparent : Colors.Black, 0));
         mascara.GradientStops.Add(new GradientStop(Colors.Black, borde));
         mascara.GradientStops.Add(new GradientStop(Colors.Black, 1 - borde));
-        mascara.GradientStops.Add(new GradientStop(hayDerecha ? Colors.Transparent : Colors.Black, 1));
+        mascara.GradientStops.Add(new GradientStop(hayDespues ? Colors.Transparent : Colors.Black, 1));
         mascara.Freeze();
         _carrusel.OpacityMask = mascara;
     }

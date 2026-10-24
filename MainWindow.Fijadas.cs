@@ -57,15 +57,21 @@ public partial class MainWindow : Window
     {
         bool puesto = _cfg.Modulos.Izquierda.Concat(_cfg.Modulos.Centro).Concat(_cfg.Modulos.Derecha)
                           .Any(m => m.Equals("fijadas", StringComparison.OrdinalIgnoreCase));
-        _tiraFijas = puesto
-            ? new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Height = Math.Max(20, _cfg.Barra.Alto - 8),
-                Margin = new Thickness(0, 0, 4, 0),
-                VerticalAlignment = VerticalAlignment.Center
-            }
-            : null;
+        if (!puesto) { _tiraFijas = null; return; }
+
+        // Con la barra vertical las fijadas también se apilan, y lo que se fija es su
+        // ancho en vez de su alto (ver "El eje de la tira" en MainWindow.Apps.cs).
+        bool v = Vertical;
+        double grosor = Math.Max(20, _cfg.Barra.Alto - 8);
+        _tiraFijas = new StackPanel
+        {
+            Orientation = v ? Orientation.Vertical : Orientation.Horizontal,
+            Width = v ? grosor : double.NaN,
+            Height = v ? double.NaN : grosor,
+            Margin = v ? new Thickness(0, 0, 0, 4) : new Thickness(0, 0, 4, 0),
+            HorizontalAlignment = v ? HorizontalAlignment.Center : HorizontalAlignment.Stretch,
+            VerticalAlignment = v ? VerticalAlignment.Stretch : VerticalAlignment.Center
+        };
     }
 
     UIElement ModuloFijas()

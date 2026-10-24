@@ -163,6 +163,17 @@ public partial class MainWindow
     void AbrirPanel(string nombre, FrameworkElement contenido, double ancho, double alto,
                     bool teclado = false, bool encoger = false, FrameworkElement? ancla = null)
     {
+        // En vertical el cajón no vale: la barra ya ocupa la pantalla de arriba abajo y
+        // no tiene hacia dónde crecer. El panel sale flotando al lado (ver
+        // MainWindow.Vertical.cs). Todo lo de aquí abajo —el recorte en tarjeta, el
+        // encogerse, la animación de alto— es de la isla horizontal.
+        if (Vertical)
+        {
+            if (_panelAbierto != null) QuitarPanelFlotante();
+            AbrirPanelFlotante(nombre, contenido, ancho, alto, teclado, ancla);
+            return;
+        }
+
         bool habiaOtro = _panelAbierto != null;
         _panelAbierto = nombre;
         _panelAlto = alto;
@@ -280,6 +291,11 @@ public partial class MainWindow
     void CerrarPanel()
     {
         if (_panelAbierto == null) return;
+        // La tarjeta se cierra sola, con su propia animación: se mira si está a la
+        // vista y no si estamos en vertical, para que un cambio de orientación con un
+        // panel abierto no deje la tarjeta colgada.
+        if (PanelFlotante.Visibility == Visibility.Visible) { CerrarPanelFlotante(); return; }
+
         var nombre = _panelAbierto;
         bool pequeno = _panelAlto < 220;
         _panelAbierto = null;
@@ -344,6 +360,11 @@ public partial class MainWindow
         {
             var r = Monitores.Raton();
             if (Isla.InputHitTest(Isla.PointFromScreen(new Point(r.X, r.Y))) != null) return;
+            // Con la barra vertical el panel vive FUERA de la isla, en su tarjeta: sin
+            // esto, el primer clic dentro del propio panel contaba como "clic fuera"
+            // y lo cerraba justo cuando ibas a usarlo.
+            if (PanelFlotante.Visibility == Visibility.Visible &&
+                PanelFlotante.InputHitTest(PanelFlotante.PointFromScreen(new Point(r.X, r.Y))) != null) return;
             // Un desplegable (la salida de audio), un tooltip o la ventana de ajustes
             // son ventanas NUESTRAS aparte de la isla: elegir algo en ellos no es "fuera"
             var bajo = Monitores.VentanaBajoElRaton();
@@ -360,7 +381,9 @@ public partial class MainWindow
     // ahora necesita. Sin esto lo que llegaba tarde salía recortado por abajo.
     void ReajustarPanel(string nombre)
     {
-        if (_panelAbierto != nombre || Cajon.Content is not FrameworkElement contenido) return;
+        if (_panelAbierto != nombre) return;
+        if (PanelFlotante.Visibility == Visibility.Visible) { ReajustarPanelFlotante(nombre); return; }
+        if (Cajon.Content is not FrameworkElement contenido) return;
         try
         {
             double bordes = Isla.BorderThickness.Top + Isla.BorderThickness.Bottom;
@@ -445,6 +468,7 @@ public partial class MainWindow
         _panelAlto = _panelAncho = 0;
         Cajon.Content = null;
         SinRecorteDelCajon();
+        QuitarPanelFlotante();
     }
 
     // ---------- Animación de alto ----------

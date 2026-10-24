@@ -31,8 +31,15 @@ public partial class MainWindow : Window
         catch { return _monitor.Escala; }
     }
 
+    // El número que recibe es el GROSOR de la franja con sus márgenes: en horizontal es
+    // el alto de la ventana y en vertical su ancho. Es el mismo dato —el grosor del
+    // panel— y lo único que cambia es contra qué eje se mide, así que los que ya
+    // llamaban a esto (abrir un panel, un cambio de DPI, recargar el config) siguen
+    // llamando igual y la barra vertical sale colocada sin tocarlos.
     void ColocarEnMonitor(double altoVentanaDip)
     {
+        if (Vertical) { ColocarEnMonitorVertical(altoVentanaDip); return; }
+
         var m = _monitor;
         double escala = _self != IntPtr.Zero ? EscalaDeWpf() : m.Escala;
         int altoPx = Math.Max(1, (int)Math.Round(altoVentanaDip * escala));
@@ -96,6 +103,17 @@ public partial class MainWindow : Window
         get
         {
             int pedidas = Math.Max(1, _cfg.Barra.MaxApps);
+
+            // En vertical la tira se apila, así que lo que la limita es el ALTO de la
+            // pantalla, y no hay que repartir el hueco entre dos lados: la zona del
+            // medio tiene la columna entera menos lo que ocupan las otras dos.
+            if (Vertical)
+            {
+                double altoDip = _monitor.Alto / _monitor.Escala - _cfg.Barra.Margen * 2;
+                int apilados = (int)Math.Floor((altoDip - EspacioOtrosModulos * 2 - AnchoIcono) / AnchoIcono);
+                return Math.Max(1, Math.Min(pedidas, apilados));
+            }
+
             double anchoDip = _monitor.Ancho / _monitor.Escala - _cfg.Barra.Margen * 2;
             // (ancho - centro) / 2 es lo que le toca a cada lado; menos el botón de Inicio
             int caben = (int)Math.Floor(((anchoDip - EspacioOtrosModulos) / 2 - AnchoIcono) / AnchoIcono);
@@ -235,10 +253,10 @@ public partial class MainWindow : Window
 
     }
 
-    // El alto que debe tener la ventana ahora mismo: la fila de módulos más el
-    // cajón si hay un panel abierto.
-    double AltoVentanaAhora() =>
-        _cfg.Barra.Alto + _cfg.Barra.Margen * 2 + (_panelAbierto != null ? _panelAlto : 0);
+    // El grosor que debe tener la ventana ahora mismo, con el panel abierto si lo hay.
+    // Lo decide GrosorVentanaAhora, que sabe si el panel crece hacia dentro (el cajón
+    // de la horizontal) o hacia el lado (la tarjeta de la vertical).
+    double AltoVentanaAhora() => GrosorVentanaAhora();
 
     IntPtr MensajePantalla(IntPtr hwnd, int msg, IntPtr w, IntPtr l, ref bool manejado)
     {

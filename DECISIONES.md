@@ -1544,6 +1544,9 @@ que edita la Biblioteca y lo que el usuario reconoce en su config; `Zonas` es un
 
 ### Los cuatro bordes: lo que se puede hacer hoy y lo que no
 
+> **B6 cambió esto.** La barra vertical ya existe: un lateral en modo barra es una barra
+> vertical de verdad, no un «se coloca arriba». Ver «La barra vertical» al final.
+
 `arriba` y `abajo` ya estaban y valen en los dos modos. Los laterales **anclan la isla**
 a ese lado sin dejar de ser horizontal: es una colocación, no un giro.
 
@@ -1612,3 +1615,127 @@ sitio donde está escrito qué significa cada modo, en vez de cuatro ifes repart
   por la espalda, que sería peor sorpresa.
 - Varios paneles a la vez: el modelo es una lista y `PanelPrincipal` ya es una
   propiedad de la isla, pero hoy todas dibujan el mismo `"principal"`.
+
+
+## Fase B · La barra vertical, o cómo girar una nube sin escribir una segunda
+
+En B5 un borde lateral en modo barra se avisaba en el log y se trataba como «arriba»,
+porque media barra vertical es peor que ninguna. B6 es la otra mitad.
+
+### La idea que lo hizo manejable
+
+La tentación era escribir una barra vertical: otro XAML, otra colocación, otro cajón,
+otro carrusel. Eso son dos nubes que hay que arreglar dos veces.
+
+Lo que de verdad cambia entre las dos es **qué eje es el grosor y qué eje es el largo**.
+La nube ya sabía vivir en una franja fija —eso es el modo barra horizontal— y ya sabía
+que un panel tiene un grosor. Así que no hay una segunda nube: hay una docena de sitios
+donde se pregunta `Vertical` y se cambian las dos medidas de sitio.
+
+El caso más claro es `ColocarEnMonitor`. Recibía «el alto de la ventana». Hoy recibe **el
+grosor de la franja con sus márgenes**, que es el mismo número; lo que cambia es contra
+qué eje se mide. Los que ya llamaban —abrir un panel, un cambio de DPI, recargar el
+config— siguen llamando igual y la barra vertical sale colocada sin tocarlos.
+
+### Las zonas, apiladas, siguen siendo las mismas tres
+
+El Grid de las zonas pasa de tres columnas (`* Auto *`) a tres **filas** con las mismas
+proporciones, y los `StackPanel` de horizontal a vertical (`OrientarZonas`). Las zonas
+conservan su significado: Izquierda es «al principio» —arriba—, Centro es el medio y
+Derecha es «al final» —abajo—. Es lo que hace Plasma, y así los widgets, la Biblioteca y
+el modo edición siguen hablando de las mismas tres zonas sin enterarse de nada.
+
+`OrientarZonas` va **antes** de `RemontarZonas`, porque los widgets se construyen según
+la orientación: el separador es una raya a lo ancho o a lo alto, el carrusel se apila o
+se tumba. Montarlos primero dejaba la mitad girada.
+
+El sitio de cada zona en el Grid se pone en código y no en el XAML. Con `Grid.Row`
+escrito en el XAML, en horizontal las tres zonas pedían filas que no existen y lo que
+las salvaba era que WPF recorta un índice fuera de rango. Funcionaba por casualidad.
+
+### Tres cosas que tienen eje propio
+
+- **El separador.** Separa en la dirección en la que se apilan los widgets, así que en
+  vertical la rayita va tumbada: las dos medidas y los dos márgenes cambian de sitio.
+- **El carrusel.** Es una tira más larga que su hueco, desplazándose por dentro de una
+  ventanita. Cinco accesos (`EjeTira`, `Desplazado`, `PonerDesplazado`, `LargoCarrusel`,
+  `PonerLargoCarrusel`) son los únicos sitios que saben de qué eje hablan; la rueda, la
+  inercia, el desvanecido de los extremos y el traer a la vista la app que se acaba de
+  activar están escritos **una sola vez** y valen para los dos.
+- **El arrastre entre zonas del modo edición.** `ZonaEn` decidía por columna del Grid;
+  ahora por columna o por fila. El punto medio de cada bloque, la marca de destino y el
+  fondo de cada zona se miden con `ALoLargo`/`ALoAncho`, que es la misma cuenta con los
+  ejes cambiados. Sin esto, editar una barra vertical habría puesto cada widget en la
+  zona equivocada.
+
+### Los paneles no caben dentro: salen al lado
+
+En horizontal el panel es el «cajón»: la isla crece de alto y el panel se despliega
+desde dentro, como una sola superficie con un saliente. En vertical eso **no se puede**:
+la barra ya va de arriba abajo y no tiene hacia dónde crecer.
+
+Así que el panel sale como una **tarjeta aparte**, pegada al lado de la barra, que es
+exactamente lo que hace Plasma — y encima es más sencillo que el recorte con
+`CombinedGeometry` de la horizontal.
+
+La tarjeta vive dentro de la **misma ventana**, que se ensancha para dejarle sitio. Una
+ventana nueva tendría que resolver otra vez el no robar el foco, el orden Z, el DPI y el
+guardián, y todo eso ya está resuelto aquí. Lo que sí hubo que añadir es que un clic
+dentro de la tarjeta no cuenta como «clic fuera»: `VigilarClicFueraDelPanel` solo miraba
+la isla, y el primer clic dentro del propio panel lo cerraba.
+
+Su aritmética (`AnchoConTarjeta`, `SitioDeLaTarjeta`) está **fuera de la ventana y es
+pura**, por un motivo concreto: el clic que abre un panel no se puede automatizar sin
+riesgo de escribir en la ventana de otro programa. Lo que se comprueba a mano es que la
+tarjeta aparece; lo que se comprueba en frío es que aparece **donde** toca, incluidos los
+casos de borde (un widget de arriba, uno de abajo, una tarjeta más alta que la pantalla).
+
+### La appbar, con los cuatro bordes
+
+`AppBar.Registrar` recibía un `bool arriba`. Ahora recibe el borde de Windows
+(`ABE_LEFT=0`, `ABE_TOP=1`, `ABE_RIGHT=2`, `ABE_BOTTOM=3`), que decide
+`PanelNube.BordeAppBar` a partir del modo y del borde del panel, y `grosorPx` es lo que
+se reserva en la dirección que toque.
+
+Un detalle que no es obvio: el `ABM_QUERYPOS` puede mover el filo que **no** fijamos
+nosotros —si ya hay otra appbar en ese lado, Windows nos aparta—, así que al volver hay
+que clavar otra vez el grosor contra el filo exterior y solo entonces hacer `ABM_SETPOS`.
+Eso ya estaba bien para arriba y abajo; ahora está escrito para los cuatro.
+
+Y hay una asimetría a propósito: una **isla** anclada a un lateral, si reservara hueco,
+lo reservaría por su franja horizontal, no por el lado. Estar pegada a un lado no la
+gira. (Hoy no reserva ninguna isla, pero la regla está escrita donde se decide.)
+
+### Las cuatro visibilidades, sin una línea de más
+
+`Deslizar` movía la isla en Y. Ahora mueve en X o en Y según la orientación, y lo que la
+aparta es **su propio grosor** y no el alto de la ventana (con un panel abierto la
+ventana es mucho más grande que la franja). `RatonEnLaFranja` y el nuevo `RatonEnElFilo`
+son la misma cuenta con los ejes cambiados.
+
+Con eso, `autoocultar` y la pantalla completa funcionan en los cuatro bordes sin que
+quien los decide (`PanelNube.TocaRecogerse`, de B5) sepa nada de la orientación. La
+visibilidad y el borde son independientes a propósito, y hay ocho pruebas que lo fijan.
+
+Al cambiar de orientación en caliente, el eje que ya no se usa vuelve a cero. Sin eso, la
+barra se quedaba apartada en una dirección que nadie iba a deshacer.
+
+### Lo que NO hace, y por qué
+
+- **El menú Inicio de 860 px no está rehecho para una columna.** Sale como tarjeta
+  flotante al lado, con su ancho de siempre, y se desplaza por dentro si no cabe de
+  alto. Un menú pensado para vertical —la lista de apps en una columna, el buscador
+  arriba, las secciones apiladas— es trabajo posterior y se decidió dejarlo fuera.
+- **La barra vertical no se aparta con el ratón.** No es un olvido: es una franja
+  reservada pegada a su lado, como la barra de Windows, y toda la maquinaria de
+  apartarla y devolverla (`CasaDeLaVentana`, `AnimarVuelta`, el filo que no se puede
+  mover) está escrita en el eje de la horizontal. Media función se vería como un fallo;
+  esto se ve como una decisión.
+- **Un widget más ancho que el grosor se recorta.** La barra recorta a sus bordes
+  (`ClipToBounds`), y con un grosor de 38 px un texto largo no cabe. Lo que se ve en una
+  columna estrecha son iconos y cifras cortas; los widgets de texto largo piden un
+  grosor mayor. Formatos específicos para vertical —el reloj en dos líneas, por
+  ejemplo— son trabajo posterior.
+- **Un solo panel.** `Paneles` es una lista desde B5 y `PanelPrincipal` ya es una
+  propiedad de cada isla, pero hoy todas dibujan el mismo `"principal"`: no se puede
+  tener una barra vertical a la izquierda y una isla arriba a la vez.
