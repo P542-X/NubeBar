@@ -229,25 +229,29 @@ public class PanelNube
     // ¿Le pedimos a Windows que nos guarde la franja (appbar)? Son TRES estados y no
     // dos, y la diferencia importa:
     //
-    //   null  → no lo has elegido: decide la orientación (ver ReservaPorDefecto)
+    //   null  → no lo has elegido: la nube flota, en los cuatro bordes
     //   true  → lo has elegido: resérvala, como la barra de tareas
     //   false → lo has elegido: no la reserves, que las ventanas pasen por debajo
     //
     // Hacía falta el tercer estado porque el valor heredado era `true` y en modo ISLA
-    // no hacía nada: llevaba ahí sin efecto desde siempre, y al pasar a barra vertical
-    // se activó solo y convirtió la nube en una barra de tareas que nadie había pedido.
+    // no hacía nada: llevaba ahí sin efecto desde siempre, y al pasar a barra se
+    // activó solo y convirtió la nube en una barra de tareas que nadie había pedido.
     // Un bool no sabe distinguir "lo quiero" de "venía puesto".
     public bool? ReservarEspacio { get; set; }
 
-    // Horizontal de lado a lado: reservar es lo normal, como cualquier barra.
-    // Vertical: NO, porque lo que se espera de una barra lateral es que flote por
-    // encima de las ventanas. Quien quiera lo contrario lo enciende en Ajustes, y
-    // entonces ya es una elección y se respeta.
-    public static bool ReservaPorDefecto(string? modo, string? posicion) =>
-        EsBarra(modo) && !EsVertical(modo, posicion);
+    // Y el valor de serie es NO RESERVAR, en los cuatro bordes.
+    //
+    // Primero se intentó que dependiera de la orientación —horizontal reserva, vertical
+    // no—, copiando lo que hace Plasma. Pero esta nube no es un panel de Plasma: es una
+    // isla que flota, y eso vale igual estirada de lado a lado. Reservar hueco empuja
+    // las ventanas de todo el escritorio, que es una decisión demasiado grande para
+    // tomarla por el usuario solo porque haya elegido el borde de arriba.
+    //
+    // Ya no depende de nada, y por eso no recibe nada: una función con dos parámetros
+    // que no mira invita a pensar que aún hay una regla escondida.
+    public const bool ReservaPorDefecto = false;
 
-    public static bool ReservaEfectiva(bool? elegido, string? modo, string? posicion) =>
-        elegido ?? ReservaPorDefecto(modo, posicion);
+    public static bool ReservaEfectiva(bool? elegido) => elegido ?? ReservaPorDefecto;
 
     public string Monitores { get; set; } = "todos";      // "todos" | "principal"
 
@@ -406,9 +410,7 @@ public class Config
                     Posicion = c.Barra.Posicion,
                     Grosor = c.Barra.Alto,
                     Margen = c.Barra.Margen,
-                    // Sin elegir a propósito: el `true` de Barra era el valor de serie
-                    // y en modo isla no hacía nada, así que no significa "lo quiero".
-                    // Decide la orientación (ver PanelNube.ReservaPorDefecto).
+                    // Sin elegir, la nube flota (ver PanelNube.ReservaPorDefecto).
                     ReservarEspacio = null,
                     Monitores = c.Barra.Monitores,
                     Visibilidad = "siempre"
@@ -449,7 +451,7 @@ public class Config
             // Barra.ReservarEspacio es un bool de toda la vida y lo leen otros sitios:
             // aquí se le da la respuesta YA RESUELTA, con el defecto de la orientación
             // aplicado si el usuario no ha elegido.
-            c.Barra.ReservarEspacio = PanelNube.ReservaEfectiva(p.ReservarEspacio, p.Modo, p.Posicion);
+            c.Barra.ReservarEspacio = PanelNube.ReservaEfectiva(p.ReservarEspacio);
             c.Barra.Monitores = p.Monitores;
         }
         catch (Exception ex) { Log.Error("migrar y derivar Paneles", ex); }

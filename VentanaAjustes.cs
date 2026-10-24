@@ -1115,21 +1115,15 @@ public sealed class VentanaAjustes : Window
         c.Children.Add(Interruptor("Ocultarla mientras la nube esté abierta",
                                    _arbol.Bandera("Barra", "OcultarBarraWindows", true),
                                    v => _arbol.Poner("Barra", "OcultarBarraWindows", v)));
-        // El valor de serie depende de la ORIENTACIÓN: una barra horizontal reserva su
-        // franja como cualquier barra, y una vertical no, porque lo que se espera de
-        // una barra lateral es que flote por encima de las ventanas. Tocar este
+        // De serie viene apagado en los cuatro bordes: la nube flota. Tocar este
         // interruptor lo convierte en una elección tuya y manda sobre el defecto.
-        string modoAhora = _arbol.TextoDelPanel(Principal, "Modo", "isla");
-        string bordeAhora = _arbol.TextoDelPanel(Principal, "Posicion", "arriba");
-        bool reservaDeSerie = PanelNube.ReservaPorDefecto(modoAhora, bordeAhora);
         c.Children.Add(Interruptor("Reservar espacio en pantalla (solo en modo barra)",
-                                   _arbol.BanderaDelPanel(Principal, "ReservarEspacio", reservaDeSerie),
+                                   _arbol.BanderaDelPanel(Principal, "ReservarEspacio", PanelNube.ReservaPorDefecto),
                                    v => _arbol.PonerDelPanel(Principal, "ReservarEspacio", v)));
-        var pistaReserva = Rotulo(PanelNube.EsVertical(modoAhora, bordeAhora)
-            ? "Con la barra vertical viene apagado: la nube flota por encima de las ventanas. " +
-              "Enciéndelo si prefieres que Windows le guarde la franja, como a la barra de tareas."
-            : "Con la barra horizontal viene encendido: Windows le guarda su franja y las " +
-              "ventanas maximizadas no la tapan.");
+        var pistaReserva = Rotulo(
+            "De serie viene apagado en los cuatro bordes: la nube flota por encima de las " +
+            "ventanas. Enciéndelo si prefieres que Windows le guarde su franja y las ventanas " +
+            "maximizadas no la tapen, como pasa con la barra de tareas.");
         pistaReserva.TextWrapping = TextWrapping.Wrap;
         pistaReserva.Opacity = 0.55;
         c.Children.Add(pistaReserva);

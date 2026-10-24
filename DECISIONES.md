@@ -2109,3 +2109,50 @@ barra/izquierda     (sin elegir)    (0,0)-(2560,1440)   no reserva ← las apps 
 barra/izquierda + ReservarEspacio:true  (54,0)-(2560,1440)  reserva ← la opción sigue estando
 barra/izquierda + autoocultar       (0,0)-(2560,1440)   no reserva
 ```
+
+#### Y el defecto acabó siendo "no reservar" en los cuatro bordes
+
+La primera versión del tri-estado hacía que el defecto dependiera de la orientación:
+horizontal reserva, vertical no. Era copiar lo que hace Plasma, donde un panel reserva
+su franja de serie.
+
+Está mal para esta nube, y se ve en cuanto la usas con la barra arriba: las ventanas se
+apartan y queda una barra de tareas más. **Esto no es un panel de Plasma, es una isla que
+flota**, y eso vale igual estirada de lado a lado que recogida en el centro. Reservar
+hueco empuja las ventanas de todo el escritorio, que es una decisión demasiado grande
+para tomarla por el usuario solo porque haya elegido el borde de arriba.
+
+Así que el defecto es **no reservar, en los cuatro bordes**. El tri-estado no cambia:
+
+```
+null  → no lo has elegido: la nube flota, siempre
+true  → lo has elegido: resérvala, como la barra de tareas
+false → lo has elegido: no la reserves
+```
+
+`ReservaPorDefecto` dejó de ser una función con dos parámetros y pasó a ser una
+constante. No es cosmético: una función que recibe el modo y el borde y no los mira
+invita a pensar que todavía hay una regla escondida ahí dentro.
+
+Dos reglas que siguen por encima de tu elección, y las dos son de antes:
+
+- **El autoocultar nunca reserva**, aunque lo hayas encendido: guardar sitio para algo
+  que no está es justo lo que se quiere evitar al autoocultar.
+- **La isla no reserva nunca**, la elijas o no. Flota encima de las ventanas, que es lo
+  que es.
+
+Medido, los doce casos del cuadro más los cuatro de las excepciones:
+
+```
+null   arriba/abajo/izquierda/derecha   área (0,0)-(2560,1440)   libre
+true   arriba                           área (0,54)-(2560,1440)
+true   abajo                            área (0,0)-(2560,1338)
+true   izquierda                        área (54,0)-(2560,1440)
+true   derecha                          área (0,0)-(2506,1440)
+false  los cuatro                       área (0,0)-(2560,1440)   libre
+true + autoocultar                      área (0,0)-(2560,1440)   libre
+true + modo isla                        área (0,0)-(2560,1440)   libre
+```
+
+Los cuatro bordes de la appbar quedan así probados contra el área de trabajo que publica
+Windows, cada uno recortando por su lado.
