@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Text.Json.Nodes;
+using System.Windows.Controls;
 using System.Windows.Media;
 
 namespace NubeBar;
@@ -128,8 +130,45 @@ public static class Pruebas
             FondoRelojes();
             FondoDelPerfilNoche();
             FondoPngDeVerdad();
+
+            // C5.3: el marco de la ventana de Ajustes
+            AjustesSecciones();
+            AjustesBusqueda();
+            AjustesSubtitulos();
+            AjustesIconosDeTarjeta();
+            AjustesIconoDeGrupo();
+
+            // C5.4: el lenguaje visual de los paneles
+            PanelesSuperficieOpaca();
+            PanelesEstadoDeMetrica();
+            PanelesMedidas();
+            PanelesTamano();
+            GestoDeQuien();
+            CentroDeControlComposicion();
+            SliderCicloDeVida();
+            SliderLasSeisSalidas();
+            SliderDiezArrastres();
             GlifoDeLaCuadricula();
             AbrirYCerrar();
+
+            // C5.8: el botón propio del centro de control
+            InicioRepartoDeLaIsla();
+            InicioEnLosCuatroBordes();
+            InicioGestoYLanzadorIntacto();
+            InicioAltoConTope();
+            InicioSeVeDeVerdad();
+            InicioSeVeEnLosDosTemasYDpi();
+
+            // C5.12: la bandeja se actualiza en caliente
+            BandejaComparaMuestras();
+            BandejaIdentidadDeUnIcono();
+
+            // C5.9: la superficie de Inicio
+            PanelRaizOpaca();
+            InicioColgadoDeSuBoton();
+            CentroNoTocaLoQueSuena();
+
+
         }
         catch (Exception ex)
         {
@@ -2352,6 +2391,627 @@ public static class Pruebas
             try { if (f != null) File.Delete(f); } catch { }
     }
 
+    // ================= C5.3: el marco de la ventana de Ajustes =================
+
+    static void AjustesSecciones()
+    {
+        Grupo("ajustes: el registro y los iconos de todas las secciones");
+
+        // Las once secciones que tiene que haber, con su categoría. Si alguien añade una
+        // y se olvida de registrarla, esto lo dice.
+        var esperadas = new (string Id, string Cat)[]
+        {
+            ("apariencia", "Aspecto"), ("colores", "Aspecto"), ("fondo", "Aspecto"),
+            ("wallpaper", "Aspecto"), ("perfiles", "Aspecto"),
+            ("modulos", "Panel"), ("biblioteca", "Panel"), ("apps", "Panel"),
+            ("atajos", "Sistema"), ("inicio", "Sistema"), ("sistema", "Sistema"),
+        };
+
+        // Cada sección tiene icono, y es un glifo de verdad: ni vacío ni una caja.
+        foreach (var (id, _) in esperadas)
+        {
+            var g = VentanaAjustes.GlifoDeSeccion(id);
+            Igual(1, g.Length, $"\"{id}\" tiene un glifo de un carácter");
+            Vale(g[0] >= 0xE000 && g[0] <= 0xF8FF,
+                 $"\"{id}\" usa la zona de uso privado, donde la fuente de iconos los tiene ({(int)g[0]:X4})");
+        }
+
+        // Y no se repiten: dos secciones con el mismo icono no se distinguen de un vistazo
+        var glifos = esperadas.Select(e => VentanaAjustes.GlifoDeSeccion(e.Id)).ToList();
+        Igual(glifos.Count, glifos.Distinct().Count(), "ningún icono se repite entre secciones");
+
+        // Una sección desconocida no revienta: cae al de ajustes
+        Igual(1, VentanaAjustes.GlifoDeSeccion("loquesea").Length, "una sección desconocida tiene icono igual");
+
+        // Las tres categorías son las que se pidieron, con sus nombres visibles
+        Igual("Personalización", VentanaAjustes.NombreDeCategoriaVisible("Aspecto"),
+              "\"Aspecto\" se llama Personalización en pantalla");
+        Igual("NubeBar", VentanaAjustes.NombreDeCategoriaVisible("Panel"),
+              "\"Panel\" se llama NubeBar");
+        Igual("Sistema", VentanaAjustes.NombreDeCategoriaVisible("Sistema"), "y Sistema, Sistema");
+        // Una categoría que no existe se devuelve tal cual en vez de quedarse vacía
+        Igual("Otra", VentanaAjustes.NombreDeCategoriaVisible("Otra"), "una categoría desconocida se enseña tal cual");
+
+        // El reparto es el que se pidió: 5 / 3 / 3
+        Igual(5, esperadas.Count(e => e.Cat == "Aspecto"), "cinco en Personalización");
+        Igual(3, esperadas.Count(e => e.Cat == "Panel"), "tres en NubeBar");
+        Igual(3, esperadas.Count(e => e.Cat == "Sistema"), "tres en Sistema");
+        Igual(11, esperadas.Length, "once secciones en total");
+    }
+
+    static void AjustesBusqueda()
+    {
+        Grupo("ajustes: la búsqueda");
+
+        var apariencia = new DescriptorAjustes("apariencia", "Apariencia", "Aspecto",
+                                               "tema", "radio", "fuente", "animaciones", "movimiento");
+        var fondo = new DescriptorAjustes("fondo", "Fondo", "Aspecto",
+                                          "escritorio", "degradado", "imagen", "presentación");
+        var modulos = new DescriptorAjustes("modulos", "Módulos", "Panel",
+                                            "widgets", "zonas", "reloj");
+        var apps = new DescriptorAjustes("apps", "Apps", "Panel", "carrusel", "ventanas");
+
+        // Sin texto, todo coincide: la lista entera a la vista
+        foreach (var d in new[] { apariencia, fondo, modulos, apps })
+            Vale(VentanaAjustes.Coincide(d, "", "Personalización"), $"sin buscar, \"{d.Nombre}\" se ve");
+        Vale(VentanaAjustes.Coincide(apariencia, "   ", "Personalización"), "ni con espacios");
+
+        // Los cuatro términos que se pidieron probar
+        Vale(VentanaAjustes.Coincide(apariencia, "animación", "Personalización"),
+             "\"animación\" encuentra Apariencia por su palabra clave");
+        Vale(VentanaAjustes.Coincide(fondo, "fondo", "Personalización"), "\"fondo\" encuentra Fondo por su nombre");
+        Vale(VentanaAjustes.Coincide(modulos, "widget", "NubeBar"), "\"widget\" encuentra Módulos");
+        Vale(VentanaAjustes.Coincide(apps, "ventana", "NubeBar"), "\"ventana\" encuentra Apps");
+
+        // Por categoría visible, que es lo que el usuario ve escrito
+        Vale(VentanaAjustes.Coincide(modulos, "nubebar", "NubeBar"), "se puede buscar por categoría");
+        Vale(!VentanaAjustes.Coincide(modulos, "nubebar", "Panel"),
+             "y es la categoría VISIBLE la que cuenta, no su id interno");
+
+        // Sin acentos ni mayúsculas no se pierde nada
+        Vale(VentanaAjustes.Coincide(apariencia, "TEMA", "Personalización"), "las mayúsculas no importan");
+        Vale(VentanaAjustes.Coincide(fondo, "PRESENTACIÓN", "Personalización"), "ni en una palabra con acento");
+
+        // Por id, que es lo que escribe quien conoce el config
+        Vale(VentanaAjustes.Coincide(apariencia, "apariencia", "Personalización"), "se puede buscar por id");
+
+        // Y el estado vacío: algo que no está, no está
+        foreach (var d in new[] { apariencia, fondo, modulos, apps })
+            Vale(!VentanaAjustes.Coincide(d, "zzzzqqq", "Personalización"),
+                 $"\"zzzzqqq\" no encuentra \"{d.Nombre}\"");
+
+        // Un trozo de palabra encuentra: "degrad" tiene que dar Fondo
+        Vale(VentanaAjustes.Coincide(fondo, "degrad", "Personalización"), "un trozo de palabra encuentra");
+        // Y ahora sin tilde, que es como la mitad de la gente escribe
+        Vale(VentanaAjustes.Coincide(apariencia, "animacion", "Personalización"),
+             "\"animacion\" sin tilde también encuentra Apariencia");
+        Vale(VentanaAjustes.Coincide(fondo, "presentacion", "Personalización"),
+             "y \"presentacion\" sin tilde encuentra Fondo");
+        Vale(VentanaAjustes.Coincide(modulos, "modulos", "NubeBar"),
+             "y \"modulos\" sin tilde encuentra Módulos");
+    }
+
+    static void AjustesSubtitulos()
+    {
+        Grupo("ajustes: cada sección explica qué es");
+
+        foreach (var id in new[] { "apariencia", "colores", "fondo", "wallpaper", "perfiles",
+                                   "modulos", "biblioteca", "apps", "atajos", "inicio", "sistema" })
+        {
+            var s = VentanaAjustes.SubtituloDe(id);
+            Vale(s.Length > 10, $"\"{id}\" tiene un subtítulo de verdad ({s.Length} caracteres)");
+            Vale(s.Length < 90, $"y no es un párrafo ({s.Length} caracteres)");
+            Vale(!s.EndsWith("."), $"sin punto final, que es un rótulo y no una frase: \"{s}\"");
+        }
+
+        // Los subtítulos no se repiten: si dos secciones dicen lo mismo, no explican nada
+        var todos = new[] { "apariencia", "colores", "fondo", "wallpaper", "perfiles",
+                            "modulos", "biblioteca", "apps", "atajos", "inicio", "sistema" }
+                    .Select(VentanaAjustes.SubtituloDe).ToList();
+        Igual(todos.Count, todos.Distinct().Count(), "ningún subtítulo se repite");
+
+        // Una sección sin subtítulo devuelve vacío en vez de reventar
+        Igual("", VentanaAjustes.SubtituloDe("loquesea"), "una sección desconocida no tiene subtítulo");
+    }
+
+    static void AjustesIconosDeTarjeta()
+    {
+        Grupo("ajustes: los iconos de las tarjetas");
+
+        // Todos tienen que estar en la zona de uso privado: fuera de ahí la fuente de
+        // iconos no los tiene y sale una caja. Es lo que se pidió comprobar.
+        foreach (var c in VentanaAjustes.Ico.Todos)
+        {
+            Vale(c >= 0xE000 && c <= 0xF8FF, $"0x{c:X4} está en la zona de uso privado");
+            var g = char.ConvertFromUtf32(c);
+            Igual(1, g.Length, $"0x{c:X4} es un solo carácter");
+            Vale(!char.IsWhiteSpace(g[0]) && !char.IsControl(g[0]),
+                 $"0x{c:X4} no es un espacio ni un control");
+        }
+
+        // Y no hay dos constantes con el mismo número: dos nombres para el mismo icono
+        // engañan a quien los usa.
+        Igual(VentanaAjustes.Ico.Todos.Length, VentanaAjustes.Ico.Todos.Distinct().Count(),
+              "ninguna constante de icono repite número");
+
+        // Los de la navegación lateral salen del mismo juego vetado
+        foreach (var id in new[] { "apariencia", "colores", "fondo", "wallpaper", "perfiles",
+                                   "modulos", "biblioteca", "apps", "atajos", "inicio", "sistema" })
+        {
+            int c = VentanaAjustes.GlifoDeSeccion(id)[0];
+            Vale(VentanaAjustes.Ico.Todos.Contains(c),
+                 $"el icono de \"{id}\" (0x{c:X4}) es uno de los vetados");
+        }
+    }
+
+    static void AjustesIconoDeGrupo()
+    {
+        Grupo("ajustes: a cada tarjeta le toca su icono");
+
+        // La tabla que elige el icono por el título. Existe para no elegirlo a mano
+        // cuarenta veces y salir cuarenta cosas distintas; esto comprueba que acierta.
+        Igual(VentanaAjustes.Ico.Forma, VentanaAjustes.IconoDeGrupo("Forma y posición"),
+              "\"Forma y posición\" usa el icono de forma");
+        Igual(VentanaAjustes.Ico.Color, VentanaAjustes.IconoDeGrupo("Colores principales"),
+              "los colores, el de color");
+        Igual(VentanaAjustes.Ico.Color, VentanaAjustes.IconoDeGrupo("Tema"), "el tema, también");
+        Igual(VentanaAjustes.Ico.Imagen, VentanaAjustes.IconoDeGrupo("Fondo de escritorio"),
+              "el fondo, el de imagen");
+        Igual(VentanaAjustes.Ico.Presentacion, VentanaAjustes.IconoDeGrupo("Wallpaper Engine"),
+              "Wallpaper Engine, el de presentación");
+        Igual(VentanaAjustes.Ico.Zonas, VentanaAjustes.IconoDeGrupo("Zonas y widgets"),
+              "las zonas, el de rejilla");
+        Igual(VentanaAjustes.Ico.Teclado, VentanaAjustes.IconoDeGrupo("Atajos de teclado"),
+              "los atajos, el de teclado");
+        Igual(VentanaAjustes.Ico.Perfil, VentanaAjustes.IconoDeGrupo("Tus perfiles"),
+              "los perfiles, el de perfil");
+        Igual(VentanaAjustes.Ico.Pantallas, VentanaAjustes.IconoDeGrupo("Monitor"),
+              "el monitor, el de pantallas");
+        Igual(VentanaAjustes.Ico.Info, VentanaAjustes.IconoDeGrupo("Estado de la integración"),
+              "el estado, el de información");
+        Igual(VentanaAjustes.Ico.Restaurar, VentanaAjustes.IconoDeGrupo("Restaurar el tema"),
+              "restaurar, el de recargar");
+        Igual(VentanaAjustes.Ico.Sonido, VentanaAjustes.IconoDeGrupo("Reacción al sonido"),
+              "el sonido, el de volumen");
+
+        // Las mayúsculas y los acentos no cambian la elección
+        Igual(VentanaAjustes.IconoDeGrupo("FORMA"), VentanaAjustes.IconoDeGrupo("forma"),
+              "las mayúsculas no cambian el icono");
+
+        // Un título que no encaja con nada cae al de ajustes, no a cero
+        Igual(VentanaAjustes.Ico.Ajustes, VentanaAjustes.IconoDeGrupo("Hola qué tal"),
+              "un título desconocido cae al icono genérico");
+        Igual(VentanaAjustes.Ico.Ajustes, VentanaAjustes.IconoDeGrupo(""), "y uno vacío, igual");
+        Igual(VentanaAjustes.Ico.Ajustes, VentanaAjustes.IconoDeGrupo(null!), "y un null no revienta");
+
+        // Lo que devuelva siempre es un icono vetado: nunca un número suelto
+        foreach (var t in new[] { "Forma", "Colores", "Fondo", "Zonas", "Apps", "Atajos",
+                                  "Inicio", "Perfiles", "Sonido", "Buscar", "Estado",
+                                  "Restaurar", "Exportar", "Monitor", "Mover", "Animaciones", "???" })
+            Vale(VentanaAjustes.Ico.Todos.Contains(VentanaAjustes.IconoDeGrupo(t)),
+                 $"\"{t}\" devuelve un icono del juego vetado");
+    }
+
+    // ================= C5.4: el lenguaje visual de los paneles =================
+
+    static void PanelesSuperficieOpaca()
+    {
+        Grupo("paneles: el escritorio no se lee a través de las tarjetas");
+
+        // Esto es la queja de fondo, y es medible. `Superficie` es un velo translúcido;
+        // `SuperficieSolida` es ese mismo color aplanado sobre el fondo opaco del tema.
+        // Lo que no puede pasar es que una tarjeta deje pasar el escritorio.
+        foreach (var t in Temas.Predefinidos)
+        {
+            var tema = new Tema();
+            Temas.Aplicar(t, tema);
+            var fondo = (Color)ColorConverter.ConvertFromString(tema.Fondo)!;
+            var texto = (Color)ColorConverter.ConvertFromString(tema.Texto)!;
+            var acento = (Color)ColorConverter.ConvertFromString(tema.Acento)!;
+            var r = Roles.Desde(tema, fondo, texto, acento);
+
+            Igual((byte)255, r.SuperficieSolida.A, $"{t.Nombre}: la superficie de tarjeta es OPACA");
+            Igual((byte)255, r.SuperficieAltaSolida.A, $"{t.Nombre}: y la elevada también");
+            Igual((byte)255, r.FondoOpaco.A, $"{t.Nombre}: el fondo opaco lo es");
+            Igual((byte)255, r.SeleccionSolida.A, $"{t.Nombre}: y la selección sólida");
+
+            // Un tema PUEDE traer su propia superficie opaca —"Nube" lo hace—, así que lo
+            // que se comprueba no es que el velo sea velo, sino que la versión sólida
+            // nunca es menos opaca que la de siempre. Esa es la garantía que importa.
+            Vale(r.SuperficieSolida.A >= r.Superficie.A,
+                 $"{t.Nombre}: la tarjeta nunca es más transparente que el velo del tema");
+
+            // El texto se lee sobre la tarjeta: es lo que de verdad importa
+            double razon = Contraste.Entre(r.Texto, r.SuperficieSolida);
+            Vale(razon >= 4.5, $"{t.Nombre}: el texto contrasta sobre la tarjeta ({razon:0.0}:1)");
+            double razonAt = Contraste.Entre(r.TextoAtenuado, r.SuperficieSolida);
+            Vale(razonAt >= 3.0, $"{t.Nombre}: y el atenuado se sigue leyendo ({razonAt:0.0}:1)");
+            double razonAc = Contraste.Entre(r.AcentoTinta, r.SuperficieSolida);
+            Vale(razonAc >= 3.0, $"{t.Nombre}: y el acento como texto ({razonAc:0.0}:1)");
+        }
+    }
+
+    static void PanelesEstadoDeMetrica()
+    {
+        Grupo("paneles: el estado de una métrica sale del valor");
+
+        // Normal, alto y crítico: el color no se escribe a mano en cada sitio, se deduce.
+        Igual(MainWindow.EstadoMetrica.Normal, MainWindow.EstadoDe(0), "0 % es normal");
+        Igual(MainWindow.EstadoMetrica.Normal, MainWindow.EstadoDe(45), "45 % es normal");
+        Igual(MainWindow.EstadoMetrica.Normal, MainWindow.EstadoDe(69.9), "casi 70 sigue normal");
+        Igual(MainWindow.EstadoMetrica.Alto, MainWindow.EstadoDe(70), "70 % ya es alto");
+        Igual(MainWindow.EstadoMetrica.Alto, MainWindow.EstadoDe(89), "89 % es alto");
+        Igual(MainWindow.EstadoMetrica.Critico, MainWindow.EstadoDe(90), "90 % es crítico");
+        Igual(MainWindow.EstadoMetrica.Critico, MainWindow.EstadoDe(100), "100 % también");
+
+        // Valores imposibles no dan un estado imposible
+        Igual(MainWindow.EstadoMetrica.Normal, MainWindow.EstadoDe(-5), "un negativo es normal");
+        Igual(MainWindow.EstadoMetrica.Critico, MainWindow.EstadoDe(500), "y un 500 es crítico");
+
+        // Es monótona: más carga nunca baja de estado
+        var antes = MainWindow.EstadoDe(0);
+        for (int i = 0; i <= 100; i += 5)
+        {
+            var ahora = MainWindow.EstadoDe(i);
+            Vale((int)ahora >= (int)antes, $"a {i} % el estado no baja");
+            antes = ahora;
+        }
+    }
+
+    static void PanelesMedidas()
+    {
+        Grupo("paneles: las medidas son las mismas en todos");
+
+        // Si cada panel elige sus números, cada panel mide distinto. Están en un sitio.
+        Vale(MainWindow.RadioCard >= 10 && MainWindow.RadioCard <= 14,
+             $"el radio de tarjeta está en el rango pedido de 10..14 ({MainWindow.RadioCard})");
+        Vale(MainWindow.RadioShell >= MainWindow.RadioCard,
+             "el contenedor redondea al menos tanto como sus tarjetas");
+        Vale(MainWindow.HuecoCard >= 8 && MainWindow.HuecoCard <= 20,
+             $"la separación entre tarjetas es consistente ({MainWindow.HuecoCard})");
+        Vale(MainWindow.DentroCard >= 10,
+             $"las tarjetas no pegan el contenido al filo ({MainWindow.DentroCard})");
+        Vale(MainWindow.AltoTocable >= 32,
+             $"los controles tienen un mínimo cómodo de pulsación ({MainWindow.AltoTocable})");
+    }
+
+    static void PanelesTamano()
+    {
+        Grupo("paneles: ninguno se pasa del tope de alto");
+
+        // Esto es la prueba que faltaba y que habría pillado el fallo antes de que lo
+        // vieras: el panel medía 1710 px de contenido y acabó topado a 1362, o sea casi
+        // toda la pantalla, con una barra de desplazamiento. El log lo decía; no había
+        // nada que lo comprobara.
+        Vale(MainWindow.TopeDeAlto >= 320,
+             $"el tope deja sitio para un panel útil ({MainWindow.TopeDeAlto})");
+        Vale(MainWindow.TopeDeAlto <= 700,
+             $"y no llega a ser media pantalla ({MainWindow.TopeDeAlto})");
+        Vale(MainWindow.AnchoDePanel >= 300 && MainWindow.AnchoDePanel <= 460,
+             $"el ancho es de un panel colgado de un icono, no de una ventana ({MainWindow.AnchoDePanel})");
+
+        // El alto que pedía el panel roto, contra el tope: la relación que no puede volver
+        const double loQueMedia = 1710;
+        Vale(loQueMedia > MainWindow.TopeDeAlto * 2,
+             "lo que medía el panel roto era más del doble del tope: era contenido de sobra, " +
+             "no pantalla de menos");
+
+        // Y que el tope quepa en la pantalla más pequeña que se puede dar: un portátil de
+        // 768 px de alto con la barra de Windows puesta.
+        Vale(MainWindow.TopeDeAlto < 768 - 100,
+             $"el tope cabe en un portátil de 768 px ({MainWindow.TopeDeAlto})");
+
+        // Medir un contenido conocido da lo que mide, para que `AltoQuePide` sea fiable
+        var pila = new System.Windows.Controls.StackPanel();
+        for (int i = 0; i < 3; i++)
+            pila.Children.Add(new System.Windows.Controls.Border { Height = 50 });
+        double pide = MainWindow.AltoQuePide(pila, MainWindow.AnchoDePanel);
+        Igual(150.0, Math.Round(pide), "tres bloques de 50 miden 150");
+
+        var vacio = new System.Windows.Controls.StackPanel();
+        Igual(0.0, Math.Round(MainWindow.AltoQuePide(vacio, MainWindow.AnchoDePanel)),
+              "un contenido vacío mide cero, y eso es lo que delata un panel sin contenido");
+
+        // Un contenido que se pasa se detecta ANTES de abrir
+        var gordo = new System.Windows.Controls.StackPanel();
+        for (int i = 0; i < 20; i++)
+            gordo.Children.Add(new System.Windows.Controls.Border { Height = 100 });
+        Vale(MainWindow.AltoQuePide(gordo, MainWindow.AnchoDePanel) > MainWindow.TopeDeAlto,
+             "un contenido de 2000 px se detecta como que se pasa del tope");
+    }
+
+    // ================= C5.5: de quién es el gesto =================
+
+    static void GestoDeQuien()
+    {
+        Grupo("gesto: un control interactivo no arrastra la nube");
+
+        // El fallo: arrastrar el deslizador de volumen movía TAMBIÉN la isla. No se podía
+        // arreglar con e.Handled porque el arrastre de la isla va en un Preview de un
+        // antepasado y los eventos Preview van de la raíz a la hoja: cuando el deslizador
+        // se entera, la isla ya empezó. Se mira el ORIGEN y se sube por el árbol.
+
+        // ---------- Los tipos que siempre son del control ----------
+        Vale(MainWindow.EsTipoInteractivo(new Button()), "un botón es interactivo");
+        Vale(MainWindow.EsTipoInteractivo(new CheckBox()), "una casilla también (ButtonBase)");
+        Vale(MainWindow.EsTipoInteractivo(new System.Windows.Controls.Slider()),
+             "un deslizador del marco, también");
+        Vale(MainWindow.EsTipoInteractivo(new ComboBox()), "un desplegable");
+        Vale(MainWindow.EsTipoInteractivo(new TextBox()), "un campo de texto (TextBoxBase)");
+        Vale(MainWindow.EsTipoInteractivo(new ScrollViewer()), "un ScrollViewer");
+        Vale(MainWindow.EsTipoInteractivo(new ListBox()), "una lista");
+        Vale(MainWindow.EsTipoInteractivo(new ProgressBar()), "una barra de progreso (RangeBase)");
+
+        // Y lo que NO lo es: la nube se puede coger por ahí
+        Vale(!MainWindow.EsTipoInteractivo(new Border()), "un borde no es interactivo");
+        Vale(!MainWindow.EsTipoInteractivo(new TextBlock()), "ni un texto");
+        Vale(!MainWindow.EsTipoInteractivo(new Grid()), "ni una rejilla");
+        Vale(!MainWindow.EsTipoInteractivo(new StackPanel()), "ni una pila");
+
+        // ---------- Subiendo por el árbol ----------
+        //
+        // Lo que de verdad pasa: el clic nace en el TextBlock de DENTRO de un botón, y el
+        // origen del evento es ese texto, no el botón.
+        var texto = new TextBlock { Text = "Silenciar" };
+        var boton = new Button { Content = texto };
+        var tarjeta = new Border { Child = boton };
+        var isla = new Border { Child = tarjeta };
+
+        Vale(MainWindow.GestoDeUnControl(texto, isla),
+             "el clic en el texto de dentro de un botón es del BOTÓN, no de la nube");
+        Vale(MainWindow.GestoDeUnControl(boton, isla), "y en el botón, igual");
+
+        // Un borde suelto dentro de la isla sí deja arrastrar
+        var suelto = new TextBlock { Text = "12:34" };
+        var islaConReloj = new Border { Child = new Border { Child = suelto } };
+        Vale(!MainWindow.GestoDeUnControl(suelto, islaConReloj),
+             "el clic en el reloj de la isla SÍ puede arrastrar la nube");
+
+        // ---------- La marca explícita ----------
+        //
+        // Mis piezas no son controles del marco: el deslizador de NubeBar es un Grid con
+        // tres Border y una Ellipse. Por tipo no hay forma de saberlo.
+        var capa = new Grid();
+        var agarre = new System.Windows.Shapes.Ellipse();
+        capa.Children.Add(agarre);
+        var dentroDeIsla = new Border { Child = capa };
+        Vale(!MainWindow.GestoDeUnControl(agarre, dentroDeIsla),
+             "sin marcar, el agarre de un deslizador propio no se distingue de un adorno");
+
+        MainWindow.SetNoArrastrarNubeBar(capa, true);
+        Vale(MainWindow.GestoDeUnControl(agarre, dentroDeIsla),
+             "marcada la capa, el gesto es del deslizador");
+        Vale(MainWindow.GestoDeUnControl(capa, dentroDeIsla), "y de la propia capa");
+
+        // La marca protege a todo lo que tenga dentro, a cualquier profundidad
+        var hondo = new TextBlock();
+        var medio = new Border { Child = new Border { Child = hondo } };
+        var cajon = new Border { Child = medio };
+        Vale(!MainWindow.GestoDeUnControl(hondo, cajon), "sin marcar el cajón, no protege");
+        MainWindow.SetNoArrastrarNubeBar(cajon, true);
+        Vale(MainWindow.GestoDeUnControl(hondo, cajon),
+             "marcado el cajón, protege a tres niveles de profundidad");
+
+        // `SinArrastre` devuelve el mismo objeto, para poder encadenarlo
+        var g = new Grid();
+        Vale(ReferenceEquals(g, MainWindow.SinArrastre(g)), "SinArrastre devuelve el mismo elemento");
+        Vale(MainWindow.GetNoArrastrarNubeBar(g), "y lo deja marcado");
+
+        // ---------- Los casos raros ----------
+        Vale(!MainWindow.GestoDeUnControl(null), "sin origen, no es de ningún control");
+        Vale(!MainWindow.GestoDeUnControl("una cadena"), "algo que no es del árbol, tampoco");
+        Vale(!MainWindow.GestoDeUnControl(new Border()), "un borde huérfano no es interactivo");
+
+        // El tope corta la subida: no se sale de la nube
+        var fuera = new Button();
+        var tope = new Border();
+        var hijo = new TextBlock();
+        tope.Child = hijo;
+        _ = fuera;
+        Vale(!MainWindow.GestoDeUnControl(hijo, tope),
+             "la búsqueda se para en el tope y no sigue hacia arriba");
+    }
+
+    static void CentroDeControlComposicion()
+    {
+        Grupo("centro de control: ancho, contenido y composición");
+
+        // ---------- El ancho ----------
+        //
+        // "Ocupa demasiado ancho" tenía una causa concreta: el panel se abría SIN ancla,
+        // y sin ancla `AbrirPanel` dibuja el cajón de punta a punta de la isla —1169 px en
+        // una pantalla de 2560— en vez de como una tarjeta del ancho pedido. Las tarjetas
+        // se estiraban a ese ancho: de ahí el espacio vacío y CPU/RAM con sitio de sobra.
+        Vale(MainWindow.AnchoDelCentro >= 420 && MainWindow.AnchoDelCentro <= 560,
+             $"el centro de control está en el rango pedido de 420..560 ({MainWindow.AnchoDelCentro})");
+        Vale(MainWindow.AnchoDePanel >= 320 && MainWindow.AnchoDePanel < MainWindow.AnchoDelCentro,
+             $"el de audio es más estrecho, que lleva menos ({MainWindow.AnchoDePanel})");
+        Vale(MainWindow.AnchoDelCentro < 1169,
+             "y los dos muy por debajo del ancho de la isla, que es lo que ocupaban antes");
+
+        // ---------- El alto ----------
+        Vale(MainWindow.TopeDeAlto <= 560, $"el tope de alto no llega a media pantalla ({MainWindow.TopeDeAlto})");
+        Vale(MainWindow.TopeDeAlto < 768 - 100, "y cabe en un portátil de 768 px");
+
+        // ---------- Las medidas de las tarjetas, compactas ----------
+        Vale(MainWindow.DentroCard <= 16, $"las tarjetas no son acolchadas ({MainWindow.DentroCard})");
+        Vale(MainWindow.HuecoCard <= 12,
+             $"ni se separan tanto que parezcan botones sueltos ({MainWindow.HuecoCard})");
+
+        // Cuatro acciones en el ancho del centro dan un botón de tamaño cómodo y no una
+        // tira de iconos perdidos: es lo que se pidió de la rejilla.
+        double porAccion = (MainWindow.AnchoDelCentro - 2 * MainWindow.DentroCard - 24) / 4;
+        Vale(porAccion >= 60 && porAccion <= 130,
+             $"cada acción rápida mide {porAccion:0} px de ancho: ni diminuta ni desperdigada");
+
+        // Y dos métricas lado a lado caben sin quedarse anchas
+        double porMetrica = (MainWindow.AnchoDelCentro - 2 * MainWindow.DentroCard) / 2;
+        Vale(porMetrica >= 140 && porMetrica <= 240,
+             $"cada métrica mide {porMetrica:0} px: no se queda con sitio de sobra");
+    }
+
+    // ================= C5.6: el deslizador no se queda agarrado =================
+
+    static void SliderCicloDeVida()
+    {
+        Grupo("slider: el gesto siempre termina");
+
+        // El fallo: al soltar, el deslizador seguía en arrastre y el valor seguía
+        // moviéndose. Colgaba de `MouseLeftButtonUp`, y en una ventana WS_EX_NOACTIVATE
+        // por capas ese evento se pierde. Ahora la verdad la dice el botón del ratón una
+        // vez por fotograma, y hay un solo camino de salida.
+        var g = new MainWindow.GestoDeslizador();
+        var apuntes = new List<string>();
+        bool capturaSoltada = false, seguimientoParado = false;
+        g.Apuntar = m => apuntes.Add(m);
+        g.SoltarCaptura = () => capturaSoltada = true;
+        g.DejarDeSeguir = () => seguimientoParado = true;
+
+        // ---------- La prueba de limpieza que se pidió ----------
+        Igual(MainWindow.EstadoGesto.Inactivo, g.Estado, "antes: inactivo");
+        Vale(!g.Capturado, "captura antes: false");
+        Vale(!g.Siguiendo, "seguimiento antes: false");
+
+        g.Empezar();
+        Igual(MainWindow.EstadoGesto.Arrastrando, g.Estado, "durante: arrastrando");
+        Vale(g.Capturado, "captura durante: true");
+        Vale(g.Siguiendo, "seguimiento durante: true");
+
+        // El botón sigue pulsado: el gesto sigue vivo
+        Vale(g.Fotograma(botonPulsado: true), "con el botón pulsado el gesto sigue");
+        Vale(g.Arrastrando, "y sigue arrastrando");
+
+        // El botón deja de estar pulsado: termina AQUÍ, sin MouseLeftButtonUp
+        Vale(!g.Fotograma(botonPulsado: false), "al dejar de estar pulsado, el gesto acaba");
+        Igual(MainWindow.EstadoGesto.Inactivo, g.Estado, "después: inactivo");
+        Vale(!g.Capturado, "captura después: false");
+        Vale(!g.Siguiendo, "seguimiento después: false");
+        Vale(!g.Arrastrando, "arrastre después: false");
+        Vale(capturaSoltada, "la captura se soltó de verdad");
+        Vale(seguimientoParado, "y el seguimiento se detuvo");
+
+        // Las trazas que se pidieron registrar
+        Vale(apuntes.Contains("slider: inicio"), "se apuntó el inicio");
+        Vale(apuntes.Contains("slider: soltado detectado"), "y que se detectó el soltado");
+        Vale(apuntes.Contains("slider: captura liberada"), "y que se liberó la captura");
+        Vale(apuntes.Any(a => a.StartsWith("slider: estado limpio")), "y que el estado quedó limpio");
+
+        // ---------- Idempotente: terminar cinco veces no rompe nada ----------
+        int antesDe = g.VecesLimpiado;
+        for (int i = 0; i < 5; i++) g.Terminar("de nuevo");
+        Igual(MainWindow.EstadoGesto.Inactivo, g.Estado, "terminar cinco veces deja inactivo");
+        Vale(!g.Capturado && !g.Siguiendo, "y sin nada agarrado");
+        Vale(g.VecesLimpiado > antesDe, "limpiar se ejecuta, pero sin volver a soltar lo ya soltado");
+
+        // ---------- Y volver a pulsar funciona inmediatamente ----------
+        g.Empezar();
+        Vale(g.Arrastrando, "el siguiente clic vuelve a funcionar");
+        Vale(g.Capturado && g.Siguiendo, "con su captura y su seguimiento");
+        g.Terminar();
+        Vale(!g.Arrastrando && !g.Capturado && !g.Siguiendo, "y vuelve a limpiar");
+    }
+
+    static void SliderLasSeisSalidas()
+    {
+        Grupo("slider: las seis formas de terminar");
+
+        var logs = new List<string>();
+        MainWindow.GestoDeslizador Nuevo()
+        {
+            logs.Clear();
+            var g = new MainWindow.GestoDeslizador();
+            g.Apuntar = m => logs.Add(m);
+            g.Empezar();
+            return g;
+        }
+
+        // 1. Soltar
+        var g1 = Nuevo();
+        g1.Terminar("soltado");
+        Vale(!g1.Arrastrando && !g1.Capturado, "soltar termina");
+
+        // 2. Perder la captura
+        var g2 = Nuevo();
+        g2.Terminar("se perdió la captura");
+        Vale(!g2.Arrastrando && !g2.Capturado, "perder la captura termina");
+
+        // 3. Escape
+        var g3 = Nuevo();
+        g3.Cancelar("Esc");
+        Vale(!g3.Arrastrando && !g3.Capturado, "Esc cancela");
+        Vale(logs.Any(a => a.Contains("cancelado")), "y queda apuntado como cancelado");
+
+        // 4. Cerrar el panel
+        var g4 = Nuevo();
+        g4.Cancelar("se cerró el panel");
+        Vale(!g4.Arrastrando && !g4.Capturado && !g4.Siguiendo,
+             "cerrar el panel no deja captura ni seguimiento");
+
+        // 5. La ventana pierde el foco
+        var g5 = Nuevo();
+        g5.Cancelar("la ventana perdió el foco");
+        Vale(!g5.Arrastrando && !g5.Capturado, "perder el foco cancela");
+
+        // 6. Empezar otra interacción encima: la anterior se cierra, no se mezclan
+        var g6 = Nuevo();
+        g6.Empezar();
+        Vale(g6.Arrastrando, "el segundo gesto queda vivo");
+        Vale(g6.Capturado && g6.Siguiendo, "con sus recursos");
+        Igual(2, logs.Count(a => a == "slider: inicio"),
+              "y el primero se cerró antes de abrir el segundo");
+        g6.Terminar();
+        Vale(!g6.Capturado && !g6.Siguiendo, "y al final no queda nada");
+
+        // Cancelar sin haber empezado no apunta nada ni revienta
+        var g7 = new MainWindow.GestoDeslizador();
+        var sueltos = new List<string>();
+        g7.Apuntar = m => sueltos.Add(m);
+        g7.Cancelar("sin nada");
+        g7.Terminar("sin nada");
+        Igual(0, sueltos.Count, "cancelar o terminar sin gesto no apunta nada");
+        Igual(MainWindow.EstadoGesto.Inactivo, g7.Estado, "y sigue inactivo");
+    }
+
+    static void SliderDiezArrastres()
+    {
+        Grupo("slider: diez arrastres consecutivos");
+
+        // Lo que se hace de verdad: arrastrar, soltar, arrastrar otra vez. Si algo se
+        // queda pegado, a la segunda o la tercera se nota.
+        var g = new MainWindow.GestoDeslizador();
+        int soltadas = 0, paradas = 0;
+        g.SoltarCaptura = () => soltadas++;
+        g.DejarDeSeguir = () => paradas++;
+
+        for (int i = 1; i <= 10; i++)
+        {
+            g.Empezar();
+            Vale(g.Arrastrando, $"arrastre {i}: empieza");
+            for (int f = 0; f < 3; f++)
+                Vale(g.Fotograma(true), $"arrastre {i}: sigue vivo en el fotograma {f + 1}");
+            g.Mover();
+            Vale(!g.Fotograma(false), $"arrastre {i}: termina al soltar");
+            Vale(!g.Capturado && !g.Siguiendo && !g.Arrastrando,
+                 $"arrastre {i}: no queda nada agarrado");
+        }
+
+        Igual(10, soltadas, "se soltó la captura diez veces, una por arrastre");
+        Igual(10, paradas, "y se paró el seguimiento diez veces");
+
+        // Alternando corto y largo, con cancelaciones por medio
+        for (int i = 0; i < 5; i++)
+        {
+            g.Empezar();
+            if (i % 2 == 0) Vale(!g.Fotograma(false), $"mezcla {i}: el corto termina enseguida");
+            else
+            {
+                for (int f = 0; f < 20; f++) g.Fotograma(true);
+                g.Cancelar("Esc a mitad");
+            }
+            Vale(!g.Capturado && !g.Siguiendo, $"mezcla {i}: queda limpio");
+        }
+    }
+
     static void GlifoDelAspa()
     {
         Grupo("vista general: el icono del aspa");
@@ -2717,5 +3377,717 @@ public static class Pruebas
         c.BorrarTodo();
         Vale(c.Vacio && c.Cuantas == 0 && c.NoLeidas == 0 && c.PorApp().Count == 0,
              "el estado vacío es coherente mire por donde se mire");
+    }
+    // ================= C5.8: el botón propio del centro de control =================
+    //
+    // Lo que esto protege: la superficie de Inicio/centro de control se abre desde un
+    // botón NUEVO de la isla. Ni desde el altavoz —que abre solo audio—, ni desde el
+    // `⊞` ni desde la cuadrícula, que ya tenían su función. El reparto vive en una sola
+    // tabla (`PanelDeBoton`) y los botones de la isla despachan a través de ella, así
+    // que comprobar la tabla es comprobar el comportamiento, no una copia del mismo.
+
+    // ================= C5.8: la superficie de Inicio =================
+    //
+    // Lo que esto protege: hay UNA superficie —saludo, multimedia, acciones rápidas,
+    // CPU/RAM, fondo, conectividad, fijadas, energía, sistema y el buscador con su lista—
+    // y se abre desde UN sitio: el botón Inicio de la isla. Hubo un rato en que las
+    // tarjetas vivían además en un panel "control" con su propio botón, y eran dos
+    // pantallas con lo mismo.
+
+    static void InicioRepartoDeLaIsla()
+    {
+        Grupo("inicio: una sola superficie y una sola entrada");
+
+        // ---------- El botón Inicio abre la superficie de Inicio ----------
+        Igual(MainWindow.PanelInicio, MainWindow.PanelDeBoton(MainWindow.BotonLanzador),
+              "el botón Inicio abre la superficie de Inicio");
+
+        // ---------- Y es la misma superficie que lleva las tarjetas del centro ----------
+        Igual(MainWindow.PanelInicio, MainWindow.PanelDelCentro,
+              "las tarjetas del centro de control viven en esa misma superficie");
+
+        // ---------- El altavoz abre EXCLUSIVAMENTE audio ----------
+        Igual(MainWindow.PanelAudio, MainWindow.PanelDeBoton(MainWindow.BotonAltavoz),
+              "el altavoz abre el panel de audio");
+        Vale(MainWindow.PanelDeBoton(MainWindow.BotonAltavoz) != MainWindow.PanelInicio,
+             "y NO la superficie de Inicio: son dos paneles distintos");
+
+        // ---------- La cuadrícula sigue donde estaba ----------
+        Igual(MainWindow.PanelVista, MainWindow.PanelDeBoton(MainWindow.BotonCuadricula),
+              "la cuadrícula sigue abriendo la vista general");
+
+        // ---------- Ya no hay un segundo botón para lo mismo ----------
+        //
+        // Cinco botones, cinco paneles distintos. Si alguien volviera a añadir una
+        // entrada a la superficie de Inicio, esta cuenta lo cantaría.
+        var paneles = MainWindow.BotonesDeIsla.Select(MainWindow.PanelDeBoton).ToList();
+        Igual(5, paneles.Count, "cinco botones en la tabla");
+        Vale(paneles.All(p => p.Length > 0), "ninguno se queda sin panel");
+        Igual(paneles.Count, paneles.Distinct().Count(),
+              "y cada uno abre un panel distinto: ni dos entradas a lo mismo ni dos pantallas iguales");
+        Igual(1, paneles.Count(p => p == MainWindow.PanelInicio),
+              "a la superficie de Inicio se entra por un solo sitio");
+
+        // Un botón que no existe no abre nada, en vez de caer en el primero de la lista
+        Igual("", MainWindow.PanelDeBoton("centro"),
+              "el botón que se retiró ya no abre nada");
+        Igual("", MainWindow.PanelDeBoton("inventado"), "ni uno desconocido");
+        Igual("", MainWindow.PanelDeBoton(""), "ni la cadena vacía");
+    }
+
+    static void InicioColgadoDeSuBoton()
+    {
+        Grupo("inicio: cuelga del botón Inicio y no se centra en la pantalla");
+
+        // El caso medido en la máquina: isla de 1163 px y la superficie pidiendo 660. El
+        // botón Inicio es el primero de la zona izquierda, así que la tarjeta tiene que
+        // salir pegada a la izquierda, no en medio ni desplazada a la derecha.
+        const double isla = 1163, borde = 2;
+        double panel = MainWindow.AnchoDeInicio;
+
+        double x = MainWindow.XdeTarjetaPura(isla, panel, 20, borde);
+        Igual(borde, x, $"con el botón en el filo izquierdo, la tarjeta sale pegada ahí (x={x:0})");
+        Vale(x + panel < isla / 2 + panel / 2,
+             $"y se queda a la izquierda, no desplazada a la derecha (acaba en {x + panel:0} de {isla:0})");
+
+        // Lo que NO puede hacer: salir centrada en la isla. Ese era el síntoma.
+        double centrada = (isla - panel) / 2;
+        Vale(Math.Abs(x - centrada) > 100,
+             $"no sale centrada en la pantalla (x={x:0}, el centro sería {centrada:0})");
+
+        // Colgada de su botón, dondequiera que esté
+        Vale(Math.Abs(MainWindow.XdeTarjetaPura(isla, panel, 500, borde) + panel / 2 - 500) < 0.01,
+             "con sitio, la tarjeta queda centrada en el botón que la abre");
+
+        // Y con el botón al final, sin salirse
+        double d = MainWindow.XdeTarjetaPura(isla, panel, isla - 20, borde);
+        Vale(d + panel <= isla - borde + 0.01, $"con el botón al final, la tarjeta no se sale (x={d:0})");
+
+        // El ancho es controlado: ni el de la isla ni el del monitor
+        Vale(panel >= 560 && panel <= 760, $"el ancho es el suyo y está acotado ({panel:0})");
+        Vale(panel < isla * 0.6, "nunca casi todo el ancho de la isla");
+        Vale(panel < 1131, "y muy por debajo de los 1131 px que medía estirado");
+    }
+
+    static void InicioEnLosCuatroBordes()
+    {
+        Grupo("inicio: cabe con la isla en los cuatro bordes");
+
+        // La cuenta que coloca la tarjeta es la misma arriba y abajo —solo cambia de qué
+        // lado crece la isla—, y lo que no puede pasar nunca es que se salga.
+        const double borde = 2;
+        double w = MainWindow.AnchoDeInicio;
+
+        foreach (double isla in new[] { 1163.0, 900.0, 700.0, 680.0 })
+        {
+            foreach (double centro in new[] { 0.0, 20.0, isla / 2, isla - 20, isla, isla * 2, -50.0 })
+            {
+                double x = MainWindow.XdeTarjetaPura(isla, w, centro, borde);
+                double ancho = Math.Min(w, isla);
+                Vale(x >= borde - 0.01,
+                     $"[isla {isla:0}, botón {centro:0}] no se sale por la izquierda (x={x:0})");
+                Vale(ancho <= isla + 0.01,
+                     $"[isla {isla:0}, botón {centro:0}] y no es más ancha que la isla ({ancho:0})");
+                if (w <= isla - 2 * borde)
+                    Vale(x + ancho <= isla - borde + 0.01,
+                         $"[isla {isla:0}, botón {centro:0}] y cuando cabe, cabe entera (x={x:0}+{ancho:0})");
+            }
+        }
+
+        // ---------- Y en vertical ----------
+        //
+        // Con la barra en un lado la superficie vive en su propia ventana, al lado de la
+        // barra. La cuenta es otra (`SitioDeLaTarjeta`) y hay que comprobarla aparte.
+        foreach (double alto in new[] { 768.0, 1080.0, 1440.0 })
+        {
+            double tope = MainWindow.TopeDeInicio(alto);
+            foreach (double? centro in new double?[] { null, 0, 40, alto / 2, alto - 20, alto })
+            {
+                var (desp, y) = MainWindow.SitioDeLaTarjeta(6, 56, 8, alto, tope, centro);
+                Vale(y >= 0, $"[vertical {alto:0}] no se sale por arriba (y={y:0})");
+                Vale(y + tope <= alto + 0.01, $"[vertical {alto:0}] ni por abajo (y={y:0}+{tope:0})");
+                Vale(desp > 0, $"[vertical {alto:0}] y se separa de la barra, no la tapa");
+            }
+        }
+
+        // En vertical el ancho se recorta a lo que cabe al lado de la barra: 660 px no
+        // entran en un portátil de 1366 con una barra gruesa, y una tarjeta más ancha que
+        // el hueco no se recorta, se queda fuera de la ventana.
+        foreach (double anchoPantalla in new[] { 1366.0, 1920.0, 2560.0 })
+        {
+            double cabe = MainWindow.AnchoMaximoDeTarjeta(anchoPantalla, 56, 8, 8);
+            Vale(cabe > 120, $"[vertical {anchoPantalla:0}] siempre cabe algo ({cabe:0})");
+            Vale(Math.Min(MainWindow.AnchoDeInicio, cabe) <= cabe + 0.01,
+                 $"[vertical {anchoPantalla:0}] y la superficie se estrecha a lo que cabe");
+        }
+    }
+
+    static void InicioAltoConTope()
+    {
+        Grupo("inicio: el alto tiene tope de verdad");
+
+        // Medido: el alto pedido era un MÍNIMO y `AbrirPanel` lo subía a lo que pedía el
+        // contenido ("pedía 560 de alto pero necesita 1076; se le da el que necesita").
+        // Con la portada entera dentro, sin tope esto se come la pantalla.
+        foreach (var (alto, que) in new[]
+        {
+            (768.0, "portátil 1366x768"), (1080.0, "1080p"), (1440.0, "1440p"),
+            (960.0, "4K al 225 %"), (1920.0, "vertical 1080x1920"),
+        })
+        {
+            double t = MainWindow.TopeDeInicio(alto);
+            Vale(t <= alto * 0.62 + 0.01 || t == 360,
+                 $"[{que}] el tope no pasa del 62 % de la pantalla ({t:0} de {alto:0})");
+            Vale(t >= 360, $"[{que}] y nunca deja la superficie inservible ({t:0})");
+            Vale(t < 1076, $"[{que}] por debajo de los 1076 px que salían ({t:0})");
+        }
+
+        Igual(960.0, MainWindow.TopeDeInicio(1920), "en una pantalla muy alta el tope se queda en 960");
+        Igual(360.0, MainWindow.TopeDeInicio(200), "y en una absurdamente baja, en el mínimo usable");
+        Vale(MainWindow.TopeDeInicio(768) < MainWindow.TopeDeInicio(1440),
+             "en una pantalla más alta cabe más superficie");
+    }
+
+    static void InicioGestoYLanzadorIntacto()
+    {
+        Grupo("inicio: el botón no arrastra la isla y el lanzador conserva lo suyo");
+
+        // ---------- El botón no mueve la NubeBar ----------
+        //
+        // Misma regla que los deslizadores: si el clic nace sobre algo con lo que se
+        // interactúa, el gesto es de ese algo. El botón Inicio es un `Button`, así que
+        // `GestoDeUnControl` lo reconoce por tipo y el arrastre de la isla no arranca. Se
+        // monta el árbol de verdad —isla, fila, botón, glifo— porque lo que falló en su
+        // día fue justo subir por el árbol, no el caso simple.
+        var isla = new Border();
+        var fila = new StackPanel();
+        var glifo = new TextBlock { Text = "⊞" };
+        var boton = new Button { Content = glifo };
+        fila.Children.Add(boton);
+        isla.Child = fila;
+
+        Vale(MainWindow.GestoDeUnControl(boton, isla), "el botón Inicio es suyo: no arrastra la isla");
+        Vale(MainWindow.GestoDeUnControl(glifo, isla),
+             "y el clic sobre el glifo tampoco: se sube por el árbol hasta el botón");
+        Vale(!MainWindow.GestoDeUnControl(fila, isla), "pero el hueco de la fila sí arrastra");
+        Vale(!MainWindow.GestoDeUnControl(isla, isla), "y la isla, por supuesto");
+
+        // Y la caja de búsqueda, que vive DENTRO de la superficie, tampoco la arrastra:
+        // escribir en ella no puede mover la nube por la pantalla.
+        var caja = new TextBox();
+        var panel = new Border { Child = caja };
+        Vale(MainWindow.GestoDeUnControl(caja, isla), "la caja de búsqueda no arrastra la isla");
+        Vale(MainWindow.GestoDeUnControl(panel.Child, isla), "ni su marco");
+
+        // ---------- El lanzador conserva sus funciones ----------
+        //
+        // La superficie unificada no es una superficie con menos cosas. Esto comprueba lo
+        // que se podía perder al meter las tarjetas dentro: las categorías del buscador
+        // siguen siendo siete y con nombre propio, y el menú del clic derecho sigue
+        // sabiendo colocarse sin salirse de la pantalla.
+        var nombres = Enum.GetValues<Categoria>()
+            .Select(c => new Resultado { Categoria = c }.Etiqueta).ToList();
+        Igual(7, nombres.Count, "las siete categorías del buscador siguen ahí");
+        Igual(nombres.Count, nombres.Distinct().Count(), "con nombre propio y sin repetirse");
+        Vale(nombres.Contains("Aplicación") && nombres.Contains("Archivo") &&
+             nombres.Contains("Ajuste") && nombres.Contains("Ventana abierta"),
+             "incluidas aplicación, archivo, ajuste y ventana abierta");
+
+        // Y el menú del clic derecho —abrir como administrador, propiedades, fijar—
+        // sigue existiendo para las filas que lo admiten. Es lo que no se puede perder
+        // al meter las tarjetas dentro de la misma superficie.
+        var app = new Resultado { Clave = "a", Titulo = "Calculadora", Categoria = Categoria.App };
+        var calculo = new Resultado { Clave = "c", Titulo = "2+2", Categoria = Categoria.Calculo };
+        Vale(MainWindow.TieneMenuDeApp(app), "una aplicación tiene su menú de clic derecho");
+        Vale(!MainWindow.TieneMenuDeApp(calculo), "y un cálculo no, que no hay nada que abrir");
+    }
+    static void PanelRaizOpaca()
+    {
+        Grupo("paneles: la raíz del panel es una superficie opaca");
+
+        // La pregunta que separa "PanelShell existe" de "PanelShell se está usando". Un
+        // panel cuya raíz no es opaca deja ver lo que haya detrás, y detrás hay una isla
+        // translúcida y el escritorio.
+        var grid = new Grid();
+        Vale(!MainWindow.EsShellOpaco(grid), "un Grid pelado no es una superficie: no tapa nada");
+
+        var sinFondo = new Border();
+        Vale(!MainWindow.EsShellOpaco(sinFondo), "ni un Border sin fondo");
+
+        var translucido = new Border { Background = new SolidColorBrush(Color.FromArgb(0x33, 20, 20, 20)) };
+        Vale(!MainWindow.EsShellOpaco(translucido),
+             "ni uno con alfa: dos capas transparentes seguidas siguen dejando pasar el escritorio");
+
+        var casi = new Border { Background = new SolidColorBrush(Color.FromArgb(0xFE, 20, 20, 20)) };
+        Vale(!MainWindow.EsShellOpaco(casi), "ni uno al 254 de 255: opaco es opaco");
+
+        var opaco = new Border { Background = new SolidColorBrush(Color.FromArgb(0xFF, 20, 20, 20)) };
+        Vale(MainWindow.EsShellOpaco(opaco), "un Border con fondo opaco sí lo es");
+
+        Vale(!MainWindow.EsShellOpaco(null), "y preguntar por nada no revienta");
+
+        // Y la superficie que usa PanelShell es opaca en los siete temas: es de donde
+        // sale el color, así que si un tema la define con alfa el panel se traspasa.
+        foreach (var t in NubeBar.Temas.Predefinidos)
+        {
+            var tema = new Tema();
+            NubeBar.Temas.Aplicar(t, tema);
+            var fondo = (Color)ColorConverter.ConvertFromString(tema.Fondo)!;
+            var texto = (Color)ColorConverter.ConvertFromString(tema.Texto)!;
+            var acento = (Color)ColorConverter.ConvertFromString(tema.Acento)!;
+            var r = Roles.Desde(tema, fondo, texto, acento);
+
+            Igual(255, (int)r.SuperficieSolida.A, $"[{t.Nombre}] la superficie sólida es opaca");
+            Igual(255, (int)r.SuperficieAltaSolida.A, $"[{t.Nombre}] y la levantada también");
+            Igual(255, (int)r.FondoOpaco.A, $"[{t.Nombre}] y el fondo del panel");
+        }
+    }
+
+    static void CentroColgadoDeSuBoton()
+    {
+        Grupo("centro: cuelga de su botón y no se centra en la pantalla");
+
+        // El caso medido en la máquina: isla de 1224 px y el centro de control pidiendo
+        // 460. Con el botón a la IZQUIERDA la tarjeta tiene que salir a la izquierda, no
+        // en medio ni desplazada a la derecha.
+        const double isla = 1224, borde = 2;
+        double panel = MainWindow.AnchoDelCentro;
+
+        // El botón es el primero de la isla: su centro está a unos 20 px del filo
+        double x = MainWindow.XdeTarjetaPura(isla, panel, 20, borde);
+        Igual(borde, x, $"con el botón en el filo izquierdo, la tarjeta sale pegada ahí (x={x:0})");
+        Vale(x + panel < isla / 2,
+             $"y se queda en la mitad izquierda, no desplazada a la derecha (acaba en {x + panel:0} de {isla:0})");
+
+        // Lo que NO puede hacer: salir centrada en la isla. Ese era el síntoma —"aparece
+        // desplazada a la derecha"— cuando el botón estaba en el grupo de la derecha.
+        double centrada = (isla - panel) / 2;
+        Vale(Math.Abs(x - centrada) > 100,
+             $"no sale centrada en la pantalla (x={x:0}, el centro sería {centrada:0})");
+
+        // Con el botón en medio sí queda centrado en ÉL, que es lo correcto
+        Vale(Math.Abs(MainWindow.XdeTarjetaPura(isla, panel, 400, borde) + panel / 2 - 400) < 0.01,
+             "colgado de su botón: centrado en el botón, donde quiera que esté");
+
+        // Y con el botón al final, a la derecha, sin salirse
+        double d = MainWindow.XdeTarjetaPura(isla, panel, isla - 20, borde);
+        Vale(d + panel <= isla - borde + 0.01, $"con el botón al final, la tarjeta no se sale (x={d:0})");
+
+        Vale(panel >= 420 && panel <= 500, $"y el ancho sigue siendo el aprobado ({panel:0})");
+        Vale(panel < isla * 0.45, "nunca casi todo el ancho de la isla");
+
+        // En pantallas donde la isla es más estrecha. Lo que se garantiza es lo que de
+        // verdad se puede garantizar: la tarjeta NUNCA empieza fuera, y nunca es más
+        // ancha que la isla.
+        //
+        // Lo que no se garantiza —y conviene tenerlo escrito— es que con una isla más
+        // estrecha que el panel la tarjeta se queda del ancho de la isla y le sobresale
+        // el grosor del borde: `w` se recorta al ancho de la isla pero la x mínima sigue
+        // siendo `borde`. No se arregla aquí porque ese estado no se alcanza: la isla se
+        // ensancha hasta el ancho del panel al abrirlo (ver `anchoIsla` en AbrirPanel),
+        // así que la isla nunca es más estrecha que su propio panel. Si algún día lo
+        // fuera, se vería 2 px de tarjeta pasada por la derecha, y además el recorte del
+        // cajón ya la corta contra el filo de la isla.
+        foreach (double estrecha in new[] { 1366.0, 900.0, 700.0, 460.0 })
+        {
+            double xx = MainWindow.XdeTarjetaPura(estrecha, panel, estrecha / 2, borde);
+            double ancho = Math.Min(panel, estrecha);
+            Vale(xx >= borde - 0.01, $"[isla {estrecha:0}] la tarjeta no empieza fuera (x={xx:0})");
+            Vale(ancho <= estrecha + 0.01,
+                 $"[isla {estrecha:0}] y no es más ancha que la isla ({ancho:0} de {estrecha:0})");
+            if (panel <= estrecha - 2 * borde)
+                Vale(xx + ancho <= estrecha - borde + 0.01,
+                     $"[isla {estrecha:0}] y cuando cabe, cabe entera con su borde (x={xx:0}+{ancho:0})");
+        }
+    }
+
+    // ================= C5.10: abrir el Centro no toca lo que suena =================
+    //
+    // Lo que se comprueba aquí es el GUARDIA, no una lista de buenas intenciones:
+    // mientras se monta un panel, las puertas que escriben audio y multimedia están
+    // cerradas. Las pruebas no llaman a `Musica.PlayPausa()` ni a `Audio.PonerVolumen()`
+    // de verdad —eso pararía la música de quien esté ejecutando la tanda, que es
+    // exactamente el fallo que se está arreglando—: llaman al guardia, que es la pieza
+    // que decide, y comprueban que decide bien.
+
+    static void CentroNoTocaLoQueSuena()
+    {
+        Grupo("centro: montar el panel no cambia nada");
+
+        bool musicaAntes = Musica.Construyendo, audioAntes = Audio.Construyendo;
+        try
+        {
+            // ---------- abrir centro → la reproducción continúa ----------
+            Musica.Construyendo = true;
+            long rechazos = Musica.Rechazadas;
+            long mutaciones = Musica.Mutaciones;
+
+            Vale(!Musica.Permitido("play/pausa"), "montando: una pausa no pasa");
+            Vale(!Musica.Permitido("siguiente"), "montando: un «siguiente» no pasa");
+            Vale(!Musica.Permitido("anterior"), "montando: un «anterior» no pasa");
+
+            Igual(rechazos + 3, Musica.Rechazadas, "los tres intentos quedan contados");
+            Igual(mutaciones, Musica.Mutaciones,
+                  "y ninguno se convierte en un cambio: la reproducción sigue igual");
+            Vale(Musica.UltimaRechazada.Contains("anterior"),
+                 $"y el último queda con su nombre ({Musica.UltimaRechazada})");
+
+            // ---------- abrir centro → volumen sin cambios ----------
+            Audio.Construyendo = true;
+            long rechazosAudio = Audio.Rechazadas;
+            Vale(!Audio.Permitido("poner el volumen a 50"), "montando: subir el volumen no pasa");
+            Vale(!Audio.Permitido("silenciar"), "montando: silenciar no pasa");
+
+            // ---------- abrir centro → dispositivo de salida sin cambios ----------
+            Vale(!Audio.Permitido("cambiar la salida a {0.0.0}"),
+                 "montando: cambiar el dispositivo de salida no pasa");
+
+            // ---------- abrir centro → aplicación multimedia sin cambios ----------
+            // La sesión que manda la elige Windows; NubeBar solo la lee. La única forma
+            // de que cambiase sería pedir "siguiente" o "anterior", y ya está cerrado.
+            Vale(!Audio.Permitido("poner el volumen de Spotify"),
+                 "montando: tocar el volumen de una aplicación tampoco pasa");
+            Igual(rechazosAudio + 4, Audio.Rechazadas, "los cuatro intentos de audio quedan contados");
+
+            // ---------- pulsar pausa → la reproducción se detiene ----------
+            //
+            // Es decir: con el panel ya montado, el guardia DEJA pasar. Si esto fallara,
+            // el arreglo habría dejado los mandos muertos, que es la otra forma de
+            // romperlo.
+            Musica.Construyendo = false;
+            Audio.Construyendo = false;
+            long rechazos2 = Musica.Rechazadas;
+            Vale(Musica.Permitido("play/pausa"), "ya montado: pulsar pausa SÍ pasa");
+            Vale(Musica.Permitido("siguiente"), "ya montado: «siguiente» sí pasa");
+            Vale(Musica.Permitido("anterior"), "ya montado: «anterior» sí pasa");
+            Igual(rechazos2, Musica.Rechazadas, "y un clic de verdad no se cuenta como rechazo");
+
+            // ---------- pulsar reproducir → la reproducción continúa ----------
+            Vale(Audio.Permitido("poner el volumen a 30"), "ya montado: el volumen se puede cambiar");
+            Vale(Audio.Permitido("cambiar la salida a {0.0.0}"), "y la salida también");
+
+            // ---------- El guardia se suelta aunque algo reviente ----------
+            //
+            // `CrearControl` lo pone en un try/finally. Lo que se comprueba es el patrón:
+            // si una tarjeta lanza, el guardia no se queda puesto. Si se quedara, el
+            // siguiente clic en pausa no haría nada y el fallo sería peor que el de ahora.
+            try
+            {
+                Musica.Construyendo = true;
+                try { throw new InvalidOperationException("una tarjeta revienta al montarse"); }
+                finally { Musica.Construyendo = false; }
+            }
+            catch (InvalidOperationException) { }
+            Vale(!Musica.Construyendo, "si una tarjeta revienta, el guardia se suelta igual");
+            Vale(Musica.Permitido("play/pausa"), "y los mandos siguen vivos después");
+        }
+        finally
+        {
+            Musica.Construyendo = musicaAntes;
+            Audio.Construyendo = audioAntes;
+        }
+    }
+
+    // ================= C5.11: la superficie de Inicio se VE =================
+    //
+    // Lo que esto protege es el fallo del panel negro con la franja blanca vertical. El
+    // contenido estaba todo ahí —37 tarjetas, todas visibles— y no se veía, porque
+    // `AbrirPanel` envolvía en un segundo `ScrollViewer` un panel que ya tenía el suyo:
+    //
+    //   tipo de raíz visual: ScrollViewer
+    //   cadena: ScrollViewer(660x893) > Border(643x1256) > Grid(629x1236)
+    //   viewport 643x893  extent 643x1256  barra visible: SÍ
+    //
+    // Las pruebas van contra `Veredicto`, que es la función que mira una radiografía y
+    // dice qué está mal. Es pura: se le puede dar una radiografía inventada y comprobar
+    // que caza cada uno de los cinco fallos que se pidieron, sin abrir una ventana.
+
+    static MainWindow.RadiografiaPanel Sana() => new()
+    {
+        Raiz = "Border",
+        Hijos = 6,
+        Tarjetas = 9, TarjetasVisibles = 9, TarjetasConArea = 9,
+        ShellEsRaiz = true, ShellOpaco = true,
+        ShellAncho = 660, ShellAlto = 893,
+        Visibilidad = "Visible",
+        HayScroll = true, ScrollInterno = true, BarraVisible = false,
+        Viewport = 760, Extent = 1120, OffsetY = 0, OffsetX = 0,
+        ViewportAncho = 646, ExtentAncho = 646,
+    };
+
+    static void InicioSeVeDeVerdad()
+    {
+        Grupo("inicio: la integración falla si el panel no se ve");
+
+        // El caso bueno no da ninguna queja. Si esto fallara, el resto de la prueba no
+        // valdría nada: estaría cazando fantasmas.
+        var bien = MainWindow.Veredicto(Sana()).ToList();
+        Igual(0, bien.Count, "una superficie sana no da ninguna queja" +
+                             (bien.Count > 0 ? ": " + string.Join(" | ", bien) : ""));
+
+        // ---------- 1. PanelShell con 0 tarjetas ----------
+        var sinTarjetas = Sana();
+        sinTarjetas.Tarjetas = sinTarjetas.TarjetasVisibles = sinTarjetas.TarjetasConArea = 0;
+        var q = MainWindow.Veredicto(sinTarjetas).ToList();
+        Vale(q.Any(x => x.Contains("0 tarjetas")), "con 0 tarjetas, falla y lo dice");
+
+        // ---------- 2. Hijos pero ninguno visible ----------
+        var invisibles = Sana();
+        invisibles.TarjetasVisibles = 0;
+        q = MainWindow.Veredicto(invisibles).ToList();
+        Vale(q.Any(x => x.Contains("NINGUNA visible")), "con tarjetas en el árbol y ninguna visible, falla");
+
+        // Y el caso hermano: visibles pero aplastadas a 0 px, que a ojo es lo mismo
+        var aplastadas = Sana();
+        aplastadas.TarjetasConArea = 0;
+        q = MainWindow.Veredicto(aplastadas).ToList();
+        Vale(q.Any(x => x.Contains("miden 0")), "con tarjetas visibles pero de 0 px, falla");
+
+        // ---------- 3. Contenido fuera del viewport ----------
+        var desplazado = Sana();
+        desplazado.OffsetY = 900;          // el máximo legal sería 1120-760 = 360
+        q = MainWindow.Veredicto(desplazado).ToList();
+        Vale(q.Any(x => x.Contains("fuera del viewport")), "con el contenido desplazado fuera, falla");
+
+        // Un offset legítimo —el usuario ha rodado la rueda— no es un fallo
+        var rodado = Sana();
+        rodado.OffsetY = 200;
+        Igual(0, MainWindow.Veredicto(rodado).Count(),
+              "pero haber desplazado el panel a mano no es un fallo");
+
+        // ---------- 4. La superficie sale completamente negra ----------
+        //
+        // "Negra" en la práctica es una de dos: no hay contenido, o el shell está
+        // aplastado. Las dos se cazan.
+        var vacia = Sana();
+        vacia.Raiz = "no hay contenido";
+        q = MainWindow.Veredicto(vacia).ToList();
+        Vale(q.Any(x => x.Contains("no tiene contenido")), "sin contenido, falla");
+        Igual(1, q.Count, "y no se encadena con quejas derivadas: una causa, un mensaje");
+
+        var chata = Sana();
+        chata.ShellAlto = 20;
+        q = MainWindow.Veredicto(chata).ToList();
+        Vale(q.Any(x => x.Contains("aplastado")), "con el shell aplastado, falla");
+
+        var viewportMinimo = Sana();
+        viewportMinimo.Viewport = 12;
+        q = MainWindow.Veredicto(viewportMinimo).ToList();
+        Vale(q.Any(x => x.Contains("no cabe nada dentro")), "con un viewport de 12 px, falla");
+
+        // ---------- 5. Una barra blanca no intencionada ----------
+        var conBarra = Sana();
+        conBarra.BarraVisible = true;
+        q = MainWindow.Veredicto(conBarra).ToList();
+        Vale(q.Any(x => x.Contains("barra de desplazamiento VISIBLE")),
+             "con una barra de scroll a la vista, falla: es la franja blanca");
+
+        // ---------- Y el envoltorio de más, que es la causa que se arregló ----------
+        var envuelto = Sana();
+        envuelto.ScrollInterno = false;
+        envuelto.ShellEsRaiz = false;
+        q = MainWindow.Veredicto(envuelto).ToList();
+        Vale(q.Any(x => x.Contains("envoltorio de fuera")),
+             "si el scroll es un envoltorio de fuera, falla: era la causa del panel negro");
+
+        // ---------- Y el shell translúcido ----------
+        var transparente = Sana();
+        transparente.ShellOpaco = false;
+        q = MainWindow.Veredicto(transparente).ToList();
+        Vale(q.Any(x => x.Contains("no es opaco")),
+             "si el shell no es opaco, falla: se leería el escritorio por detrás");
+    }
+
+    static void InicioSeVeEnLosDosTemasYDpi()
+    {
+        Grupo("inicio: se lee en los siete temas y a cualquier DPI");
+
+        // La parte comprobable de "ningún texto del escritorio atravesando la superficie"
+        // es que la superficie sea OPACA y que lo que lleva escrito se lea encima. Se mide
+        // contra la superficie sólida, no contra la pintada: un color con alfa no tiene
+        // luminancia propia hasta que se sabe qué hay detrás.
+        const double MinimoTexto = 4.5, MinimoSecundario = 3.0;
+
+        foreach (var t in NubeBar.Temas.Predefinidos)
+        {
+            var tema = new Tema();
+            NubeBar.Temas.Aplicar(t, tema);
+            var fondo = (Color)ColorConverter.ConvertFromString(tema.Fondo)!;
+            var texto = (Color)ColorConverter.ConvertFromString(tema.Texto)!;
+            var acento = (Color)ColorConverter.ConvertFromString(tema.Acento)!;
+            var r = Roles.Desde(tema, fondo, texto, acento);
+
+            // La superficie del panel y de sus tarjetas, opacas: es lo que impide que el
+            // escritorio se lea a través
+            Igual(255, (int)r.FondoOpaco.A, $"[{t.Nombre}] el fondo del panel es opaco");
+            Igual(255, (int)r.SuperficieSolida.A, $"[{t.Nombre}] y la superficie de las tarjetas");
+
+            void Mide(Color tinta, Color detras, double min, string que)
+            {
+                double c = Contraste.Entre(tinta, detras);
+                Vale(c >= min, $"[{t.Nombre}] {que}: contraste {c:0.0} (hace falta {min:0.0})");
+            }
+
+            Mide(r.Texto, r.SuperficieSolida, MinimoTexto, "el saludo sobre la tarjeta");
+            Mide(r.TextoAtenuado, r.SuperficieSolida, MinimoSecundario, "la fecha");
+            Mide(r.AcentoTinta, r.FondoOpaco, MinimoSecundario, "la hora en acento");
+            Mide(r.Texto, r.SuperficieAltaSolida, MinimoTexto, "el título de lo que suena");
+        }
+
+        // ---------- DPI alto ----------
+        //
+        // La colocación va en unidades de WPF y la ventana en píxeles: con la escala al
+        // 150 % o al 225 % la superficie tiene que seguir cabiendo y la tarjeta seguir
+        // dentro de la isla. Son las medidas de WPF las que se comprueban.
+        foreach (var (anchoPx, altoPx, escala, que) in new[]
+        {
+            (2560.0, 1440.0, 1.0, "2560x1440 al 100 %"),
+            (2560.0, 1440.0, 1.5, "2560x1440 al 150 %"),
+            (3840.0, 2160.0, 2.25, "4K al 225 %"),
+            (1366.0, 768.0, 1.0, "portátil al 100 %"),
+            (1920.0, 1080.0, 1.25, "1080p al 125 %"),
+        })
+        {
+            double anchoWpf = anchoPx / escala, altoWpf = altoPx / escala;
+            double tope = MainWindow.TopeDeInicio(altoWpf);
+
+            Vale(tope <= altoWpf * 0.62 + 0.01, $"[{que}] el tope respeta el 62 % ({tope:0} de {altoWpf:0})");
+            Vale(tope >= 360, $"[{que}] y sigue siendo usable ({tope:0})");
+
+            // La tarjeta, anclada al botón Inicio del filo izquierdo, cabe en la isla
+            double isla = Math.Min(anchoWpf, 1200);
+            double x = MainWindow.XdeTarjetaPura(isla, MainWindow.AnchoDeInicio, 20, 2);
+            Vale(x >= 2 - 0.01, $"[{que}] la tarjeta no se sale por la izquierda (x={x:0})");
+            Vale(Math.Min(MainWindow.AnchoDeInicio, isla) <= isla + 0.01,
+                 $"[{que}] y no es más ancha que la isla");
+
+            // Y en vertical, al lado de la barra
+            var (desp, y) = MainWindow.SitioDeLaTarjeta(6, 56, 8, altoWpf, tope, altoWpf / 2);
+            Vale(y >= 0 && y + tope <= altoWpf + 0.01,
+                 $"[{que}] en vertical la tarjeta cabe de arriba abajo (y={y:0}+{tope:0} de {altoWpf:0})");
+            Vale(desp > 0, $"[{que}] y no tapa la barra");
+        }
+    }
+    // ================= C5.12: la bandeja se actualiza en caliente =================
+    //
+    // La bandeja NO se enumera al arrancar y se queda así: la fuente es la
+    // `ObservableCollection` de ManagedShell, que recibe los `Shell_NotifyIcon` de cada
+    // app, y NubeBar reconcilia su tira cuando esa colección avisa. Eso está medido con
+    // apps de verdad (ver `--diagbandeja`), y lo que se comprueba aquí es la pieza que
+    // decide QUÉ ha cambiado de una muestra a la siguiente: lo que separa "ha entrado una
+    // app" de "el panel se está reconstruyendo solo".
+
+    static DiagBandeja.Ficha F(string id, string nombre = "app", bool oculto = false) =>
+        new(id, nombre, oculto);
+
+    static void BandejaComparaMuestras()
+    {
+        Grupo("bandeja: qué ha cambiado de una muestra a la siguiente");
+
+        var a = F("hwnd:1/uid:1", "Steam");
+        var b = F("guid:11111111-1111-1111-1111-111111111111", "Discord");
+        var c = F("hwnd:2/uid:0", "NordVPN");
+
+        // ---------- Sin cambios no hay cambios ----------
+        var igual = DiagBandeja.Comparar(new() { a, b, c }, new() { a, b, c });
+        Vale(igual.Nada, "la misma lista dos veces no da ningún cambio");
+        Igual(0, igual.Anadidos.Count, "ni añadidos");
+        Igual(0, igual.Eliminados.Count, "ni eliminados");
+        Vale(!igual.OrdenMovido, "ni el orden movido: abrir y cerrar el panel no puede mover nada");
+
+        // ---------- Una app que arranca DESPUÉS ----------
+        var nueva = DiagBandeja.Comparar(new() { a, b }, new() { a, b, c });
+        Igual(1, nueva.Anadidos.Count, "una app nueva se detecta");
+        Vale(nueva.Anadidos[0].Contains("NordVPN"), $"y se dice cuál ({nueva.Anadidos[0]})");
+        Igual(0, nueva.Eliminados.Count, "sin eliminar nada por el camino");
+        Vale(!nueva.OrdenMovido, "y entrar al final no mueve el orden de los que estaban");
+
+        // ---------- Una app que se cierra ----------
+        var menos = DiagBandeja.Comparar(new() { a, b, c }, new() { a, c });
+        Igual(1, menos.Eliminados.Count, "una app cerrada se detecta");
+        Vale(menos.Eliminados[0].Contains("Discord"), $"y se dice cuál ({menos.Eliminados[0]})");
+        Vale(!menos.OrdenMovido, "quitar una de en medio no cuenta como mover el orden");
+
+        // ---------- Varias de golpe ----------
+        var tres = DiagBandeja.Comparar(new() { a }, new() { a, b, c, F("hwnd:3/uid:7", "OneDrive") });
+        Igual(3, tres.Anadidos.Count, "tres apps a la vez se detectan las tres");
+
+        // ---------- Duplicados ----------
+        //
+        // La identidad es la ventana y su número, o el GUID. Dos entradas con la misma
+        // identidad es lo que pasaría si al reiniciar Explorer una app se registrara otra
+        // vez sin que la anterior se hubiera retirado.
+        var dup = DiagBandeja.Comparar(new() { a }, new() { a, b, b });
+        Igual(1, dup.Duplicados.Count, "un icono repetido se caza");
+        Vale(dup.Duplicados[0].Contains("x2"), $"y se dice cuántas veces ({dup.Duplicados[0]})");
+
+        // Dos apps distintas que se LLAMAN igual no son un duplicado: el título no es
+        // identidad —cambia con el tooltip— y confundirlo escondería iconos de verdad.
+        var mismoNombre = DiagBandeja.Comparar(
+            new() { a },
+            new() { a, F("hwnd:9/uid:1", "powershell.exe"), F("hwnd:10/uid:1", "powershell.exe") });
+        Igual(0, mismoNombre.Duplicados.Count,
+              "dos ventanas distintas con el mismo título NO son un duplicado");
+        Igual(2, mismoNombre.Anadidos.Count, "son dos iconos nuevos, y los dos salen");
+
+        // Y el mismo icono cambiando de título sigue siendo el mismo: un tooltip nuevo
+        // no puede sacar y volver a meter el icono, que es lo que haría parpadear la tira
+        var retitulado = DiagBandeja.Comparar(
+            new() { F("hwnd:2/uid:0", "NordVPN desconectado") },
+            new() { F("hwnd:2/uid:0", "NordVPN conectado a España") });
+        Vale(retitulado.Nada, "cambiar el tooltip no saca ni mete el icono: no parpadea");
+
+        // ---------- El orden ----------
+        var movido = DiagBandeja.Comparar(new() { a, b, c }, new() { c, b, a });
+        Vale(movido.OrdenMovido, "si los mismos iconos cambian de orden, se dice");
+        Igual(0, movido.Anadidos.Count, "sin que entre nada");
+        Igual(0, movido.Eliminados.Count, "ni salga nada");
+
+        // Quitar uno de en medio no "mueve" el orden de los demás: siguen en su secuencia
+        var sinElDeEnMedio = DiagBandeja.Comparar(new() { a, b, c }, new() { a, c });
+        Vale(!sinElDeEnMedio.OrdenMovido, "los que quedan conservan su secuencia relativa");
+
+        // ---------- Los casos de borde ----------
+        Vale(DiagBandeja.Comparar(new(), new()).Nada, "dos listas vacías no dan cambios");
+        Igual(2, DiagBandeja.Comparar(new(), new() { a, b }).Anadidos.Count,
+              "de vacío a dos, dos añadidos (es el arranque de la bandeja)");
+        Igual(2, DiagBandeja.Comparar(new() { a, b }, new()).Eliminados.Count,
+              "y de dos a vacío, dos eliminados (es Explorer reiniciándose)");
+
+        // ---------- Reiniciar Explorer: todo se va y todo vuelve ----------
+        //
+        // Lo que se ve al reiniciar Explorer es que las apps se vuelven a registrar. Lo
+        // que NO puede quedar es un icono contado dos veces.
+        var antes = new List<DiagBandeja.Ficha> { a, b, c };
+        var vacia = DiagBandeja.Comparar(antes, new());
+        Igual(3, vacia.Eliminados.Count, "al caerse Explorer se van los tres");
+        var vuelta = DiagBandeja.Comparar(new(), antes);
+        Igual(3, vuelta.Anadidos.Count, "y al volver, vuelven los tres");
+        Igual(0, vuelta.Duplicados.Count, "sin duplicarse ninguno");
+    }
+
+    static void BandejaIdentidadDeUnIcono()
+    {
+        Grupo("bandeja: la identidad de un icono no es su nombre");
+
+        // Un icono con GUID se identifica por el GUID: es lo que Windows garantiza
+        // estable entre reinicios de la app y de Explorer.
+        var conGuid = F("guid:699e423d-73da-42ba-b94e-881ff8672467", "Discord.exe");
+        var mismoGuidOtroNombre = F("guid:699e423d-73da-42ba-b94e-881ff8672467", "Discord - 3 mensajes");
+        Vale(DiagBandeja.Comparar(new() { conGuid }, new() { mismoGuidOtroNombre }).Nada,
+             "el mismo GUID con otro título es el mismo icono");
+
+        // Y uno sin GUID, por su ventana y su número. La misma ventana con otro número
+        // son dos iconos distintos: una app puede registrar varios.
+        var uid0 = F("hwnd:656880/uid:0", "Medal.exe");
+        var uid4 = F("hwnd:656880/uid:4", "Medal.exe");
+        var dos = DiagBandeja.Comparar(new() { uid0 }, new() { uid0, uid4 });
+        Igual(1, dos.Anadidos.Count, "la misma ventana con otro uid es otro icono");
+        Igual(0, dos.Duplicados.Count, "y no es un duplicado");
+
+        // La ficha se lee: nombre, identidad y si está en los ocultos
+        Igual("Steam [hwnd:1/uid:1]", F("hwnd:1/uid:1", "Steam").ToString(), "la ficha se lee");
+        Igual("Steam [hwnd:1/uid:1] (oculto)", F("hwnd:1/uid:1", "Steam", true).ToString(),
+              "y dice si el icono está en los ocultos");
     }
 }

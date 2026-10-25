@@ -244,6 +244,28 @@ public static class Audio
         catch { return _ultimoPico = 0; }
     }
 
+
+    // ================= El guardia: montar un panel no toca el audio =================
+    //
+    // Mismo criterio que en Musica.cs: mientras se construye un panel, lo único legal es
+    // leer. Cierra las cuatro puertas que escriben —volumen, silencio, volumen de una
+    // sesión y dispositivo de salida— y apunta con su nombre cualquier intento.
+    //
+    // Es lo que convierte "abrir el centro no cambia el volumen ni la salida" en algo
+    // comprobable y no en una promesa: si alguna ruta lo intenta, no pasa y se sabe cuál.
+    public static bool Construyendo;
+    public static long Rechazadas;
+    public static string UltimaRechazada = "ninguna";
+
+    internal static bool Permitido(string que)
+    {
+        if (!Construyendo) return true;
+        Rechazadas++;
+        UltimaRechazada = $"{DateTime.Now:HH:mm:ss.fff} {que}";
+        Log.Info($"audio: se IGNORA «{que}»: se está montando un panel, " +
+                 $"y montar solo lee (rechazo nº {Rechazadas})");
+        return false;
+    }
     public static int Volumen()
     {
         try
@@ -257,6 +279,7 @@ public static class Audio
 
     public static void PonerVolumen(int porCiento)
     {
+        if (!Permitido($"poner el volumen a {porCiento}")) return;
         try
         {
             if (VolumenDelDefecto() is not { } v) return;
@@ -281,6 +304,7 @@ public static class Audio
 
     public static void Silenciar(bool si)
     {
+        if (!Permitido(si ? "silenciar" : "quitar el silencio")) return;
         try { VolumenDelDefecto()?.SetMute(si, ref _sinContexto); }
         catch (Exception ex) { Log.Error("silenciar", ex); }
     }
@@ -369,6 +393,7 @@ public static class Audio
 
     public static void PonerVolumenSesion(Sesion s, int porCiento)
     {
+        if (!Permitido($"poner el volumen de {s.Nombre}")) return;
         try
         {
             if (s.Control is ISimpleAudioVolume v)
@@ -379,6 +404,7 @@ public static class Audio
 
     public static void SilenciarSesion(Sesion s, bool si)
     {
+        if (!Permitido($"silenciar {s.Nombre}")) return;
         try { if (s.Control is ISimpleAudioVolume v) v.SetMute(si, ref _sinContexto); }
         catch (Exception ex) { Log.Error("silenciar una app", ex); }
     }
@@ -438,6 +464,7 @@ public static class Audio
 
     public static bool CambiarSalida(string idDispositivo)
     {
+        if (!Permitido($"cambiar la salida a {idDispositivo}")) return false;
         if (!PuedeCambiarSalida) return false;
         _cacheVolumen = null;             // la salida cambia: el objeto guardado ya no vale
         try

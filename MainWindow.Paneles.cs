@@ -78,20 +78,36 @@ public partial class MainWindow
     void SinRecorteDelCajon()
     {
         if (_tarjetaAncla == null) return;
+        // Se le devuelve el ancho libre: si el siguiente panel se abre SIN ancla, tiene
+        // que poder ocupar el cajón entero y no quedarse con el ancho del anterior.
+        if (_tarjetaContenido != null)
+        {
+            _tarjetaContenido.Width = double.NaN;
+            _tarjetaContenido.HorizontalAlignment = HorizontalAlignment.Stretch;
+        }
         _tarjetaAncla = null;
         _tarjetaContenido = null;
         _tarjetaAncho = 0;
         Isla.Clip = null;
     }
-
     // Dónde empieza la tarjeta, en coordenadas de la isla: centrada bajo su icono y
     // sin salirse por ningún lado. Se recalcula en cada fotograma y no se apunta al
     // abrir, porque la isla se expande DESDE EL CENTRO: mientras crece, el icono se
     // mueve dentro de ella y una x de antes dejaba la tarjeta a medio camino. Con la
     // isla recogida y más estrecha que el propio panel, directamente en la esquina.
+    // La cuenta, aparte del árbol visual: dado el ancho de la isla, el del panel y el
+    // centro del icono que lo abre, dónde empieza la tarjeta. Está fuera para poder
+    // comprobarla con la isla arriba, abajo y recogida sin abrir ninguna ventana.
+    internal static double XdeTarjetaPura(double anchoIsla, double anchoPanel,
+                                          double centroAncla, double borde)
+    {
+        double w = Math.Min(anchoPanel, anchoIsla);
+        borde = Math.Max(2, borde);
+        return Math.Clamp(centroAncla - w / 2, borde, Math.Max(borde, anchoIsla - w - borde));
+    }
+
     double XdeTarjeta()
     {
-        double w = Math.Min(_tarjetaAncho, Isla.ActualWidth);
         double centro = Isla.ActualWidth / 2;
         try
         {
@@ -99,8 +115,7 @@ public partial class MainWindow
                 centro = ancla.TransformToAncestor(Isla).Transform(new Point(0, 0)).X + ancla.ActualWidth / 2;
         }
         catch { }
-        double borde = Math.Max(2, Isla.BorderThickness.Left);
-        return Math.Clamp(centro - w / 2, borde, Math.Max(borde, Isla.ActualWidth - w - borde));
+        return XdeTarjetaPura(Isla.ActualWidth, _tarjetaAncho, centro, Isla.BorderThickness.Left);
     }
 
     void AplicarRecorteDelCajon()
@@ -123,13 +138,34 @@ public partial class MainWindow
             double x = XdeTarjeta();
 
             // El contenido viaja con su tarjeta: el cajón empieza después del filo y
-            // del padding de la isla, así que lo que se le pone de margen es el resto
+            // del padding de la isla, así que lo que se le pone de margen es el resto.
+            //
+            // ---------- Y mide lo que mide la tarjeta ----------
+            //
+            // Aquí estaba el fallo que el recorte TAPABA. El cajón ocupa la isla entera y
+            // el contenido se estira a él: con la isla de 1163 px y un panel de 460, el
+            // contenido medía 1143 y el recorte dejaba ver solo los 460 de la izquierda.
+            // Resultado: las tarjetas cortadas por la mitad, no ajustadas.
+            //
+            // Y pasaba desapercibido porque los paneles anclados a un icono de la DERECHA
+            // salían bien por casualidad: el margen izquierdo que se les pone aquí les
+            // comía el ancho sobrante y acababan midiendo, sin pretenderlo, lo suyo. En
+            // cuanto el ancla se mueve a la izquierda el margen es 0 y el contenido se
+            // desparrama. La medida lo cantó: ancho pedido 460, ancho real 1143.
+            //
+            // Con el ancho puesto, el contenido mide SIEMPRE lo que mide su tarjeta,
+            // esté el ancla donde esté, y el recorte vuelve a ser solo lo que dice ser:
+            // un recorte.
             if (_tarjetaContenido != null)
             {
                 var m = _tarjetaContenido.Margin;
                 double izq = Math.Max(0, x - Isla.Padding.Left - Isla.BorderThickness.Left);
                 if (Math.Abs(m.Left - izq) > 0.5)
                     _tarjetaContenido.Margin = new Thickness(izq, m.Top, m.Right, m.Bottom);
+
+                _tarjetaContenido.HorizontalAlignment = HorizontalAlignment.Left;
+                if (double.IsNaN(_tarjetaContenido.Width) || Math.Abs(_tarjetaContenido.Width - w) > 0.5)
+                    _tarjetaContenido.Width = w;
             }
 
             // Lo que la tarjeta se mete en la barra. Nunca menos que su propio radio:
@@ -152,24 +188,90 @@ public partial class MainWindow
     // Abre un panel dentro de la isla. Si ya había otro, lo sustituye con transición suave.
     // Devuelve false si el panel pedido ya estaba abierto (y entonces lo cierra: alternar).
     bool AlternarPanel(string nombre, Func<FrameworkElement> crear, double ancho, double alto,
-                       bool teclado = false, FrameworkElement? ancla = null, bool scrollPropio = false)
+                       bool teclado = false, FrameworkElement? ancla = null, bool scrollPropio = false,
+                       double? topeDuro = null)
     {
         if (_panelAbierto == nombre) { CerrarPanel(); return false; }
-        AbrirPanel(nombre, crear(), ancho, alto, teclado, ancla: ancla, scrollPropio: scrollPropio);
+        AbrirPanel(nombre, crear(), ancho, alto, teclado, ancla: ancla, scrollPropio: scrollPropio,
+                   topeDuro: topeDuro);
         return true;
     }
 
     // Con "ancla" (el icono del que cuelga el panel) el cajón no se dibuja de punta a
     // punta, sino como una tarjeta de "ancho" pegada a ese icono. Ver RecortarCajon.
     //
-    // "scrollPropio" solo lo mira el camino VERTICAL: dice que el panel ya se desplaza
-    // por dentro y que, si no cabe, hay que recortarle el alto en vez de envolverlo en
-    // otro scroll. El camino horizontal lo ignora a propósito, para que el menú Inicio
-    // de siempre se siga comportando exactamente igual que antes de C1.
+    // "scrollPropio" dice que el panel ya se desplaza por dentro, y entonces NO se le
+    // pone otro scroll encima: si no cabe, se le recorta el alto y su propio scroll hace
+    // su trabajo. Lo miran los DOS caminos, el vertical y el horizontal. El horizontal lo
+    // ignoraba, y eso es lo que dejó la superficie de Inicio con un scroll de más, su
+    // barra a la vista y la fila `Star` sin acotar.
+
+    // ================= Diagnóstico temporal del flujo de apertura =================
+    //
+    // Sirve para distinguir, sin adivinar, por qué lo que se ve no coincide con lo que
+    // se ha escrito: binario antiguo, botón equivocado, ancho ignorado por `AbrirPanel`,
+    // raíz visual que se estira, o `PanelShell` sin consumir.
+    //
+    // TEMPORAL: quitar cuando la superficie de Inicio esté aprobada.
+    internal static string _ultimoBoton = "ninguno";
+    internal static void ApuntarBoton(string boton)
+    {
+        _ultimoBoton = boton;
+        Log.Info($"botón pulsado: {boton}");
+    }
+
+    // ¿La raíz que se mete en el cajón es una superficie opaca de verdad? Es la
+    // pregunta que separa "PanelShell existe" de "PanelShell se está usando".
+    //
+    // Mira a través del scroll: cuando el contenido no cabe, `AbrirPanel` lo envuelve en
+    // un `ScrollViewer`, y entonces la raíz del cajón es ese scroll —transparente— con la
+    // superficie opaca DENTRO. La traza decía "shell opaco: NO (ScrollViewer)" y era un
+    // falso negativo: el panel sí estaba tapado.
+    internal static bool EsShellOpaco(object? raiz)
+    {
+        for (int vuelta = 0; vuelta < 4 && raiz != null; vuelta++)
+        {
+            if (raiz is Border b && b.Background is SolidColorBrush s && s.Color.A == 255) return true;
+            raiz = raiz switch
+            {
+                ScrollViewer sv => sv.Content,
+                Border bo => bo.Child,
+                _ => null,
+            };
+        }
+        return false;
+    }
+
+    void ApuntarFlujo(string nombre, FrameworkElement raiz, double anchoPedido,
+                      FrameworkElement? ancla)
+    {
+        try
+        {
+            string queAncla = ancla == null
+                ? "NINGUNA -> el cajón se despliega de punta a punta de la isla"
+                : $"{ancla.GetType().Name} \"{ancla.ToolTip}\"";
+            Log.Info($"panel solicitado: {nombre}");
+            Log.Info($"ancla: {queAncla}");
+            Log.Info($"ancho pedido: {anchoPedido:0}");
+            Log.Info($"shell opaco: {(EsShellOpaco(raiz) ? "sí" : $"NO ({raiz.GetType().Name})")}");
+
+            // El tamaño real solo existe cuando el layout ha pasado: medirlo aquí daría
+            // 0 y no diría nada. Se apunta en cuanto WPF ha colocado la raíz.
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
+            {
+                Log.Info($"ancho real: {raiz.ActualWidth:0}");
+                Log.Info($"alto real: {raiz.ActualHeight:0}");
+                Log.Info($"isla real: {Isla.ActualWidth:0}x{Isla.ActualHeight:0}");
+            }));
+        }
+        catch (Exception ex) { Log.Error("apuntar el flujo del panel", ex); }
+    }
+
     void AbrirPanel(string nombre, FrameworkElement contenido, double ancho, double alto,
                     bool teclado = false, bool encoger = false, FrameworkElement? ancla = null,
-                    bool scrollPropio = false)
+                    bool scrollPropio = false, double? topeDuro = null)
     {
+        ApuntarFlujo(nombre, contenido, ancho, ancla);
         // En vertical el cajón no vale: la barra ya ocupa la pantalla de arriba abajo y
         // no tiene hacia dónde crecer. El panel sale flotando al lado (ver
         // MainWindow.Vertical.cs). Todo lo de aquí abajo —el recorte en tarjeta, el
@@ -177,7 +279,7 @@ public partial class MainWindow
         if (Vertical)
         {
             if (_panelAbierto != null) QuitarPanelFlotante();
-            AbrirPanelFlotante(nombre, contenido, ancho, alto, teclado, ancla, scrollPropio);
+            AbrirPanelFlotante(nombre, contenido, ancho, alto, teclado, ancla, scrollPropio, topeDuro);
             return;
         }
 
@@ -233,13 +335,55 @@ public partial class MainWindow
 
             // Y por mucho que necesite, la isla no puede crecer más de lo que cabe en
             // la pantalla: lo que sobre se recorre por dentro con la rueda
-            double tope = AltoMaximoPanel();
+            //
+            // ---------- El alto pedido era un MÍNIMO, no un tope ----------
+            //
+            // Aquí estaba el segundo fallo. `alto` solo servía para abajo: si el
+            // contenido pedía más, se le daba más (ver el `if (pide > alto)` de abajo).
+            // El centro de control pedía 560 y salía de 1076 px, tres cuartos de una
+            // pantalla de 1440, porque sus ocho tarjetas medían eso. "Altura máxima
+            // controlada" no era controlada por nadie.
+            //
+            // Con `topeDuro` el que abre puede decir "de aquí no pasas"; lo que sobre se
+            // desplaza por dentro, que es exactamente lo que ya se hacía con el tope de
+            // la pantalla. Sin `topeDuro` el comportamiento es el de siempre, para no
+            // tocarle el alto a los paneles que crecen a propósito (la lista de wifis, el
+            // centro de notificaciones).
+            double tope = Math.Min(AltoMaximoPanel(), topeDuro ?? double.PositiveInfinity);
             if (pide > tope)
             {
-                Log.Info($"panel {nombre}: necesita {pide:0} de alto y en la pantalla caben {tope:0}; se desplaza por dentro");
-                Cajon.Content = null;               // para poder cambiarle el padre
-                Cajon.Content = EnvolverConScroll(contenido, tope - bordes);
-                contenido = (FrameworkElement)Cajon.Content;
+                // ---------- Y "scrollPropio" también aquí ----------
+                //
+                // Aquí estaba el fallo del panel negro con la franja blanca. Este camino
+                // envolvía SIEMPRE en un `ScrollViewer`, aunque el panel ya tuviera el
+                // suyo. Antes no se notaba porque la superficie de Inicio nunca pasaba del
+                // tope; en cuanto le entró la portada entera, empezó a pasar, y el
+                // resultado medido fue:
+                //
+                //   tipo de raíz visual: ScrollViewer
+                //   cadena: ScrollViewer(660x893) > Border(643x1256) > Grid(629x1236)
+                //   viewport 643x893  extent 643x1256  barra visible: SÍ
+                //
+                // Tres consecuencias, las tres visibles: (1) la barra de ese scroll de más
+                // es la FRANJA BLANCA VERTICAL; (2) `PanelShell` deja de ser la raíz y sus
+                // 17 px de ancho que la barra le come dejan a la vista el fondo del
+                // scroll, que no es opaco; (3) dentro de un scroll el alto disponible es
+                // INFINITO, así que la fila `Star` del Inicio deja de estar acotada, su
+                // portada se estira a 1256 px y 363 se quedan fuera del viewport.
+                //
+                // El camino vertical ya lo hacía bien: si el panel se desplaza por dentro,
+                // no se le pone otro scroll encima; se le recorta el alto y su propio
+                // scroll hace su trabajo. Esto es lo mismo.
+                if (scrollPropio)
+                    Log.Info($"panel {nombre}: necesita {pide:0} de alto y el tope es {tope:0}; " +
+                             "se recorta y se desplaza con su propio scroll");
+                else
+                {
+                    Log.Info($"panel {nombre}: necesita {pide:0} de alto y el tope es {tope:0}; se desplaza por dentro");
+                    Cajon.Content = null;               // para poder cambiarle el padre
+                    Cajon.Content = EnvolverConScroll(contenido, tope - bordes);
+                    contenido = (FrameworkElement)Cajon.Content;
+                }
                 pide = tope;
             }
 
@@ -293,11 +437,49 @@ public partial class MainWindow
         string desdeTecla = tecla == 0 ? "" :
             $", {System.Diagnostics.Stopwatch.GetElapsedTime(tecla).TotalMilliseconds:0} ms desde la tecla";
         Log.Info($"panel abierto: {nombre} ({ancho:0}x{alto:0}, teclado={teclado}){desdeTecla}");
+        // Y si se pasa de un panel sin teclado a uno que SÍ lo pide, hay que darse de
+        // baja: cambiar de panel no pasa por `CerrarPanel`, y el lanzador se habría
+        // encontrado con dos Esc —el suyo, que vacía la búsqueda, y el del hook.
+        if (teclado) DejarDeEscucharEscape(); else EscucharEscape();
+    }
+
+    // ================= Esc cierra el panel =================
+    //
+    // Los paneles de centro de control, audio, red y batería NO piden teclado: la isla es
+    // WS_EX_NOACTIVATE y nunca tiene el foco, así que un `KeyDown` suyo no se dispara
+    // nunca. Por eso Esc no los cerraba: no faltaba un manejador, faltaba alguien a
+    // quien avisar. El aviso llega del hook de teclado, que sí ve la tecla, y la tecla
+    // no se traga.
+    //
+    // Los que sí piden teclado —el lanzador y la vista general— siguen con su propio Esc
+    // intacto: el del lanzador primero vacía la búsqueda, y meterse por medio le habría
+    // cambiado el comportamiento.
+    Action? _escDelPanel;
+
+    void EscucharEscape()
+    {
+        if (_gancho == null || _escDelPanel != null) return;
+        _escDelPanel = () => Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (_panelAbierto == null) return;
+            Log.Info($"Esc con el panel {_panelAbierto} abierto: se cierra");
+            CerrarPanel();
+        }));
+        _gancho.Escape += _escDelPanel;
+        _gancho.HayPanel = true;
+    }
+
+    void DejarDeEscucharEscape()
+    {
+        if (_escDelPanel == null) return;
+        if (_gancho != null) { _gancho.Escape -= _escDelPanel; _gancho.HayPanel = false; }
+        _escDelPanel = null;
     }
 
     void CerrarPanel()
     {
         if (_panelAbierto == null) return;
+        DejarDeEscucharEscape();
         // La tarjeta se cierra sola, con su propia animación: se mira si está a la
         // vista y no si estamos en vertical, para que un cambio de orientación con un
         // panel abierto no deje la tarjeta colgada.
@@ -353,7 +535,7 @@ public partial class MainWindow
     // Se mira igual que en el menú (VigilarClicFueraDelMenu): a pelo cada 150 ms, que
     // funciona aunque el clic caiga en otra aplicación y no nos llegue.
     static readonly HashSet<string> SeCierranConClicFuera = new()
-        { PanelRed, PanelControl, PanelBandeja, PanelBateria, PanelNotas };
+        { PanelRed, PanelBandeja, PanelBateria, PanelNotas };
     bool _clicFueraContado;
 
     void VigilarClicFueraDelPanel()

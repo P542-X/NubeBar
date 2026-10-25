@@ -76,6 +76,8 @@ public partial class App : Application
         // cuadrícula solo existe con la isla, sus animaciones y los ganchos de Windows en
         // marcha, así que no se puede medir con un arnés aparte. Ver DiagVista.cs.
         DiagVista.Leer(e.Args);
+        DiagInicio.Leer(e.Args);      // "--diaginicio": mide la superficie de Inicio y se cierra
+        DiagBandeja.Leer(e.Args);     // "--diagbandeja": vigila la bandeja un rato y se cierra
 
         if (e.Args.Length > 0 && e.Args[0] == Guardian.Bandera)
         {

@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Windows.Controls.Primitives;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -15,7 +16,7 @@ namespace NubeBar;
 // wifis que hay a la vista para entrar en ellas desde la isla, y un test de velocidad.
 public partial class MainWindow : Window
 {
-    const string PanelRed = "red";
+    internal const string PanelRed = "red";
     const double AnchoRed = 420;
     const double AltoFilaWifi = 32;
     const int FilasWifiALaVista = 5;      // las demás, con la rueda
@@ -47,42 +48,60 @@ public partial class MainWindow : Window
     void AbrirRed()
     {
         _redConClave = null;
-        AlternarPanel(PanelRed, CrearRed, AnchoRed, 200);
+        AlternarPanel(PanelRed, CrearRed, AnchoRed, 200, ancla: _anclaRed);
     }
 
     FrameworkElement CrearRed()
     {
-        var columna = new StackPanel { Margin = new Thickness(14, 2, 14, 12) };
+        var columna = new StackPanel { Margin = new Thickness(12, 4, 12, 8) };
 
-        // --- Conectado ahora ---
-        columna.Children.Add(Titulito("Conectado"));
+        // ---------- Qué cambia aquí, y qué NO ----------
+        //
+        // Cambia el envoltorio: lo que antes eran rótulos y filas sueltas sobre el fondo
+        // ahora son tarjetas con superficie opaca. **Los contenedores son los mismos**
+        // —`_redConectadas`, `_redLista`, `_redScroll`, los cuatro TextBlock de
+        // velocidad—, así que `RellenarRed`, `AjustarFilasWifi` y el refresco parcial
+        // siguen funcionando sin tocar una línea: vacían y rellenan SU pila, no el panel.
+        //
+        // Y la lógica de `Red.cs` no se toca en absoluto.
+
+        // ---------- Conexión actual ----------
+        var colCon = new StackPanel();
+        var tipo = Red.Estado();
+        colCon.Children.Add(SectionHeader(
+            tipo == Red.Tipo.Cable ? 0xE839 : tipo == Red.Tipo.Wifi ? 0xE701 : 0xEB55,
+            "Red e Internet",
+            StatusBadge(tipo switch
+            {
+                Red.Tipo.Cable => "Conectado",
+                Red.Tipo.Wifi => "Wi-Fi",
+                _ => "Sin conexión",
+            }, tipo != Red.Tipo.Sin, tipo == Red.Tipo.Sin)));
+
         _redConectadas = new StackPanel();
         _redConectadas.Children.Add(Tenue("Mirando…"));
-        columna.Children.Add(_redConectadas);
+        colCon.Children.Add(_redConectadas);
+        columna.Children.Add(Card(colCon));
 
-        // --- Wifis a la vista ---
-        var cabecera = new Grid { Margin = new Thickness(0, 8, 0, 2) };
-        cabecera.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        cabecera.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        _redTitulo = Titulito("Redes wifi");
-        _redTitulo.Margin = new Thickness(0);
-        _redTitulo.VerticalAlignment = VerticalAlignment.Center;
-        cabecera.Children.Add(_redTitulo);
-        var buscar = Boton(Glifo(""), "Volver a buscar redes", () =>
+        // ---------- Redes wifi ----------
+        var colWifi = new StackPanel();
+        var buscar = BotonIcono(0xE72C, "Volver a buscar redes", () =>
         {
             Red.Escanear();
-            if (_redEstado != null) _redEstado.Text = "Buscando redes…";
+            if (_redEstado != null)
+            {
+                _redEstado.Text = "Buscando redes…";
+                _redEstado.Visibility = Visibility.Visible;
+            }
             // wlanapi necesita unos 4 s para tener la lista nueva tras un escaneo
             Dispatcher.InvokeAsync(async () => { await Task.Delay(4000); await RellenarRed(); });
         });
-        buscar.Height = 24;
-        Grid.SetColumn(buscar, 1);
-        cabecera.Children.Add(buscar);
-        columna.Children.Add(cabecera);
+        _redTitulo = Titulito("Redes wifi");
+        colWifi.Children.Add(SectionHeader(0xE701, "Redes Wi-Fi", buscar));
 
         _redEstado = Tenue("");
         _redEstado.Visibility = Visibility.Collapsed;
-        columna.Children.Add(_redEstado);
+        colWifi.Children.Add(_redEstado);
 
         _redLista = new StackPanel();
         _redLista.SizeChanged += (_, e) => { if (e.WidthChanged) AjustarFilasWifi(); };
@@ -103,26 +122,36 @@ public partial class MainWindow : Window
             _redScroll.ScrollToVerticalOffset(_redScroll.VerticalOffset - Math.Sign(e.Delta) * AltoFilaWifi * 2);
             e.Handled = true;
         };
-        columna.Children.Add(_redScroll);
+        colWifi.Children.Add(_redScroll);
+        columna.Children.Add(Card(colWifi));
 
-        // --- Test de velocidad ---
-        columna.Children.Add(Titulito("Velocidad"));
-        columna.Children.Add(CrearVelocidad());
+        // ---------- Velocidad, como tarjeta de estadísticas ----------
+        var colVel = new StackPanel();
+        colVel.Children.Add(SectionHeader(0xE9D9, "Velocidad"));
+        colVel.Children.Add(CrearVelocidad());
+        columna.Children.Add(Card(colVel));
 
-        // --- A Windows, para lo que no se hace aquí ---
-        var ajustes = Boton(new TextBlock { Text = "Ajustes de red de Windows", Foreground = _acentoLegible, FontSize = 11 },
-                            "Abrir la configuración de red de Windows", () => { AbrirAjustesRed("ms-settings:network"); });
-        ajustes.HorizontalAlignment = HorizontalAlignment.Left;
-        ajustes.Margin = new Thickness(-6, 8, 0, 0);
-        ajustes.Height = 22;
-        columna.Children.Add(ajustes);
+        // ---------- Acciones de abajo ----------
+        var colAcc = new StackPanel();
+        var rejilla = new UniformGrid { Columns = 2 };
+        rejilla.Children.Add(QuickAction(0xE713, "Ajustes de Windows", false,
+            () => AbrirAjustesRed("ms-settings:network"), "Abrir la configuración de red de Windows"));
+        rejilla.Children.Add(QuickAction(0xE72C, "Actualizar", false, () =>
+        {
+            Red.Escanear();
+            Dispatcher.InvokeAsync(async () => { await Task.Delay(4000); await RellenarRed(); });
+        }, "Volver a buscar redes y refrescar los datos"));
+        colAcc.Children.Add(rejilla);
+        columna.Children.Add(Card(colAcc));
 
         Velocidad.Cambio += VelocidadCambio;
         columna.Unloaded += (_, _) => Velocidad.Cambio -= VelocidadCambio;
 
+        ApuntarPanel(PanelRed, columna, AnchoRed, TopeDeAlto);
+
         // El panel se abre ya y se rellena por detrás
         Dispatcher.InvokeAsync(RellenarYEscanear, DispatcherPriority.Background);
-        return columna;
+        return PanelShell(columna, 0);
     }
 
     // Listar las wifis es instantáneo (28 ms medidos), pero lo que da Windows es su
@@ -453,8 +482,24 @@ public partial class MainWindow : Window
         _velNota = Tenue("");
         _velNota.VerticalAlignment = VerticalAlignment.Center;
         abajo.Children.Add(_velNota);
-        _velBoton = Boton(new TextBlock { Text = "Medir", Foreground = _acentoLegible }, "Hacer un test de velocidad (speed.cloudflare.com)",
-                          () => { _ = Velocidad.Medir(); PintarVelocidad(); });
+        // "Medir" con aspecto de botón secundario, no de texto azul suelto: usa la misma
+        // plantilla que el resto de los botones de los paneles.
+        _velBoton = new Button
+        {
+            Content = new TextBlock
+            {
+                Text = "Medir", FontSize = 11.5, Foreground = _texto,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+            },
+            Template = PlantillaDeAccion(false),
+            MinHeight = AltoTocable,
+            Padding = new Thickness(14, 4, 14, 4),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Cursor = System.Windows.Input.Cursors.Hand,
+            ToolTip = "Hacer un test de velocidad (speed.cloudflare.com)",
+        };
+        _velBoton.Click += (_, _) => { _ = Velocidad.Medir(); PintarVelocidad(); };
         _velBoton.Height = 26;
         Grid.SetColumn(_velBoton, 1);
         abajo.Children.Add(_velBoton);

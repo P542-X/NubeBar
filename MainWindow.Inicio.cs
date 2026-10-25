@@ -19,8 +19,10 @@ namespace NubeBar;
 // comandos y web). Lo rápido se calcula al teclear; los archivos van por detrás.
 public partial class MainWindow
 {
-    const string PanelInicio = "inicio";
+    internal const string PanelInicio = "inicio";
     const double AnchoMenu = 660, AltoFila = 44, FilasVisibles = 9;
+    // El mismo número, visible para las pruebas: el ancho de la superficie de Inicio.
+    internal const double AnchoDeInicio = AnchoMenu;
     // Seis y se acabó. Veinte filas era una lista para recorrer con la rueda, y un
     // buscador no es para recorrerlo: o lo que quieres está arriba del todo o la
     // puntuación está mal. Con seis, lo que sale tiene que ser lo bueno.
@@ -63,6 +65,23 @@ public partial class MainWindow
 
     double AltoMenuEfectivo => !Vertical ? AltoMenu
         : Math.Min(AltoMenu, AltoMaximoDeTarjeta(_monitor.Alto / _monitor.Escala, _cfg.Barra.Margen));
+
+    // ---------- El tope de alto ----------
+    //
+    // `AltoMenu` es lo que mide la LISTA de resultados, y es un mínimo: `AbrirPanel` le
+    // da más si el contenido lo pide. Con la portada —multimedia, acciones rápidas,
+    // CPU/RAM, fondo, conectividad, fijadas, energía y sistema— el contenido pide mucho
+    // más, y sin tope el panel se comería la pantalla: con el centro de control pasó
+    // exactamente eso, medido ("pedía 560 de alto pero necesita 1076; se le da el que
+    // necesita"). El tope es el criterio del resto de los paneles: nunca más del 62 % del
+    // monitor, y la portada se desplaza por dentro con su propio scroll.
+    internal static double TopeDeInicio(double altoPantalla) =>
+        Math.Max(360, Math.Min(960, altoPantalla * 0.62));
+
+    double AltoMaximoDeInicio() => Vertical
+        ? Math.Min(TopeDeInicio(_monitor.Alto / _monitor.Escala),
+                   AltoMaximoDeTarjeta(_monitor.Alto / _monitor.Escala, _cfg.Barra.Margen))
+        : TopeDeInicio(_monitor.Alto / _monitor.Escala);
 
     // ================= Tecla Windows =================
     // Hay un solo hook de teclado para todas las islas: lo monta la jefa y lo
@@ -126,6 +145,7 @@ public partial class MainWindow
             CerrarMenu();
             return;
         }
+        ApuntarBoton("tecla Windows");   // TEMPORAL: diagnóstico del flujo
         AbrirMenuInicio();
     }
 
@@ -185,18 +205,73 @@ public partial class MainWindow
     // null y la tarjeta se centra, que es la salida razonable.
     Button? _botonInicio;
 
-    internal UIElement ModuloInicio() => _botonInicio = Boton(Texto("⊞", 16), "Inicio", AbrirMenuInicio);
+    internal UIElement ModuloInicio() => _botonInicio =
+        Boton(Texto("⊞", 16), "Inicio", () => { ApuntarBoton("⊞ lanzador"); AbrirMenuInicio(); });
 
     void AbrirMenuInicio()
     {
-        // En vertical la tarjeta se alinea con el botón de Inicio, como el lanzador de
-        // Plasma; en horizontal el ancla no se usa (el panel es el cajón de la isla y
-        // se despliega de punta a punta, igual que siempre).
+        // ---------- La vigilancia de lo que suena ----------
+        //
+        // Abrir Inicio no puede parar la música. Eso está medido —la reproducción sigue y
+        // el progreso avanza con la superficie abierta— y los guardias de `Musica` y
+        // `Audio` lo garantizan mientras se monta.
+        //
+        // Este muestreo es el INSTRUMENTO que lo demostró, y se queda: apagado en el uso
+        // normal (cuesta cuatro enumeraciones de dispositivos y tres tareas por apertura,
+        // y eso no se le cobra a nadie por si acaso) y encendido con `--diaginicio`, que
+        // es cuando se quiere volver a comprobar.
+        long mutAntes = Musica.Mutaciones;
+        int volAntes = 0; bool mudoAntes = false; string salidaAntes = "";
+        if (DiagInicio.Encendido)
+        {
+            volAntes = Audio.Volumen();
+            mudoAntes = Audio.Silenciado;
+            salidaAntes = SalidaActual();
+            ApuntarMultimedia("antes de abrir Inicio", mutAntes, volAntes, mudoAntes, salidaAntes);
+        }
+
+        // ---------- Anclado a su botón, en las dos orientaciones ----------
+        //
+        // En horizontal NO se pasaba ancla, y sin ancla el cajón de la isla se despliega
+        // de punta a punta: 1163 px en una pantalla de 2560, mientras el panel pide 660.
+        // El contenido se estira a ese hueco —de ahí las tarjetas estiradas— y el trozo
+        // de isla que queda sin tarjeta deja ver el escritorio de detrás. Medido:
+        // "ancho pedido: 660 / ancho real: 1131 / recorte del cajón: NO".
+        //
+        // Era deliberado ("igual que siempre", decía el comentario), pero ese "siempre"
+        // es justo lo que no se aguanta mirando. Con ancla, el cajón se recorta como una
+        // tarjeta del ancho pedido colgada del botón Inicio, que es su entrada.
+        //
+        // El ancla es la referencia REAL del botón, no una coordenada: `XdeTarjeta` le
+        // pregunta dónde está en cada fotograma —así la sigue mientras la isla crece o
+        // cambia de borde— y en vertical `ColocarPanelFlotante` usa su centro en
+        // coordenadas de pantalla. De ahí salen los cuatro bordes sin un número a mano.
+        //
+        // Si quitas el módulo de Inicio de la isla, `_botonInicio` es null y se ancla a
+        // la isla: la tarjeta sale centrada, pero RECORTADA, que es lo que importa.
         if (!AlternarPanel(PanelInicio, CrearMenuInicio, AnchoMenuEfectivo, AltoMenuEfectivo,
-                           teclado: true, ancla: Vertical ? _botonInicio : null,
-                           scrollPropio: true)) return;
+                           teclado: true, ancla: (FrameworkElement?)_botonInicio ?? Isla,
+                           scrollPropio: true, topeDuro: AltoMaximoDeInicio())) return;
         _filtro = null;
         CapturarClicsFuera(true);
+
+        // Los 30 segundos muestreados, solo con el diagnóstico encendido (ver arriba).
+        // Si la reproducción se corta, el log dice en qué momento y si alguien pidió el
+        // cambio.
+        if (DiagInicio.Encendido)
+            Dispatcher.InvokeAsync(async () =>
+            {
+                foreach (int s in new[] { 2, 10, 30 })
+                {
+                    await Task.Delay(s == 2 ? 2000 : s == 10 ? 8000 : 20000);
+                    if (_panelAbierto != PanelInicio)
+                    {
+                        Log.Info($"multimedia: Inicio ya estaba cerrado a los {s} s");
+                        return;
+                    }
+                    ApuntarMultimedia($"{s} s con Inicio abierto", mutAntes, volAntes, mudoAntes, salidaAntes);
+                }
+            }, DispatcherPriority.Background);
         Dispatcher.InvokeAsync(() =>
         {
             _caja?.Focus();
@@ -540,7 +615,18 @@ public partial class MainWindow
         raiz.Children.Add(capaMenu);
 
         _raizMenu = raiz;
-        return raiz;
+
+        // ---------- La superficie opaca ----------
+        //
+        // `PanelShell` existía desde el rediseño y esta superficie —la que de verdad se
+        // abre con el botón Inicio y con la tecla Windows— nunca lo consumía: la raíz era
+        // este `Grid`, que no pinta nada. El contenido se apoyaba directamente en la isla,
+        // que es translúcida, y por eso se leía el texto del escritorio de detrás. La
+        // traza lo decía con todas las letras: "shell opaco: NO (Grid)".
+        //
+        // Con margen 0 porque la raíz ya trae el suyo (6, 8, 6, 10) y dos acolchados
+        // seguidos dejan el panel con un marco que no pega.
+        return PanelShell(raiz, 0);
     }
 
     ScrollViewer? _portada;
@@ -548,15 +634,44 @@ public partial class MainWindow
     // Entra escalonada: cada tarjeta un pelín después que la anterior
     ScrollViewer CrearPortada()
     {
+        // ---------- Montar es LEER ----------
+        //
+        // Mientras se construye la portada, las puertas que escriben audio y multimedia
+        // están cerradas: si alguna tarjeta intentara pausar, cambiar el volumen o el
+        // dispositivo de salida, no pasa y queda apuntado con su nombre en el log. Ver
+        // `Musica.Permitido` y `Audio.Permitido`.
+        //
+        // El `finally` no es adorno: si una tarjeta lanzara y el guardia se quedara
+        // puesto, el siguiente clic del usuario en pausa no haría nada.
+        Musica.Construyendo = true;
+        Audio.Construyendo = true;
+        try { return MontarPortada(); }
+        finally
+        {
+            Musica.Construyendo = false;
+            Audio.Construyendo = false;
+        }
+    }
+
+    ScrollViewer MontarPortada()
+    {
         var pila = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+
+        // Las tarjetas son las del diseño aprobado (`Card`, opacas y con su filo), las
+        // mismas que se montaron para el centro de control. No hay dos pantallas con lo
+        // mismo: el centro de control ES esta portada, y su único acceso es el botón
+        // Inicio. Las piezas propias del lanzador —las fijadas y la energía— se quedan:
+        // una superficie unificada no es una superficie con menos cosas.
         var piezas = new UIElement[]
         {
-            CrearTarjetaMusica(),
-            CrearAccesosRapidos(),
-            CrearGraficas(),
-            CrearTarjetaWallpaper(),
+            CardMultimedia(),
+            CardAccionesRapidas(),
+            CardMetricas(),
+            CardFondo(),
+            CardConectividad(),
             CrearFijadas(),
-            CrearEnergia()
+            CrearEnergia(),
+            CardAccionesDelSistema(),
         };
 
         for (int i = 0; i < piezas.Length; i++)
@@ -570,6 +685,10 @@ public partial class MainWindow
             mover.BeginAnimation(TranslateTransform.YProperty, Kf(14, 0, 420, retardo, Muelle));
             mover.Y = 0;
         }
+        // El idioma del teclado solo sale si tienes más de una distribución puesta: la
+        // propia tarjeta lo decide, y por eso se añade aparte del bucle de entrada.
+        CardTeclado(pila);
+
 
         return new ScrollViewer
         {

@@ -27,7 +27,7 @@ namespace NubeBar;
 // tiene que pasar: nunca un rectángulo roto.
 public partial class MainWindow
 {
-    const string PanelVista = "vista";
+    internal const string PanelVista = "vista";
     const int IdAtajoVista = 0xB0CA;
     const int MaxEnVista = 24;
     const double AnchoTarjeta = 236, AltoTarjeta = 158, AltoPie = 44;
@@ -109,8 +109,9 @@ public partial class MainWindow
     }
 
     // ================= Abrir y cerrar =================
-    void AlternarVista()
+    void AlternarVista()   // el icono de la cuadrícula
     {
+        ApuntarBoton("cuadrícula");    // TEMPORAL: diagnóstico del flujo
         if (_panelAbierto == PanelVista) { CerrarVista(); return; }
         AbrirVista();
     }
@@ -271,6 +272,329 @@ public partial class MainWindow
     //
     // Abre la vista general, la deja QUIETA los segundos que se pidan y escribe el
     // recuento. Nada de esto corre en el uso normal: es `--diagvista`.
+
+    // ================= --diaginicio =================
+    //
+    // Mide lo que ha salido en pantalla de verdad. Ver DiagInicio.cs.
+
+    // ================= --diagbandeja =================
+    //
+    // Vigila la bandeja y apunta cada cambio con su causa. Ver DiagBandeja.cs.
+    async System.Threading.Tasks.Task CorrerDiagnosticoDeLaBandeja()
+    {
+        try
+        {
+            Log.Info($"=== diagnóstico de la bandeja: {DiagBandeja.Segundos} s ===");
+            Log.Info($"ejecutable medido: {Environment.ProcessPath}  pid {Environment.ProcessId}");
+
+            // Esperar a que la bandeja se haya registrado y las apps hayan respondido al
+            // "TaskbarCreated": lo que se mide después de esto es la sesión en marcha.
+            await System.Threading.Tasks.Task.Delay(9000);
+
+            var antes = MuestraDeBandeja();
+            long anadidos = 0, eliminados = 0, duplicados = 0, aperturas = 0, bailes = 0;
+            Apunta($"bandeja: enumerados={antes.Count} (los que había al empezar a mirar)");
+            Apunta($"bandeja: fantasmas={Bandeja.Fantasmas()}");
+            foreach (var f in antes) Apunta($"  · {f}");
+
+            for (int s = 1; s <= DiagBandeja.Segundos; s++)
+            {
+                await System.Threading.Tasks.Task.Delay(1000);
+                var ahora = MuestraDeBandeja();
+                var c = DiagBandeja.Comparar(antes, ahora);
+
+                if (!c.Nada)
+                {
+                    anadidos += c.Anadidos.Count;
+                    eliminados += c.Eliminados.Count;
+                    duplicados += c.Duplicados.Count;
+                    if (c.OrdenMovido) bailes++;
+
+                    if (c.Anadidos.Count > 0) Apunta($"bandeja: añadidos={c.Anadidos.Count} → {string.Join(", ", c.Anadidos)}  [t+{s}s]");
+                    if (c.Eliminados.Count > 0) Apunta($"bandeja: eliminados={c.Eliminados.Count} → {string.Join(", ", c.Eliminados)}  [t+{s}s]");
+                    if (c.Duplicados.Count > 0) Apunta($"bandeja: duplicados={c.Duplicados.Count} → {string.Join(", ", c.Duplicados)}  [t+{s}s]");
+                    if (c.OrdenMovido) Apunta($"bandeja: el orden se ha movido sin que entrara ni saliera nada  [t+{s}s]");
+                    Apunta($"bandeja: enumerados={ahora.Count}  [t+{s}s]");
+                    antes = ahora;
+                }
+
+                // Y cada 10 s se abre y se cierra el desplegable de iconos ocultos: es la
+                // comprobación de "refresco por apertura" y de que abrirlo muchas veces no
+                // cambia el orden ni duplica nada.
+                if (s % 10 == 0)
+                {
+                    aperturas++;
+                    var alAbrir = MuestraDeBandeja();
+                    AlternarBandejaExtra();
+                    await System.Threading.Tasks.Task.Delay(500);
+                    int enPanel = _panelAbierto == PanelBandeja
+                        ? (Cajon.Content as FrameworkElement) is { } raiz ? Radiografiar(raiz).Hijos : 0
+                        : -1;
+                    Apunta($"bandeja: fantasmas={Bandeja.Fantasmas()} (iconos cuya ventana ya no existe)");
+                    Apunta($"bandeja: refresco por apertura nº {aperturas} — la lista se vuelve a enumerar al abrir " +
+                           $"({alAbrir.Count} iconos; panel={(enPanel < 0 ? "no se abrió (no sobra ninguno)" : enPanel + " en la rejilla")})");
+                    if (_panelAbierto == PanelBandeja) { CerrarPanel(); await System.Threading.Tasks.Task.Delay(400); }
+                }
+            }
+
+            Apunta($"bandeja: RESUMEN — añadidos={anadidos} eliminados={eliminados} duplicados={duplicados} " +
+                   $"aperturas={aperturas} fantasmas={Bandeja.Fantasmas()} órdenes movidos sin motivo={bailes}");
+            var fin = MuestraDeBandeja();
+            Apunta($"bandeja: enumerados={fin.Count} al terminar");
+            foreach (var f in fin) Apunta($"  · {f}");
+        }
+        catch (Exception ex) { Log.Error("el diagnóstico de la bandeja", ex); }
+        finally { Application.Current.Shutdown(0); }
+    }
+
+    static void Apunta(string linea) { Log.Info(linea); Console.WriteLine(linea); }
+
+    List<DiagBandeja.Ficha> MuestraDeBandeja() =>
+        Bandeja.Iconos is { } ic
+            ? ic.Select(DiagBandeja.FichaDe).ToList()
+            : new List<DiagBandeja.Ficha>();
+    async System.Threading.Tasks.Task CorrerDiagnosticoDeInicio()
+    {
+        try
+        {
+            Log.Info("=== diagnóstico de la superficie de Inicio ===");
+            Log.Info($"ejecutable medido: {Environment.ProcessPath}");
+            Log.Info($"pid: {Environment.ProcessId}");
+
+            // 1) El panel de Inicio, por el mismo camino que la tecla Windows
+            ApuntarBoton("--diaginicio (simula la tecla Windows)");
+            AbrirMenuInicio();
+            await System.Threading.Tasks.Task.Delay(1200);   // que el layout y la animación acaben
+            MedirLoAbierto("inicio");
+
+            // Si se pidieron segundos, Inicio se queda abierto: es lo que deja al
+            // muestreador de multimedia hacer su trabajo (ver AbrirMenuInicio).
+            if (DiagInicio.Segundos > 0)
+            {
+                Log.Info($"--diaginicio: Inicio se queda abierto {DiagInicio.Segundos} s");
+                Console.WriteLine($"Inicio abierto {DiagInicio.Segundos} s; mirando la música...");
+                for (int s = 5; s <= DiagInicio.Segundos; s += 5)
+                {
+                    await System.Threading.Tasks.Task.Delay(5000);
+                    Console.WriteLine($"  {s} s: panel={_panelAbierto ?? "cerrado"}");
+                }
+                MedirLoAbierto("inicio (al final)");
+            }
+
+            // 2) Y el panel de audio, que SÍ es un panel aparte y tiene que seguir siéndolo
+            CerrarPanel();
+            await System.Threading.Tasks.Task.Delay(600);
+            AbrirDesde(BotonAltavoz);
+            await System.Threading.Tasks.Task.Delay(1000);
+            MedirLoAbierto("audio");
+
+            CerrarPanel();
+            await System.Threading.Tasks.Task.Delay(400);
+        }
+        catch (Exception ex) { Log.Error("el diagnóstico de Inicio", ex); }
+        finally { Application.Current.Shutdown(0); }
+    }
+
+    // ---------- La radiografía de un panel abierto ----------
+    //
+    // Lo que hace falta para distinguir "no se ha creado" de "se ha creado y no se ve":
+    // el árbol visual de verdad, con las medidas, el scroll y la visibilidad de cada
+    // capa. Un panel negro casi vacío puede ser cualquiera de cinco cosas distintas y a
+    // ojo se parecen todas.
+    internal sealed class RadiografiaPanel
+    {
+        public string Raiz = "";
+        public int Hijos, Tarjetas, TarjetasVisibles, TarjetasConArea;
+        public bool ShellEsRaiz, ShellOpaco;
+        public double ShellAncho, ShellAlto;
+        public string Visibilidad = "";
+        public bool Recorta;
+        public double Viewport, Extent, OffsetY, OffsetX, ExtentAncho, ViewportAncho;
+        public bool HayScroll, BarraVisible, ScrollInterno;
+        public string Cadena = "";
+    }
+
+    // Recorre el árbol desde la raíz del cajón y rellena la radiografía. Es puro sobre el
+    // árbol: no toca nada, solo mira.
+    internal static RadiografiaPanel Radiografiar(FrameworkElement? raiz)
+    {
+        var r = new RadiografiaPanel();
+        if (raiz == null) { r.Raiz = "no hay contenido"; return r; }
+
+        r.Raiz = raiz.GetType().Name;
+        r.Visibilidad = raiz.Visibility.ToString();
+        r.Recorta = raiz.ClipToBounds;
+
+        // La cadena de capas, de fuera a dentro: es lo que delata un envoltorio de más
+        var cadena = new System.Text.StringBuilder();
+        object? capa = raiz;
+        FrameworkElement? shell = null;
+        for (int i = 0; i < 6 && capa != null; i++)
+        {
+            if (capa is FrameworkElement fe)
+                cadena.Append($"{fe.GetType().Name}({fe.ActualWidth:0}x{fe.ActualHeight:0})");
+            else cadena.Append(capa.GetType().Name);
+
+            if (capa is ScrollViewer sv)
+            {
+                r.HayScroll = true;
+                r.Viewport = sv.ViewportHeight;
+                r.Extent = sv.ExtentHeight;
+                r.OffsetY = sv.VerticalOffset;
+                r.OffsetX = sv.HorizontalOffset;
+                r.ViewportAncho = sv.ViewportWidth;
+                r.ExtentAncho = sv.ExtentWidth;
+                r.BarraVisible = sv.ComputedVerticalScrollBarVisibility == Visibility.Visible;
+            }
+            if (shell == null && capa is Border b && b.Background is SolidColorBrush s && s.Color.A == 255)
+            {
+                shell = b;
+                r.ShellEsRaiz = ReferenceEquals(b, raiz);
+                r.ShellOpaco = true;
+                r.ShellAncho = b.ActualWidth;
+                r.ShellAlto = b.ActualHeight;
+            }
+
+            capa = capa switch
+            {
+                ScrollViewer sv2 => sv2.Content,
+                Border bo => bo.Child,
+                _ => null,
+            };
+            if (capa != null) cadena.Append(" > ");
+        }
+        r.Cadena = cadena.ToString();
+
+        // Las tarjetas: existen en el árbol, se ven, y ocupan área. Las tres cosas son
+        // distintas y el fallo puede estar en cualquiera.
+        foreach (var t in Descendientes(raiz).OfType<Border>())
+        {
+            if (t.Background is not SolidColorBrush sb || sb.Color.A != 255) continue;
+            if (ReferenceEquals(t, shell)) continue;
+            r.Tarjetas++;
+            if (t.IsVisible) r.TarjetasVisibles++;
+            if (t.ActualWidth > 1 && t.ActualHeight > 1) r.TarjetasConArea++;
+        }
+
+
+        // El scroll que SÍ debe existir: el que el propio panel lleva dentro. Se busca en
+        // todo el árbol, no solo en la cadena de fuera, porque vive bajo la fila de los
+        // resultados. Lo que importa de él es que su barra NO esté a la vista (la
+        // superficie no lleva barras) y que el contenido no se quede desplazado fuera.
+        if (!r.HayScroll)
+        {
+            foreach (var sv in Descendientes(raiz).OfType<ScrollViewer>())
+            {
+                if (sv.ViewportHeight <= 0) continue;
+                r.HayScroll = true;
+                r.ScrollInterno = true;
+                r.Viewport = sv.ViewportHeight;
+                r.Extent = sv.ExtentHeight;
+                r.OffsetY = sv.VerticalOffset;
+                r.OffsetX = sv.HorizontalOffset;
+                r.ViewportAncho = sv.ViewportWidth;
+                r.ExtentAncho = sv.ExtentWidth;
+                r.BarraVisible = sv.ComputedVerticalScrollBarVisibility == Visibility.Visible;
+                break;
+            }
+        }
+
+        if (raiz is Panel p) r.Hijos = p.Children.Count;
+        else if (shell is Border bs && bs.Child is Panel pp) r.Hijos = pp.Children.Count;
+        else if (raiz is ContentControl cc && cc.Content != null) r.Hijos = 1;
+
+        return r;
+    }
+
+    // Todo el árbol visual por debajo, sin recursión infinita y sin reventar si una rama
+    // aún no se ha realizado.
+    static IEnumerable<DependencyObject> Descendientes(DependencyObject raiz)
+    {
+        var pila = new Stack<DependencyObject>();
+        pila.Push(raiz);
+        int tope = 0;
+        while (pila.Count > 0 && tope++ < 20000)
+        {
+            var d = pila.Pop();
+            yield return d;
+            int n = 0;
+            try { n = VisualTreeHelper.GetChildrenCount(d); } catch { }
+            for (int i = 0; i < n; i++)
+            {
+                DependencyObject? h = null;
+                try { h = VisualTreeHelper.GetChild(d, i); } catch { }
+                if (h != null) pila.Push(h);
+            }
+        }
+    }
+
+    void MedirLoAbierto(string esperado)
+    {
+        var raiz = PanelSuperpuestoAbierto && _superpuesta is { } v
+            ? v.Cajon.Content as FrameworkElement
+            : Cajon.Content as FrameworkElement;
+        var r = Radiografiar(raiz);
+
+        // ¿Dos paneles encima? El cajón de la isla y la ventana superpuesta no pueden
+        // tener contenido a la vez: si lo tienen, se está mirando el que no es.
+        bool dos = Cajon.Content != null && _superpuesta is { Cajon.Content: not null };
+
+        var lineas = new[]
+        {
+            $"--- medido: {esperado} ---",
+            $"panel solicitado: {esperado}",
+            $"panel abierto: {_panelAbierto ?? "ninguno"}",
+            $"botón de origen: {_ultimoBoton}",
+            $"ancla: {(_tarjetaAncla == null ? "NINGUNA" : _tarjetaAncla.GetType().Name + " \"" + _tarjetaAncla.ToolTip + "\"")}",
+            $"ventana: {ActualWidth:0}x{ActualHeight:0}  isla: {Isla.ActualWidth:0}x{Isla.ActualHeight:0}",
+            $"ancho pedido: {_panelAncho:0}  alto pedido: {_panelAlto:0}",
+            $"tipo de raíz visual: {r.Raiz}",
+            $"cadena de capas: {r.Cadena}",
+            $"PanelShell: {(r.ShellOpaco ? $"{r.ShellAncho:0}x{r.ShellAlto:0}" : "NO HAY")}" +
+                $"  es la raíz: {(r.ShellEsRaiz ? "sí" : "NO")}  opaco: {(r.ShellOpaco ? "sí" : "NO")}",
+            $"hijos: {r.Hijos}  tarjetas: {r.Tarjetas} (visibles {r.TarjetasVisibles}, con área {r.TarjetasConArea})",
+            $"Visibility: {r.Visibilidad}  ClipToBounds: {r.Recorta}",
+            r.HayScroll
+                ? $"ScrollViewer ({(r.ScrollInterno ? "interno, el del propio panel" : "ENVOLTORIO DE FUERA")}): " +
+                  $"viewport {r.ViewportAncho:0}x{r.Viewport:0}  extent {r.ExtentAncho:0}x{r.Extent:0}  " +
+                  $"offset ({r.OffsetX:0},{r.OffsetY:0})  barra visible: {(r.BarraVisible ? "SÍ" : "no")}"
+                : "ScrollViewer: no hay",
+            $"recorte del cajón: {(Isla.Clip == null ? "NO (de punta a punta)" : "sí")}",
+            $"dos paneles a la vez: {(dos ? "SÍ — se está mirando el que no es" : "no")}",
+        };
+        foreach (var l in lineas) { Log.Info(l); Console.WriteLine(l); }
+
+        // Y el veredicto, por si el que lee son unos ojos cansados
+        foreach (var mal in Veredicto(r))
+        {
+            Log.Info("MAL: " + mal);
+            Console.WriteLine("MAL: " + mal);
+        }
+    }
+
+    // Las cinco cosas que NO pueden pasar. Está aparte y es pura para poder comprobarla
+    // sin abrir una ventana: ver las pruebas de integración.
+    internal static IEnumerable<string> Veredicto(RadiografiaPanel r)
+    {
+        if (r.Raiz == "no hay contenido") { yield return "el panel no tiene contenido"; yield break; }
+        if (!r.ShellOpaco) yield return "PanelShell no está o no es opaco: se verá el escritorio por detrás";
+        if (r.Tarjetas == 0) yield return "PanelShell tiene 0 tarjetas: el panel sale negro y vacío";
+        if (r.Tarjetas > 0 && r.TarjetasVisibles == 0)
+            yield return $"hay {r.Tarjetas} tarjetas en el árbol pero NINGUNA visible";
+        if (r.Tarjetas > 0 && r.TarjetasConArea == 0)
+            yield return $"hay {r.Tarjetas} tarjetas visibles pero todas miden 0: algo las ha aplastado";
+        if (r.HayScroll && r.BarraVisible)
+            yield return "hay una barra de desplazamiento VISIBLE: es la franja que se ve en el panel";
+        if (r.HayScroll && !r.ScrollInterno)
+            yield return "el scroll es un envoltorio de fuera: PanelShell deja de ser la raíz y la " +
+                         "fila Star del panel se queda sin acotar";
+        if (r.HayScroll && r.Viewport > 0 && r.OffsetY > r.Extent - r.Viewport + 1)
+            yield return $"el contenido está desplazado fuera del viewport (offset {r.OffsetY:0} de {r.Extent - r.Viewport:0})";
+        if (r.HayScroll && r.Viewport is > 0 and < 60)
+            yield return $"el viewport mide {r.Viewport:0} px: no cabe nada dentro";
+        if (r.ShellOpaco && r.ShellAlto < 60)
+            yield return $"PanelShell mide {r.ShellAlto:0} px de alto: se ha quedado aplastado";
+    }
     async System.Threading.Tasks.Task CorrerDiagnosticoDeLaVista()
     {
         try

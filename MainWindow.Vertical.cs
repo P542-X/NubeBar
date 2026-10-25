@@ -220,7 +220,8 @@ public partial class MainWindow : Window
     VentanaSuperpuesta Superpuesta() => _superpuesta ??= new VentanaSuperpuesta(this);
 
     void AbrirPanelFlotante(string nombre, FrameworkElement contenido, double ancho, double alto,
-                            bool teclado, FrameworkElement? ancla, bool scrollPropio = false)
+                            bool teclado, FrameworkElement? ancla, bool scrollPropio = false,
+                            double? topeDuro = null)
     {
         var v = Superpuesta();
 
@@ -228,7 +229,8 @@ public partial class MainWindow : Window
         double anchoPantalla = _monitor.Ancho / _monitor.Escala;
         double altoPantalla = _monitor.Alto / _monitor.Escala;
         double topeAncho = AnchoMaximoDeTarjeta(anchoPantalla, Grosor, _cfg.Barra.Margen, SeparacionPanel);
-        double topeAlto = AltoMaximoDeTarjeta(altoPantalla, _cfg.Barra.Margen);
+        double topeAlto = Math.Min(AltoMaximoDeTarjeta(altoPantalla, _cfg.Barra.Margen),
+                                   topeDuro ?? double.PositiveInfinity);
 
         if (ancho > topeAncho)
         {
@@ -296,6 +298,9 @@ public partial class MainWindow : Window
         var r = v.Rectangulo();
         Log.Info($"panel abierto al lado: {nombre} ({ancho:0}x{alto:0}, teclado={teclado}) " +
                  $"en ({r.Izq},{r.Arr})-({r.Der},{r.Aba})");
+        // Ver MainWindow.Paneles.cs: la isla no tiene foco, y el que pide teclado lleva
+        // su propio Esc.
+        if (teclado) DejarDeEscucharEscape(); else EscucharEscape();
     }
 
     void CerrarPanelFlotante()
@@ -435,6 +440,7 @@ public partial class MainWindow : Window
     // ventana se esconde —eso devuelve el orden Z— y se vacía.
     void QuitarPanelFlotante()
     {
+        DejarDeEscucharEscape();
         if (_superpuesta is not { } v) return;
         if (_panelConTeclado) { _panelConTeclado = false; v.Teclado(false); }
         v.Tarjeta.BeginAnimation(OpacityProperty, null);

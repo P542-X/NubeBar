@@ -31,6 +31,63 @@ static class Bandeja
 
     public static event Action? Cambio;
 
+    // ---------- Los que siguen vivos ----------
+    //
+    // ---------- El fallo que esto arregla ----------
+    //
+    // Al reiniciar Explorer, las apps vuelven a registrar su icono —eso es lo que
+    // garantiza el mensaje "TaskbarCreated"— pero lo hacen con una VENTANA NUEVA. El
+    // registro viejo se queda en la colección, porque nadie ha mandado el NIM_DELETE
+    // correspondiente: la ventana que lo habría mandado ya no existe.
+    //
+    // Resultado medido con Explorer reiniciado a mitad de sesión:
+    //
+    //   añadidos=1 → Wallpaper Engine [hwnd:91689058/uid:1000]
+    //   ...
+    //     · Wallpaper Engine [hwnd:91557986/uid:1000]   ← el viejo, con la ventana muerta
+    //     · Wallpaper Engine [hwnd:91689058/uid:1000]   ← el nuevo
+    //
+    // Y comprobando esas dos ventanas: `IsWindow(91557986) = False`. O sea, la bandeja
+    // enseñaba Wallpaper Engine dos veces, y una de las dos no respondía a los clics.
+    //
+    // ---------- Por qué se filtra y no se borra ----------
+    //
+    // La colección es de ManagedShell y la mantiene él con los mensajes de las apps.
+    // Quitarle entradas por detrás es meterle la mano a su estado; filtrar al mirar es
+    // barato (una llamada a `IsWindow` por icono), no pelea con la librería y da el mismo
+    // resultado a la vista.
+    //
+    // Y se filtra AQUÍ, en un solo sitio, para que la tira, la cuenta del "^" y la
+    // rejilla de los ocultos no puedan discrepar: con la cuenta sin filtrar el "^" decía
+    // "otros 3" y en la rejilla salían 2.
+    public static System.Collections.Generic.List<NotifyIcon> Vivos()
+    {
+        var lista = new System.Collections.Generic.List<NotifyIcon>();
+        try
+        {
+            foreach (var i in Iconos ?? new ObservableCollection<NotifyIcon>())
+                if (EstaVivo(i)) lista.Add(i);
+        }
+        catch (Exception ex) { Log.Error("filtrar los iconos vivos de la bandeja", ex); }
+        return lista;
+    }
+
+    // Un icono está vivo si la ventana que lo registró sigue existiendo. Los que se
+    // registran con GUID y sin ventana (hay alguno) se dan por vivos: no hay nada que
+    // comprobar y descartarlos sería esconder un icono bueno.
+    public static bool EstaVivo(NotifyIcon i)
+    {
+        try { return i.HWnd == IntPtr.Zero || Nativo.Existe(i.HWnd); }
+        catch { return true; }
+    }
+
+    // Cuántos de la colección son fantasmas. Solo para el log y el diagnóstico.
+    public static int Fantasmas()
+    {
+        try { return (Iconos?.Count ?? 0) - Vivos().Count; }
+        catch { return 0; }
+    }
+
     public static void Encender()
     {
         if (_shell != null) return;

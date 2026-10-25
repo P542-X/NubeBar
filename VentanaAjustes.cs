@@ -34,6 +34,10 @@ public sealed class VentanaAjustes : Window
         MainWindow.AsegurarWidgetsRegistrados();
         return RegistroWidgets.Ids.ToList();
     }
+    // La misma fuente de iconos que la nube, y por el mismo motivo: si no está, Windows
+    // sustituye por cajas. Se nombra una vez aquí en vez de repetirla en cada glifo.
+    const string FuenteDeIconos = MainWindow.FuenteIconos;
+
 
     SolidColorBrush _fondo = new(Color.FromRgb(0x16, 0x16, 0x1A));
     SolidColorBrush _texto = new(Colors.White);
@@ -46,7 +50,7 @@ public sealed class VentanaAjustes : Window
     // los siete temas, en claro y en oscuro.
     SolidColorBrush _elegido = new(Color.FromArgb(0x33, 0x7A, 0xA2, 0xF7));
     SolidColorBrush _acentoLegible = new(Color.FromRgb(0x7A, 0xA2, 0xF7));
-    Roles _roles = Roles.PorDefecto();
+    internal Roles _roles = Roles.PorDefecto();
 
     TabControl _pestanas = new();
     readonly RegistroAjustes _modulos = new();
@@ -65,11 +69,22 @@ public sealed class VentanaAjustes : Window
         LeerColoresDelTema();
 
         Title = "Ajustes de la nube";
-        Width = 760;
-        Height = 620;
+        // Más ancha que antes porque ahora hay navegación lateral: con 760 el contenido se
+        // quedaba en 570 y las tarjetas con dos columnas no caben. Y con mínimos, para que
+        // una ventana estrecha no deje el pie encima del contenido ni recorte la lista.
+        Width = 940;
+        Height = 660;
+        MinWidth = 720;
+        MinHeight = 460;
+        // Y nunca más grande que la pantalla donde se abre: a 150 % de PPP una ventana de
+        // 940x660 en un portátil de 1366x768 nacía con el pie fuera.
+        var pant = Monitores.DelRaton() ?? Monitores.Principal();
+        double anchoUtil = pant.TrabajoAncho / pant.Escala, altoUtil = pant.TrabajoAlto / pant.Escala;
+        Width = Math.Min(Width, Math.Max(MinWidth, anchoUtil - 40));
+        Height = Math.Min(Height, Math.Max(MinHeight, altoUtil - 40));
         // Centrada en la pantalla donde tengas el ratón, no siempre en la principal
         WindowStartupLocation = WindowStartupLocation.Manual;
-        var m = Monitores.DelRaton() ?? Monitores.Principal();
+        var m = pant;
         Left = (m.TrabajoX + (m.TrabajoAncho - Width * m.Escala) / 2) / m.Escala;
         Top = (m.TrabajoY + (m.TrabajoAlto - Height * m.Escala) / 2) / m.Escala;
         WindowStyle = WindowStyle.None;
@@ -166,51 +181,177 @@ public sealed class VentanaAjustes : Window
     }
 
     // ================= Esqueleto =================
+    // ================= El marco de la ventana =================
+    //
+    // ---------- Qué cambia y qué NO ----------
+    //
+    // Cambia el marco: una cabecera que se queda quieta, navegación lateral agrupada en
+    // tres categorías, el contenido en tarjetas y UNA barra de acciones al pie. No cambia
+    // ni una sección: siguen siendo los mismos `Seccion*()`, con los mismos ids y el mismo
+    // registro, porque el registro ya las guardaba como `Func<UIElement>`.
+    //
+    // Y el `TabControl` se queda. Parece raro si no se ve la navegación encima, y es
+    // deliberado: `RehacerPagina(id, ...)`, `_modulos.Indice(id)` y el botón de la sección
+    // Fondo que salta a Wallpaper trabajan contra él. Lo que se le quita es la tira de
+    // pestañas —con una plantilla que solo pinta el contenido elegido— y lo que se le pone
+    // es la lista lateral mandándole el `SelectedIndex`. Sustituirlo por otro anfitrión
+    // habría significado reescribir esas tres cosas para no ganar nada.
+
+    // ---------- Los iconos ----------
+    //
+    // Por su número y nunca como carácter literal. Un glifo de la zona de uso privado
+    // escrito a pelo se pierde al reescribir el archivo y el botón se queda funcionando
+    // pero invisible: pasó con el de la cuadrícula en C4.1 y no se repite.
+    static readonly Dictionary<string, int> Iconos = new()
+    {
+        ["apariencia"] = 0xE771,   // Personalize
+        ["colores"] = 0xE790,      // Color
+        ["fondo"] = 0xE91B,        // Photo
+        ["wallpaper"] = 0xE786,    // Slideshow
+        ["perfiles"] = 0xE77B,     // Contact2
+        ["modulos"] = 0xE8A9,      // GridView
+        ["biblioteca"] = 0xE8F1,   // Library
+        ["apps"] = 0xECAA,         // AppIconDefault
+        ["atajos"] = 0xE765,       // KeyboardClassic
+        ["inicio"] = 0xE80F,       // Home
+        ["sistema"] = 0xE713,      // Settings
+    };
+
+    const int CodigoNube = 0xE753;      // Cloud
+
+    static string Glifo(int codigo) => char.ConvertFromUtf32(codigo);
+
+    internal static string SubtituloDe(string id) =>
+        Subtitulos.TryGetValue(id, out var s) ? s : "";
+
+    internal static string GlifoDeSeccion(string id) =>
+        Glifo(Iconos.TryGetValue(id, out int c) ? c : 0xE713);
+
+    // ---------- Las categorías ----------
+    //
+    // El registro ya agrupa bien: "Aspecto" son exactamente las cinco de personalización,
+    // "Panel" las tres de NubeBar y "Sistema" las tres del sistema. Así que esto es solo
+    // cómo se LLAMAN en pantalla; no se toca ninguna registración ni ningún id.
+    static readonly (string Id, string Nombre, string Sub)[] Categorias =
+    {
+        ("Aspecto", "Personalización", "Personaliza el aspecto de tu escritorio"),
+        ("Panel", "NubeBar", "Organiza los widgets y módulos"),
+        ("Sistema", "Sistema", "Controla ventanas, atajos y comportamiento"),
+    };
+
+    static readonly Dictionary<string, string> Subtitulos = new()
+    {
+        ["apariencia"] = "El tema, la forma y cuánto se mueve todo",
+        ["colores"] = "Los colores del tema y sus roles",
+        ["fondo"] = "El fondo del escritorio, por tipo y por monitor",
+        ["wallpaper"] = "Wallpaper Engine y su integración con la escena de inicio",
+        ["perfiles"] = "Configura tu perfil actual",
+        ["modulos"] = "Qué widgets hay en cada zona de la nube",
+        ["biblioteca"] = "Añade, oculta o quita widgets",
+        ["apps"] = "El carrusel de aplicaciones y las fijadas",
+        ["atajos"] = "Las combinaciones de teclado",
+        ["inicio"] = "El menú Inicio propio y su buscador",
+        ["sistema"] = "Arranque, notificaciones y diagnóstico",
+    };
+
+    // ---------- Estado del marco ----------
+    TextBlock? _subtitulo;
+    TextBlock? _sinGuardar;
+    Button? _botonGuardar;
+    TextBox? _busqueda;
+    StackPanel? _lateral;
+    readonly List<(string Id, Button Boton)> _navegacion = new();
+    readonly DispatcherTimer _vigilaCambios = new() { Interval = TimeSpan.FromMilliseconds(400) };
+
     UIElement Montar()
     {
         var marco = new Border
         {
             Background = _fondo,
             CornerRadius = new CornerRadius(16),
-            BorderBrush = _acento,
+            BorderBrush = new SolidColorBrush(_roles.Borde),
             BorderThickness = new Thickness(1),
             Effect = new System.Windows.Media.Effects.DropShadowEffect
             { BlurRadius = 24, ShadowDepth = 0, Opacity = 0.5, Color = Colors.Black }
         };
 
-        var rejilla = new Grid { Margin = new Thickness(18) };
-        rejilla.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var rejilla = new Grid();
+        rejilla.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });                  // cabecera
         rejilla.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        rejilla.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        rejilla.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });                  // acciones
 
-        var titulo = new TextBlock
-        {
-            Text = "Ajustes de la nube",
-            FontSize = 20,
-            Foreground = _texto,
-            Margin = new Thickness(4, 0, 0, 12)
-        };
-        Grid.SetRow(titulo, 0);
-        rejilla.Children.Add(titulo);
+        // ================= Las secciones, por el registro =================
+        RegistrarSecciones();
+
+        // ================= Cabecera =================
+        var cabecera = Cabecera();
+        Grid.SetRow(cabecera, 0);
+        rejilla.Children.Add(cabecera);
+
+        // ================= Cuerpo: lateral + contenido =================
+        var cuerpo = new Grid();
+        // El lateral con ancho fijo: con Auto, un nombre largo lo ensanchaba y el contenido
+        // se encogía al cambiar de sección, que se lee como que la ventana salta.
+        cuerpo.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(196) });
+        cuerpo.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var lateral = Lateral();
+        Grid.SetColumn(lateral, 0);
+        cuerpo.Children.Add(lateral);
 
         _pestanas = new TabControl
         {
             Background = Brushes.Transparent,
             BorderThickness = new Thickness(0),
-            Foreground = _texto
+            Foreground = _texto,
+            // La plantilla pinta SOLO el contenido elegido: la tira de pestañas desaparece
+            // y la navegación la lleva la lista lateral.
+            Template = PlantillaSinPestanas(),
         };
-        // Sin esto las pestañas salen con el estilo de Windows: blancas sobre blanco
-        // y prácticamente ilegibles encima de un fondo oscuro
-        _pestanas.ItemContainerStyle = EstiloPestana();
+        foreach (var m in _modulos.Todos)
+            _pestanas.Items.Add(Pestana(m.Descriptor.Nombre, m.Construir()));
+        _pestanas.SelectionChanged += (_, e) => { if (e.OriginalSource == _pestanas) AlCambiarDePagina(); };
+        Grid.SetColumn(_pestanas, 1);
+        cuerpo.Children.Add(_pestanas);
 
-        // Las ocho secciones, por el registro. Siguen siendo los mismos métodos
-        // Seccion*(): lo que cambia es que ahora tienen id y palabras clave, que la
-        // ventana no sabe cuántas hay, y que recargar una no depende de acordarse de
-        // su número (ver AplicarTema, que antes usaba Items[1] a pelo).
+        Grid.SetRow(cuerpo, 1);
+        rejilla.Children.Add(cuerpo);
+
+        // ================= Barra de acciones, una sola =================
+        var pie = Pie();
+        Grid.SetRow(pie, 2);
+        rejilla.Children.Add(pie);
+
+        marco.Child = rejilla;
+
+        // El indicador de cambios sin guardar se mira con un reloj corto en vez de
+        // engancharse a cada control: hay ciento y pico, y `HaCambiado()` es comparar dos
+        // cadenas. Enganchar ciento y pico oyentes para esto sería pagar de más.
+        _vigilaCambios.Tick += (_, _) => RefrescarCambios();
+        _vigilaCambios.Start();
+        Closed += (_, _) => _vigilaCambios.Stop();
+
+        AlCambiarDePagina();
+        return marco;
+    }
+
+    void RegistrarSecciones()
+    {
+        // Los mismos ids, los mismos nombres y las mismas palabras clave de siempre: la
+        // navegación nueva se monta ENCIMA del registro, no en su lugar.
         _modulos.Registrar("apariencia", "Apariencia", "Aspecto", SeccionApariencia,
                            "tema", "radio", "fuente", "tamaño", "opacidad", "animaciones", "movimiento");
         _modulos.Registrar("colores", "Colores", "Aspecto", SeccionColores,
                            "acento", "fondo", "texto", "paleta", "hsv", "wallpaper", "roles", "contraste");
+        _modulos.Registrar("fondo", "Fondo", "Aspecto", SeccionFondo,
+                           "fondo", "escritorio", "degradado", "color sólido", "imagen",
+                           "presentación", "wallpaper", "monitor", "rellenar", "ajustar");
+        _modulos.Registrar("wallpaper", "Wallpaper", "Aspecto", SeccionWallpaper,
+                           "fondo", "wallpaper engine", "monitor", "paleta", "integración",
+                           "playlist", "escena", "inicio", "espera", "animado");
+        _modulos.Registrar("perfiles", "Perfiles", "Aspecto", SeccionPerfiles,
+                           "perfil", "concentración", "creativo", "noche", "minimal",
+                           "aplicar", "deshacer", "exportar", "importar", "duplicar");
         _modulos.Registrar("modulos", "Módulos", "Panel", SeccionModulos,
                            "widgets", "zonas", "izquierda", "centro", "derecha", "reloj", "bandeja");
         _modulos.Registrar("biblioteca", "Biblioteca", "Panel", SeccionBiblioteca,
@@ -221,37 +362,775 @@ public sealed class VentanaAjustes : Window
                            "teclado", "combinación", "vista general", "teclas");
         _modulos.Registrar("inicio", "Inicio", "Sistema", SeccionInicio,
                            "menú", "buscador", "archivos", "web", "saludo", "tecla windows");
-        _modulos.Registrar("fondo", "Fondo", "Aspecto", SeccionFondo,
-                           "fondo", "escritorio", "degradado", "color sólido", "imagen",
-                           "presentación", "wallpaper", "monitor", "rellenar", "ajustar");
-        _modulos.Registrar("wallpaper", "Wallpaper", "Aspecto", SeccionWallpaper,
-                           "fondo", "wallpaper engine", "monitor", "paleta", "integración",
-                           "playlist", "escena", "inicio", "espera", "animado");
-        _modulos.Registrar("perfiles", "Perfiles", "Aspecto", SeccionPerfiles,
-                           "perfil", "concentración", "creativo", "noche", "minimal",
-                           "aplicar", "deshacer", "exportar", "importar", "duplicar");
         _modulos.Registrar("sistema", "Sistema", "Sistema", SeccionSistema,
                            "arrancar", "windows", "notificaciones", "monitores", "diagnóstico");
+    }
 
-        foreach (var m in _modulos.Todos)
-            _pestanas.Items.Add(Pestana(m.Descriptor.Nombre, m.Construir()));
-        Grid.SetRow(_pestanas, 1);
-        rejilla.Children.Add(_pestanas);
+    // ---------- La cabecera ----------
+    UIElement Cabecera()
+    {
+        var marco = new Border
+        {
+            Background = new SolidColorBrush(_roles.Superficie),
+            BorderBrush = new SolidColorBrush(_roles.Borde),
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(20, 16, 20, 14),
+            CornerRadius = new CornerRadius(16, 16, 0, 0),
+        };
 
-        var botones = new StackPanel
+        var fila = new Grid();
+        fila.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        fila.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        fila.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        // La nube
+        var nube = new TextBlock
+        {
+            Text = Glifo(CodigoNube),
+            FontFamily = new FontFamily(FuenteDeIconos),
+            FontSize = 26,
+            Foreground = _acentoLegible,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 14, 0),
+        };
+        Grid.SetColumn(nube, 0);
+        fila.Children.Add(nube);
+
+        // Título y subtítulo
+        var textos = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        textos.Children.Add(new TextBlock
+        {
+            Text = "Ajustes de la nube",
+            FontSize = 19,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = _texto,
+        });
+        _subtitulo = new TextBlock
+        {
+            Text = "",
+            FontSize = 12,
+            Foreground = _textoAtenuado,
+            Margin = new Thickness(0, 2, 0, 0),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+        };
+        textos.Children.Add(_subtitulo);
+        Grid.SetColumn(textos, 1);
+        fila.Children.Add(textos);
+
+        // Buscador, perfil activo y cambios pendientes
+        var derecha = new StackPanel
         {
             Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 14, 0, 0)
+            VerticalAlignment = VerticalAlignment.Center,
         };
-        botones.Children.Add(BotonPlano("Cancelar", Cancelar, false));
-        botones.Children.Add(BotonPlano("Guardar", Guardar, true));
-        Grid.SetRow(botones, 2);
-        rejilla.Children.Add(botones);
 
-        marco.Child = rejilla;
+        _sinGuardar = new TextBlock
+        {
+            Text = "",
+            FontSize = 11.5,
+            Foreground = _acentoLegible,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 12, 0),
+        };
+        derecha.Children.Add(_sinGuardar);
+
+        var perfil = Perfiles.LeerEstado().Activo;
+        if (!string.IsNullOrWhiteSpace(perfil))
+        {
+            var p = Perfiles.Todos().FirstOrDefault(x => x.Id == perfil);
+            derecha.Children.Add(new Border
+            {
+                Background = new SolidColorBrush(_roles.Seleccion),
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(10, 4, 10, 4),
+                Margin = new Thickness(0, 0, 10, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Child = new TextBlock
+                {
+                    Text = p?.Nombre ?? perfil!,
+                    FontSize = 11.5,
+                    Foreground = _acentoLegible,
+                },
+                ToolTip = "El perfil que está puesto",
+            });
+        }
+
+        derecha.Children.Add(CajaDeBusqueda());
+        Grid.SetColumn(derecha, 2);
+        fila.Children.Add(derecha);
+
+        marco.Child = fila;
         return marco;
     }
+
+    UIElement CajaDeBusqueda()
+    {
+        var caja = new Border
+        {
+            Background = new SolidColorBrush(_roles.SuperficieAlta),
+            CornerRadius = new CornerRadius(8),
+            BorderBrush = new SolidColorBrush(_roles.Borde),
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(8, 0, 4, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        var fila = new StackPanel { Orientation = Orientation.Horizontal };
+        fila.Children.Add(new TextBlock
+        {
+            Text = Glifo(0xE721),       // Search
+            FontFamily = new FontFamily(FuenteDeIconos),
+            FontSize = 12,
+            Foreground = _textoAtenuado,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 6, 0),
+        });
+
+        _busqueda = new TextBox
+        {
+            Width = 170, Height = 26,
+            Background = Brushes.Transparent,
+            Foreground = _texto,
+            BorderThickness = new Thickness(0),
+            VerticalContentAlignment = VerticalAlignment.Center,
+            ToolTip = "Buscar en los ajustes (por nombre, descripción o categoría)",
+        };
+        _busqueda.TextChanged += (_, _) => Filtrar(_busqueda!.Text);
+        _busqueda.KeyDown += (_, e) =>
+        {
+            // Esc limpia la búsqueda en vez de cerrar la ventana: cerrarla con una
+            // búsqueda escrita a medias se lee como perder el trabajo.
+            if (e.Key == Key.Escape && _busqueda!.Text.Length > 0)
+            {
+                _busqueda.Text = "";
+                e.Handled = true;
+            }
+        };
+        fila.Children.Add(_busqueda);
+
+        var limpiar = new Button
+        {
+            Content = Glifo(0xE711),    // Cancel
+            FontFamily = new FontFamily(FuenteDeIconos),
+            FontSize = 10,
+            Width = 22, Height = 22,
+            Background = Brushes.Transparent,
+            Foreground = _textoAtenuado,
+            BorderThickness = new Thickness(0),
+            Cursor = Cursors.Hand,
+            ToolTip = "Limpiar la búsqueda",
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        limpiar.Click += (_, _) => { if (_busqueda != null) _busqueda.Text = ""; };
+        fila.Children.Add(limpiar);
+
+        caja.Child = fila;
+        return caja;
+    }
+
+    // ---------- La navegación lateral ----------
+    UIElement Lateral()
+    {
+        var marco = new Border
+        {
+            // Un fondo distinto del contenido, para que se lean como dos zonas. Sale del
+            // rol de superficie, no de una mezcla a mano.
+            Background = new SolidColorBrush(_roles.Superficie),
+            BorderBrush = new SolidColorBrush(_roles.Borde),
+            BorderThickness = new Thickness(0, 0, 1, 0),
+            Padding = new Thickness(10, 12, 10, 12),
+        };
+
+        _lateral = new StackPanel();
+        _navegacion.Clear();
+
+        foreach (var (catId, catNombre, _) in Categorias)
+        {
+            var delGrupo = _modulos.Todos
+                .Where(m => m.Descriptor.Categoria.Equals(catId, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (delGrupo.Count == 0) continue;
+
+            _lateral.Children.Add(new TextBlock
+            {
+                Text = catNombre.ToUpperInvariant(),
+                FontSize = 10,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = _textoAtenuado,
+                Opacity = 0.75,
+                Margin = new Thickness(10, 12, 0, 6),
+            });
+
+            foreach (var m in delGrupo)
+                _lateral.Children.Add(BotonDeNavegacion(m.Descriptor));
+        }
+
+        marco.Child = new ScrollViewer
+        {
+            Content = _lateral,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+        };
+        return marco;
+    }
+
+    Button BotonDeNavegacion(DescriptorAjustes d)
+    {
+        var contenido = new StackPanel { Orientation = Orientation.Horizontal };
+        contenido.Children.Add(new TextBlock
+        {
+            Text = GlifoDeSeccion(d.Id),
+            FontFamily = new FontFamily(FuenteDeIconos),
+            FontSize = 15,
+            Width = 22,
+            Foreground = _texto,
+            VerticalAlignment = VerticalAlignment.Center,
+        });
+        contenido.Children.Add(new TextBlock
+        {
+            Text = d.Nombre,
+            FontSize = 13,
+            Foreground = _texto,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(8, 0, 0, 0),
+        });
+
+        var b = new Button
+        {
+            Content = contenido,
+            // El filo va SIEMPRE puesto y lo que cambia es su color: con el grosor a 0 y a
+            // 1 según la selección, el texto se movía un píxel al cambiar de página.
+            Template = PlantillaDeNavegacion(),
+            Padding = new Thickness(10, 8, 12, 8),
+            Margin = new Thickness(0, 1, 0, 1),
+            HorizontalContentAlignment = HorizontalAlignment.Left,
+            Cursor = Cursors.Hand,
+            Tag = d.Id,
+            ToolTip = Subtitulos.TryGetValue(d.Id, out var s) ? s : d.Nombre,
+        };
+        b.Click += (_, _) => Ir(d.Id);
+        b.KeyDown += (_, e) =>
+        {
+            // Flechas para moverse por la lista, como en cualquier panel de ajustes.
+            if (e.Key is not (Key.Up or Key.Down)) return;
+            var vivos = _navegacion.Where(x => x.Boton.Visibility == Visibility.Visible).ToList();
+            int i = vivos.FindIndex(x => x.Id == d.Id);
+            if (i < 0) return;
+            int j = e.Key == Key.Down ? i + 1 : i - 1;
+            if (j < 0 || j >= vivos.Count) return;
+            Ir(vivos[j].Id);
+            vivos[j].Boton.Focus();
+            e.Handled = true;
+        };
+
+        _navegacion.Add((d.Id, b));
+        return b;
+    }
+
+    // Plantilla del botón de navegación: superficie al pasar por encima, selección con el
+    // velo del acento y una barrita del acento a la izquierda. Todo de los roles.
+    ControlTemplate PlantillaDeNavegacion()
+    {
+        var plantilla = new ControlTemplate(typeof(Button));
+
+        var marco = new FrameworkElementFactory(typeof(Border), "marco");
+        marco.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+        marco.SetValue(Border.CornerRadiusProperty, new CornerRadius(8));
+        marco.SetValue(Border.BorderThicknessProperty, new Thickness(3, 0, 0, 0));
+        marco.SetValue(Border.BorderBrushProperty, Brushes.Transparent);
+        marco.SetBinding(Border.PaddingProperty,
+            new System.Windows.Data.Binding("Padding") { RelativeSource = System.Windows.Data.RelativeSource.TemplatedParent });
+
+        var presentador = new FrameworkElementFactory(typeof(ContentPresenter));
+        presentador.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Left);
+        presentador.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+        marco.AppendChild(presentador);
+        plantilla.VisualTree = marco;
+
+        var encima = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+        encima.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(_roles.SuperficieAlta), "marco"));
+        plantilla.Triggers.Add(encima);
+
+        // El foco de teclado se ve: es lo que hace la ventana usable con Tab.
+        var foco = new Trigger { Property = UIElement.IsKeyboardFocusWithinProperty, Value = true };
+        foco.Setters.Add(new Setter(Border.BorderBrushProperty, new SolidColorBrush(_roles.AcentoTinta), "marco"));
+        plantilla.Triggers.Add(foco);
+
+        return plantilla;
+    }
+
+    // El TabControl sin su tira de pestañas: solo el contenido elegido.
+    ControlTemplate PlantillaSinPestanas()
+    {
+        var plantilla = new ControlTemplate(typeof(TabControl));
+        var presentador = new FrameworkElementFactory(typeof(ContentPresenter));
+        presentador.SetBinding(ContentPresenter.ContentProperty,
+            new System.Windows.Data.Binding("SelectedContent") { RelativeSource = System.Windows.Data.RelativeSource.TemplatedParent });
+        plantilla.VisualTree = presentador;
+        return plantilla;
+    }
+
+    // ---------- Ir a una sección ----------
+    internal void Ir(string id)
+    {
+        int donde = _modulos.Indice(id);
+        if (donde < 0 || donde >= _pestanas.Items.Count) return;
+        _pestanas.SelectedIndex = donde;
+        AlCambiarDePagina();
+    }
+
+    // ---------- La transición al cambiar de página ----------
+    //
+    // Un fundido corto, y respetando el nivel de animación: `Animacion.EscalarFundido`
+    // devuelve 0 en "Desactivado", y entonces **no se anima nada** — la página cambia de
+    // golpe, que es lo que se pidió. No hay rebote, ni desplazamiento, ni nada que se
+    // mueva: un panel de ajustes que se menea cansa a la tercera vez.
+    void FundirPagina()
+    {
+        if (_pestanas.SelectedIndex < 0) return;
+        double ms = Animacion.EscalarFundido(110);
+        if (ms <= 0) { _pestanas.Opacity = 1; return; }
+        _pestanas.BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation
+        {
+            From = 0.55,
+            To = 1,
+            Duration = TimeSpan.FromMilliseconds(ms),
+        });
+    }
+
+    void AlCambiarDePagina()
+    {
+        FundirPagina();
+        var id = IdDeLaPaginaActual();
+        if (_subtitulo != null)
+            _subtitulo.Text = Subtitulos.TryGetValue(id, out var s)
+                ? s
+                : Categorias.FirstOrDefault(c => c.Id == CategoriaDe(id)).Sub ?? "";
+
+        foreach (var (nid, b) in _navegacion)
+        {
+            bool elegido = nid == id;
+            if (b.Template.FindName("marco", b) is not Border marco) continue;
+            marco.Background = elegido ? new SolidColorBrush(_roles.Seleccion) : Brushes.Transparent;
+            marco.BorderBrush = elegido ? new SolidColorBrush(_roles.Acento) : Brushes.Transparent;
+            if (b.Content is StackPanel sp)
+                foreach (var hijo in sp.Children.OfType<TextBlock>())
+                {
+                    hijo.Foreground = elegido ? _acentoLegible : _texto;
+                    hijo.FontWeight = elegido ? FontWeights.SemiBold : FontWeights.Normal;
+                }
+        }
+    }
+
+    string IdDeLaPaginaActual()
+    {
+        int i = _pestanas.SelectedIndex;
+        return i >= 0 && i < _modulos.Todos.Count ? _modulos.Todos[i].Descriptor.Id : "";
+    }
+
+    string CategoriaDe(string id) => _modulos.Buscar(id)?.Descriptor.Categoria ?? "";
+
+    // ---------- La búsqueda ----------
+    //
+    // Filtra la LISTA, no destruye la página: lo que estás viendo sigue ahí mientras
+    // buscas. Reutiliza las palabras clave que el registro ya guardaba desde la Fase A,
+    // que se escribieron precisamente para esto.
+    internal static bool Coincide(DescriptorAjustes d, string texto, string categoriaVisible)
+    {
+        if (string.IsNullOrWhiteSpace(texto)) return true;
+        var q = texto.Trim();
+
+        // ---------- Sin acentos y sin mayúsculas ----------
+        //
+        // `Contains(q, CurrentCultureIgnoreCase)` ignora las mayúsculas pero NO los
+        // acentos, y eso se nota en castellano a la primera: buscar "animación" no
+        // encontraba la palabra clave "animaciones", y buscar "presentacion" sin tilde no
+        // encontraba "presentación". Quien busca no sabe cómo lo escribimos nosotros.
+        //
+        // `CompareInfo.IndexOf` con `IgnoreNonSpace` compara plegando los diacríticos, que
+        // es lo que hace cualquier buscador decente y no hay que inventar.
+        var ci = System.Globalization.CultureInfo.CurrentCulture.CompareInfo;
+        const System.Globalization.CompareOptions como =
+            System.Globalization.CompareOptions.IgnoreCase |
+            System.Globalization.CompareOptions.IgnoreNonSpace;
+
+        bool En(string? s)
+        {
+            if (string.IsNullOrEmpty(s)) return false;
+            try { return ci.IndexOf(s, q, como) >= 0; }
+            catch { return s.Contains(q, StringComparison.OrdinalIgnoreCase); }
+        }
+
+        if (En(d.Nombre) || En(d.Id) || En(categoriaVisible)) return true;
+        return d.PalabrasClave.Any(En);
+    }
+
+    void Filtrar(string texto)
+    {
+        int visibles = 0;
+        foreach (var (id, b) in _navegacion)
+        {
+            var d = _modulos.Buscar(id)?.Descriptor;
+            bool ok = d != null && Coincide(d, texto, NombreDeCategoriaVisible(d.Categoria));
+            b.Visibility = ok ? Visibility.Visible : Visibility.Collapsed;
+            if (ok) visibles++;
+        }
+
+        // Los rótulos de categoría se esconden si no les queda nada debajo: una categoría
+        // vacía con su título puesto parece un fallo.
+        if (_lateral != null)
+        {
+            string? cat = null;
+            var porRotulo = new Dictionary<TextBlock, List<Button>>();
+            TextBlock? ultimo = null;
+            foreach (var hijo in _lateral.Children)
+            {
+                if (hijo is TextBlock t) { ultimo = t; porRotulo[t] = new List<Button>(); cat = t.Text; }
+                else if (hijo is Button b && ultimo != null) porRotulo[ultimo].Add(b);
+            }
+            foreach (var (rotulo, botones) in porRotulo)
+                rotulo.Visibility = botones.Any(x => x.Visibility == Visibility.Visible)
+                    ? Visibility.Visible : Visibility.Collapsed;
+            _ = cat;
+        }
+
+        if (_subtitulo != null && texto.Trim().Length > 0)
+            _subtitulo.Text = visibles == 0
+                ? $"Nada coincide con «{texto.Trim()}». Prueba con «tema», «fondo», «widget» o «ventana»."
+                : $"{visibles} sección(es) coinciden con «{texto.Trim()}»";
+        else AlCambiarDePagina();
+
+        // Con una sola coincidencia se salta sola: es lo que uno espera al escribir.
+        if (visibles == 1 && texto.Trim().Length >= 3)
+        {
+            var unica = _navegacion.FirstOrDefault(x => x.Boton.Visibility == Visibility.Visible);
+            if (unica.Id != null && unica.Id != IdDeLaPaginaActual())
+            {
+                int donde = _modulos.Indice(unica.Id);
+                if (donde >= 0) _pestanas.SelectedIndex = donde;
+            }
+        }
+    }
+
+    internal static string NombreDeCategoriaVisible(string catId) =>
+        Categorias.FirstOrDefault(c => c.Id.Equals(catId, StringComparison.OrdinalIgnoreCase)).Nombre ?? catId;
+
+    // ---------- La barra de acciones, UNA ----------
+    //
+    // Antes había Guardar/Cancelar abajo y además Aplicar/Cancelar/Restaurar dentro de la
+    // página de Fondo, que es el tipo de duplicado que hace dudar de qué botón manda. Lo
+    // global vive aquí y solo aquí; lo de una página se queda en su tarjeta pero con un
+    // nombre que diga qué hace de verdad ("Aplicar el fondo ahora", no "Aplicar").
+    UIElement Pie()
+    {
+        var marco = new Border
+        {
+            Background = new SolidColorBrush(_roles.Superficie),
+            BorderBrush = new SolidColorBrush(_roles.Borde),
+            BorderThickness = new Thickness(0, 1, 0, 0),
+            Padding = new Thickness(20, 12, 20, 12),
+            CornerRadius = new CornerRadius(0, 0, 16, 16),
+        };
+
+        var fila = new Grid();
+        fila.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        fila.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        fila.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        // ---------- Por qué NO hay un "Restaurar" global ----------
+        //
+        // Se pidió, y no existe en el código: no hay ninguna operación de "volver a los
+        // valores de fábrica", y añadirla en una fase de presentación habría sido meter una
+        // acción destructiva nueva de paso. Lo que sí existe vive donde tiene sentido y con
+        // un nombre que dice qué hace: "Restaurar" en una tarjeta de perfil devuelve ESE
+        // perfil a fábrica, y "Restaurar el fondo anterior" en la página de Fondo devuelve
+        // el fondo que había. Eso no es un duplicado del pie: son otras cosas.
+        //
+        // Aquí quedan las dos globales, una vez cada una.
+        var izquierda = new TextBlock
+        {
+            Text = "Los cambios se guardan al pulsar Guardar",
+            FontSize = 11,
+            Foreground = _textoAtenuado,
+            Opacity = 0.6,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        Grid.SetColumn(izquierda, 0);
+        fila.Children.Add(izquierda);
+
+        var derecha = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        derecha.Children.Add(BotonPlano("Cancelar", Cancelar, false));
+        _botonGuardar = BotonPlano("Guardar", Guardar, true);
+        derecha.Children.Add(_botonGuardar);
+        Grid.SetColumn(derecha, 2);
+        fila.Children.Add(derecha);
+
+        marco.Child = fila;
+        return marco;
+    }
+
+
+    // ---------- La tarjeta ----------
+    //
+    // Un bloque con título, icono, descripción breve y sus controles dentro. Lo que evita
+    // es la pantalla de controles sueltos sobre el fondo plano: con la tarjeta, lo que va
+    // junto se ve junto.
+    //
+    // El radio y la separación salen de aquí y no de cada sitio, para que todas midan lo
+    // mismo. Y el filo va siempre puesto cambiando solo de color, por lo de siempre: con
+    // el grosor variable, el contenido se mueve al cambiar de estado.
+    const double RadioTarjeta = 12;
+
+    internal Border Tarjeta(string titulo, int icono, string? descripcion, UIElement contenido)
+    {
+        var col = new StackPanel();
+
+        var cab = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 2) };
+        cab.Children.Add(new TextBlock
+        {
+            Text = Glifo(icono),
+            FontFamily = new FontFamily(FuenteDeIconos),
+            FontSize = 14,
+            Foreground = _acentoLegible,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 9, 0),
+        });
+        cab.Children.Add(new TextBlock
+        {
+            Text = titulo,
+            FontSize = 13.5,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = _texto,
+            VerticalAlignment = VerticalAlignment.Center,
+        });
+        col.Children.Add(cab);
+
+        if (!string.IsNullOrWhiteSpace(descripcion))
+            col.Children.Add(new TextBlock
+            {
+                Text = descripcion,
+                FontSize = 11.5,
+                Foreground = _textoAtenuado,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(23, 0, 0, 10),
+            });
+        else
+            col.Children.Add(new Border { Height = 8 });
+
+        col.Children.Add(contenido);
+
+        return new Border
+        {
+            Background = new SolidColorBrush(_roles.Superficie),
+            BorderBrush = new SolidColorBrush(_roles.Borde),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(RadioTarjeta),
+            Padding = new Thickness(16, 14, 16, 16),
+            Margin = new Thickness(0, 0, 0, 14),
+            Child = col,
+        };
+    }
+
+    // El encabezado de una página: título grande y una línea de qué es. Va dentro del
+    // contenido y no en la cabecera de la ventana, que es de la ventana.
+    internal UIElement TituloDePagina(string titulo, string descripcion)
+    {
+        var col = new StackPanel { Margin = new Thickness(0, 0, 0, 16) };
+        col.Children.Add(new TextBlock
+        {
+            Text = titulo,
+            FontSize = 17,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = _texto,
+        });
+        if (descripcion.Length > 0)
+            col.Children.Add(new TextBlock
+            {
+                Text = descripcion,
+                FontSize = 12,
+                Foreground = _textoAtenuado,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 4, 0, 0),
+            });
+        return col;
+    }
+
+
+    // ================= El constructor de páginas =================
+    //
+    // Las once secciones estaban escritas igual: una columna, y dentro una tirada de
+    // `Rotulo("X", true)` separando grupos de controles. O sea que la estructura YA estaba
+    // —los grupos existían— y lo único que faltaba era dibujarla.
+    //
+    // Esto es lo que la dibuja. Cada `Grupo(...)` cierra la tarjeta anterior y abre otra, y
+    // `Mas(...)` echa controles en la que esté abierta. Así migrar una sección es cambiar
+    // `Rotulo(x, true)` por `Grupo(x, icono)` y `c.Children.Add` por `p.Mas`: ni un control
+    // se toca, ni una lambda cambia, ni un valor se mueve de sitio.
+    //
+    // Y existe en vez de repetir la subcolumna a mano en once sitios porque a la tercera
+    // sección ya se te olvida cerrar una.
+    sealed class Pagina
+    {
+        readonly VentanaAjustes _v;
+        readonly StackPanel _raiz = new();
+        StackPanel? _dentro;            // el contenido de la tarjeta abierta
+
+        public Pagina(VentanaAjustes v, string titulo, string descripcion)
+        {
+            _v = v;
+            _raiz.Margin = new Thickness(22, 20, 22, 20);
+            _raiz.Children.Add(_v.TituloDePagina(titulo, descripcion));
+        }
+
+        // Abre una tarjeta. La anterior se queda cerrada con lo que se le echó.
+        public Pagina Grupo(string titulo, int icono, string? descripcion = null)
+        {
+            _dentro = new StackPanel();
+            _raiz.Children.Add(_v.Tarjeta(titulo, icono, descripcion, _dentro));
+            return this;
+        }
+
+        // Un control. Si nadie abrió tarjeta, se abre una sin título: más vale una tarjeta
+        // sin rótulo que un control suelto sobre el fondo.
+        public Pagina Mas(UIElement e)
+        {
+            if (_dentro == null) Grupo("", 0xE713);
+            _dentro!.Children.Add(e);
+            return this;
+        }
+
+        // Ayuda contextual: dentro de la tarjeta, atenuada y con sangría. Es lo que
+        // sustituye a los párrafos sueltos.
+        public Pagina Pista(string texto)
+        {
+            var t = _v.Rotulo(texto);
+            t.TextWrapping = TextWrapping.Wrap;
+            t.FontSize = 11;
+            t.Opacity = 0.6;
+            t.Margin = new Thickness(0, 8, 0, 0);
+            return Mas(t);
+        }
+
+        // Un aviso: lo mismo pero con filo, para lo que el usuario tiene que ver de verdad.
+        // Nunca con rojo a mano: el rol `Aviso` es el que sabe de qué color va en cada tema.
+        public Pagina Aviso(string texto)
+        {
+            var t = _v.Rotulo(texto);
+            t.TextWrapping = TextWrapping.Wrap;
+            t.FontSize = 11.5;
+            var caja = new Border
+            {
+                Background = new SolidColorBrush(_v._roles.SuperficieAlta),
+                BorderBrush = new SolidColorBrush(_v._roles.Aviso),
+                BorderThickness = new Thickness(0, 0, 0, 0),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(11, 8, 11, 8),
+                Margin = new Thickness(0, 10, 0, 0),
+                Child = t,
+            };
+            caja.BorderThickness = new Thickness(3, 0, 0, 0);
+            return Mas(caja);
+        }
+
+        public UIElement Fin() => _raiz;
+    }
+
+    Pagina NuevaPagina(string id) =>
+        new(this, _modulos.Buscar(id)?.Descriptor.Nombre ?? id, SubtituloDe(id));
+
+
+    // ---------- Los iconos de las tarjetas ----------
+    //
+    // Un juego corto y vetado, con nombre. Corto a propósito: cuarenta tarjetas con
+    // cuarenta iconos distintos es ruido, y además cada glifo nuevo es un riesgo de que la
+    // fuente no lo tenga y salga una caja. Los de la navegación lateral sí son únicos —hay
+    // una prueba—; los de las tarjetas se repiten entre páginas, que está bien: dentro de
+    // una página lo que distingue es el título.
+    //
+    // Todos son nombres de Segoe MDL2 de los de siempre, no rarezas de una versión.
+    internal static class Ico
+    {
+        public const int Ajustes = 0xE713;      // Settings
+        public const int Forma = 0xE771;        // Personalize
+        public const int Color = 0xE790;        // Color
+        public const int Imagen = 0xE91B;       // Photo
+        public const int Presentacion = 0xE786; // Slideshow
+        public const int Zonas = 0xE8A9;        // GridView
+        public const int Biblioteca = 0xE8F1;   // Library
+        public const int Apps = 0xECAA;         // AppIconDefault
+        public const int Teclado = 0xE765;      // KeyboardClassic
+        public const int Inicio = 0xE80F;       // Home
+        public const int Perfil = 0xE77B;       // Contact2
+        public const int Sonido = 0xE767;       // Volume
+        public const int Buscar = 0xE721;       // Search
+        public const int Info = 0xE946;         // Info
+        public const int Restaurar = 0xE72C;    // Refresh
+        public const int Guardar = 0xE74E;      // Save
+        public const int Pantallas = 0xE740;    // FullScreen
+        public const int Mover = 0xE70F;        // Edit
+        public const int Nube = 0xE753;         // Cloud
+
+        // Todos, para poder comprobarlos de una vez.
+        public static readonly int[] Todos =
+        {
+            Ajustes, Forma, Color, Imagen, Presentacion, Zonas, Biblioteca, Apps,
+            Teclado, Inicio, Perfil, Sonido, Buscar, Info, Restaurar, Guardar,
+            Pantallas, Mover, Nube,
+        };
+    }
+
+    // Qué icono le toca a una tarjeta según su título. Una tabla y no una elección a mano
+    // en cada sitio: cuarenta elecciones a mano salen distintas entre sí sin motivo, y esto
+    // además se puede comprobar.
+    internal static int IconoDeGrupo(string titulo, int siNoSe = Ico.Ajustes)
+    {
+        var t = (titulo ?? "").ToLowerInvariant();
+        bool Hay(params string[] cs) => cs.Any(x => t.Contains(x, StringComparison.Ordinal));
+
+        // ---------- Las ACCIONES van primero ----------
+        //
+        // El orden de estas preguntas no es decorativo. "Restaurar el tema" contiene
+        // "tema", así que con el color antes se llevaba el icono de color y no el de
+        // recargar — y lo que la tarjeta hace es restaurar, no elegir un color. Lo pilló
+        // una prueba. Regla: lo que la tarjeta HACE manda sobre de qué TRATA.
+        if (Hay("restaur", "volver", "deshacer")) return Ico.Restaurar;
+        if (Hay("export", "import", "guardar", "probar", "aplicar")) return Ico.Guardar;
+
+        if (Hay("forma", "posición", "posicion", "modo")) return Ico.Forma;
+        if (Hay("color", "tema", "contraste", "paleta")) return Ico.Color;
+        if (Hay("fondo", "imagen", "degradado")) return Ico.Imagen;
+        if (Hay("presentación", "presentacion", "wallpaper", "animado")) return Ico.Presentacion;
+        if (Hay("zona", "widget", "módulo", "modulo", "orden")) return Ico.Zonas;
+        if (Hay("bibliotec", "catálogo", "catalogo")) return Ico.Biblioteca;
+        if (Hay("app", "carrusel", "fijad")) return Ico.Apps;
+        if (Hay("atajo", "tecla", "combinaci")) return Ico.Teclado;
+        if (Hay("inicio", "menú", "menu", "arranque", "saludo")) return Ico.Inicio;
+        if (Hay("perfil")) return Ico.Perfil;
+        if (Hay("sonido", "audio", "volumen")) return Ico.Sonido;
+        if (Hay("buscar", "búsqueda", "busqueda", "buscador")) return Ico.Buscar;
+        if (Hay("estado", "diagnóstico", "diagnostico", "aviso", "notificaci")) return Ico.Info;
+        if (Hay("pantalla", "monitor")) return Ico.Pantallas;
+        if (Hay("mover", "arrastr", "visibilidad", "grosor", "margen", "texto", "fuente")) return Ico.Mover;
+        if (Hay("movimiento", "animaci", "escena")) return Ico.Forma;
+        return siNoSe;
+    }
+
+    void RefrescarCambios()
+    {
+        try
+        {
+            bool hay = _arbol.HaCambiado();
+            if (_sinGuardar != null)
+                _sinGuardar.Text = hay ? "Cambios sin guardar" : "";
+            if (_botonGuardar != null)
+            {
+                _botonGuardar.IsEnabled = hay;
+                _botonGuardar.Opacity = hay ? 1 : 0.5;
+                _botonGuardar.ToolTip = hay ? "Guardar y cerrar" : "No hay nada que guardar";
+            }
+        }
+        catch (Exception ex) { Log.Error("mirar si hay cambios sin guardar", ex); }
+    }
+
 
     // Pestaña plana: texto tenue, y la elegida con el color de acento y su subrayado
     Style EstiloPestana()
@@ -306,7 +1185,7 @@ public sealed class VentanaAjustes : Window
 
     StackPanel Columna() => new() { Margin = new Thickness(4) };
 
-    TextBlock Rotulo(string t, bool titulo = false) => new()
+    internal TextBlock Rotulo(string t, bool titulo = false) => new()
     {
         Text = t,
         Foreground = _texto,
@@ -401,13 +1280,13 @@ public sealed class VentanaAjustes : Window
     // ================= Secciones =================
     UIElement SeccionApariencia()
     {
-        var c = Columna();
-        c.Children.Add(Rotulo("Forma", true));
+        var p = NuevaPagina("apariencia");
+        p.Grupo("Forma", IconoDeGrupo("Forma"));
         // La geometría se escribe en Paneles[principal], que es la autoridad desde B5.
         // Las claves equivalentes de "Barra" ya no se leen: se derivan al cargar.
-        c.Children.Add(Opciones("Modo", new[] { "isla", "barra" }, _arbol.TextoDelPanel(Principal, "Modo", "isla"),
+        p.Mas(Opciones("Modo", new[] { "isla", "barra" }, _arbol.TextoDelPanel(Principal, "Modo", "isla"),
                                 v => _arbol.PonerDelPanel(Principal, "Modo", v)));
-        c.Children.Add(Opciones("Posición", PanelNube.Posiciones, _arbol.TextoDelPanel(Principal, "Posicion", "arriba"),
+        p.Mas(Opciones("Posición", PanelNube.Posiciones, _arbol.TextoDelPanel(Principal, "Posicion", "arriba"),
                                 v => _arbol.PonerDelPanel(Principal, "Posicion", v)));
         // Los cuatro bordes valen en los dos modos, pero no significan lo mismo, y eso
         // no se adivina de un desplegable con cuatro palabras.
@@ -416,113 +1295,113 @@ public sealed class VentanaAjustes : Window
         pista.TextWrapping = TextWrapping.Wrap;
         pista.Opacity = 0.55;
         pista.Margin = new Thickness(0, 0, 0, 4);
-        c.Children.Add(pista);
-        c.Children.Add(Opciones("Visibilidad", PanelNube.Visibilidades,
+        p.Mas(pista);
+        p.Mas(Opciones("Visibilidad", PanelNube.Visibilidades,
                                 _arbol.TextoDelPanel(Principal, "Visibilidad", "siempre"),
                                 v => _arbol.PonerDelPanel(Principal, "Visibilidad", v)));
-        c.Children.Add(Deslizador("Grosor", 24, 72, _arbol.NumeroDelPanel(Principal, "Grosor", 38),
+        p.Mas(Deslizador("Grosor", 24, 72, _arbol.NumeroDelPanel(Principal, "Grosor", 38),
                                   v => _arbol.PonerDelPanel(Principal, "Grosor", v)));
-        c.Children.Add(Deslizador("Margen", 0, 32, _arbol.NumeroDelPanel(Principal, "Margen", 8),
+        p.Mas(Deslizador("Margen", 0, 32, _arbol.NumeroDelPanel(Principal, "Margen", 8),
                                   v => _arbol.PonerDelPanel(Principal, "Margen", v)));
-        c.Children.Add(Deslizador("Radio de esquinas", 0, 36, _arbol.Numero("Tema", "Radio", 20),
+        p.Mas(Deslizador("Radio de esquinas", 0, 36, _arbol.Numero("Tema", "Radio", 20),
                                   v => _arbol.Poner("Tema", "Radio", v)));
 
-        c.Children.Add(Rotulo("Texto", true));
+        p.Grupo("Texto", IconoDeGrupo("Texto"));
         var fuentes = Fonts.SystemFontFamilies
             .Select(f => f.Source)
             .OrderBy(s => s, StringComparer.CurrentCultureIgnoreCase)
             .ToArray();
-        c.Children.Add(Opciones("Fuente", fuentes, _arbol.Texto("Tema", "Fuente", "Segoe UI"),
+        p.Mas(Opciones("Fuente", fuentes, _arbol.Texto("Tema", "Fuente", "Segoe UI"),
                                 v => _arbol.Poner("Tema", "Fuente", v)));
-        c.Children.Add(Deslizador("Tamaño", 9, 22, _arbol.Numero("Tema", "TamanoFuente", 13),
+        p.Mas(Deslizador("Tamaño", 9, 22, _arbol.Numero("Tema", "TamanoFuente", 13),
                                   v => _arbol.Poner("Tema", "TamanoFuente", v)));
 
-        c.Children.Add(Rotulo("Movimiento", true));
+        p.Grupo("Movimiento", IconoDeGrupo("Movimiento"));
         // "auto" sigue a Windows (Accesibilidad > Efectos visuales > Efectos de
         // animación): quien ya ha pedido menos movimiento en el sistema no tiene que
         // volver a pedirlo aquí. Equilibrado no quita animaciones, las acorta.
-        c.Children.Add(Opciones("Animaciones", new[] { "auto", "completo", "equilibrado", "reducido", "desactivado" },
+        p.Mas(Opciones("Animaciones", new[] { "auto", "completo", "equilibrado", "reducido", "desactivado" },
                                 _arbol.Texto("Animaciones", "Nivel", "auto"),
                                 v => _arbol.Poner("Animaciones", "Nivel", v)));
-        c.Children.Add(Opciones("Escena de entrada", new[] { "primera-vez", "cada-inicio", "al-cambiar-tema", "nunca" },
+        p.Mas(Opciones("Escena de entrada", new[] { "primera-vez", "cada-inicio", "al-cambiar-tema", "nunca" },
                                 _arbol.Texto("Animaciones", "Robot", "primera-vez"),
                                 v => _arbol.Poner("Animaciones", "Robot", v)));
         // Verla sin tener que reiniciar la nube. No gasta la "primera vez": una vista
         // previa es para decidir si la quieres, no para estrenarla.
-        c.Children.Add(BotonPlano("Ver la escena ahora", () => EscenaArranque.VistaPrevia(), false));
+        p.Mas(BotonPlano("Ver la escena ahora", () => EscenaArranque.VistaPrevia(), false));
         var pistaEscena = Rotulo("Una nubecita aparece en el centro, saluda y se abre: por dentro de " +
                                  "ella va apareciendo el escritorio ya montado. Al final se recoge y se " +
                                  "mete en la barra. Se salta con Esc o con un clic, y con el movimiento " +
                                  "desactivado no aparece.");
         pistaEscena.TextWrapping = TextWrapping.Wrap;
         pistaEscena.Opacity = 0.55;
-        c.Children.Add(pistaEscena);
+        p.Mas(pistaEscena);
 
-        c.Children.Add(Rotulo("Reacción al sonido", true));
-        c.Children.Add(Interruptor("La isla respira con lo que suena",
+        p.Grupo("Reacción al sonido", IconoDeGrupo("Reacción al sonido"));
+        p.Mas(Interruptor("La isla respira con lo que suena",
                                    _arbol.Bandera("Barra", "PulsoAudio", true),
                                    v => _arbol.Poner("Barra", "PulsoAudio", v)));
-        c.Children.Add(Interruptor("Las teclas de volumen enseñan el aviso de la isla, no el de Windows",
+        p.Mas(Interruptor("Las teclas de volumen enseñan el aviso de la isla, no el de Windows",
                                    _arbol.Bandera("Barra", "TeclasVolumen", true),
                                    v => _arbol.Poner("Barra", "TeclasVolumen", v)));
 
-        c.Children.Add(Rotulo("Mover la isla", true));
-        c.Children.Add(Interruptor("Se puede apartar arrastrándola",
+        p.Grupo("Mover la isla", IconoDeGrupo("Mover la isla"));
+        p.Mas(Interruptor("Se puede apartar arrastrándola",
                                    _arbol.Bandera("Barra", "Arrastrable", true),
                                    v => _arbol.Poner("Barra", "Arrastrable", v)));
-        c.Children.Add(Deslizador("Segundos antes de volver a su sitio", 0.5, 10,
+        p.Mas(Deslizador("Segundos antes de volver a su sitio", 0.5, 10,
                                   _arbol.Numero("Barra", "SegundosParaVolver", 2),
                                   v => _arbol.Poner("Barra", "SegundosParaVolver", Math.Round(v, 1))));
 
-        c.Children.Add(Rotulo("Pantallas", true));
-        c.Children.Add(Opciones("Monitores", new[] { "todos", "principal" },
+        p.Grupo("Pantallas", IconoDeGrupo("Pantallas"));
+        p.Mas(Opciones("Monitores", new[] { "todos", "principal" },
                                 _arbol.TextoDelPanel(Principal, "Monitores", "todos"),
                                 v => _arbol.PonerDelPanel(Principal, "Monitores", v)));
-        c.Children.Add(Interruptor("Cada isla enseña las apps de su pantalla",
+        p.Mas(Interruptor("Cada isla enseña las apps de su pantalla",
                                    _arbol.Bandera("Barra", "AppsPorMonitor", true),
                                    v => _arbol.Poner("Barra", "AppsPorMonitor", v)));
-        c.Children.Add(Interruptor("Esconderse cuando algo ocupa la pantalla entera",
+        p.Mas(Interruptor("Esconderse cuando algo ocupa la pantalla entera",
                                    _arbol.Bandera("Barra", "OcultarEnPantallaCompleta", true),
                                    v => _arbol.Poner("Barra", "OcultarEnPantallaCompleta", v)));
-        c.Children.Add(Interruptor("Esconderse también con una ventana maximizada (juegos, vídeos)",
+        p.Mas(Interruptor("Esconderse también con una ventana maximizada (juegos, vídeos)",
                                    _arbol.Bandera("Barra", "OcultarConMaximizada", false),
                                    v => _arbol.Poner("Barra", "OcultarConMaximizada", v)));
-        return c;
+        return p.Fin();
     }
 
     UIElement SeccionColores()
     {
-        var c = Columna();
+        var p = NuevaPagina("colores");
 
-        c.Children.Add(Rotulo("Temas listos", true));
+        p.Grupo("Temas listos", IconoDeGrupo("Temas listos"));
         var muestras = new WrapPanel();
         foreach (var t in Temas.Predefinidos) muestras.Children.Add(MuestraTema(t));
-        c.Children.Add(muestras);
+        p.Mas(muestras);
 
-        c.Children.Add(Rotulo("Fondo (con opacidad)", true));
+        p.Grupo("Fondo (con opacidad)", IconoDeGrupo("Fondo (con opacidad)"));
         var selFondo = new SelectorColor { ConOpacidad = true }.Montar();
         selFondo.Valor = Hex(_arbol.Texto("Tema", "Fondo", "#E6000000"), Colors.Black);
         selFondo.Cambiado += v => { _arbol.Poner("Tema", "Fondo", SelectorColor.AHex(v, true)); Cambio(); };
-        c.Children.Add(selFondo);
+        p.Mas(selFondo);
 
-        c.Children.Add(Rotulo("Texto", true));
+        p.Grupo("Texto", IconoDeGrupo("Texto"));
         var selTexto = new SelectorColor { ConOpacidad = false }.Montar();
         selTexto.Valor = Hex(_arbol.Texto("Tema", "Texto", "#FFFFFF"), Colors.White);
         selTexto.Cambiado += v => { _arbol.Poner("Tema", "Texto", SelectorColor.AHex(v, false)); Cambio(); };
-        c.Children.Add(selTexto);
+        p.Mas(selTexto);
 
-        c.Children.Add(Rotulo("Acento", true));
+        p.Grupo("Acento", IconoDeGrupo("Acento"));
         var selAcento = new SelectorColor { ConOpacidad = false }.Montar();
         selAcento.Valor = Hex(_arbol.Texto("Tema", "Acento", "#7AA2F7"), Colors.CornflowerBlue);
         selAcento.Cambiado += v => { _arbol.Poner("Tema", "Acento", SelectorColor.AHex(v, false)); Cambio(); };
-        c.Children.Add(selAcento);
+        p.Mas(selAcento);
 
-        c.Children.Add(Interruptor("Colores desde el wallpaper", _arbol.Bandera("Tema", "DesdeWallpaper", false),
+        p.Mas(Interruptor("Colores desde el wallpaper", _arbol.Bandera("Tema", "DesdeWallpaper", false),
                                    v => _arbol.Poner("Tema", "DesdeWallpaper", v)));
-        c.Children.Add(Interruptor("Borde de acento alrededor de la isla", _arbol.Bandera("Tema", "BordeAcento", true),
+        p.Mas(Interruptor("Borde de acento alrededor de la isla", _arbol.Bandera("Tema", "BordeAcento", true),
                                    v => _arbol.Poner("Tema", "BordeAcento", v)));
 
-        c.Children.Add(Rotulo("Mis temas", true));
+        p.Grupo("Mis temas", IconoDeGrupo("Mis temas"));
         var fila = new StackPanel { Orientation = Orientation.Horizontal };
         fila.Children.Add(BotonPlano("Exportar", ExportarTema, false));
         fila.Children.Add(BotonPlano("Importar", () => ImportarTema(selFondo, selTexto, selAcento), false));
@@ -531,8 +1410,8 @@ public sealed class VentanaAjustes : Window
             Directory.CreateDirectory(Temas.Carpeta);
             Process.Start(new ProcessStartInfo(Temas.Carpeta) { UseShellExecute = true })?.Dispose();
         }, false));
-        c.Children.Add(fila);
-        return c;
+        p.Mas(fila);
+        return p.Fin();
     }
 
     UIElement MuestraTema(TemaGuardado t)
@@ -675,9 +1554,9 @@ public sealed class VentanaAjustes : Window
     // caliente hace el resto.
     UIElement SeccionBiblioteca()
     {
-        var c = Columna();
-        c.Children.Add(Rotulo("Biblioteca de widgets", true));
-        c.Children.Add(new TextBlock
+        var p = NuevaPagina("biblioteca");
+        p.Grupo("Biblioteca de widgets", IconoDeGrupo("Biblioteca de widgets"));
+        p.Mas(new TextBlock
         {
             Text = "Lo que puedes poner en la nube. Ocultar conserva el sitio del widget; " +
                    "quitar lo devuelve aquí.",
@@ -687,14 +1566,14 @@ public sealed class VentanaAjustes : Window
         });
 
         var biblioteca = new Biblioteca(_arbol, _roles, () => { _escritura.Stop(); _arbol.Guardar(); }, _modulos);
-        c.Children.Add(biblioteca.Construir());
-        return c;
+        p.Mas(biblioteca.Construir());
+        return p.Fin();
     }
 
     UIElement SeccionModulos()
     {
-        var c = Columna();
-        c.Children.Add(Rotulo("Arrastra los módulos entre columnas para colocarlos", true));
+        var p = NuevaPagina("modulos");
+        p.Grupo("Arrastra los módulos entre columnas para colocarlos", IconoDeGrupo("Arrastra los módulos entre columnas para colocarlos"));
 
         var rejilla = new Grid();
         for (int i = 0; i < 3; i++) rejilla.ColumnDefinitions.Add(new ColumnDefinition());
@@ -705,7 +1584,7 @@ public sealed class VentanaAjustes : Window
 
         Grid.SetColumn(izq.Caja, 0); Grid.SetColumn(cen.Caja, 1); Grid.SetColumn(der.Caja, 2);
         rejilla.Children.Add(izq.Caja); rejilla.Children.Add(cen.Caja); rejilla.Children.Add(der.Caja);
-        c.Children.Add(rejilla);
+        p.Mas(rejilla);
 
         void Volcar()
         {
@@ -716,7 +1595,7 @@ public sealed class VentanaAjustes : Window
         }
         foreach (var l in new[] { izq, cen, der }) l.AlCambiar = Volcar;
 
-        c.Children.Add(Rotulo("Disponibles (doble clic para añadir a la izquierda)", true));
+        p.Grupo("Disponibles (doble clic para añadir a la izquierda)", IconoDeGrupo("Disponibles (doble clic para añadir a la izquierda)"));
         var disponibles = new WrapPanel();
         foreach (var m in _modulosDisponibles)
         {
@@ -734,13 +1613,13 @@ public sealed class VentanaAjustes : Window
             b.Click += (_, _) => { izq.Lista.Items.Add(etiqueta); Volcar(); };
             disponibles.Children.Add(b);
         }
-        c.Children.Add(disponibles);
-        c.Children.Add(new TextBlock
+        p.Mas(disponibles);
+        p.Mas(new TextBlock
         {
             Text = "Doble clic en un módulo de una columna para quitarlo.",
             Foreground = _textoAtenuado, Margin = new Thickness(0, 6, 0, 0)
         });
-        return c;
+        return p.Fin();
     }
 
     sealed class CajaModulos
@@ -881,31 +1760,33 @@ public sealed class VentanaAjustes : Window
 
     UIElement SeccionApps()
     {
-        var c = Columna();
-        c.Children.Add(Rotulo("Iconos de aplicaciones", true));
-        c.Children.Add(Deslizador("Máximo visibles", 3, 30, _arbol.Numero("Barra", "MaxApps", 10),
+        var p = NuevaPagina("apps");
+        p.Grupo("Iconos de aplicaciones", IconoDeGrupo("Iconos de aplicaciones"));
+        p.Mas(Deslizador("Máximo visibles", 3, 30, _arbol.Numero("Barra", "MaxApps", 10),
                                   v => _arbol.Poner("Barra", "MaxApps", Math.Round(v))));
-        c.Children.Add(Interruptor("Enseñar solo las apps del escritorio virtual actual",
+        p.Mas(Interruptor("Enseñar solo las apps del escritorio virtual actual",
                                    _arbol.Bandera("Barra", "AppsDelEscritorio", false),
                                    v => _arbol.Poner("Barra", "AppsDelEscritorio", v)));
 
-        c.Children.Add(Rotulo("Apps fijadas en la barra", true));
-        c.Children.Add(ListaEditable("Barra", "AppsFijadas",
+        p.Grupo("Apps fijadas en la barra", IconoDeGrupo("Apps fijadas en la barra"));
+        p.Mas(ListaEditable("Barra", "AppsFijadas",
             "Siempre a la vista, abiertas o no, y en este orden. Con el módulo \"fijadas\" puesto " +
             "(viene de serie, junto al reloj) se ven también con la isla recogida, sin acercar el ratón; " +
             "si lo quitas, vuelven al carrusel. Una ruta de ejecutable por línea, o " +
             "shell:AppsFolder\\<id> para las de la Store. Más cómodo: clic derecho sobre el icono " +
             "de una app en la isla."));
-        c.Children.Add(Interruptor("Agrupar las ventanas del mismo programa",
+        p.Grupo("Agrupar", Ico.Zonas, "Varias ventanas del mismo programa, en un solo icono");
+        p.Grupo("Agrupar", Ico.Zonas, "Varias ventanas del mismo programa, en un solo icono");
+        p.Mas(Interruptor("Agrupar las ventanas del mismo programa",
                                    _arbol.Bandera("Barra", "AgruparApps", true),
                                    v => _arbol.Poner("Barra", "AgruparApps", v)));
-        return c;
+        return p.Fin();
     }
 
     UIElement SeccionAtajos()
     {
-        var c = Columna();
-        c.Children.Add(Rotulo("Vista general de ventanas", true));
+        var p = NuevaPagina("atajos");
+        p.Grupo("Vista general de ventanas", IconoDeGrupo("Vista general de ventanas"));
 
         var aviso = new TextBlock { Foreground = Brushes.Tomato, Margin = new Thickness(0, 6, 0, 0), TextWrapping = TextWrapping.Wrap };
         var campo = new TextBox
@@ -954,10 +1835,10 @@ public sealed class VentanaAjustes : Window
                 aviso.Text = problema;
             }
         };
-        c.Children.Add(campo);
-        c.Children.Add(aviso);
-        c.Children.Add(Rotulo("Ajustar ventanas a los bordes", true));
-        c.Children.Add(Interruptor("Arrastrar una ventana a un borde la coloca ahí",
+        p.Mas(campo);
+        p.Mas(aviso);
+        p.Grupo("Ajustar ventanas a los bordes", IconoDeGrupo("Ajustar ventanas a los bordes"));
+        p.Mas(Interruptor("Arrastrar una ventana a un borde la coloca ahí",
                                    _arbol.Bandera("Barra", "AjustarAlArrastrar", true),
                                    v => _arbol.Poner("Barra", "AjustarAlArrastrar", v)));
         var pistaAjuste = Rotulo("Al borde izquierdo o derecho, media pantalla; a una esquina, un cuarto; " +
@@ -965,9 +1846,9 @@ public sealed class VentanaAjustes : Window
                                  "de trabajo, así que con «Reservar espacio» puesto no se mete debajo de la nube.");
         pistaAjuste.TextWrapping = TextWrapping.Wrap;
         pistaAjuste.Opacity = 0.55;
-        c.Children.Add(pistaAjuste);
+        p.Mas(pistaAjuste);
 
-        c.Children.Add(new TextBlock
+        p.Mas(new TextBlock
         {
             Text = "Aviso: una combinación que YA tenga otra aplicación no se puede teclear aquí, " +
                    "porque Windows se la entrega a esa aplicación y nunca llega a este campo. " +
@@ -992,7 +1873,7 @@ public sealed class VentanaAjustes : Window
             }
         };
 
-        return c;
+        return p.Fin();
     }
 
     // Se registra de verdad y se suelta: es la única forma de saber si está cogida
@@ -1016,19 +1897,19 @@ public sealed class VentanaAjustes : Window
 
     UIElement SeccionInicio()
     {
-        var c = Columna();
-        c.Children.Add(Rotulo("Menú Inicio", true));
-        c.Children.Add(Interruptor("La tecla Windows abre el menú de la nube",
+        var p = NuevaPagina("inicio");
+        p.Grupo("Menú Inicio", IconoDeGrupo("Menú Inicio"));
+        p.Mas(Interruptor("La tecla Windows abre el menú de la nube",
                                    _arbol.Bandera("Inicio", "TeclaWindows", true),
                                    v => _arbol.Poner("Inicio", "TeclaWindows", v)));
-        c.Children.Add(Interruptor("Buscar también en archivos (índice de Windows)",
+        p.Mas(Interruptor("Buscar también en archivos (índice de Windows)",
                                    _arbol.Bandera("Inicio", "BuscarArchivos", true),
                                    v => _arbol.Poner("Inicio", "BuscarArchivos", v)));
-        c.Children.Add(Interruptor("Saludo en la cabecera",
+        p.Mas(Interruptor("Saludo en la cabecera",
                                    _arbol.Bandera("Inicio", "Saludo", true),
                                    v => _arbol.Poner("Inicio", "Saludo", v)));
 
-        c.Children.Add(Rotulo("Buscador web", true));
+        p.Grupo("Buscador web", IconoDeGrupo("Buscador web"));
         var web = new TextBox
         {
             Text = _arbol.Texto("Inicio", "BuscadorWeb", "https://www.google.com/search?q="),
@@ -1038,9 +1919,9 @@ public sealed class VentanaAjustes : Window
             Foreground = _texto, BorderThickness = new Thickness(0)
         };
         web.TextChanged += (_, _) => { _arbol.Poner("Inicio", "BuscadorWeb", web.Text); Cambio(); };
-        c.Children.Add(web);
+        p.Mas(web);
 
-        c.Children.Add(Rotulo("Apps fijadas", true));
+        p.Grupo("Apps fijadas", IconoDeGrupo("Apps fijadas"));
         var lista = new ListBox
         {
             Height = 130,
@@ -1072,16 +1953,16 @@ public sealed class VentanaAjustes : Window
             if (lista.SelectedItem is string s) { lista.Items.Remove(s); Volcar(); }
         }, false));
 
-        c.Children.Add(lista);
-        c.Children.Add(nueva);
-        c.Children.Add(fila);
-        return c;
+        p.Mas(lista);
+        p.Mas(nueva);
+        p.Mas(fila);
+        return p.Fin();
     }
 
     UIElement SeccionWallpaper()
     {
-        var c = Columna();
-        c.Children.Add(Rotulo("Wallpaper Engine", true));
+        var p = NuevaPagina("wallpaper");
+        p.Grupo("Wallpaper Engine", IconoDeGrupo("Wallpaper Engine"));
 
         var ruta = new TextBox
         {
@@ -1092,18 +1973,18 @@ public sealed class VentanaAjustes : Window
             Foreground = _texto, BorderThickness = new Thickness(0)
         };
         ruta.TextChanged += (_, _) => { _arbol.Poner("Wallpaper", "Ruta", ruta.Text); Cambio(); };
-        c.Children.Add(ruta);
+        p.Mas(ruta);
 
         var detectada = WallpaperEngine.Exe;
-        c.Children.Add(new TextBlock
+        p.Mas(new TextBlock
         {
             Text = detectada != null ? "Detectado solo en: " + detectada : "No se ha detectado Wallpaper Engine",
             Foreground = _textoAtenuado, TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 6, 0, 0)
         });
         if (detectada != null)
-            c.Children.Add(BotonPlano("Usar la ruta detectada", () => ruta.Text = detectada, false));
-        c.Children.Add(BotonPlano("Elegir el ejecutable…", () =>
+            p.Mas(BotonPlano("Usar la ruta detectada", () => ruta.Text = detectada, false));
+        p.Mas(BotonPlano("Elegir el ejecutable…", () =>
         {
             var d = new Microsoft.Win32.OpenFileDialog
             {
@@ -1114,15 +1995,16 @@ public sealed class VentanaAjustes : Window
             if (d.ShowDialog() == true) ruta.Text = d.FileName;
         }, false));
 
-        c.Children.Add(Deslizador("Monitor del que se leen los colores", 0, 3,
+        p.Grupo("Paleta y monitor", Ico.Color, "De qué pantalla se leen los colores del wallpaper");
+        p.Mas(Deslizador("Monitor del que se leen los colores", 0, 3,
                                   _arbol.Numero("Wallpaper", "Monitor", 0),
                                   v => _arbol.Poner("Wallpaper", "Monitor", Math.Round(v))));
-        c.Children.Add(Interruptor("Enviar mi color de acento al wallpaper",
+        p.Mas(Interruptor("Enviar mi color de acento al wallpaper",
                                    _arbol.Bandera("Tema", "EnviarColorAlWallpaper", false),
                                    v => _arbol.Poner("Tema", "EnviarColorAlWallpaper", v)));
 
         // ================= La integración =================
-        c.Children.Add(Rotulo("Integración con Wallpaper Engine", true));
+        p.Grupo("Integración con Wallpaper Engine", IconoDeGrupo("Integración con Wallpaper Engine"));
 
         var pista = Rotulo("Con esto puesto, NubeBar puede abrir Wallpaper Engine al arrancar, cargar el " +
                            "wallpaper que elijas y esperar a que esté listo antes de que la nube se abra: " +
@@ -1131,17 +2013,18 @@ public sealed class VentanaAjustes : Window
                            "no es NubeBar.");
         pista.TextWrapping = TextWrapping.Wrap;
         pista.Opacity = 0.6;
-        c.Children.Add(pista);
+        p.Mas(pista);
 
-        c.Children.Add(Interruptor("Activar la integración",
+        p.Mas(Interruptor("Activar la integración",
                                    _arbol.Bandera("Wallpaper", "Integrar", false),
                                    v => _arbol.Poner("Wallpaper", "Integrar", v)));
-        c.Children.Add(Interruptor("Iniciar Wallpaper Engine con NubeBar",
+        p.Mas(Interruptor("Iniciar Wallpaper Engine con NubeBar",
                                    _arbol.Bandera("Wallpaper", "IniciarConNubeBar", false),
                                    v => _arbol.Poner("Wallpaper", "IniciarConNubeBar", v)));
 
         // ---------- Qué cargar ----------
-        c.Children.Add(Rotulo("Wallpaper o playlist"));
+        p.Grupo("Qué cargar", Ico.Presentacion, "El wallpaper o la playlist que NubeBar le pedirá");
+        p.Mas(Rotulo("Wallpaper o playlist"));
 
         var elegido = new TextBox
         {
@@ -1151,8 +2034,8 @@ public sealed class VentanaAjustes : Window
             Background = _superficieAlta, Foreground = _texto, BorderThickness = new Thickness(0)
         };
         elegido.TextChanged += (_, _) => { _arbol.Poner("Wallpaper", "WallpaperElegido", elegido.Text); Cambio(); };
-        c.Children.Add(elegido);
-        c.Children.Add(BotonPlano("Elegir el wallpaper…", () =>
+        p.Mas(elegido);
+        p.Mas(BotonPlano("Elegir el wallpaper…", () =>
         {
             // Se abre en la carpeta de wallpapers de Wallpaper Engine si se sabe dónde
             // está, pero no se adivina el fichero: lo elige el usuario.
@@ -1175,29 +2058,30 @@ public sealed class VentanaAjustes : Window
             Background = _superficieAlta, Foreground = _texto, BorderThickness = new Thickness(0)
         };
         playlist.TextChanged += (_, _) => { _arbol.Poner("Wallpaper", "PlaylistElegida", playlist.Text); Cambio(); };
-        c.Children.Add(Rotulo("O el nombre de una playlist (manda sobre el wallpaper)"));
-        c.Children.Add(playlist);
+        p.Mas(Rotulo("O el nombre de una playlist (manda sobre el wallpaper)"));
+        p.Mas(playlist);
 
         // ---------- Dónde ----------
         var cuantos = Math.Max(1, Monitores.Todos().Count);
         var destinos = new List<string> { Integracion.TodosLosMonitores };
         for (int i = 0; i < cuantos; i++) destinos.Add(i.ToString());
-        c.Children.Add(Opciones("Monitor de destino", destinos.ToArray(),
+        p.Grupo("Dónde y hasta cuándo", Ico.Pantallas, "El monitor de destino, qué hacer al salir y cuánto espera la nube");
+        p.Mas(Opciones("Monitor de destino", destinos.ToArray(),
                                 _arbol.Texto("Wallpaper", "MonitorDestino", Integracion.TodosLosMonitores),
                                 v => _arbol.Poner("Wallpaper", "MonitorDestino", v)));
 
         // ---------- Al salir ----------
-        c.Children.Add(Opciones("Al salir de NubeBar", new[] { "nada", "pausar", "cerrar" },
+        p.Mas(Opciones("Al salir de NubeBar", new[] { "nada", "pausar", "cerrar" },
                                 _arbol.Texto("Wallpaper", "AlSalir", "nada"),
                                 v => _arbol.Poner("Wallpaper", "AlSalir", v)));
         var pistaSalir = Rotulo("Solo se aplica a lo que haya abierto NubeBar. Si Wallpaper Engine ya estaba " +
                                 "abierto cuando arrancaste, no se toca al salir: no es nuestro.");
         pistaSalir.TextWrapping = TextWrapping.Wrap;
         pistaSalir.Opacity = 0.55;
-        c.Children.Add(pistaSalir);
+        p.Mas(pistaSalir);
 
         // ---------- La espera ----------
-        c.Children.Add(Deslizador($"Esperar al fondo (segundos)",
+        p.Mas(Deslizador($"Esperar al fondo (segundos)",
                                   Integracion.MinEspera, Integracion.MaxEspera,
                                   _arbol.Numero("Wallpaper", "SegundosEspera", 8),
                                   v => _arbol.Poner("Wallpaper", "SegundosEspera", Math.Round(v))));
@@ -1205,7 +2089,7 @@ public sealed class VentanaAjustes : Window
                                  "se abre igual con el escritorio que haya: la pantalla no se queda en negro.");
         pistaEspera.TextWrapping = TextWrapping.Wrap;
         pistaEspera.Opacity = 0.55;
-        c.Children.Add(pistaEspera);
+        p.Mas(pistaEspera);
 
         // ---------- Los dos botones ----------
         var resultado = new TextBlock
@@ -1214,7 +2098,8 @@ public sealed class VentanaAjustes : Window
             Margin = new Thickness(0, 8, 0, 0)
         };
 
-        c.Children.Add(BotonPlano("Probar wallpaper", () =>
+        p.Grupo("Probar", Ico.Guardar, "Prueba con lo que hay escrito ahora, sin cerrar los ajustes");
+        p.Mas(BotonPlano("Probar wallpaper", () =>
         {
             // Se prueba con lo que hay ESCRITO ahora, no con lo guardado: si no, habría
             // que cerrar los ajustes para poder probar un cambio.
@@ -1233,7 +2118,7 @@ public sealed class VentanaAjustes : Window
             resultado.Foreground = p.Ok ? _texto : _textoAtenuado;
         }, false));
 
-        c.Children.Add(BotonPlano("Ver escena de inicio", () =>
+        p.Mas(BotonPlano("Ver escena de inicio", () =>
         {
             // La vista previa no espera a nadie: es para ver la escena, no para medir la
             // integración. Si quieres probar la espera, reinicia NubeBar.
@@ -1243,7 +2128,7 @@ public sealed class VentanaAjustes : Window
                 : "Escena lanzada. Para probar la espera al fondo de verdad, reinicia NubeBar.";
         }, false));
 
-        c.Children.Add(resultado);
+        p.Mas(resultado);
 
         // ---------- El estado, que es lo que hace falta para diagnosticar ----------
         var estadoWE = new TextBlock
@@ -1255,9 +2140,10 @@ public sealed class VentanaAjustes : Window
             $"Ahora mismo: {(WallpaperEngine.Abierto ? "Wallpaper Engine está abierto" : "Wallpaper Engine no está abierto")}. " +
             $"Última vez que NubeBar lo tocó: {Integracion.Ahora}. " +
             $"Pantallas detectadas: {Monitores.Todos().Count}.";
-        c.Children.Add(estadoWE);
+        p.Grupo("Estado de la integración", Ico.Info);
+        p.Mas(estadoWE);
 
-        return c;
+        return p.Fin();
     }
 
     // ================= Perfiles de escritorio =================
@@ -1267,20 +2153,20 @@ public sealed class VentanaAjustes : Window
     // color a mano, que es la regla desde la Fase A.
     UIElement SeccionPerfiles()
     {
-        var c = Columna();
+        var pag = NuevaPagina("perfiles");
         Perfiles.CrearLosDeSerie();
 
         var estado = Perfiles.LeerEstado();
         var todos = Perfiles.Todos();
         var arbol = ConfigArbol.Cargar();
 
-        c.Children.Add(Rotulo("Perfiles de escritorio", true));
+        pag.Grupo("Perfiles de escritorio", IconoDeGrupo("Perfiles de escritorio"));
         var intro = Rotulo("Un perfil guarda el tema, el nivel de animación, el panel, los widgets, las " +
                            "notificaciones, el No molestar y el fondo. Aplicarlo lo cambia todo de una vez " +
                            "y con una sola escritura; lo que el perfil no menciona se queda como lo tengas.");
         intro.TextWrapping = TextWrapping.Wrap;
         intro.Opacity = 0.6;
-        c.Children.Add(intro);
+        pag.Mas(intro);
 
         // ---------- El aviso de deshacer, arriba y solo si hay algo que deshacer ----------
         if (Perfiles.HayQueDeshacer)
@@ -1305,17 +2191,19 @@ public sealed class VentanaAjustes : Window
             }, true));
             fila.Children.Add(bots);
             aviso.Child = fila;
-            c.Children.Add(aviso);
+            pag.Mas(aviso);
         }
 
         if (todos.Count == 0)
-            c.Children.Add(Rotulo("No hay perfiles. Importa uno o duplica alguno de los de serie."));
+            pag.Mas(Rotulo("No hay perfiles. Importa uno o duplica alguno de los de serie."));
 
+        pag.Grupo("Tus perfiles", Ico.Perfil,
+                  "Cada tarjeta es un perfil: lo que cambia y qué puedes hacer con él");
         foreach (var p in todos)
-            c.Children.Add(TarjetaDePerfil(p, estado, arbol));
+            pag.Mas(TarjetaDePerfil(p, estado, arbol));
 
         // ---------- Importar ----------
-        c.Children.Add(Rotulo("Importar", true));
+        pag.Grupo("Importar", IconoDeGrupo("Importar"));
         var resultado = Rotulo("");
         resultado.TextWrapping = TextWrapping.Wrap;
 
@@ -1348,16 +2236,17 @@ public sealed class VentanaAjustes : Window
                                 : "");
             Rehacer();
         }, false));
-        c.Children.Add(filaImp);
-        c.Children.Add(resultado);
+        pag.Mas(filaImp);
+        pag.Mas(resultado);
 
         var nota = Rotulo("Los perfiles se guardan en %APPDATA%\\NubeBar\\perfiles, uno por fichero y con su " +
                           "versión. Un perfil de una versión más nueva se rechaza en vez de leerse a medias.");
         nota.TextWrapping = TextWrapping.Wrap;
         nota.Opacity = 0.5;
         nota.Margin = new Thickness(0, 10, 0, 0);
-        c.Children.Add(nota);
-        return c;
+        pag.Grupo("Dónde se guardan", Ico.Info);
+        pag.Mas(nota);
+        return pag.Fin();
     }
 
     UIElement TarjetaDePerfil(Perfil p, Perfiles.EstadoPerfiles estado, ConfigArbol arbol)
@@ -1559,8 +2448,8 @@ public sealed class VentanaAjustes : Window
 
     UIElement SeccionFondo()
     {
-        var c = Columna();
-        c.Children.Add(Rotulo("Fondo de escritorio", true));
+        var p = NuevaPagina("fondo");
+        p.Grupo("Monitor", Ico.Pantallas, "A qué pantalla se refiere todo lo de abajo");
 
         var pantallas = Monitores.Todos();
         bool porMonitor = _monitorDelFondo.Length > 0;
@@ -1577,7 +2466,7 @@ public sealed class VentanaAjustes : Window
             claves.Add(m.Clave);
         }
         int elegida = Math.Max(0, claves.IndexOf(_monitorDelFondo));
-        c.Children.Add(Opciones("Editar el fondo de", nombres.ToArray(), nombres[elegida], v =>
+        p.Mas(Opciones("Editar el fondo de", nombres.ToArray(), nombres[elegida], v =>
         {
             int i = nombres.IndexOf(v);
             _monitorDelFondo = i >= 0 ? claves[i] : "";
@@ -1590,8 +2479,8 @@ public sealed class VentanaAjustes : Window
                                "«Usar este fondo en todos los monitores» borra lo propio de esta pantalla.");
             pista.TextWrapping = TextWrapping.Wrap;
             pista.Opacity = 0.55;
-            c.Children.Add(pista);
-            c.Children.Add(BotonPlano("Usar este fondo en todos los monitores", () =>
+            p.Mas(pista);
+            p.Mas(BotonPlano("Usar este fondo en todos los monitores", () =>
             {
                 QuitarFondoDeMonitor(_monitorDelFondo);
                 _monitorDelFondo = "";
@@ -1612,7 +2501,8 @@ public sealed class VentanaAjustes : Window
         };
         var visibles = Fondos.Tipos.Select(t => etiquetas[t]).ToArray();
         var actual = etiquetas.TryGetValue(tipo, out var e) ? e : etiquetas["ninguno"];
-        c.Children.Add(Opciones("Tipo", visibles, actual, v =>
+        p.Grupo("Tipo de fondo", Ico.Imagen, "Qué clase de fondo pone NubeBar");
+        p.Mas(Opciones("Tipo", visibles, actual, v =>
         {
             var clave = etiquetas.First(p => p.Value == v).Key;
             EscribirFondo("Tipo", clave);
@@ -1620,45 +2510,47 @@ public sealed class VentanaAjustes : Window
         }));
 
         // ---------- Vista previa ----------
-        c.Children.Add(VistaPreviaDelFondo(tipo));
+        p.Grupo("Vista previa", Ico.Buscar, "Lo que se va a ver en el escritorio");
+        p.Mas(VistaPreviaDelFondo(tipo));
 
         // ---------- Lo propio de cada tipo ----------
+        p.Grupo("Ajustes de este tipo", Ico.Forma, "Los controles propios del fondo elegido");
         switch (tipo)
         {
             case "solido":
-                c.Children.Add(Rotulo("Color"));
-                c.Children.Add(CampoDeColorDelFondo("Color1", "#1A1B26"));
+                p.Mas(Rotulo("Color"));
+                p.Mas(CampoDeColorDelFondo("Color1", "#1A1B26"));
                 break;
 
             case "degradado":
-                c.Children.Add(Rotulo("De este color"));
-                c.Children.Add(CampoDeColorDelFondo("Color1", "#0B0D14"));
-                c.Children.Add(Rotulo("A este otro"));
-                c.Children.Add(CampoDeColorDelFondo("Color2", "#7AA2F7"));
-                c.Children.Add(Deslizador("Ángulo", 0, 360, LeerNumFondo("Angulo", 135),
+                p.Mas(Rotulo("De este color"));
+                p.Mas(CampoDeColorDelFondo("Color1", "#0B0D14"));
+                p.Mas(Rotulo("A este otro"));
+                p.Mas(CampoDeColorDelFondo("Color2", "#7AA2F7"));
+                p.Mas(Deslizador("Ángulo", 0, 360, LeerNumFondo("Angulo", 135),
                                           v => { EscribirFondoNum("Angulo", Math.Round(v)); }, 5));
                 break;
 
             case "imagen":
-                c.Children.Add(Rotulo("Imagen"));
-                c.Children.Add(CampoDeRutaDelFondo("Ruta", false));
+                p.Mas(Rotulo("Imagen"));
+                p.Mas(CampoDeRutaDelFondo("Ruta", false));
                 break;
 
             case "presentacion":
-                c.Children.Add(Rotulo("Carpeta con las imágenes"));
-                c.Children.Add(CampoDeRutaDelFondo("CarpetaPresentacion", true));
+                p.Mas(Rotulo("Carpeta con las imágenes"));
+                p.Mas(CampoDeRutaDelFondo("CarpetaPresentacion", true));
                 var cuantas = Fondos.ImagenesDe(LeerFondo("CarpetaPresentacion", "")).Count;
                 var info = Rotulo(cuantas == 0
                     ? "No encuentro imágenes en esa carpeta."
                     : $"{cuantas} imagen(es) encontradas.");
                 info.Opacity = 0.6;
-                c.Children.Add(info);
-                c.Children.Add(Deslizador("Cambiar cada (segundos)", Fondos.MinSegundos, 3600,
+                p.Mas(info);
+                p.Mas(Deslizador("Cambiar cada (segundos)", Fondos.MinSegundos, 3600,
                                           LeerNumFondo("SegundosPresentacion", 300),
                                           v => EscribirFondoNum("SegundosPresentacion", Math.Round(v)), 5));
-                c.Children.Add(Interruptor("Orden aleatorio", LeerBanderaFondo("Aleatorio", false),
+                p.Mas(Interruptor("Orden aleatorio", LeerBanderaFondo("Aleatorio", false),
                                            v => EscribirFondoBool("Aleatorio", v)));
-                c.Children.Add(BotonPlano("Pasar a la siguiente ahora", () => _ = GestorFondos.Avanzar(), false));
+                p.Mas(BotonPlano("Pasar a la siguiente ahora", () => _ = GestorFondos.Avanzar(), false));
                 break;
 
             case "animado":
@@ -1669,8 +2561,8 @@ public sealed class VentanaAjustes : Window
                     : "No encuentro Wallpaper Engine. Los demás tipos de fondo siguen funcionando; para " +
                       "usar este, instálalo o indica su ruta en la sección Wallpaper.");
                 we.TextWrapping = TextWrapping.Wrap;
-                c.Children.Add(we);
-                c.Children.Add(BotonPlano("Ir a los ajustes de Wallpaper Engine", () =>
+                p.Mas(we);
+                p.Mas(BotonPlano("Ir a los ajustes de Wallpaper Engine", () =>
                 {
                     int donde = _modulos.Indice("wallpaper");
                     if (donde >= 0 && donde < _pestanas.Items.Count) _pestanas.SelectedIndex = donde;
@@ -1690,7 +2582,8 @@ public sealed class VentanaAjustes : Window
                 ["mosaico"] = "Mosaico (se repite)",
             };
             var aj = LeerFondo("Ajuste", "rellenar");
-            c.Children.Add(Opciones("Cómo encaja", ajustes.Values.ToArray(),
+            p.Grupo("Cómo encaja la imagen", Ico.Pantallas, "Rellenar recorta; ajustar deja la imagen entera. Ninguno deforma.");
+            p.Mas(Opciones("Cómo encaja", ajustes.Values.ToArray(),
                 ajustes.TryGetValue(aj, out var va) ? va : ajustes["rellenar"],
                 v => EscribirFondo("Ajuste", ajustes.First(p => p.Value == v).Key)));
         }
@@ -1703,7 +2596,7 @@ public sealed class VentanaAjustes : Window
         };
 
         var fila = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(-8, 12, 0, 0) };
-        fila.Children.Add(BotonPlano("Aplicar", () =>
+        fila.Children.Add(BotonPlano("Aplicar el fondo ahora", () =>
         {
             // Se guarda primero —una escritura atómica— y se aplica después desde lo
             // guardado: así lo que se ve es exactamente lo que queda en el config.
@@ -1715,25 +2608,15 @@ public sealed class VentanaAjustes : Window
             estado.Text = (r.Ok ? "✓ " : "✗ ") + r.Detalle;
         }, true));
 
-        fila.Children.Add(BotonPlano("Cancelar", () =>
-        {
-            // Byte a byte como estaba al abrir la ventana: es lo que ya hacía ConfigArbol
-            // para el resto de los ajustes.
-            _arbol.Revertir();
-            var cfg = Config.Cargar()?.Fondo;
-            if (cfg != null) _ = GestorFondos.AplicarAsync(cfg, forzar: true);
-            estado.Text = "Cambios descartados.";
-            RehacerFondo();
-        }, false));
-
-        fila.Children.Add(BotonPlano("Restaurar el anterior", () =>
+        fila.Children.Add(BotonPlano("Volver al fondo anterior", () =>
         {
             estado.Text = GestorFondos.RestaurarAnterior()
                 ? "✓ Puesto el fondo que había antes de que NubeBar lo tocara."
                 : "No hay fondo anterior guardado (NubeBar no ha cambiado el tuyo todavía).";
         }, false));
-        c.Children.Add(fila);
-        c.Children.Add(estado);
+        p.Grupo("Aplicar", Ico.Guardar, "Estos botones son de esta página: el fondo se pone al momento");
+        p.Mas(fila);
+        p.Mas(estado);
 
         // ---------- Qué hay puesto ahora mismo ----------
         var ahora = new TextBlock
@@ -1750,8 +2633,9 @@ public sealed class VentanaAjustes : Window
                 : "No he podido leer el fondo actual de Windows. ") +
             (GestorFondos.Corriendo ? "La presentación está en marcha. " : "") +
             (GestorFondos.HayInstantanea ? "Hay un fondo anterior guardado." : "");
-        c.Children.Add(ahora);
-        return c;
+        p.Grupo("Estado", Ico.Info);
+        p.Mas(ahora);
+        return p.Fin();
     }
 
     void RehacerFondo() => RehacerPagina("fondo", SeccionFondo);
@@ -1943,34 +2827,34 @@ public sealed class VentanaAjustes : Window
 
     UIElement SeccionSistema()
     {
-        var c = Columna();
-        c.Children.Add(Rotulo("Arranque", true));
+        var p = NuevaPagina("sistema");
+        p.Grupo("Arranque", IconoDeGrupo("Arranque"));
 
         var estado = new TextBlock { Foreground = _textoAtenuado, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0) };
         estado.Text = Arranque.Activo ? "Ahora mismo sí arranca con Windows." : "Ahora mismo no arranca con Windows.";
 
-        c.Children.Add(Interruptor("Arrancar con Windows", Arranque.Activo, v =>
+        p.Mas(Interruptor("Arrancar con Windows", Arranque.Activo, v =>
         {
             bool ok = Arranque.Poner(v, out string msg);
             estado.Foreground = ok ? _texto : Brushes.Tomato;
             estado.Opacity = ok ? 0.6 : 1;
             estado.Text = (ok ? "Hecho: " : "No se pudo: ") + msg;
         }));
-        c.Children.Add(estado);
-        c.Children.Add(new TextBlock
+        p.Mas(estado);
+        p.Mas(new TextBlock
         {
             Text = "Crea o quita un acceso directo en la carpeta Inicio de Windows hacia " + Arranque.ExeRecomendado(),
             Foreground = _texto, Opacity = 0.45, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0)
         });
 
-        c.Children.Add(Rotulo("Bandeja del sistema", true));
-        c.Children.Add(Interruptor("Traer los iconos de la bandeja a la isla",
+        p.Grupo("Bandeja del sistema", IconoDeGrupo("Bandeja del sistema"));
+        p.Mas(Interruptor("Traer los iconos de la bandeja a la isla",
                                    _arbol.Bandera("Barra", "Bandeja", true),
                                    v => _arbol.Poner("Barra", "Bandeja", v)));
-        c.Children.Add(Deslizador("Iconos visibles antes del desplegable (0 = solo el \"^\")", 0, 15,
+        p.Mas(Deslizador("Iconos visibles antes del desplegable (0 = solo el \"^\")", 0, 15,
                                   _arbol.Numero("Barra", "MaxBandeja", 0),
                                   v => _arbol.Poner("Barra", "MaxBandeja", Math.Round(v))));
-        c.Children.Add(new TextBlock
+        p.Mas(new TextBlock
         {
             Text = "Para que se encienda hay que añadir además el módulo \"bandeja\" en Módulos: " +
                    "si no estuviera puesto, los iconos desaparecerían de la barra de Windows sin " +
@@ -1978,8 +2862,8 @@ public sealed class VentanaAjustes : Window
             Foreground = _texto, Opacity = 0.45, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0)
         });
 
-        c.Children.Add(Rotulo("Notificaciones", true));
-        c.Children.Add(Interruptor("Enseñar las notificaciones en la isla",
+        p.Grupo("Notificaciones", IconoDeGrupo("Notificaciones"));
+        p.Mas(Interruptor("Enseñar las notificaciones en la isla",
                                    _arbol.Bandera("Barra", "Notificaciones", true),
                                    v => _arbol.Poner("Barra", "Notificaciones", v)));
         var silenciadas = _arbol.Lista("Barra", "NotificacionesSilenciadas");
@@ -1994,21 +2878,21 @@ public sealed class VentanaAjustes : Window
         };
         caja.TextChanged += (_, _) => _arbol.PonerLista("Barra", "NotificacionesSilenciadas",
             caja.Text.Split('\n').Select(s => s.Trim()).Where(s => s.Length > 0).ToList());
-        c.Children.Add(caja);
-        c.Children.Add(new TextBlock
+        p.Mas(caja);
+        p.Mas(new TextBlock
         {
             Text = "Una app por línea para silenciarla: basta un trozo de su identificador " +
                    "(por ejemplo \"Discord\" o \"WindowsStore\"). \"No molestar\" se respeta siempre.",
             Foreground = _texto, Opacity = 0.45, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0)
         });
 
-        c.Children.Add(Rotulo("Barra de tareas de Windows", true));
-        c.Children.Add(Interruptor("Ocultarla mientras la nube esté abierta",
+        p.Grupo("Barra de tareas de Windows", IconoDeGrupo("Barra de tareas de Windows"));
+        p.Mas(Interruptor("Ocultarla mientras la nube esté abierta",
                                    _arbol.Bandera("Barra", "OcultarBarraWindows", true),
                                    v => _arbol.Poner("Barra", "OcultarBarraWindows", v)));
         // De serie viene apagado en los cuatro bordes: la nube flota. Tocar este
         // interruptor lo convierte en una elección tuya y manda sobre el defecto.
-        c.Children.Add(Interruptor("Reservar espacio en pantalla (solo en modo barra)",
+        p.Mas(Interruptor("Reservar espacio en pantalla (solo en modo barra)",
                                    _arbol.BanderaDelPanel(Principal, "ReservarEspacio", PanelNube.ReservaPorDefecto),
                                    v => _arbol.PonerDelPanel(Principal, "ReservarEspacio", v)));
         var pistaReserva = Rotulo(
@@ -2017,12 +2901,12 @@ public sealed class VentanaAjustes : Window
             "maximizadas no la tapen, como pasa con la barra de tareas.");
         pistaReserva.TextWrapping = TextWrapping.Wrap;
         pistaReserva.Opacity = 0.55;
-        c.Children.Add(pistaReserva);
+        p.Mas(pistaReserva);
 
-        c.Children.Add(Rotulo("Archivos", true));
-        c.Children.Add(BotonPlano("Abrir la carpeta del config", () =>
+        p.Grupo("Archivos", IconoDeGrupo("Archivos"));
+        p.Mas(BotonPlano("Abrir la carpeta del config", () =>
             Process.Start(new ProcessStartInfo(Config.Carpeta) { UseShellExecute = true })?.Dispose(), false));
-        return c;
+        return p.Fin();
     }
 
     // ================= Guardar / cancelar =================

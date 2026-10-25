@@ -11,7 +11,7 @@ namespace NubeBar;
 // que no tiene nada de batería.
 public partial class MainWindow : Window
 {
-    const string PanelBateria = "bateria";
+    internal const string PanelBateria = "bateria";
 
     void AbrirBateria() => AlternarPanel(PanelBateria, CrearBateria, 340, 150, teclado: false);
 

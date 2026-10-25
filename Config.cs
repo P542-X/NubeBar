@@ -120,6 +120,8 @@ public class Modulos
     public bool FijadasDeSerie { get; set; } = true;
     public bool AppsAlCentro { get; set; } = true;
     public bool NotificacionesDeSerie { get; set; } = true;
+    public bool CentroALaIzquierda { get; set; } = true;
+    public bool CentroRetirado { get; set; } = true;
 
     // Widgets puestos en una zona pero que NO se dibujan.
     //
@@ -602,6 +604,37 @@ public class Config
                 c.Modulos.NotificacionesDeSerie = tocado = true;
             }
 
+            // ---------- El botón del centro de control, a la izquierda ----------
+            //
+            // Nació dentro del módulo "control", que vive en la zona DERECHA con la red,
+            // el volumen y la batería. Y el panel cuelga de su botón, así que salía
+            // desplegado en la mitad derecha de la pantalla. Es su propio módulo y va a
+            // la izquierda, al lado del lanzador, que es de donde se espera que salga el
+            // centro de control: se abre hacia dentro de la pantalla desde la esquina.
+            //
+            // Si lo quitas de la isla, la bandera se queda puesta y no vuelve solo.
+            if (!arbol.Bandera("Modulos", "CentroALaIzquierda", false))
+            {
+                if (AnadirUnaVez(c, arbol, "centro", antesDe: "", zona: "Izquierda"))
+                    Log.Info("módulo centro añadido a la izquierda (al lado del lanzador)");
+                arbol.Poner("Modulos", "CentroALaIzquierda", true);
+                c.Modulos.CentroALaIzquierda = tocado = true;
+            }
+
+            // ---------- Y se retira ----------
+            //
+            // El botón propio del centro de control existió un rato y se retiró: su
+            // superficie es la portada de Inicio y se abre desde el botón Inicio, así que
+            // un segundo botón para lo mismo era una entrada duplicada. Si se queda en el
+            // config, la isla dibuja un hueco de "módulo desconocido".
+            if (!arbol.Bandera("Modulos", "CentroRetirado", false))
+            {
+                if (QuitarUnaVez(c, arbol, "centro"))
+                    Log.Info("módulo centro retirado: su superficie es la portada de Inicio");
+                arbol.Poner("Modulos", "CentroRetirado", true);
+                c.Modulos.CentroRetirado = tocado = true;
+            }
+
             if (tocado) arbol.Guardar();
         }
         catch (Exception ex) { Log.Error("añadir los módulos de serie", ex); }
@@ -626,6 +659,26 @@ public class Config
         return true;
     }
 
+
+    // Lo quita de donde esté, una vez. Hace falta para retirar limpiamente un módulo que
+    // se añadió de serie y luego se retiró del programa: si se deja en el config, la isla
+    // dibuja un hueco de "módulo desconocido" donde no hay nada que dibujar.
+    static bool QuitarUnaVez(Config c, ConfigArbol arbol, string modulo)
+    {
+        bool tocado = false;
+        foreach (var (nombre, lista) in new (string, List<string>)[]
+        {
+            ("Izquierda", c.Modulos.Izquierda),
+            ("Centro",    c.Modulos.Centro),
+            ("Derecha",   c.Modulos.Derecha),
+        })
+        {
+            if (lista.RemoveAll(m => m.Equals(modulo, StringComparison.OrdinalIgnoreCase)) == 0) continue;
+            arbol.PonerLista("Modulos", nombre, lista);
+            tocado = true;
+        }
+        return tocado;
+    }
     // Lo cambia de zona, una vez. A diferencia de AnadirUnaVez, si no lo tienes puesto
     // en ningún sitio NO se mete: lo habrás quitado tú y no es cosa nuestra devolverlo.
     static bool MoverUnaVez(Config c, ConfigArbol arbol, string modulo, string zona, string antesDe)

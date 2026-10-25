@@ -140,7 +140,6 @@ public partial class MainWindow : Window, IAnfitrionWidget
         Log.Info($"widgets registrados: {RegistroWidgets.Todos.Count}");
     }
 
-
     // ---------- Escribir apilado ----------
     //
     // El salto de línea de los formatos verticales. Como constante y no suelto en cada

@@ -138,6 +138,17 @@ public partial class MainWindow : Window
                 _self = new WindowInteropHelper(this).Handle;
                 Nativo.NoActivable(_self);
                 VigilarCambiosDePantalla();
+        // ---------- Lo que vive dentro de un panel nunca arrastra la isla ----------
+        //
+        // Se marca el CAJÓN, que es donde `AbrirPanel` mete el contenido de todos los
+        // paneles. Marcarlo una vez aquí cubre audio, el centro de control, red, batería,
+        // la vista de ventanas y lo que venga: ninguno tiene que acordarse de protegerse.
+        //
+        // Marcar cada control por su cuenta era la otra opción y es la que se olvida: el
+        // deslizador de volumen no estaba marcado y la nube se iba detrás del ratón.
+        SinArrastre(Cajon);
+        if (_superpuesta is { } sup) SinArrastre(sup.Cajon);
+
                 MontarArrastre();
                 Aplicar();
                 if (_esJefa) RegistrarAtajos();
@@ -203,6 +214,8 @@ public partial class MainWindow : Window
 
             // El modo diagnóstico: solo la jefa, y después de que todo esté en marcha.
             if (DiagVista.Encendido && _esJefa) await CorrerDiagnosticoDeLaVista();
+            if (DiagInicio.Encendido && _esJefa) await CorrerDiagnosticoDeInicio();
+            if (DiagBandeja.Encendido && _esJefa) await CorrerDiagnosticoDeLaBandeja();
         };
         Closed += (_, _) =>
         {
@@ -221,6 +234,7 @@ public partial class MainWindow : Window
 
             Nativo.QuitarAtajo(_self, IdAtajoVista);   // el atajo vuelve a quien lo quiera
             DesmontarAjusteDeBordes();                 // antes de Parar(): el reloj del ratón es nuestro
+            DejarDeEscucharEscape();                   // y el Esc de los paneles se da de baja
             GestorFondos.Apagar();                     // y el reloj de la presentación se suelta
             GestorVentanas.Parar();                    // y los ganchos de ventanas se sueltan
             _gancho?.Dispose();                        // y la tecla Windows vuelve a la normalidad
@@ -263,8 +277,34 @@ public partial class MainWindow : Window
             // ejemplo) se quedaba a la vista hasta un segundo entero y se veía
             // el parpadeo. Ahora lo hace el vigilante de 150 ms.
             Historial.Anotar(Nativo.Cpu(), Nativo.Ram());
+            // Y si el centro de control está abierto, sus dos métricas se repintan solas.
+            // Va aquí, en el Tick que ya corre una vez por segundo, en vez de un reloj
+            // nuevo: dos relojes para lo mismo es lo que acaba descompasado.
+            RefrescarMetricasDelControl();
         }
         if (_esJefa) VigilarNotificaciones();
+        // ---------- Los fantasmas de la bandeja ----------
+        //
+        // Una app que se cierra bien manda su NIM_DELETE y la colección avisa sola. Una
+        // que se muere de golpe —o cuyo registro queda huérfano al reiniciar Explorer—
+        // no manda nada, y nadie avisaría nunca.
+        //
+        // Así que se CUENTAN los fantasmas una vez por segundo (una llamada a `IsWindow`
+        // por icono, nada) y solo se repinta si la cuenta ha cambiado. No es reconstruir
+        // la bandeja en cada fotograma: es mirar un número y no tocar nada mientras sea
+        // el mismo. Es la misma regla que el vigilante de ventanas, que se encontró con
+        // el parpadeo por no tenerla.
+        if (_esJefa && Bandeja.Encendida)
+        {
+            int fantasmas = Bandeja.Fantasmas();
+            if (fantasmas != _fantasmasBandeja)
+            {
+                Log.Info($"bandeja: fantasmas={fantasmas} (eran {_fantasmasBandeja}): " +
+                         "iconos cuya ventana ya no existe; se repinta una vez");
+                _fantasmasBandeja = fantasmas;
+                RefrescarBandeja();
+            }
+        }
         VigilarVuelta();
         RefrescarMusica();
         VigilarPulsoAudio();   // si ha empezado a sonar algo, despierta al pulso

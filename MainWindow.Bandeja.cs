@@ -18,6 +18,7 @@ public partial class MainWindow : Window
     StackPanel? _bandeja;
     Button? _botonMas;
     readonly Dictionary<NotifyIcon, Button> _botonesBandeja = new();
+    int _fantasmasBandeja;      // ver el Tick: solo se repinta si esta cuenta cambia
 
     const string PanelBandeja = "bandeja";
     const double AnchoIconoBandeja = 26;
@@ -48,7 +49,11 @@ public partial class MainWindow : Window
     void RefrescarBandeja()
     {
         if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(new Action(RefrescarBandeja)); return; }
-        if (_bandeja == null || Bandeja.Iconos is not { } iconos) return;
+        if (_bandeja == null || !Bandeja.Encendida) return;
+        // Filtrados por `Bandeja.Vivos()`: tras reiniciar Explorer la colección conserva el
+        // registro viejo de las apps que se volvieron a registrar, con su ventana ya
+        // muerta. Ver Bandeja.Vivos.
+        var iconos = Bandeja.Vivos();
 
         int tope = Math.Max(0, _cfg.Barra.MaxBandeja);
         // Los que no caben se van al desplegable "^", igual que en Windows
@@ -197,7 +202,10 @@ public partial class MainWindow : Window
         Log.Info($"bandeja: \"{TipDe(icono).Split('\n')[0]}\" no admite clics (es de la barra de " +
                  $"tareas de Windows, no de una app): se abre {que}");
 
-        if (g == GuidVolumen) { AbrirControl(); return; }
+        // El icono de volumen de la barra de Windows abre nuestro panel de AUDIO, que es
+        // donde vive el volumen. Antes abría el centro de control, que ya no es un panel
+        // aparte: su superficie es la de Inicio.
+        if (g == GuidVolumen) { AbrirAudio(); return; }
         if (g == GuidRed) { AbrirRed(); return; }
         if (g == GuidBateria) { AbrirBateria(); return; }
         if (g == GuidSeguridad) { AbrirAjustes("windowsdefender:"); return; }
@@ -245,7 +253,10 @@ public partial class MainWindow : Window
     // ---------- El desplegable "^" ----------
     void AlternarBandejaExtra()
     {
-        if (Bandeja.Iconos is not { } iconos) return;
+        // La misma lista filtrada que usa la tira: si aquí se contara sin filtrar, el "^"
+        // diría "otros 3" y en la rejilla saldrían 2.
+        var iconos = Bandeja.Vivos();
+        if (!Bandeja.Encendida) return;
         int tope = Math.Max(0, _cfg.Barra.MaxBandeja);
         var resto = iconos.Where(i => !i.IsHidden).Skip(tope).ToList();
         if (resto.Count == 0) return;
