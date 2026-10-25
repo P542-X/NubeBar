@@ -24,6 +24,8 @@ public partial class App : Application
         {
             var ex = a.ExceptionObject as Exception;
             Log.Error("excepción sin capturar en un hilo de fondo", ex ?? new Exception(a.ExceptionObject?.ToString() ?? "desconocida"));
+            // Nos vamos a pique, pero no con la pantalla pintada de negro
+            EscenaArranque.Cerrar("excepción sin capturar");
         };
         TaskScheduler.UnobservedTaskException += (_, a) =>
         {
@@ -65,7 +67,23 @@ public partial class App : Application
             return;
         }
 
-        MainWindow = NubeBar.MainWindow.Arrancar();
+        // La escena de entrada va ANTES de montar las islas: lo que tapa es justamente
+        // el rato feo del arranque (Explorer recalculando el área de trabajo, la barra
+        // de Windows escondiéndose, el carrusel llenándose). Si no toca mostrarla, no
+        // crea nada y esto no cuesta nada. Ver EscenaArranque.
+        EscenaArranque.Arrancar();
+
+        try
+        {
+            MainWindow = NubeBar.MainWindow.Arrancar();
+        }
+        catch
+        {
+            // Si la nube no llega a montarse, lo último que puede pasar es dejar al
+            // usuario con la pantalla negra de la escena delante.
+            EscenaArranque.Cerrar("la nube no pudo arrancar");
+            throw;
+        }
 
         // Y a la escucha de "NubeBar.exe --salir". Se cierran TODAS las islas, no
         // solo la jefa: con dos pantallas, cerrar la jefa deja viva la otra y el
@@ -74,6 +92,9 @@ public partial class App : Application
         Instancia.EscucharSalida(() => Dispatcher.BeginInvoke(new Action(() =>
         {
             Log.Info("salida pedida desde fuera (--salir)");
+            // La escena primero: es una ventana más y, si se cerrara la última isla
+            // con ella abierta, se quedaría sola en pantalla y en negro.
+            EscenaArranque.Cerrar("--salir");
             foreach (var isla in NubeBar.MainWindow.Islas.ToList().Where(i => i != MainWindow))
                 isla.Close();
             (MainWindow as Window)?.Close();

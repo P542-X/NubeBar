@@ -148,6 +148,11 @@ public partial class MainWindow : Window
             // en Aplicar hay que hacerla aparecer o no se vería nada
             AnimarAparicion();
 
+            // Y aquí ya hay nube que enseñar: la escena de entrada puede levantar la
+            // pintura. Lo avisa la JEFA y una sola vez; las demás islas no mandan en
+            // esto. Si no había escena, no hace nada (ver EscenaArranque).
+            if (_esJefa) EscenaArranque.InterfazLista();
+
             try
             {
                 if (_esJefa)

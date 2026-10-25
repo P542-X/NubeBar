@@ -428,12 +428,18 @@ public sealed class VentanaAjustes : Window
         c.Children.Add(Opciones("Animaciones", new[] { "auto", "completo", "equilibrado", "reducido", "desactivado" },
                                 _arbol.Texto("Animaciones", "Nivel", "auto"),
                                 v => _arbol.Poner("Animaciones", "Nivel", v)));
-        // La escena del robot todavía no existe (llega en la fase C). La opción se
-        // guarda ya para que quien la cambie no la pierda al actualizar, pero aquí no
-        // hay botón de vista previa: no habría nada que previsualizar.
         c.Children.Add(Opciones("Escena de entrada", new[] { "primera-vez", "cada-inicio", "al-cambiar-tema", "nunca" },
                                 _arbol.Texto("Animaciones", "Robot", "primera-vez"),
                                 v => _arbol.Poner("Animaciones", "Robot", v)));
+        // Verla sin tener que reiniciar la nube. No gasta la "primera vez": una vista
+        // previa es para decidir si la quieres, no para estrenarla.
+        c.Children.Add(BotonPlano("Ver la escena ahora", () => EscenaArranque.VistaPrevia(), false));
+        var pistaEscena = Rotulo("El robot cruza la pantalla con el pincel, la deja en negro un " +
+                                 "momento y al levantarse ya está la nube montada debajo. Se salta con Esc " +
+                                 "o con un clic, y con el movimiento desactivado no aparece.");
+        pistaEscena.TextWrapping = TextWrapping.Wrap;
+        pistaEscena.Opacity = 0.55;
+        c.Children.Add(pistaEscena);
 
         c.Children.Add(Rotulo("Reacción al sonido", true));
         c.Children.Add(Interruptor("La isla respira con lo que suena",

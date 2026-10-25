@@ -2156,3 +2156,115 @@ true + modo isla                        área (0,0)-(2560,1440)   libre
 
 Los cuatro bordes de la appbar quedan así probados contra el área de trabajo que publica
 Windows, cada uno recortando por su lado.
+
+
+## Fase C2 · La escena de entrada
+
+La Fase A dejó escritas en el config cuatro claves —`Animaciones.Robot`, `RobotVisto`,
+`RobotAlCambiarTema`— y un desplegable en Ajustes con un comentario honesto al lado:
+«la escena del robot todavía no existe». C2 es escribirla.
+
+### Lo que resuelve, que no es decorativo
+
+Arrancar NubeBar es feo durante segundo y medio: Explorer recalcula el área de trabajo,
+la barra de Windows se esconde (tarda unos 0,7 s), las islas se montan, el carrusel se
+llena a trompicones. La pintura tapa exactamente ese rato, y lo que se descubre al
+levantarla es el escritorio ya terminado. Por eso la escena **espera a que la interfaz
+avise** en vez de durar un tiempo fijo: si el arranque se alarga, el negro se alarga con
+él.
+
+### El robot
+
+Dibujado con primitivas y original a propósito: nada que se parezca a una mascota
+conocida ni a la marca de nadie. Es **una nube con cuerpo de máquina** — el contorno del
+cuerpo es literalmente la silueta de una nube, la cara es una visera oscura con dos ojos
+del **color de acento del usuario**, lleva una antena con su bombilla encendida y, en
+vez de patas, un propulsor, porque una nube no anda.
+
+Se dibuja a partir de un solo número, el alto, y todo lo demás sale en proporción: cabe
+igual en un portátil de 768 que en un 4K, y al 150 % de DPI no hay nada que tocar.
+
+El pincel va a su **izquierda**, no a su derecha. Parece un detalle tonto y no lo es: el
+robot cruza hacia la derecha y la pintura queda detrás, así que el pincel tiene que estar
+del lado de lo ya pintado. Con el pincel delante parecía que pintaba por donde todavía no
+había pasado.
+
+### Dos cosas que solo se ven mirando el dibujo
+
+Esta fase se pudo revisar sin sacar nada por pantalla: la composición está en un método
+aparte que devuelve el lienzo y un `Avanzar(t)`, así que se puede dibujar **fuera de
+pantalla** y guardar fotogramas en PNG. Mirándolos aparecieron dos fallos que ninguna
+prueba de lógica habría cazado:
+
+1. **Un extremo redondeado sobresale medio grosor del punto final.** El trazo mide
+   1,35 × el alto de la pantalla, o sea que su casquete asoma ~730 px por delante de
+   donde cree el código que está el filo. Consecuencia: el trazo nacía ya tapando media
+   pantalla, y el robot iba setecientos píxeles por detrás de su propia pintura.
+2. **Las "cerdas" en gris se leían como dos barras** cruzando la pantalla, no como
+   textura. En negro —del mismo negro— no se ven como líneas: se ven como que el filo de
+   la pintura no es limpio, que es lo que distingue un pincel de un barrido.
+
+### Por qué se dibuja fotograma a fotograma
+
+El trazo, las dos cerdas y el robot podrían ser cuatro animaciones de WPF en paralelo. No
+lo son: van de un solo `Avanzar(t)` colgado de `CompositionTarget.Rendering`. El motivo
+es la sincronía. Cuatro relojes independientes se separan en cuanto el sistema va
+cargado — y «el sistema cargado» es, literalmente, el momento en que esto se ejecuta.
+Con un solo avance por fotograma no hay forma de que el pincel se despegue de la pintura.
+
+### El segundo y medio que se perdía
+
+La primera versión montaba la escena en `ContentRendered`, que parecía lo correcto: así
+se mide la ventana de verdad. Costaba **segundo y medio**. Justo detrás de crear la
+escena, `App` llama a `MainWindow.Arrancar()`, que monopoliza el hilo de interfaz hasta
+que termina; hasta entonces no hay ni un fotograma. La escena empezaba tarde y se perdía
+justamente el rato que venía a tapar: medido, revelaba a los 3645 ms en vez de a los
+~2400 de diseño.
+
+Se monta en el constructor, con las medidas del monitor en unidades de WPF (píxeles entre
+su escala), que es exactamente lo que WPF le va a dar a esa ventana ahí. No hace falta
+esperar a nadie para saberlo.
+
+### Las reglas que no se negocian
+
+- **Nunca dejar la pantalla negra.** Tres redes: el revelado se dispara aunque la
+  interfaz no avise (a los ~5,4 s), un temporizador cierra la ventana pase lo que pase a
+  los 9 s, y `App` la cierra si `MainWindow.Arrancar()` revienta o si salta una excepción
+  sin capturar. Si algo falla, se cae del lado de «no hay escena», nunca del de «pantalla
+  negra».
+- **Ni foco ni clics.** `WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT`: no se
+  activa, no sale en Alt+Tab y **los clics la atraviesan**. Mientras dura, el escritorio
+  responde igual que sin ella.
+- **Se puede saltar.** Esc o un clic la revelan al instante. Como la ventana no recibe
+  entrada —por el punto anterior—, se mira el teclado y el botón a pelo cada 60 ms, que
+  es el mismo truco que usa el arrastre de la isla.
+- **Una sola vez.** Se crea en `App.OnStartup` y en ningún otro sitio: recargar el tema,
+  los paneles o los widgets no la vuelve a sacar. Medido: tres remontajes de zonas, una
+  sola escena.
+- **`--salir` la cierra primero**, antes que las islas. Si se cerrara la última isla con
+  la escena abierta, se quedaría sola en pantalla y en negro.
+- **Se apunta como vista DESPUÉS de verla**, no antes: si reventara a mitad, la próxima
+  vez vuelve a intentarlo en vez de quedarse sin estrenar para siempre.
+
+### Los cuatro niveles
+
+| | robot | pintar | negro | revelar |
+|---|---|---|---|---|
+| Completo | sí | 1150 ms | 1000 ms | 460 ms |
+| Equilibrado | sí | 700 | 620 | 280 |
+| Reducido | **no** | 200 | 260 | 180 |
+| Desactivado | — | no se crea la escena |
+
+Los tiempos no pasan por `Animacion.Escalar` como el resto del proyecto, y es a
+propósito: esto no es una animación de la isla, es una escena con tres tiempos que tienen
+que guardar una proporción entre ellos. Un factor único los estiraría mal.
+
+En «reducido» no hay pincelada que dibujar: el negro se pone de una vez y lo que queda es
+el fundido de entrada y el de salida — la versión «muy breve y simplificada» del nivel.
+
+### Lo que falta
+
+El modo `al-cambiar-tema` del desplegable **se comporta hoy como `primera-vez`**: sale al
+arrancar si no la has visto. El disparo por cambio de tema necesita un gancho en
+`AplicarTema` que distinga un cambio de color de verdad de una recarga cualquiera del
+config, y meterlo en esta tanda habría tocado código ya verificado por un extra.

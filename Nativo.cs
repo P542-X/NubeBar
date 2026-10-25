@@ -182,6 +182,15 @@ static class Nativo
         try { return AllowSetForegroundWindow(pid); } catch { return false; }
     }
 
+    // Los clics la atraviesan y van a lo que haya debajo. Lo usa la escena de entrada:
+    // mientras dura, el escritorio responde igual que si no estuviera.
+    public static void Atravesable(IntPtr h) =>
+        SetWindowLong(h, -20, GetWindowLong(h, -20) | 0x20);   // WS_EX_TRANSPARENT
+
+    // ¿Está pulsada esa tecla ahora mismo? Para una ventana que no recibe entrada a
+    // propósito —la escena de entrada— es la única forma de atender a Esc.
+    public static bool TeclaPulsada(int vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
+
     // La barra nunca roba el foco ni sale en Alt+Tab, así Wallpaper Engine
     // no la cuenta como "otra aplicación enfocada" y no se pausa al usarla
     public static void NoActivable(IntPtr h) =>
