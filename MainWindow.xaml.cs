@@ -170,6 +170,7 @@ public partial class MainWindow : Window
                     // El gestor de ventanas: una instantánea para toda la aplicación, al día
                     // por los eventos de Windows en vez de por un sondeo.
                     GestorVentanas.Arrancar(Dispatcher);
+                    MontarAjusteDeBordes();
                     if (_cfg.Barra.Notificaciones && Notificaciones.Disponible)
                     {
                         Notificaciones.Arrancar();
@@ -215,6 +216,7 @@ public partial class MainWindow : Window
             if (!_esJefa) return;                      // lo global lo desmonta solo la jefa
 
             Nativo.QuitarAtajo(_self, IdAtajoVista);   // el atajo vuelve a quien lo quiera
+            DesmontarAjusteDeBordes();                 // antes de Parar(): el reloj del ratón es nuestro
             GestorVentanas.Parar();                    // y los ganchos de ventanas se sueltan
             _gancho?.Dispose();                        // y la tecla Windows vuelve a la normalidad
             Bandeja.Apagar();                          // los iconos vuelven a la bandeja de Explorer

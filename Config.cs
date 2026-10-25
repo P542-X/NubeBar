@@ -62,6 +62,11 @@ public class Barra
     // con el error 1409. Ctrl+Alt+W ("W de ventanas") sí está libre, y no choca con
     // Ctrl+Shift+Space, que en Visual Studio es la ayuda de parámetros.
     public string AtajoVistaGeneral { get; set; } = "Ctrl+Alt+W";       // abre la cuadrícula de ventanas
+
+    // Arrastrar una ventana a un borde la ajusta a media pantalla, a un cuarto o la
+    // maximiza, con una previsualización antes de soltar. Se puede apagar: quien ya
+    // usa el ajuste de Windows o una herramienta propia no quiere dos a la vez.
+    public bool AjustarAlArrastrar { get; set; } = true;
     public string Monitores { get; set; } = "todos";   // "todos" | "principal" (DERIVADA de Paneles, ver arriba)
     public bool AppsPorMonitor { get; set; } = true;   // cada isla enseña las apps de SU monitor
     public bool OcultarEnPantallaCompleta { get; set; } = true;

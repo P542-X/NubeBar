@@ -912,6 +912,17 @@ public sealed class VentanaAjustes : Window
         };
         c.Children.Add(campo);
         c.Children.Add(aviso);
+        c.Children.Add(Rotulo("Ajustar ventanas a los bordes", true));
+        c.Children.Add(Interruptor("Arrastrar una ventana a un borde la coloca ahí",
+                                   _arbol.Bandera("Barra", "AjustarAlArrastrar", true),
+                                   v => _arbol.Poner("Barra", "AjustarAlArrastrar", v)));
+        var pistaAjuste = Rotulo("Al borde izquierdo o derecho, media pantalla; a una esquina, un cuarto; " +
+                                 "arriba, maximizar. Antes de soltar se ve dónde va a caer. Respeta el área " +
+                                 "de trabajo, así que con «Reservar espacio» puesto no se mete debajo de la nube.");
+        pistaAjuste.TextWrapping = TextWrapping.Wrap;
+        pistaAjuste.Opacity = 0.55;
+        c.Children.Add(pistaAjuste);
+
         c.Children.Add(new TextBlock
         {
             Text = "Aviso: una combinación que YA tenga otra aplicación no se puede teclear aquí, " +

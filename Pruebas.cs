@@ -86,6 +86,7 @@ public static class Pruebas
             EscConPrioridad();
             QuienSeArrastra();
             SoltarLaTarjeta();
+            ArrastrarAlBorde();
             QueHacerConUnAviso();
             CuandoTocaFoto();
             OrdenCongelado();
@@ -1127,6 +1128,74 @@ public static class Pruebas
         Vale(!MainWindow.AjustaAlSoltar(false, Zona.Ninguna), "ni lo uno ni lo otro");
     }
 
+    static void ArrastrarAlBorde()
+    {
+        Grupo("ajuste: arrastrar una ventana a un borde");
+
+        // ---------- Cuándo se vigila un arrastre ----------
+        Vale(MainWindow.VigilarElArrastre(activado: true, existe: true, esNuestra: false, maximizada: false),
+             "una ventana normal de otra aplicación se vigila");
+        Vale(!MainWindow.VigilarElArrastre(false, true, false, false),
+             "con el ajuste apagado en Ajustes, no se vigila nada");
+        Vale(!MainWindow.VigilarElArrastre(true, existe: false, false, false),
+             "una ventana que ya no existe, no");
+        Vale(!MainWindow.VigilarElArrastre(true, true, esNuestra: true, false),
+             "y la nube moviéndose a sí misma tampoco: ya tiene su propio arrastre");
+        Vale(!MainWindow.VigilarElArrastre(true, true, false, maximizada: true),
+             "a una maximizada la restaura Windows al arrastrarla: ahí no nos metemos");
+
+        // Apagarlo en Ajustes gana siempre, pase lo que pase con el resto
+        foreach (bool existe in new[] { true, false })
+            foreach (bool nuestra in new[] { true, false })
+                foreach (bool max in new[] { true, false })
+                    Vale(!MainWindow.VigilarElArrastre(false, existe, nuestra, max),
+                         $"apagado es apagado (existe={existe}, nuestra={nuestra}, max={max})");
+
+        // ---------- Y qué se hace al soltar ----------
+        var mia = new IntPtr(0x1234);
+        var otra = new IntPtr(0x5678);
+
+        Igual(MainWindow.FinDeArrastre.Ajustar, MainWindow.AlTerminar(mia, mia, Zona.Izquierda),
+              "soltada en un borde, se ajusta");
+        Igual(MainWindow.FinDeArrastre.SoltarSinAjustar, MainWindow.AlTerminar(mia, mia, Zona.Ninguna),
+              "soltada en medio, se recoge la previsualización y nada más");
+
+        // Esto es lo que faltaba: el aviso de OTRA ventana no puede cancelar el arrastre
+        // en curso. MoverSeTermina salta por cualquiera que termine de moverse, y una
+        // recolocación de fondo apagaba el reloj y borraba la previsualización.
+        Igual(MainWindow.FinDeArrastre.NoEsNuestro, MainWindow.AlTerminar(mia, otra, Zona.Izquierda),
+              "que otra ventana termine de moverse no toca el arrastre en curso");
+        Igual(MainWindow.FinDeArrastre.NoEsNuestro, MainWindow.AlTerminar(IntPtr.Zero, otra, Zona.Izquierda),
+              "y sin arrastre en marcha, un aviso suelto no ajusta nada");
+        Igual(MainWindow.FinDeArrastre.NoEsNuestro, MainWindow.AlTerminar(IntPtr.Zero, IntPtr.Zero, Zona.Izquierda),
+              "ni con los dos vacíos");
+
+        foreach (var z in Enum.GetValues<Zona>())
+            Vale(MainWindow.AlTerminar(mia, otra, z) == MainWindow.FinDeArrastre.NoEsNuestro,
+                 $"con otra ventana nunca se ajusta ({z})");
+
+        // ---------- La previsualización es una promesa ----------
+        //
+        // Se dibuja con el monitor DEL PUNTERO, así que el ajuste tiene que caer en ese
+        // mismo monitor. Deducirlo de la ventana no vale: en el salto entre dos pantallas
+        // el cuerpo sigue en la de origen mientras el ratón ya empuja el borde de la otra.
+        var dos = Pantalla(x: 1920, y: 0, w: 2560, h: 1440, tx: 1920, tw: 2560, th: 1440);
+        var util = ZonasAjuste.AreaUtil(dos);
+        foreach (var z in Enum.GetValues<Zona>())
+        {
+            if (z == Zona.Ninguna) continue;
+            var h = ZonasAjuste.Colocacion(z, util);
+            Vale(h.X >= util.X && h.Derecha <= util.Derecha && h.Y >= util.Y && h.Abajo <= util.Abajo,
+                 $"lo prometido en la segunda pantalla cae en la segunda pantalla ({z})");
+        }
+
+        // El punto que pide la zona y el hueco que se ajusta salen del MISMO monitor
+        var zona = ZonasAjuste.ZonaDelPunto(1922, 700, dos);
+        Igual(Zona.Izquierda, zona, "el borde izquierdo de la segunda pantalla");
+        var hueco = ZonasAjuste.Colocacion(zona, util);
+        Igual(1920, hueco.X, "y su mitad izquierda empieza donde empieza esa pantalla");
+        Igual(1280, hueco.Ancho, "con la mitad de SU ancho, no la del monitor principal");
+    }
 
     static void GlifoDeLaCuadricula()
     {

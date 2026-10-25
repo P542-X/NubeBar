@@ -48,6 +48,12 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
 - **Esconder la isla**: clic derecho en la isla → «Esconder la isla» y se va de
   todas las pantallas. Vuelve al pulsar la tecla Windows.
 - Vista general tipo Exposé con todas las ventanas, con atajo global.
+- **Ajustar ventanas a los bordes**: arrastra una ventana al borde izquierdo o
+  derecho y se queda en media pantalla; a una esquina, en un cuarto; arriba,
+  maximizada. Antes de soltar se ve dónde va a caer, y lo que se ve es lo que
+  pasa: el ajuste cae en la pantalla del puntero, no en la de origen. Respeta el
+  área de trabajo, así que con «Reservar espacio» puesto no se mete debajo de la
+  isla. Se puede apagar en Ajustes.
 - `NubeBar.exe --ventanas [informe.txt]` cuenta qué ventanas ve y por qué
   descarta las demás, agrupadas por programa. Es de solo lectura —no activa, no
   mueve, no cierra nada— y está para que «me faltan aplicaciones» se pueda
@@ -276,6 +282,7 @@ Windows: quien ya ha pedido menos movimiento ahí no tiene que volver a pedirlo 
 | `Barra.MaxApps` | `10` | Iconos de apps visibles a la vez; el resto, con la rueda |
 | `Barra.AgruparApps` | `true` | Las ventanas del mismo programa, en un solo icono |
 | `Barra.AtajoVistaGeneral` | `"Ctrl+Alt+W"` | Atajo global de la vista general |
+| `Barra.AjustarAlArrastrar` | `true` | Arrastrar una ventana a un borde la ajusta ahí, con previsualización |
 | `Barra.Monitores` | `"todos"` | `"todos"` (una isla por pantalla) o `"principal"` |
 | `Barra.AppsPorMonitor` | `true` | Cada isla enseña solo las apps de su pantalla |
 | `Barra.OcultarEnPantallaCompleta` | `true` | La isla se esconde si algo ocupa su pantalla entera |

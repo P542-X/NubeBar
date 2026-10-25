@@ -3556,3 +3556,176 @@ escritorio de verdad: la vista quieta treinta segundos con muchas aplicaciones, 
 foco desde fuera, arrastrar una tarjeta a la mitad derecha y a una esquina, y arrastrar el
 Bloc de notas por su barra de título a los cuatro bordes y cruzando de monitor. El
 `--diagvista` cubre la primera con números; las demás dejan su rastro en el log.
+
+## Fase C4.2 · Ajustar al arrastrar
+
+Lo primero de la lista de C4.1, y lo que separa «tengo una vista general» de «tengo un
+gestor de ventanas»: arrastrar una ventana a un borde y que se coloque, con una
+previsualización antes de soltar.
+
+Las cuentas ya estaban hechas. `ZonasAjuste` sabe desde C4.1 a dónde va cada zona, qué
+zona pide un punto y en qué orden hay que restaurar, colocar y activar. Lo que faltaba
+era enterarse del arrastre y dibujar la promesa.
+
+### Enterarse sin capturar nada
+
+Windows avisa de que alguien ha empezado a mover una ventana
+(`EVENT_SYSTEM_MOVESIZESTART`) y de que la ha soltado (`...MOVESIZEEND`), y esos avisos
+ya los recibe `GestorVentanas`. Así que aquí **no se instala ningún gancho más**: se
+escucha lo que él publica.
+
+Mientras dura el arrastre se pregunta dónde está el puntero cada 60 ms con
+`GetCursorPos`. Eso **no es capturar el ratón**: no hay gancho de entrada, nadie deja de
+recibir sus clics y se deja de preguntar en cuanto se suelta. Es la misma técnica con la
+que la isla se deja arrastrar desde B2, y la razón de no usar `MouseMove` es la de
+siempre: el ratón lo tiene capturado la ventana que se está moviendo, no nosotros.
+
+La previsualización es una `VentanaSuperpuesta`, la de los paneles de la barra vertical:
+hacía falta algo que se dibuje encima de todo, que no coja el foco y que deje pasar los
+clics, y eso ya existía. Montar una segunda ventana flotante con reglas propias habría
+sido exactamente la deuda que la Fase 7 quiere no tener.
+
+Y solo la isla **jefa** vigila. Con dos monitores hay dos `MainWindow`, el arrastre es
+uno solo, y sin esto se pelearían por enseñar dos previsualizaciones de lo mismo.
+
+### Los tres fallos de escribirlo dentro del manejador
+
+La primera versión compilaba y no tenía ni una prueba, por un motivo concreto: las
+decisiones estaban **dentro de los manejadores de eventos**, donde no hay forma de
+comprobarlas sin arrastrar ventanas de verdad en el escritorio de alguien. Es literalmente
+el mismo error que produjo los cuatro fallos de C4.1, cometido otra vez en la fase
+siguiente. Sacarlas fuera encontró tres:
+
+**1. El aviso de otra ventana cancelaba el arrastre.** `MoverSeTermina` salta por
+*cualquier* ventana que termine de moverse, no solo por la que se arrastra. El manejador
+paraba el reloj, borraba el estado y escondía la previsualización **antes** de comprobar
+si la ventana era la suya, así que una recolocación de fondo en mitad del gesto —otra
+aplicación acomodando una ventana, el propio Windows— dejaba el arrastre sin ajustar y la
+previsualización apagada. Ahora la primera pregunta es de quién es el aviso:
+
+```csharp
+AlTerminar(enCurso, soltada, zona)
+  → NoEsNuestro       // no es la que vigilábamos: no se toca nada
+  → SoltarSinAjustar  // es la nuestra, pero no acabó en ninguna zona
+  → Ajustar
+```
+
+**2. La previsualización prometía una pantalla y el ajuste caía en otra.** El rectángulo
+se dibuja con el monitor **del puntero** (`Monitores.DelRaton`), pero al soltar se llamaba
+a `ZonasAjuste.Ajustar(ventana, zona)` sin pasarlo, y ahí el monitor se deduce de la
+ventana con `MonitorFromWindow`. En el salto entre dos pantallas esas dos cosas no son la
+misma: el cuerpo de la ventana sigue en la de origen mientras el ratón ya empuja el borde
+de la otra. Se veía la mitad izquierda de la segunda pantalla y la ventana se colocaba en
+la primera.
+
+El arreglo es guardar el monitor con el que se dibujó y pasarlo: **la previsualización es
+una promesa y tiene que decidir ella**. Hay prueba de que lo colocado en la segunda
+pantalla cae dentro de la segunda pantalla, para las siete zonas.
+
+**3. Los clics no la atravesaban, aunque el comentario dijera que sí.**
+`ShowActivated = false` solo evita que robe el foco al aparecer; para que el ratón ni la
+vea hace falta `WS_EX_TRANSPARENT`, que es `Nativo.Atravesable` y ya existía para la
+escena de arranque. Durante el arrastre no se nota —el ratón lo tiene capturado la
+ventana que se mueve— y se nota justo al terminar, con la previsualización todavía puesta
+mientras Windows reacomoda. El estilo necesita el hwnd, que no existe hasta el primer
+`Show()`, así que se pone ahí y una sola vez.
+
+Y de paso, el reloj del ratón se para al cerrar: cerrar NubeBar en mitad de un arrastre
+dejaba un `DispatcherTimer` preguntando por el puntero. `DesmontarAjusteDeBordes` va
+**antes** de `GestorVentanas.Parar()`, porque los oyentes son nuestros y se quitan en el
+orden inverso al que se pusieron.
+
+### Lo que no se toca
+
+**Una maximizada no se ajusta.** Lo que hace Windows al arrastrar una maximizada es
+restaurarla; meterse ahí sería pelearse con el gestor del sistema por el mismo gesto.
+
+**No se activa al soltar.** `ZonasAjuste.Ajustar` sabe activar la ventana si la
+colocación es una elección del usuario, y aquí lo es, pero se le pasa `activar: false` a
+propósito: la ventana que se arrastra **ya es la del frente**, así que activarla es un
+paso de más, y si `SetForegroundWindow` fallara, `Nativo.Activar` haría el truco del Alt
+sintético para nada. Desde la vista general sí se activa, porque allí la ventana elegida
+puede estar detrás — que es el fallo 1 de C4.1.
+
+**Y se puede apagar.** `Barra.AjustarAlArrastrar`, de serie puesto. Quien ya use el
+ajuste de Windows o FancyZones no quiere dos cosas peleándose por el mismo borde.
+
+### Lo que se midió
+
+`--pruebas` pasa de 446 a **482 comprobaciones**. Las nuevas son las dos decisiones y la
+promesa de la previsualización:
+
+- cuándo se vigila un arrastre, regla por regla, y que apagarlo en Ajustes gana sobre
+  cualquier combinación de las otras tres;
+- qué se hace al soltar, incluido que el aviso de otra ventana no es asunto nuestro —
+  comprobado para las ocho zonas, ninguna puede terminar en «Ajustar» con la ventana
+  equivocada;
+- y que lo prometido en la segunda pantalla cae dentro de la segunda pantalla, con la
+  mitad de **su** ancho y empezando donde empieza ella.
+
+### Lo que queda
+
+Sigue pendiente todo lo de la lista de C4.1 —zonas personalizadas, dividir con el
+teclado, recordar la pareja, reordenar dentro de la vista general— y una cosa nueva: el
+**margen de 12 px es el de Windows, no el del usuario**. Si se quiere más tolerancia hay
+que sacar `ZonasAjuste.Margen` a la configuración, y eso se hará cuando sea un ajuste de
+widget de la Fase 7 y no una casilla más en la ventana de siempre.
+
+
+## Fase C4.2b · Los tres arrastres
+
+El otro fallo que salió al probarla a mano: el arrastre acababa en quien no debía, y a
+veces lo que se movía era la nube. Tres causas distintas, una por cada forma de confundir
+los gestos.
+
+**2a. La isla decidía antes de que la tarjeta pudiera hablar.** El arrastre de la isla se
+engancha en `Isla.PreviewMouseLeftButtonDown`, y los eventos **Preview van de la raíz a la
+hoja**: cuando la tarjeta se entera del clic, la isla ya ha empezado su arrastre. Poner
+`e.Handled` en la tarjeta llega tarde **por definición**. La única comprobación que había
+era `_panelAbierto == PanelVista`, que depende de un campo de estado y no del gesto.
+
+Ahora son tres, y cada una tapa un agujero distinto: el panel abierto, **que el clic salga
+del árbol visual de la vista** (`EnLaVista`, subiendo por el árbol desde
+`e.OriginalSource`) y que no haya ya un ajuste en marcha. Y si el arrastre de la isla
+llegara a empezar con la vista abierta, el log lo dice con la palabra `ERROR`.
+
+**2b. Los dos ajustes compartían estado.** El arrastre de tarjeta y el de ventana real
+usaban los mismos `_zonaPrevia`, `_monitorPrevio` y `_previa`. Cerrar la vista en mitad del
+arrastre de una ventana real llamaba a `PararArrastreDeTarjeta`, que borraba la zona y
+escondía la previsualización; al soltar ya no había zona y **el gesto se perdía en
+silencio**. La previsualización tiene ahora **dueño** (`DuenoPrevia.Tarjeta` o `.Ventana`):
+quien no la tiene, no la puede apagar.
+
+**2c. La previsualización podía comerse el clic.** El comentario decía que los clics la
+atravesaban y no era verdad. Hacen falta las tres cosas:
+
+1. `IsHitTestVisible = false` en el contenido — la mitad de WPF. No basta: un `Background`
+   puesto, **aunque sea `Transparent`**, hace que la ventana cuente para el ratón.
+2. `WS_EX_TRANSPARENT` — la mitad de Win32. Tampoco basta sola: hay rutas
+   (`WindowFromPoint`, un bucle de arrastre que pregunta por su cuenta) que le mandan el
+   `WM_NCHITTEST` igual.
+3. **Contestar `HTTRANSPARENT` al `WM_NCHITTEST`** — decir explícitamente "yo no estoy
+   aquí, pregunta a la de debajo". Es lo único que cierra el caso, y es lo que impide que
+   la previsualización se convierta en la ventana bajo el puntero.
+
+Es **opt-in** (`VentanaSuperpuesta.HacerseAtravesable`): la misma clase es la de los
+paneles de la barra vertical, que sí tienen que recibir clics y escribir en el buscador.
+
+Y de C4.2 siguen puestas las dos reglas que ya se arreglaron: el aviso de fin de **otra**
+ventana no cancela el gesto, y el monitor del puntero se mantiene explícito desde la
+previsualización hasta el ajuste — ahora también en el arrastre de tarjeta, que lo pasa a
+`Ajustar(h, z, monitor)`.
+
+
+### Lo que se midió
+
+**Treinta y seis comprobaciones** para el ajuste al arrastrar, las del grupo
+`ajuste: arrastrar una ventana a un borde`: cuándo se vigila un arrastre regla por regla,
+que apagarlo en Ajustes gane sobre cualquier combinación de las otras tres, qué se hace al
+soltar —incluido que el aviso de **otra** ventana no es asunto nuestro, comprobado para
+las ocho zonas— y que lo prometido en la segunda pantalla caiga dentro de la segunda
+pantalla, con la mitad de **su** ancho.
+
+Sobre el total que imprime `--pruebas`, ver la advertencia de C4.1c: no es una constante,
+porque unas pocas comprobaciones recorren las aplicaciones abiertas de la máquina. Con
+siete abiertas, el árbol completo da 515 y ninguna mal.

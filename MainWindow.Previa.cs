@@ -37,10 +37,11 @@ public partial class MainWindow
     Zona _zonaPrevia = Zona.Ninguna;
     Monitores.Info? _monitorPrevio;     // y en QUÉ PANTALLA lo prometió
 
-    // Si hay algún ajuste en curso. La isla lo pregunta para no empezar el suyo encima:
-    // con un solo botón no hay dos gestos a la vez, y si el estado dice que sí, el que no
-    // empieza es el de la isla.
-    public bool AjustandoAlgo => _duenoPrevia != DuenoPrevia.Nadie || ArrastrandoTarjeta;
+    // Si hay algún ajuste en curso, de cualquiera de los dos tipos. La isla lo pregunta
+    // para no empezar el suyo encima: con un solo botón no hay dos gestos a la vez, y si
+    // el estado dice que sí, el que no empieza es el de la isla.
+    public bool AjustandoAlgo => _duenoPrevia != DuenoPrevia.Nadie || ArrastrandoTarjeta ||
+                                 _arrastrada != IntPtr.Zero;
 
     // ---------- Enseñar la promesa ----------
     //
