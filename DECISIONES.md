@@ -2930,3 +2930,195 @@ Seiscientos elementos menos, y lo que queda es una figura con tres transformacio
   negra con la nube pequeña, siempre acaba en la barra y sin restos. Entre 445 y 32 ms
   según desde dónde se salte.
 - **60–240 Hz**: el estado en un instante dado es idéntico en los seis.
+
+## Fase C3 · El lanzador y el centro de notificaciones
+
+Dos cosas que no se parecen en nada y que comparten una idea: **lo que decide lo que ves
+tiene que poder comprobarse sin abrir una ventana**. El ranking del buscador y el
+contador de no leídas son exactamente el tipo de código que se rompe sin dar error —
+simplemente ordena mal, o cuenta de más— y hasta ahora ninguno de los dos se podía mirar.
+
+### Los cuatro peldaños
+
+El parecido devolvía un número suelto que mezclaba prefijo, subsecuencia y distancia de
+edición. Funcionaba, pero la cifra era la única explicación de por qué una cosa salía
+antes que otra, y no se podía razonar sobre ella: un 0,88 podía ser «las iniciales
+encajan» o «se parece bastante escrito mal», y esas dos cosas no deben valer lo mismo.
+
+Ahora cada criterio cae en su **franja**, y la franja es el peldaño:
+
+| | | |
+|---|---|---|
+| Exacta | 1,00 | lo escrito ES el nombre |
+| Prefijo | 0,90 – 0,99 | el nombre empieza por lo escrito |
+| Palabra | 0,78 – 0,89 | una palabra empieza así, las iniciales, o aparece por el medio |
+| Aproximada | 0,01 – 0,76 | subsecuencia o erratas |
+
+Las franjas no se solapan, y eso es el invariante del que vive todo lo demás: **ordenar
+por puntos y ordenar por peldaño dan lo mismo**, así que no hay dos verdades que
+mantener sincronizadas. Dentro de cada franja se afina con lo que cubre la consulta —
+escribir «note» para «Notepad» vale más que para «Notepad++ plugin manager»— y eso es lo
+que desempata de verdad, no el orden en que la fuente devolvió las cosas.
+
+### El empujón por costumbre, y lo que enseñó la prueba
+
+Las apps que más usas suben en la lista. Eso se sumaba tal cual, hasta +0,35, y con el
+ranking nuevo eso es un error: basta para que una **errata** de una app muy usada
+adelante a un nombre que empieza por lo escrito. El peldaño dice cómo de bien encaja lo
+que has escrito, y eso no lo arregla la costumbre.
+
+El primer arreglo fue repartir el empujón sobre lo que falta para el 1,0. Parecía
+suficiente y **la prueba lo tiró en el primer intento**: con 0,70 y el empujón al máximo
+salía 0,805, que ya es franja de palabra. Lo que hay que mirar no es el 1,0 sino el
+**techo de su propia franja**:
+
+```csharp
+public static double ConCostumbre(double puntos, double empujon, Nivel nivel)
+{
+    double tope = TopeDe(nivel);
+    if (puntos >= tope) return puntos;      // la fuente le puso un extra a propósito
+    return Math.Min(tope, puntos + empujon * (tope - puntos));
+}
+```
+
+Así la costumbre desempata dentro del peldaño —que es lo que debe hacer— y no puede
+subirte uno. Comprobado con el empujón disparado a 1,0 desde el suelo de cada franja.
+
+Vale la pena dejarlo escrito porque es el patrón: **las dos veces que la prueba encontró
+algo en esta fase, lo encontró en código que yo acababa de escribir y daba por bueno.**
+
+### Orden estable de verdad
+
+`OrderByDescending` de LINQ ya es estable, pero «estable» ahí significa «en el orden en
+que llegaron», y el orden en que llegan las apps depende de cómo recorrió Windows el
+menú Inicio. Eso no es estabilidad, es azar repetible. El orden definitivo desempata por
+puntos, peldaño, categoría, título y clave — siempre el mismo, vengan como vengan.
+
+Y los repetidos se funden quedándose con el de más puntos. La identidad es lo que **se
+ve** —categoría, título y detalle— y no la clave: la clave de dos ventanas del mismo
+programa es la misma a propósito (sirve para contar usos), y colapsarlas escondería
+ventanas de verdad. Hay una prueba para justo eso.
+
+### Cancelar lo que llega tarde
+
+Los archivos los busca Windows Search en otro hilo. Cancelar el token no basta: una tarea
+puede haber terminado justo antes de la cancelación y estar ya en la cola del hilo de
+interfaz, y entonces el token no dice nada. Por eso cada petición se lleva un número
+—`Relevo`— y al volver se pregunta si sigue siendo la última. Son tres líneas, y son las
+que deciden si ves archivos de «doc» debajo de «documento».
+
+---
+
+### El centro de notificaciones no trae una ventana nueva
+
+Es un panel más, como el de la red o el de la batería. Eso no es pereza: significa que
+sale solo en los cuatro bordes, porque con la isla horizontal se despliega el cajón y con
+la barra vertical `AbrirPanel` deriva a la ventana superpuesta de C1, que ya calcula su
+rectángulo en coordenadas de pantalla, se eleva por encima de las aplicaciones y devuelve
+el orden Z al cerrarse. Inventar aquí una segunda arquitectura habría significado repetir
+los dos problemas que esa ventana resolvió y resolverlos peor.
+
+### Y no pide el teclado
+
+El menú Inicio sí lo pide, porque tiene una caja donde escribes. Este no: si lo pidiera,
+abrir las notificaciones te sacaría de lo que estabas haciendo, y eso es exactamente lo
+que un centro de notificaciones no debe hacer.
+
+Esc se mira preguntando al sistema cada 60 ms **mientras este panel está abierto** — el
+mismo truco que usa la escena de entrada y que usa el arrastre de la isla. No hay gancho,
+no se captura nada, ninguna otra ventana se entera, y se deja de mirar en cuanto se
+cierra. El clic fuera lo da el vigilante que ya existía: el panel solo tuvo que apuntarse
+a la lista.
+
+### «No molestar» no se come tu historial
+
+El código anterior descartaba las notificaciones que llegaban con el modo silencio
+puesto: `if (NoMolestar.Activo) continue;` antes de encolarlas. Con una isla que solo
+asoma avisos eso era defendible. Con un centro que guarda historial es un fallo: el modo
+silencio te borraría lo que ha pasado mientras no mirabas.
+
+Ahora el centro **se queda todo lo que llega** y devuelve solo lo que además hay que
+asomar. «No molestar» impide lo segundo y no lo primero. Es la diferencia entre «ahora no
+me interrumpas» y «no quiero saber nada», y un centro de notificaciones necesita la
+primera.
+
+Son dos interruptores distintos y se enseñan como tales: el de NubeBar, que se puede
+cambiar desde el panel, y las horas de silencio de Windows, que son de solo lectura
+(`SHQueryUserNotificationState`) y que el botón dice pero no finge poder apagar.
+
+### Las acciones rápidas, y hasta dónde llegan
+
+Un toast puede traer botones. Vienen en el XML como `<action content="…"
+arguments="…" activationType="…">` y **solo se pueden pulsar las de tipo `protocol`**:
+esas son una URI y lanzarlas es abrirla. Las de tipo `foreground`/`background` —las de
+responder a un mensaje, las que de verdad querrías— no son una URI: son un argumento que
+Windows le entrega a la app dueña a través de la plataforma de notificaciones, y para
+hablar con esa plataforma hace falta identidad de paquete, que es justo lo que NubeBar no
+tiene (el mismo motivo por el que las notificaciones se leen de la base de datos).
+
+Fingirlo sería lo peor de los dos mundos: un botón «Responder» que en realidad abre la
+app y pierde lo que ibas a responder. Así que **esas no se enseñan**, y pulsar la tarjeta
+—que abre la app dueña— sigue siendo lo que hay. Las URI, además, se filtran antes de
+llegar al shell: fuera `file:`, `javascript:`, `vbscript:`, `data:` y `shell:`.
+
+### Lo nuestro va en su propio archivo
+
+Si has leído una notificación y cuál has descartado se guarda en
+`notificaciones.json`, al lado de `uso.json` y **no dentro del config**. Dos razones: el
+config lo edita la gente a mano y no tiene por qué llenarse de identificadores, y
+guardarlo ahí dispararía la recarga en caliente cada vez que marcas una como leída.
+
+Descartar es para siempre: se apunta el id para que no vuelva cuando se relea la base de
+Windows, que sigue teniéndola. Los ids descartados también tienen tope — son números,
+pero el archivo es del usuario y no tiene por qué crecer sin fin.
+
+Lo que ya estuviera silenciado en `Barra.NotificacionesSilenciadas` se sigue respetando:
+era la única forma de silenciar una app antes de que existiera el centro, y quien la usó
+no tiene por qué volver a hacerlo.
+
+### La campana viene de serie, y se puede quitar
+
+Usa el mecanismo que ya existía para `control`, `bandeja` y `fijadas`: una bandera
+`Modulos.NotificacionesDeSerie` que mete el módulo **una vez** delante de la bandeja. Si
+lo quitas de la isla, la bandera se queda puesta y no vuelve.
+
+Es un cambio en el config del usuario y conviene decirlo: añade un módulo a
+`Modulos.Derecha` y una bandera. Es reversible y es el convenio de la casa desde la
+Fase A, pero no es invisible.
+
+### La cifra de la chapita, y el segundo fallo que cazó la prueba
+
+El número de no leídas va **dentro** de un círculo del acento, así que su tinta es la que
+se lee ahí y no la del texto de la isla. Se puso `Contraste.Legible(blanco, acento)`, que
+es lo que hace el resto del proyecto… y la prueba de los siete temas lo tiró: salía entre
+**2,0 y 2,9 de contraste en seis de los siete**.
+
+El motivo es que `Legible` aclara el color hacia el blanco cuando el fondo es oscuro, y
+partiendo del blanco no tiene a dónde ir. Para un relleno de tono medio hay que **elegir**
+entre blanco y negro, no aclarar. De ahí `Contraste.TintaSobre`, que es ahora una regla
+general del proyecto: con ella la cifra no baja de 4,5 en ninguno de los siete.
+
+### Las pruebas se quedan
+
+Las fases anteriores comprobaban cada tanda con un arnés temporal que se borraba al
+terminar. Para medir una animación eso está bien —lo que se mide es irrepetible— pero
+aquí no: son reglas que tienen que seguir siendo verdad dentro de seis meses.
+
+`NubeBar.exe --pruebas [informe.txt]` corre **180 comprobaciones** y devuelve 1 si algo
+falla. Es un `if` en `App.OnStartup`, como `--salir` y `--guardian`: no añade nada al
+arranque normal, no abre ninguna ventana, no toca el config y no deja ningún proceso
+detrás. El centro se prueba con instancias propias y la persistencia en una carpeta
+temporal que se borra.
+
+Cubren: los cuatro peldaños y que sus franjas no se solapan, erratas, orden estable,
+repetidos, búsquedas vacías, el empujón por costumbre, el relevo de las búsquedas que
+tardan, agrupación, contador de no leídas, marcar como leída, descartar, borrar todo,
+silenciar, no molestar, persistencia, el alto de la tarjeta en cinco pantallas, el
+contraste del panel en los siete temas, los cuatro niveles de animación y abrir y cerrar
+en bucle.
+
+### Lo que no cubren
+
+Que sea bonito. El contraste se mide; la composición hay que mirarla. Y la agrupación
+visual en la barra vertical depende de la ventana superpuesta de C1, que ya tenía su
+propia verificación pero no con este contenido dentro.

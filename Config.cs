@@ -92,6 +92,7 @@ public class Modulos
     public bool BandejaDeSerie { get; set; } = true;
     public bool FijadasDeSerie { get; set; } = true;
     public bool AppsAlCentro { get; set; } = true;
+    public bool NotificacionesDeSerie { get; set; } = true;
 
     // Widgets puestos en una zona pero que NO se dibujan.
     //
@@ -539,6 +540,18 @@ public class Config
                     Log.Info("módulo apps movido al centro (así se ve con la isla recogida)");
                 arbol.Poner("Modulos", "AppsAlCentro", true);
                 c.Modulos.AppsAlCentro = tocado = true;
+            }
+
+            // La campana de notificaciones, delante de la bandeja: el mismo sitio que
+            // ocupa en Plasma y en Windows, y el orden en que se miran las cosas
+            // —primero si hay algo que leer, después los iconos de segundo plano—.
+            // Si la quitas de la isla, la bandera se queda puesta y no vuelve.
+            if (!arbol.Bandera("Modulos", "NotificacionesDeSerie", false))
+            {
+                if (AnadirUnaVez(c, arbol, "notificaciones", antesDe: "bandeja"))
+                    Log.Info("módulo notificaciones añadido a la derecha (viene de serie)");
+                arbol.Poner("Modulos", "NotificacionesDeSerie", true);
+                c.Modulos.NotificacionesDeSerie = tocado = true;
             }
 
             if (tocado) arbol.Guardar();

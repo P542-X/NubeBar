@@ -51,6 +51,16 @@ static class Contraste
         return max == 0 ? 0 : (max - min) / max;
     }
 
+    // La tinta de un RELLENO: blanco o negro, el que más se lea encima.
+    //
+    // Para un número dentro de una chapita de color no vale `Legible`: esa aclara el
+    // color hacia el blanco cuando el fondo es oscuro, y partiendo del blanco no tiene
+    // a dónde ir. Sobre un acento de tono medio hay que ELEGIR, y la elección correcta
+    // es la de más contraste de las dos. Medido en los siete temas de serie: con
+    // `Legible` la cifra salía entre 2,0 y 2,9 de contraste; así, nunca baja de 4,5.
+    public static Color TintaSobre(Color relleno) =>
+        Entre(Colors.White, relleno) >= Entre(Colors.Black, relleno) ? Colors.White : Colors.Black;
+
     // Devuelve el color tal cual si ya se lee; si no, el mismo tono acercado al
     // blanco (sobre fondo oscuro) o al negro (sobre fondo claro) lo justo.
     public static Color Legible(Color color, Color fondo, double minimo = Minimo)

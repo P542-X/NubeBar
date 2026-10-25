@@ -20,7 +20,14 @@ namespace NubeBar;
 // del original: en el peor caso, la copia sale un poco antigua y ya está.
 public static class Notificaciones
 {
-    public sealed record Aviso(long Id, string App, string Titulo, string Texto, DateTime Cuando, string AumId);
+    // Una acción rápida de la notificación. `Uri` solo viene cuando se puede lanzar de
+    // verdad —un protocolo: http, ms-settings, el que sea—; las acciones que solo sabe
+    // atender la app dueña a través de la plataforma de Windows llegan con Uri vacío y
+    // el centro no las enseña. Ver el comentario de Acciones().
+    public sealed record AccionRapida(string Texto, string Uri);
+
+    public sealed record Aviso(long Id, string App, string Titulo, string Texto, DateTime Cuando,
+                               string AumId, IReadOnlyList<AccionRapida>? Acciones = null);
 
     // Solo lo cambian las pruebas, para apuntar a una base sintética.
     // NUBEBAR_NOTIS_PRUEBA=<carpeta> hace lo mismo desde fuera: es la única forma
@@ -171,7 +178,7 @@ public static class Notificaciones
 
             var (titulo, texto) = Partir(xml);
             if (titulo.Length == 0 && texto.Length == 0) continue;
-            lista.Add(new Aviso(id, NombreBonito(aumid), titulo, texto, cuando, aumid));
+            lista.Add(new Aviso(id, NombreBonito(aumid), titulo, texto, cuando, aumid, Acciones(xml)));
         }
         return lista;
     }
@@ -228,6 +235,84 @@ public static class Notificaciones
         return trozo.Length == 0 ? aumid : trozo;
     }
 
+
+    // ---------- Las acciones rápidas de una notificación ----------
+    //
+    // Un toast puede traer botones ("Responder", "Marcar como leído", "Ver pedido").
+    // Vienen en el XML como <action content="..." arguments="..." activationType="...">.
+    //
+    // Y aquí hay un límite que conviene dejar escrito en vez de disimular: **solo se
+    // pueden pulsar las de tipo `protocol`**. Esas son una URI y lanzarlas es abrirla.
+    // Las de tipo `foreground`/`background` —las de responder a un mensaje, las que de
+    // verdad querrías— no son una URI: son un argumento que Windows le entrega a la app
+    // dueña a través de la plataforma de notificaciones, y para hablar con esa
+    // plataforma hace falta identidad de paquete, que es justo lo que NubeBar no tiene
+    // (ver la cabecera de este archivo).
+    //
+    // Fingirlo sería lo peor de los dos mundos: un botón "Responder" que en realidad
+    // abre la app y pierde lo que ibas a responder. Así que esas no se enseñan, y
+    // pulsar la tarjeta —que abre la app dueña— sigue siendo lo que hay.
+    static IReadOnlyList<AccionRapida>? Acciones(string xml)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(xml)) return null;
+            var doc = XDocument.Parse(xml);
+            var lista = new List<AccionRapida>();
+
+            foreach (var a in doc.Descendants().Where(e => e.Name.LocalName == "action"))
+            {
+                var texto = (a.Attribute("content")?.Value ?? "").Trim();
+                var argumento = (a.Attribute("arguments")?.Value ?? "").Trim();
+                var tipo = (a.Attribute("activationType")?.Value ?? "").Trim();
+                if (texto.Length == 0) continue;
+                if (!tipo.Equals("protocol", StringComparison.OrdinalIgnoreCase)) continue;
+                if (!EsUriLanzable(argumento)) continue;
+                lista.Add(new AccionRapida(texto, argumento));
+                if (lista.Count == 3) break;      // tres botones llenan la tarjeta
+            }
+            return lista.Count == 0 ? null : lista;
+        }
+        catch { return null; }
+    }
+
+    // Solo esquemas, y solo los que abren algo. Nada de file: ni de javascript:: lo que
+    // llega aquí viene de una app cualquiera y acaba en ShellExecute.
+    internal static bool EsUriLanzable(string uri)
+    {
+        if (string.IsNullOrWhiteSpace(uri)) return false;
+        int dosPuntos = uri.IndexOf(':');
+        if (dosPuntos <= 0) return false;
+        var esquema = uri[..dosPuntos].ToLowerInvariant();
+        if (esquema is "file" or "javascript" or "vbscript" or "data" or "shell") return false;
+        foreach (var c in esquema)
+            if (!char.IsLetterOrDigit(c) && c != '+' && c != '-' && c != '.') return false;
+        return true;
+    }
+
+    // Lanza una acción rápida. Pasa por el shell igual que un enlace del navegador.
+    public static void Lanzar(AccionRapida a)
+    {
+        if (!EsUriLanzable(a.Uri)) return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = a.Uri, UseShellExecute = true
+            })?.Dispose();
+        }
+        catch (Exception ex) { Log.Error("lanzar una acción de notificación", ex); }
+    }
+
+    // El historial que ya había cuando NubeBar arrancó. `Nuevas()` solo trae lo que ha
+    // llegado desde entonces —para no soltar de golpe en la isla las de los últimos
+    // días— pero el centro de notificaciones sí tiene que enseñarlas: es su historial.
+    // No toca `_ultimaVista`, así que llamarlo no se come ningún aviso pendiente.
+    public static List<Aviso> Historial(int cuantas)
+    {
+        try { return Leer(Math.Clamp(cuantas, 1, 200)); }
+        catch (Exception ex) { Log.Error("leer el historial de notificaciones", ex); return new List<Aviso>(); }
+    }
     // Pulsar el aviso abre la app dueña
     public static void Abrir(string aumid)
     {

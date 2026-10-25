@@ -167,7 +167,11 @@ public partial class MainWindow : Window
                     Uso.Cargar();
                     _ = Fuentes.CargarApps();   // el índice del buscador se arma por detrás
                     MontarTeclaWindows();
-                    if (_cfg.Barra.Notificaciones && Notificaciones.Disponible) Notificaciones.Arrancar();
+                    if (_cfg.Barra.Notificaciones && Notificaciones.Disponible)
+                    {
+                        Notificaciones.Arrancar();
+                        Centro.Arrancar(_cfg.Barra.NotificacionesSilenciadas, Dispatcher);
+                    }
                 }
                 VigilarWallpaperEngine();
                 MontarPulsoAudio();

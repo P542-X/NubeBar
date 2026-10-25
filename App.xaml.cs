@@ -49,6 +49,16 @@ public partial class App : Application
             return;
         }
 
+        // "NubeBar.exe --pruebas [informe.txt]": corre las comprobaciones de lógica y se
+        // va. No abre ninguna ventana, no toca el config y devuelve 1 si algo falla,
+        // para poder encadenarlo.
+        if (e.Args.Length > 0 && e.Args[0] == Pruebas.Bandera)
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Shutdown(Pruebas.Correr(e.Args));
+            return;
+        }
+
         if (e.Args.Length > 0 && e.Args[0] == Guardian.Bandera)
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;

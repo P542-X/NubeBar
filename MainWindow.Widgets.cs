@@ -102,6 +102,9 @@ public partial class MainWindow : Window, IAnfitrionWidget
         R("control", "Centro de control", "Idioma, red, volumen y batería", "", CategoriaWidget.Sistema,
           i => i.ModuloControl());
 
+        R("notificaciones", "Notificaciones", "La campana, con las que no has leído y su historial",
+          "", CategoriaWidget.Sistema, i => i.ModuloNotificaciones());
+
         // ---------- Medios ----------
         R("musica", "Música", "Carátula y barras de lo que suena", "", CategoriaWidget.Medios,
           i => new StackPanel

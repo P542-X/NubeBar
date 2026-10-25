@@ -38,6 +38,7 @@ public partial class MainWindow
     Point _ratonAlPintar = new(double.NaN, double.NaN);
     Categoria? _filtro;                 // Tab va rotando entre las categorías que hay
     CancellationTokenSource? _buscaArchivos;
+    readonly Relevo _relevo = new();      // descarta los archivos que llegan tarde
     DispatcherTimer? _esperaArchivos;
 
     // Con la portada (lo que suena, accesos, gráficas, wallpaper, fijadas y energía)
@@ -216,6 +217,7 @@ public partial class MainWindow
                         .Take(5).Select(f => f.GetMethod()?.Name ?? "?")));
         CapturarClicsFuera(false);
         _buscaArchivos?.Cancel();
+        _relevo.Olvidar();
         _esperaArchivos?.Stop();
         OlvidarMenuDeApp();
         CerrarPanel();
@@ -607,8 +609,8 @@ public partial class MainWindow
             }
         }
 
-        foreach (var r in encontrados) r.Puntos += Uso.Empujon(r.Clave);
-        _resultados = Ordenar(encontrados);
+        foreach (var r in encontrados) r.Puntos = Ranking.ConCostumbre(r.Puntos, Uso.Empujon(r.Clave), r.Nivel);
+        _resultados = Ranking.Ordenar(encontrados);
         Pintar();
         reloj.Stop();
 
@@ -618,40 +620,21 @@ public partial class MainWindow
         ProgramarArchivos(limpia);
     }
 
-    // Ordena y, si hay un ganador claro, tira lo que no le llega ni de lejos.
-    //
-    // Con seis filas el relleno se nota: escribiendo "cmd" salía el Símbolo del
-    // sistema el primero y detrás cuatro cosas que solo tienen las letras c, m y d
-    // desperdigadas por el nombre ("Blackmagic RAW Speed Test"). Bajar el liston del
-    // parecido no vale, porque es el mismo que aguanta las erratas ("fotosop" ->
-    // Photoshop). Lo que sí vale es mirarlo en relación al mejor: si uno saca mucho
-    // más que otro, el otro no es lo que buscabas.
-    //
-    // El liston lo pone el mejor de los resultados NORMALES: el cálculo y el comando
-    // valen 10 a propósito para ir siempre los primeros y no deben subirlo. Y la
-    // búsqueda en la web se queda siempre, que es la salida de emergencia.
-    static List<Resultado> Ordenar(List<Resultado> encontrados)
-    {
-        var orden = encontrados.OrderByDescending(r => r.Puntos).ToList();
-        double mejor = orden.Where(r => r.Puntos < 2).Select(r => r.Puntos).DefaultIfEmpty(0).Max();
-        if (mejor <= 0) return orden;
-        double liston = mejor * 0.6;
-        return orden.Where(r => r.Puntos >= liston || r.Categoria == Categoria.Web).ToList();
-    }
-
     // La propia ventana de ajustes, buscable como cualquier otra cosa
     Resultado? AjustesDeLaNube(string norm)
     {
-        double p = Math.Max(Parecido.Puntuar(norm, "Ajustes de la nube"),
-                            Parecido.Puntuar(norm, "NubeBar configuración"));
-        if (p < 0.5) return null;
+        var m = Parecido.Medir(norm, "Ajustes de la nube");
+        var m2 = Parecido.Medir(norm, "NubeBar configuración");
+        if (m2.Puntos > m.Puntos) m = m2;
+        if (m.Puntos < 0.5) return null;
         return new Resultado
         {
             Categoria = Categoria.Ajuste,
             Titulo = "Ajustes de la nube",
             Detalle = "Cambiar colores, módulos y comportamiento",
             Clave = "ajuste:nubebar",
-            Puntos = p,
+            Puntos = m.Puntos,
+            Nivel = m.Nivel,
             Abrir = AbrirAjustes
         };
     }
@@ -663,9 +646,13 @@ public partial class MainWindow
             foreach (var h in g.Ventanas)
             {
                 var titulo = Nativo.Titulo(h);
-                double p = Parecido.Puntuar(norm, titulo);
-                double pe = Parecido.Puntuar(norm, Path.GetFileNameWithoutExtension(g.Exe));
-                double mejor = Math.Max(p, pe * 0.9);
+                var porTitulo = Parecido.Medir(norm, titulo);
+                var porExe = Parecido.Medir(norm, Path.GetFileNameWithoutExtension(g.Exe));
+                // El nombre del ejecutable vale un poco menos que el título de la
+                // ventana: el título es lo que estás viendo en la barra de tareas.
+                bool ganaTitulo = porTitulo.Puntos >= porExe.Puntos * 0.9;
+                double mejor = ganaTitulo ? porTitulo.Puntos : porExe.Puntos * 0.9;
+                var nivelV = ganaTitulo ? porTitulo.Nivel : porExe.Nivel;
                 if (mejor < 0.5) continue;
                 var v = h;
                 yield return new Resultado
@@ -675,7 +662,8 @@ public partial class MainWindow
                     Detalle = Path.GetFileName(g.Exe),
                     Clave = "ventana:" + Path.GetFileName(g.Exe),
                     IconoRuta = g.Exe.StartsWith("hwnd:") ? null : g.Exe,
-                    Puntos = mejor * 1.02,     // saltar a algo ya abierto suele ser lo que quieres
+                    Puntos = Math.Min(1.0, mejor * 1.02),   // saltar a algo abierto suele ser lo que quieres
+                    Nivel = nivelV,
                     Abrir = () => Nativo.Activar(v)
                 };
             }
@@ -685,6 +673,7 @@ public partial class MainWindow
     void ProgramarArchivos(string consulta)
     {
         _buscaArchivos?.Cancel();
+        _relevo.Olvidar();
         _esperaArchivos?.Stop();
         if (!_cfg.Inicio.BuscarArchivos || consulta.Length < 3 || consulta.StartsWith(">")) return;
 
@@ -701,15 +690,27 @@ public partial class MainWindow
         var consulta = _caja.Text.Trim();
         if (consulta.Length < 3) return;
 
+        // Dos cerrojos, y hacen falta los dos. El token corta la consulta a Windows
+        // Search en cuanto sigues escribiendo; el turno del relevo descarta lo que ya
+        // venía de vuelta cuando se canceló —una tarea puede haber terminado justo
+        // antes y estar ya en la cola del hilo de interfaz, y entonces el token no
+        // dice nada—. Sin el turno salían archivos de "doc" debajo de "documento".
         var cts = new CancellationTokenSource();
+        var anterior = _buscaArchivos;
         _buscaArchivos = cts;
+        anterior?.Cancel();
+        anterior?.Dispose();
+        long turno = _relevo.Pedir();
+
         Task.Run(() => Fuentes.Archivos(consulta, 8, cts.Token), cts.Token)
             .ContinueWith(t =>
             {
+                if (!_relevo.SigueSiendoLaUltima(turno)) return;
                 if (cts.IsCancellationRequested || !t.IsCompletedSuccessfully) return;
-                if (_caja == null || _caja.Text.Trim() != consulta) return;   // ya has seguido escribiendo
-                foreach (var r in t.Result) r.Puntos += Uso.Empujon(r.Clave);
-                _resultados = Ordenar(_resultados.Concat(t.Result).ToList());
+                if (_panelAbierto != PanelInicio || _caja == null) return;
+                if (_caja.Text.Trim() != consulta) return;   // ya has seguido escribiendo
+                foreach (var r in t.Result) r.Puntos = Ranking.ConCostumbre(r.Puntos, Uso.Empujon(r.Clave), r.Nivel);
+                _resultados = Ranking.Ordenar(_resultados.Concat(t.Result));
                 Pintar();
             }, TaskScheduler.FromCurrentSynchronizationContext());
     }

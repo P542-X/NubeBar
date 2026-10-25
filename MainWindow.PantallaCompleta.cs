@@ -55,7 +55,7 @@ public partial class MainWindow : Window
             jefa?.VigilarBarraDeWindows();
             foreach (var i in Islas.ToList())
             {
-                try { i.VigilarClicFueraDelMenu(); i.VigilarClicFueraDelPanel(); }
+                try { i.VigilarClicFueraDelMenu(); i.VigilarClicFueraDelPanel(); i.VigilarEscDelPanel(); }
                 catch (Exception ex) { Log.Error("clic fuera del menú", ex); }
                 try { i.RevisarPantallaCompleta(); }
                 catch (Exception ex) { Log.Error("pantalla completa", ex); }
