@@ -10,7 +10,7 @@ using System.Windows.Media.Imaging;
 
 namespace NubeBar;
 
-static class Nativo
+public static class Nativo
 {
     delegate bool EnumProc(IntPtr h, IntPtr l);
     [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc cb, IntPtr l);
@@ -32,25 +32,19 @@ static class Nativo
     [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h, int attr, out int val, int size);
 
     // ---------- Ventanas ----------
+    // Las ventanas del usuario. Quién cuenta como tal lo decide GestorVentanas con una
+    // función pura sobre los datos de la ventana, y es la MISMA regla que usa la vista
+    // general: antes había dos parecidas pero no iguales, y la de aquí vivía dentro de
+    // una lambda donde no se podía comprobar.
     public static List<IntPtr> VentanasAbiertas(IntPtr self)
     {
         var lista = new List<IntPtr>();
-        var escritorio = FindWindow("Progman", null);
         EnumWindows((h, _) =>
         {
-            if (h != self && h != escritorio && EsVentanaDeBarra(h)) lista.Add(h);
+            if (h != self && GestorVentanas.EsDelUsuario(Ficha(h), out string _)) lista.Add(h);
             return true;
         }, IntPtr.Zero);
         return lista;
-    }
-
-    static bool EsVentanaDeBarra(IntPtr h)
-    {
-        if (!IsWindowVisible(h) || GetWindowTextLength(h) == 0) return false;
-        if (GetWindow(h, 4) != IntPtr.Zero) return false;            // GW_OWNER
-        if ((GetWindowLong(h, -20) & 0x80) != 0) return false;        // WS_EX_TOOLWINDOW
-        DwmGetWindowAttribute(h, 14, out int cloaked, sizeof(int));   // DWMWA_CLOAKED
-        return cloaked == 0;
     }
 
     public static IntPtr Activa() => GetForegroundWindow();
@@ -562,5 +556,213 @@ static class Nativo
         GetSystemPowerStatus(out var s);
         if (s.Flag == 128 || s.Percent == 255) return "";
         return $"{(s.AC == 1 ? "AC" : "BAT")} {s.Percent}%";
+    }
+
+    // ================= C4: ventanas reales =================
+
+    [DllImport("user32.dll")] static extern bool IsZoomed(IntPtr h);
+    [DllImport("user32.dll")] static extern bool IsWindow(IntPtr h);
+    [DllImport("user32.dll")] static extern IntPtr MonitorFromWindow(IntPtr h, uint flags);
+
+    public static bool Existe(IntPtr h) => h != IntPtr.Zero && IsWindow(h);
+    public static bool EstaMaximizada(IntPtr h) => IsZoomed(h);
+
+    public static IntPtr MonitorDe(IntPtr h) => MonitorFromWindow(h, 2);   // NEAREST
+
+    // Los hechos de una ventana, leídos de golpe.
+    //
+    // Se saca TODO de una pasada y se devuelve como datos planos a propósito: así quien
+    // decide si una ventana es del usuario no necesita que la ventana exista —se le
+    // puede dar una ficha inventada— y esa decisión se puede comprobar sin abrir nada.
+    // Era el trozo de la barra de tareas que más se equivocaba y el único que no se
+    // podía mirar.
+    public readonly record struct FichaVentana(
+        IntPtr Hwnd,
+        bool Visible,
+        int LargoTitulo,
+        bool TieneDueno,
+        int EstiloEx,
+        int Estilo,
+        bool Tapada,            // DWM la tiene "cloaked": otro escritorio virtual, o suspendida
+        bool EsNuestra,
+        string Clase,
+        int Pid);
+
+    public static FichaVentana Ficha(IntPtr h)
+    {
+        int tapada = 0;
+        try { DwmGetWindowAttribute(h, 14, out tapada, sizeof(int)); } catch { }
+        GetWindowThreadProcessId(h, out int pid);
+        return new FichaVentana(
+            h,
+            IsWindowVisible(h),
+            GetWindowTextLength(h),
+            GetWindow(h, 4) != IntPtr.Zero,          // GW_OWNER
+            GetWindowLong(h, -20),                   // GWL_EXSTYLE
+            GetWindowLong(h, -16),                   // GWL_STYLE
+            tapada != 0,
+            EsNuestra(h),
+            Clase(h),
+            pid);
+    }
+
+    // Todas las ventanas de nivel superior, sin filtrar. Quien filtra es GestorVentanas.
+    public static List<IntPtr> TodasLasDeNivelSuperior()
+    {
+        var lista = new List<IntPtr>();
+        EnumWindows((h, _) => { lista.Add(h); return true; }, IntPtr.Zero);
+        return lista;
+    }
+
+    // ---------- Colocar una ventana ----------
+    //
+    // Restaurar ANTES de mover no es un detalle: a una ventana maximizada Windows le
+    // ignora el SetWindowPos y se queda donde estaba, y a una minimizada la mueve sin
+    // enseñarla. Las dos cosas se leen como "no ha pasado nada".
+    public static bool ColocarVentanaDelUsuario(IntPtr h, int x, int y, int ancho, int alto)
+    {
+        if (!Existe(h)) return false;
+        try
+        {
+            if (IsIconic(h) || IsZoomed(h)) ShowWindow(h, 9);    // SW_RESTORE
+            // SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED
+            return SetWindowPos(h, IntPtr.Zero, x, y, ancho, alto, 0x0004 | 0x0010 | 0x0020);
+        }
+        catch (Exception ex) { Log.Error("colocar una ventana", ex); return false; }
+    }
+
+    public static void Maximizar(IntPtr h)
+    {
+        if (!Existe(h)) return;
+        const uint WM_SYSCOMMAND = 0x0112;
+        const int SC_MAXIMIZE = 0xF030;
+        PostMessage(h, WM_SYSCOMMAND, (IntPtr)SC_MAXIMIZE, IntPtr.Zero);
+    }
+
+    public static void Restaurar(IntPtr h)
+    {
+        if (!Existe(h)) return;
+        const uint WM_SYSCOMMAND = 0x0112;
+        const int SC_RESTORE = 0xF120;
+        PostMessage(h, WM_SYSCOMMAND, (IntPtr)SC_RESTORE, IntPtr.Zero);
+    }
+
+    // ---------- Enterarse de lo que hacen las ventanas ----------
+    //
+    // `SetWinEventHook` fuera de contexto: Windows avisa a NUESTRO proceso cuando pasa
+    // algo, sin inyectar ninguna DLL en los demás y sin procesos residentes. Las
+    // llamadas llegan al hilo que instaló el gancho y solo mientras ese hilo bombee
+    // mensajes, así que instalándolo desde el hilo de interfaz las notificaciones ya
+    // vienen en el hilo correcto.
+    //
+    // OJO con el delegado: si se deja que lo recoja el recolector de basura, la
+    // siguiente llamada de Windows salta a memoria liberada y tira el proceso. Por eso
+    // se guarda en un campo estático. Es el error clásico de esta API.
+    public delegate void GanchoEventos(IntPtr gancho, uint evento, IntPtr hwnd,
+                                       int objeto, int hijo, uint hilo, uint cuando);
+
+    [DllImport("user32.dll")]
+    static extern IntPtr SetWinEventHook(uint min, uint max, IntPtr dll, GanchoEventos cb,
+                                         uint pid, uint hilo, uint flags);
+
+    [DllImport("user32.dll")] static extern bool UnhookWinEvent(IntPtr gancho);
+
+    public const uint EvtPrimerPlano = 0x0003;     // EVENT_SYSTEM_FOREGROUND
+    public const uint EvtMoverEmpieza = 0x000A;    // EVENT_SYSTEM_MOVESIZESTART
+    public const uint EvtMoverTermina = 0x000B;    // EVENT_SYSTEM_MOVESIZEEND
+    public const uint EvtMinimizar = 0x0016;       // EVENT_SYSTEM_MINIMIZESTART
+    public const uint EvtRestaurar = 0x0017;       // EVENT_SYSTEM_MINIMIZEEND
+    public const uint EvtCrear = 0x8000;           // EVENT_OBJECT_CREATE
+    public const uint EvtDestruir = 0x8001;        // EVENT_OBJECT_DESTROY
+    public const uint EvtMostrar = 0x8002;         // EVENT_OBJECT_SHOW
+    public const uint EvtEsconder = 0x8003;        // EVENT_OBJECT_HIDE
+    public const uint EvtSitio = 0x800B;           // EVENT_OBJECT_LOCATIONCHANGE
+    public const uint EvtNombre = 0x800C;          // EVENT_OBJECT_NAMECHANGE
+
+    static readonly List<GanchoEventos> _delegadosVivos = new();
+    static readonly List<IntPtr> _ganchosVivos = new();
+
+    public static IntPtr EscucharEventos(uint desde, uint hasta, GanchoEventos cb)
+    {
+        try
+        {
+            // WINEVENT_OUTOFCONTEXT (0) | WINEVENT_SKIPOWNPROCESS (2): nuestras propias
+            // ventanas no tienen por qué avisarnos de nada.
+            var g = SetWinEventHook(desde, hasta, IntPtr.Zero, cb, 0, 0, 0 | 2);
+            if (g == IntPtr.Zero) { Log.Info($"no se pudo escuchar los eventos {desde:X}-{hasta:X}"); return IntPtr.Zero; }
+            _delegadosVivos.Add(cb);      // que no lo recoja el GC mientras Windows lo tenga
+            _ganchosVivos.Add(g);
+            return g;
+        }
+        catch (Exception ex) { Log.Error("escuchar eventos de ventanas", ex); return IntPtr.Zero; }
+    }
+
+    // Se llama al cerrar NubeBar. Si se olvidara, los ganchos mueren igualmente con el
+    // proceso, pero dejarlo explícito es lo que permite decir que no hay fugas.
+    public static void DejarDeEscuchar()
+    {
+        foreach (var g in _ganchosVivos)
+            try { UnhookWinEvent(g); } catch { }
+        Log.Info($"ganchos de ventanas liberados: {_ganchosVivos.Count}");
+        _ganchosVivos.Clear();
+        _delegadosVivos.Clear();
+    }
+
+    // ---------- Una foto de la ventana ----------
+    //
+    // `PrintWindow` con PW_RENDERFULLCONTENT (2) le pide a la ventana que se dibuje en
+    // un lienzo nuestro. Es la única vía que sirve aquí: las miniaturas de DWM no se
+    // componen dentro de ventanas por capas, y TODAS las de NubeBar lo son (la isla es
+    // redondeada y translúcida). Ver DECISIONES.md.
+    //
+    // Devuelve null si no se puede, y quien llama enseña la tarjeta con icono y título.
+    [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint flags);
+    [DllImport("user32.dll")] static extern IntPtr GetWindowDC(IntPtr h);
+    [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr h, IntPtr dc);
+    [DllImport("gdi32.dll")] static extern IntPtr CreateCompatibleDC(IntPtr dc);
+    [DllImport("gdi32.dll")] static extern IntPtr CreateCompatibleBitmap(IntPtr dc, int w, int h);
+    [DllImport("gdi32.dll")] static extern IntPtr SelectObject(IntPtr dc, IntPtr obj);
+    [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr obj);
+    [DllImport("gdi32.dll")] static extern bool DeleteDC(IntPtr dc);
+
+    public static System.Windows.Media.Imaging.BitmapSource? Foto(IntPtr h, int anchoMax)
+    {
+        if (!Existe(h) || IsIconic(h)) return null;
+        var r = Rectangulo(h);
+        int w = r.Der - r.Izq, alt = r.Aba - r.Arr;
+        if (w <= 0 || alt <= 0 || w > 20000 || alt > 20000) return null;
+
+        IntPtr dcVentana = IntPtr.Zero, dcMemoria = IntPtr.Zero, mapa = IntPtr.Zero, antiguo = IntPtr.Zero;
+        try
+        {
+            dcVentana = GetWindowDC(h);
+            if (dcVentana == IntPtr.Zero) return null;
+            dcMemoria = CreateCompatibleDC(dcVentana);
+            mapa = CreateCompatibleBitmap(dcVentana, w, alt);
+            if (dcMemoria == IntPtr.Zero || mapa == IntPtr.Zero) return null;
+            antiguo = SelectObject(dcMemoria, mapa);
+
+            if (!PrintWindow(h, dcMemoria, 2)) return null;
+
+            var fuente = System.Windows.Interop.Imaging.CreateBitmapSourceFromHBitmap(
+                mapa, IntPtr.Zero, System.Windows.Int32Rect.Empty,
+                System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
+
+            // Se guarda ya encogida: una tarjeta mide 200 px y quedarse la foto entera
+            // de un 4K son 33 MB por ventana.
+            double escala = Math.Min(1.0, anchoMax / (double)w);
+            var pequena = new System.Windows.Media.Imaging.TransformedBitmap(
+                fuente, new System.Windows.Media.ScaleTransform(escala, escala));
+            pequena.Freeze();
+            return pequena;
+        }
+        catch { return null; }
+        finally
+        {
+            if (antiguo != IntPtr.Zero) SelectObject(dcMemoria, antiguo);
+            if (mapa != IntPtr.Zero) DeleteObject(mapa);
+            if (dcMemoria != IntPtr.Zero) DeleteDC(dcMemoria);
+            if (dcVentana != IntPtr.Zero) ReleaseDC(h, dcVentana);
+        }
     }
 }

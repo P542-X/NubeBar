@@ -59,6 +59,23 @@ public partial class App : Application
             return;
         }
 
+        // "NubeBar.exe --ventanas [informe.txt]": qué ventanas ve y por qué descarta las
+        // demás. Solo lee: no activa, no mueve ni cierra nada. Está para que "faltan
+        // aplicaciones" se pueda investigar con los datos de la máquina en vez de a base
+        // de cambiar el filtro a ciegas.
+        if (e.Args.Length > 0 && e.Args[0] == Auditoria.Bandera)
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Shutdown(Auditoria.Correr(e.Args));
+            return;
+        }
+
+        // "NubeBar.exe --diagvista [segundos]": arranca NubeBar DE VERDAD, abre la vista
+        // general, la deja quieta y cuenta qué le pasa. El bucle que hacía parpadear la
+        // cuadrícula solo existe con la isla, sus animaciones y los ganchos de Windows en
+        // marcha, así que no se puede medir con un arnés aparte. Ver DiagVista.cs.
+        DiagVista.Leer(e.Args);
+
         if (e.Args.Length > 0 && e.Args[0] == Guardian.Bandera)
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;

@@ -142,6 +142,46 @@ public sealed class VentanaSuperpuesta : Window
         }
     }
 
+    // ---------- Que los clics la atraviesen DE VERDAD ----------
+    //
+    // Hacen falta las tres cosas, y ninguna sobra:
+    //
+    //  1. `IsHitTestVisible = false`. Es la mitad de WPF, y no basta: un `Background`
+    //     puesto —aunque sea `Transparent`— hace que la ventana cuente para el ratón.
+    //     (Un `Background` NULO no contaría, pero entonces no se ve nada.)
+    //  2. `WS_EX_TRANSPARENT`. Es la mitad de Win32, y tampoco basta sola: hay rutas
+    //     —`WindowFromPoint`, un bucle de arrastre que pregunta por su cuenta— que le
+    //     terminan mandando el `WM_NCHITTEST` igual.
+    //  3. Contestar `HTTRANSPARENT` al `WM_NCHITTEST`. Es decir explícitamente "yo no
+    //     estoy aquí, pregunta a la de debajo", y es lo único que cierra el caso.
+    //
+    // Es **opt-in**: esta misma clase es la de los paneles de la barra vertical, que
+    // tienen que recibir clics y escribir en el buscador. Solo la previsualización del
+    // ajuste la pide, y para ella no recibir nunca un clic es un requisito: si se
+    // convirtiera en la ventana bajo el puntero, el arrastre de una ventana real podría
+    // acabar apuntándole a ella.
+    bool _atravesable;
+
+    public void HacerseAtravesable()
+    {
+        if (_atravesable || _self == IntPtr.Zero) return;
+        _atravesable = true;
+        Nativo.Atravesable(_self);
+        if (PresentationSource.FromVisual(this) is HwndSource h) h.AddHook(NoEstoyAqui);
+        IsHitTestVisible = false;
+        Log.Info("previsualización del ajuste: atravesable (WS_EX_TRANSPARENT + HTTRANSPARENT)");
+    }
+
+    const int WM_NCHITTEST = 0x0084;
+    const int HTTRANSPARENT = -1;
+
+    IntPtr NoEstoyAqui(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool manejado)
+    {
+        if (!_atravesable || msg != WM_NCHITTEST) return IntPtr.Zero;
+        manejado = true;
+        return new IntPtr(HTTRANSPARENT);
+    }
+
     // ---------- El rectángulo que ocupa, en pantalla ----------
     internal Nativo.RECT Rectangulo() => _self == IntPtr.Zero ? default : Nativo.Rectangulo(_self);
 

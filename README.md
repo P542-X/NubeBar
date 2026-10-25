@@ -48,6 +48,16 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
 - **Esconder la isla**: clic derecho en la isla → «Esconder la isla» y se va de
   todas las pantallas. Vuelve al pulsar la tecla Windows.
 - Vista general tipo Exposé con todas las ventanas, con atajo global.
+- `NubeBar.exe --ventanas [informe.txt]` cuenta qué ventanas ve y por qué
+  descarta las demás, agrupadas por programa. Es de solo lectura —no activa, no
+  mueve, no cierra nada— y está para que «me faltan aplicaciones» se pueda
+  investigar con los datos de la máquina en vez de cambiando el filtro a ciegas.
+- `NubeBar.exe --diagvista [segundos]` abre la vista general, la deja quieta y cuenta
+  qué le pasa: reconciliaciones, reconstrucciones completas (que son una anomalía),
+  tarjetas creadas o eliminadas, miniaturas reemplazadas y de qué tipo de evento de
+  Windows viene cada aviso. Hay que parar antes la NubeBar que esté puesta, porque
+  arranca una de verdad: el parpadeo que vino a medir solo existía con la isla y sus
+  animaciones en marcha.
 
 **El menú Inicio propio**
 - Se abre con la tecla Windows (interceptada sin romper ninguna combinación `Win+…`).

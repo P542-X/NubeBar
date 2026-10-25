@@ -67,6 +67,29 @@ public partial class MainWindow : Window
             // no la isla entera. Cada arrastre con lo suyo.
             if (EsDelCarrusel(e.OriginalSource)) return;
 
+            // ---------- Con la vista general abierta, el gesto NO es de la isla ----------
+            //
+            // Lo que se arrastra es una ventana del escritorio, no la nube. Tres
+            // comprobaciones y no una, porque cada una tapa un agujero distinto:
+            //
+            //  1. **El panel abierto es la vista.** Lo normal.
+            //  2. **El clic sale del árbol visual de la vista.** Esto es lo que faltaba:
+            //     no vale con que la tarjeta ponga `e.Handled`, porque este manejador va
+            //     en un `PreviewMouseLeftButtonDown` de un ANTEPASADO, y los eventos
+            //     Preview van de la raíz a la hoja — cuando la tarjeta se entera, la isla
+            //     ya ha empezado su arrastre.
+            //  3. **Ya hay un ajuste en marcha**, de una tarjeta o de una ventana real.
+            //     Dos gestos a la vez con un solo botón no existen; si el estado dice que
+            //     sí, el que no empieza es este.
+            if (_panelAbierto == PanelVista || EnLaVista(e.OriginalSource) || AjustandoAlgo)
+            {
+                Log.Info("arrastre isla NO EMPIEZA: el gesto es de la vista general" +
+                         (_panelAbierto == PanelVista ? " (panel=vista)" : "") +
+                         (EnLaVista(e.OriginalSource) ? " (el clic sale de la vista)" : "") +
+                         (AjustandoAlgo ? " (ya hay un ajuste en marcha)" : ""));
+                return;
+            }
+
             _raizRaton = PuntoRaton();
             var r = Nativo.Rectangulo(_self);
             _raizX = r.Izq;
@@ -125,7 +148,12 @@ public partial class MainWindow : Window
             Expandir(false);
 
             Isla.Cursor = Cursors.SizeAll;
-            Log.Info("arrastrando la isla");
+            // Si esto sale con la vista abierta es un FALLO, no una curiosidad: significa
+            // que las tres comprobaciones de arriba no han bastado.
+            DiagVista.ArrastresIsla++;
+            if (_panelAbierto == PanelVista) DiagVista.ArrastresIslaConVistaAbierta++;
+            Log.Info((_panelAbierto == PanelVista ? "ERROR: " : "") + "arrastre isla INICIADO" +
+                     (_panelAbierto == PanelVista ? " CON LA VISTA ABIERTA" : ""));
         }
 
         MoverVentanaA(_raizX + (int)Math.Round(dx), _raizY + (int)Math.Round(dy));

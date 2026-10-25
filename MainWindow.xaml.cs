@@ -70,7 +70,7 @@ public partial class MainWindow : Window
     DateTime _wpUltimo;
     string _ultimoColorEnviado = "";
 
-    const string FuenteIconos = "Segoe Fluent Icons, Segoe MDL2 Assets";
+    internal const string FuenteIconos = "Segoe Fluent Icons, Segoe MDL2 Assets";
 
     // Curvas: "Muelle" se pasa un pelín y vuelve (como la isla del iPhone), "Suave" frena sin rebote
     static readonly IEasingFunction Muelle = new BackEase { Amplitude = 0.35, EasingMode = EasingMode.EaseOut };
@@ -167,6 +167,9 @@ public partial class MainWindow : Window
                     Uso.Cargar();
                     _ = Fuentes.CargarApps();   // el índice del buscador se arma por detrás
                     MontarTeclaWindows();
+                    // El gestor de ventanas: una instantánea para toda la aplicación, al día
+                    // por los eventos de Windows en vez de por un sondeo.
+                    GestorVentanas.Arrancar(Dispatcher);
                     if (_cfg.Barra.Notificaciones && Notificaciones.Disponible)
                     {
                         Notificaciones.Arrancar();
@@ -192,6 +195,9 @@ public partial class MainWindow : Window
                      $"monitor ({_monitor.X},{_monitor.Y}) {_monitor.Ancho}x{_monitor.Alto} dpi={_monitor.Dpi} | " +
                      $"MaxApps={MaxAppsEfectivo} | {ResumenDelPanel()} | " +
                      $"Wallpaper Engine={WallpaperEngine.Exe ?? "no encontrado"}");
+
+            // El modo diagnóstico: solo la jefa, y después de que todo esté en marcha.
+            if (DiagVista.Encendido && _esJefa) await CorrerDiagnosticoDeLaVista();
         };
         Closed += (_, _) =>
         {
@@ -209,6 +215,7 @@ public partial class MainWindow : Window
             if (!_esJefa) return;                      // lo global lo desmonta solo la jefa
 
             Nativo.QuitarAtajo(_self, IdAtajoVista);   // el atajo vuelve a quien lo quiera
+            GestorVentanas.Parar();                    // y los ganchos de ventanas se sueltan
             _gancho?.Dispose();                        // y la tecla Windows vuelve a la normalidad
             Bandeja.Apagar();                          // los iconos vuelven a la bandeja de Explorer
             Notificaciones.Limpiar();                  // y la copia de su base se borra del temporal

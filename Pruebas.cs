@@ -70,6 +70,27 @@ public static class Pruebas
             SieteTemas();
             AltoDelPanel();
             Niveles();
+
+            // C4: ventanas reales
+            Filtro();
+            OrdenDeVentanas();
+            EstadosDeVentana();
+            Zonas();
+            ZonasDelPunto();
+            AreaDeTrabajo();
+            DpiYMonitores();
+            AltoDeLaVistaGeneral();
+            CuandoFalla();
+            AbrirYCerrarLaVista();
+            PlanDeAjuste();
+            EscConPrioridad();
+            QuienSeArrastra();
+            SoltarLaTarjeta();
+            QueHacerConUnAviso();
+            CuandoTocaFoto();
+            OrdenCongelado();
+            GlifoDelAspa();
+            GlifoDeLaCuadricula();
             AbrirYCerrar();
         }
         catch (Exception ex)
@@ -459,6 +480,673 @@ public static class Pruebas
     }
 
 
+
+    // ================= C4: gestor de ventanas =================
+    //
+    // Todo esto se comprueba con FICHAS INVENTADAS, no con ventanas de verdad. Es la
+    // razón de que `EsDelUsuario` reciba datos planos en vez de un HWND: una prueba que
+    // tuviera que abrir el Bloc de notas para comprobar el filtro acabaría cerrando
+    // ventanas del usuario, y eso no se hace.
+
+    const int ToolWindow = 0x00000080;
+    const int AppWindow = 0x00040000;
+    const int NoActivable = 0x08000000;
+
+    static Nativo.FichaVentana F(
+        string clase = "Notepad", int largoTitulo = 10, bool visible = true, bool dueno = false,
+        int estiloEx = 0, bool tapada = false, bool nuestra = false, int pid = 1234, long hwnd = 0x1000) =>
+        new((IntPtr)hwnd, visible, largoTitulo, dueno, estiloEx, 0, tapada, nuestra, clase, pid);
+
+    static void Filtro()
+    {
+        Grupo("ventanas: qué cuenta como ventana del usuario");
+
+        Vale(GestorVentanas.EsDelUsuario(F(), out _), "una ventana normal cuenta");
+
+        // Lo nuestro, fuera. Es lo primero que hay que acertar: si falla, "cerrar
+        // todas" o "forzar el cierre" podrían acabar matando a NubeBar.
+        Vale(!GestorVentanas.EsDelUsuario(F(nuestra: true), out var p1), "las de NubeBar no cuentan");
+        Igual("es de NubeBar", p1, "y se dice por qué");
+
+        Vale(!GestorVentanas.EsDelUsuario(F(visible: false), out _), "las invisibles no cuentan");
+        Vale(!GestorVentanas.EsDelUsuario(F(tapada: true), out _),
+             "las tapadas tampoco (otro escritorio virtual, o suspendida)");
+        Vale(!GestorVentanas.EsDelUsuario(F(estiloEx: ToolWindow), out var p2), "las tool window no cuentan");
+        Igual("es una ventana de herramientas", p2, "y se dice por qué");
+        Vale(!GestorVentanas.EsDelUsuario(F(estiloEx: NoActivable), out _),
+             "las que no se pueden activar no cuentan: pulsarlas no haría nada");
+
+        // Colgar de otra = ser su diálogo. La excepción documentada es APPWINDOW.
+        Vale(!GestorVentanas.EsDelUsuario(F(dueno: true), out _), "las que cuelgan de otra no cuentan");
+        Vale(GestorVentanas.EsDelUsuario(F(dueno: true, estiloEx: AppWindow), out _),
+             "salvo si piden explícitamente que se las trate como aplicación");
+
+        // El título vacío es sospechoso, pero NO es lo único que se mira: esa era la
+        // regla de antes y dejaba pasar el escritorio y la barra de tareas.
+        Vale(!GestorVentanas.EsDelUsuario(F(largoTitulo: 0), out var p3), "sin título no cuenta");
+        Igual("no tiene título", p3, "y se dice por qué");
+
+        foreach (var c in new[] { "Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd",
+                                  "Windows.UI.Core.CoreWindow", "MultitaskingViewFrame", "Button" })
+            Vale(!GestorVentanas.EsDelUsuario(F(clase: c), out _), $"la clase {c} es del sistema");
+
+        Vale(GestorVentanas.ClaseDelSistema("progman"), "las clases del sistema no distinguen mayúsculas");
+        Vale(!GestorVentanas.ClaseDelSistema("CabinetWClass"), "el Explorador sí es del usuario");
+        Vale(!GestorVentanas.ClaseDelSistema(null), "una clase nula no es del sistema");
+
+        Vale(!GestorVentanas.EsDelUsuario(F(hwnd: 0), out _), "un handle nulo no es nada");
+    }
+
+    static VentanaReal V(string titulo = "t", string app = "app", long hwnd = 1,
+                         bool activa = false, long ultimaVez = 0,
+                         EstadoVentana estado = EstadoVentana.Normal, int pid = 1) =>
+        new()
+        {
+            Hwnd = (IntPtr)hwnd, Titulo = titulo, App = app, Activa = activa,
+            UltimaVez = ultimaVez, Estado = estado, Pid = pid
+        };
+
+    static List<VentanaReal> Ordenadas(params VentanaReal[] v)
+    {
+        var l = v.ToList();
+        l.Sort(GestorVentanas.Comparar);
+        return l;
+    }
+
+    static void OrdenDeVentanas()
+    {
+        Grupo("ventanas: orden estable");
+
+        // La activa, siempre delante
+        var a = Ordenadas(V("b", hwnd: 2, ultimaVez: 9), V("a", hwnd: 1, activa: true, ultimaVez: 1));
+        Igual("a", a[0].Titulo, "la activa va primero aunque otra se usara después");
+
+        // Y después, por lo reciente
+        var b = Ordenadas(V("vieja", hwnd: 1, ultimaVez: 1), V("nueva", hwnd: 2, ultimaVez: 5));
+        Igual("nueva", b[0].Titulo, "después, la usada más recientemente");
+
+        // A igualdad total, por app, título y handle: siempre el mismo orden
+        var c1 = Ordenadas(V("z", "beta", 3), V("a", "alfa", 2), V("m", "alfa", 1));
+        var c2 = Ordenadas(V("m", "alfa", 1), V("z", "beta", 3), V("a", "alfa", 2));
+        Vale(c1.Select(x => x.Titulo).SequenceEqual(c2.Select(x => x.Titulo)),
+             "el orden no depende de cómo llegaron");
+        Igual("a", c1[0].Titulo, "a igualdad, por aplicación y título");
+
+        // Dos ventanas idénticas salvo el handle: siguen siendo dos y en orden fijo
+        var d = Ordenadas(V("igual", "app", 7), V("igual", "app", 3));
+        Igual(2, d.Count, "dos ventanas iguales no se funden");
+        Igual((IntPtr)3, d[0].Hwnd, "y desempata el handle");
+    }
+
+    static void EstadosDeVentana()
+    {
+        Grupo("ventanas: estados y nombres");
+
+        Igual("Minimizada", V(estado: EstadoVentana.Minimizada).Estampa, "se lee el estado minimizada");
+        Igual("Maximizada", V(estado: EstadoVentana.Maximizada).Estampa, "y maximizada");
+        Igual("Normal", V().Estampa, "y normal");
+
+        Igual("notepad", GestorVentanas.NombreDeApp(@"C:\Windows\system32\notepad.exe"), "el nombre sale de la ruta");
+        Igual("", GestorVentanas.NombreDeApp(""), "sin ruta no hay nombre");
+        Igual("", GestorVentanas.NombreDeApp("   "), "ni con espacios");
+
+        // Una ruta imposible no puede reventar: viene de preguntarle a otro proceso
+        try { GestorVentanas.NombreDeApp("??::\\<>|"); Vale(true, "una ruta imposible no revienta"); }
+        catch { Vale(false, "una ruta imposible no revienta"); }
+
+        // El tamaño sale del rectángulo
+        var v = V();
+        v.Rect = new Nativo.RECT { Izq = 10, Arr = 20, Der = 110, Aba = 220 };
+        Igual(100, v.Ancho, "el ancho sale del rectángulo");
+        Igual(200, v.Alto, "y el alto");
+    }
+
+    // ---------- Zonas de ajuste ----------
+
+    static Monitores.Info Pantalla(int x = 0, int y = 0, int w = 1920, int h = 1080,
+                                   int tx = 0, int ty = 0, int tw = 1920, int th = 1080, uint dpi = 96) =>
+        new(IntPtr.Zero, @"\\.\DISPLAY1", x, y, w, h, tx, ty, tw, th, true, dpi);
+
+    static void Zonas()
+    {
+        Grupo("ajuste: a dónde va cada zona");
+
+        var area = new Hueco(0, 0, 1920, 1080);
+
+        var izq = ZonasAjuste.Colocacion(Zona.Izquierda, area);
+        var der = ZonasAjuste.Colocacion(Zona.Derecha, area);
+        Igual(new Hueco(0, 0, 960, 1080), izq, "la mitad izquierda");
+        Igual(new Hueco(960, 0, 960, 1080), der, "la mitad derecha");
+        Igual(area.Ancho, izq.Ancho + der.Ancho, "las dos mitades suman el ancho entero");
+        Igual(izq.Derecha, der.X, "y se tocan sin dejar raya");
+
+        // Con un ancho impar tampoco queda raya
+        var impar = new Hueco(0, 0, 1921, 1080);
+        var i2 = ZonasAjuste.Colocacion(Zona.Izquierda, impar);
+        var d2 = ZonasAjuste.Colocacion(Zona.Derecha, impar);
+        Igual(1921, i2.Ancho + d2.Ancho, "con ancho impar siguen sumando el total");
+        Igual(i2.Derecha, d2.X, "y siguen tocándose");
+
+        Igual(area, ZonasAjuste.Colocacion(Zona.Maximizar, area), "maximizar es el área entera");
+        Igual(new Hueco(0, 0, 960, 540), ZonasAjuste.Colocacion(Zona.ArribaIzquierda, area), "cuarto superior izquierdo");
+        Igual(new Hueco(960, 540, 960, 540), ZonasAjuste.Colocacion(Zona.AbajoDerecha, area), "cuarto inferior derecho");
+
+        // Los cuatro cuartos cubren la pantalla entera sin solaparse
+        long suma = 0;
+        foreach (var z in new[] { Zona.ArribaIzquierda, Zona.ArribaDerecha, Zona.AbajoIzquierda, Zona.AbajoDerecha })
+        {
+            var c = ZonasAjuste.Colocacion(z, area);
+            suma += (long)c.Ancho * c.Alto;
+        }
+        Igual((long)area.Ancho * area.Alto, suma, "los cuatro cuartos cubren la pantalla exacta");
+
+        // Un área vacía no produce rectángulos absurdos
+        Vale(ZonasAjuste.Colocacion(Zona.Izquierda, new Hueco(0, 0, 0, 0)).Vacio, "un área vacía sigue vacía");
+    }
+
+    static void ZonasDelPunto()
+    {
+        Grupo("ajuste: qué zona pide el puntero");
+
+        var m = Pantalla();
+        Igual(Zona.Izquierda, ZonasAjuste.ZonaDelPunto(2, 540, m), "pegado al borde izquierdo");
+        Igual(Zona.Derecha, ZonasAjuste.ZonaDelPunto(1918, 540, m), "pegado al derecho");
+        Igual(Zona.Maximizar, ZonasAjuste.ZonaDelPunto(960, 2, m), "arriba del todo, en el centro");
+        Igual(Zona.ArribaIzquierda, ZonasAjuste.ZonaDelPunto(2, 2, m), "la esquina de arriba a la izquierda");
+        Igual(Zona.ArribaDerecha, ZonasAjuste.ZonaDelPunto(1918, 2, m), "la de arriba a la derecha");
+        Igual(Zona.AbajoIzquierda, ZonasAjuste.ZonaDelPunto(2, 1078, m), "la de abajo a la izquierda");
+        Igual(Zona.AbajoDerecha, ZonasAjuste.ZonaDelPunto(1918, 1078, m), "la de abajo a la derecha");
+        Igual(Zona.Ninguna, ZonasAjuste.ZonaDelPunto(960, 540, m), "en el centro no se ajusta nada");
+        Igual(Zona.Ninguna, ZonasAjuste.ZonaDelPunto(960, 900, m), "ni por abajo sin tocar el borde");
+
+        // Fuera del monitor, nada
+        Igual(Zona.Ninguna, ZonasAjuste.ZonaDelPunto(-50, 540, m), "a la izquierda del monitor, nada");
+        Igual(Zona.Ninguna, ZonasAjuste.ZonaDelPunto(3000, 540, m), "y a la derecha tampoco");
+
+        // Un monitor que no empieza en 0,0: el segundo de un escritorio extendido
+        var dos = Pantalla(x: 1920, y: 0, w: 2560, h: 1440, tx: 1920, tw: 2560, th: 1440);
+        Igual(Zona.Izquierda, ZonasAjuste.ZonaDelPunto(1922, 700, dos), "el borde izquierdo del segundo monitor");
+        Igual(Zona.Derecha, ZonasAjuste.ZonaDelPunto(4478, 700, dos), "y su borde derecho");
+        Igual(Zona.Ninguna, ZonasAjuste.ZonaDelPunto(10, 700, dos), "un punto del primero no es de este");
+
+        // Un monitor diminuto no puede dar zonas absurdas
+        var enano = Pantalla(w: 20, h: 20, tw: 20, th: 20);
+        Vale(ZonasAjuste.ZonaDelPunto(10, 10, enano) != Zona.Ninguna, "en una pantalla diminuta todo es borde");
+        Igual(Zona.Ninguna, ZonasAjuste.ZonaDelPunto(0, 0, Pantalla(w: 0, h: 0)), "un monitor de tamaño cero no da zonas");
+    }
+
+    static void AreaDeTrabajo()
+    {
+        Grupo("ajuste: el área útil con la barra en cada borde");
+
+        // Lo que Windows llama área de trabajo ya trae descontada la franja de una
+        // AppBar registrada. Se comprueba con las cuatro posiciones de NubeBar.
+        const int franja = 48;
+
+        var arriba = Pantalla(ty: franja, th: 1080 - franja);
+        var a = ZonasAjuste.AreaUtil(arriba);
+        Igual(franja, a.Y, "con la barra arriba, el área empieza más abajo");
+        Igual(1080 - franja, a.Alto, "y es más baja");
+        Igual(franja, ZonasAjuste.Colocacion(Zona.Izquierda, a).Y, "y la mitad izquierda no se mete debajo");
+
+        var abajo = Pantalla(th: 1080 - franja);
+        var b = ZonasAjuste.AreaUtil(abajo);
+        Igual(0, b.Y, "con la barra abajo, el área empieza arriba del todo");
+        Igual(1080 - franja, b.Abajo, "y termina antes de la barra");
+        Igual(1080 - franja, ZonasAjuste.Colocacion(Zona.AbajoDerecha, b).Abajo, "y el cuarto inferior tampoco la pisa");
+
+        var izquierda = Pantalla(tx: franja, tw: 1920 - franja);
+        var c = ZonasAjuste.AreaUtil(izquierda);
+        Igual(franja, c.X, "con la barra a la izquierda, el área empieza a su derecha");
+        Igual(franja, ZonasAjuste.Colocacion(Zona.Izquierda, c).X, "y la mitad izquierda empieza ahí");
+
+        var derecha = Pantalla(tw: 1920 - franja);
+        var d = ZonasAjuste.AreaUtil(derecha);
+        Igual(1920 - franja, d.Derecha, "con la barra a la derecha, el área termina antes");
+        Igual(1920 - franja, ZonasAjuste.Colocacion(Zona.Derecha, d).Derecha, "y la mitad derecha no la pisa");
+
+        // Y la cuenta de restar una franja a mano, para cuando haga falta
+        var entero = new Hueco(0, 0, 1920, 1080);
+        Igual(new Hueco(0, 40, 1920, 1040), entero.Menos("arriba", 40), "restar por arriba");
+        Igual(new Hueco(0, 0, 1920, 1040), entero.Menos("abajo", 40), "restar por abajo");
+        Igual(new Hueco(40, 0, 1880, 1080), entero.Menos("izquierda", 40), "restar por la izquierda");
+        Igual(new Hueco(0, 0, 1880, 1080), entero.Menos("derecha", 40), "restar por la derecha");
+        Igual(entero, entero.Menos("arriba", 0), "restar cero no cambia nada");
+        Igual(entero, entero.Menos("loquesea", 40), "un borde desconocido no cambia nada");
+        Vale(!entero.Menos("arriba", 99999).Vacio, "una franja absurda no deja el área vacía");
+    }
+
+    static void DpiYMonitores()
+    {
+        Grupo("ajuste: DPI y varios monitores");
+
+        // El ajuste trabaja en PÍXELES de pantalla, no en unidades de WPF: por eso el
+        // DPI no cambia las cuentas. Lo que cambia con el DPI es cuánto mide eso en la
+        // pantalla, y de eso se encarga Windows.
+        foreach (uint dpi in new uint[] { 96, 120, 144, 192 })
+        {
+            var m = Pantalla(dpi: dpi);
+            var izq = ZonasAjuste.Colocacion(Zona.Izquierda, ZonasAjuste.AreaUtil(m));
+            Igual(960, izq.Ancho, $"a {dpi} ppp la mitad sigue siendo la mitad en píxeles");
+            Igual(Zona.Izquierda, ZonasAjuste.ZonaDelPunto(2, 540, m), $"y el borde sigue siendo el borde a {dpi} ppp");
+        }
+
+        // Dos monitores con DPI distinto: cada uno manda en lo suyo
+        var principal = Pantalla(w: 3840, h: 2160, tw: 3840, th: 2160, dpi: 192);
+        var segundo = Pantalla(x: 3840, w: 1920, h: 1080, tx: 3840, tw: 1920, th: 1080, dpi: 96);
+        Igual(1920, ZonasAjuste.Colocacion(Zona.Izquierda, ZonasAjuste.AreaUtil(principal)).Ancho,
+              "la mitad del 4K son 1920 px");
+        Igual(960, ZonasAjuste.Colocacion(Zona.Izquierda, ZonasAjuste.AreaUtil(segundo)).Ancho,
+              "y la del 1080p, 960");
+        Igual(3840, ZonasAjuste.Colocacion(Zona.Izquierda, ZonasAjuste.AreaUtil(segundo)).X,
+              "la mitad del segundo monitor empieza donde empieza él");
+    }
+
+    static void AltoDeLaVistaGeneral()
+    {
+        Grupo("vista general: el alto de la tarjeta");
+
+        foreach (var (alto, que) in new[]
+        {
+            (768.0, "portátil 1366x768"), (1080.0, "1080p"), (1440.0, "1440p"), (1920.0, "vertical"),
+        })
+        {
+            double vacia = MainWindow.AltoDeLaVista(0, 1, alto);
+            double pocas = MainWindow.AltoDeLaVista(2, 2, alto);
+            double muchas = MainWindow.AltoDeLaVista(24, 4, alto);
+
+            Vale(vacia >= 150, $"[{que}] el estado vacío tiene sitio para su mensaje ({vacia:0})");
+            Vale(pocas <= muchas, $"[{que}] con más ventanas la vista no encoge");
+            Vale(muchas <= alto * 0.73 + 1, $"[{que}] y nunca pasa del 72 % de la pantalla ({muchas:0} de {alto:0})");
+            Vale(muchas >= 260, $"[{que}] pero siempre cabe algo ({muchas:0})");
+        }
+        Vale(MainWindow.AltoDeLaVista(40, 4, 200) >= 260, "en una pantalla de 200 px sigue siendo sensato");
+    }
+
+    // ---------- Lo que pasa cuando algo falla ----------
+
+    static void CuandoFalla()
+    {
+        Grupo("ventanas: cuando algo no se puede");
+
+        // Un handle muerto no revienta nada, y ninguna acción lo intenta a ciegas
+        var muerta = (IntPtr)0x7FFFFFFF;
+        Vale(!Nativo.Existe(IntPtr.Zero), "el handle nulo no existe");
+        Vale(!Nativo.Existe(muerta), "un handle inventado no existe");
+        Vale(!ZonasAjuste.Ajustar(muerta, Zona.Izquierda), "ajustar una ventana que no existe no hace nada");
+        Vale(!ZonasAjuste.Ajustar(IntPtr.Zero, Zona.Maximizar), "ni la nula");
+        Vale(!ZonasAjuste.Ajustar((IntPtr)1, Zona.Ninguna), "ni a ninguna zona");
+
+        // Y colocar tampoco
+        Vale(!Nativo.ColocarVentanaDelUsuario(muerta, 0, 0, 100, 100), "colocar una que no existe falla sin romper");
+
+        // La foto de una ventana que no existe es null, no una excepción: la tarjeta
+        // tiene que poder enseñar el icono en vez de un rectángulo roto.
+        Vale(Nativo.Foto(muerta, 200) == null, "la foto de una ventana muerta es nula");
+        Vale(Nativo.Foto(IntPtr.Zero, 200) == null, "y la de la nula también");
+
+        // El icono tampoco revienta
+        try { Nativo.Icono(muerta); Vale(true, "pedir el icono de una ventana muerta no revienta"); }
+        catch { Vale(false, "pedir el icono de una ventana muerta no revienta"); }
+
+        // Un título de una ventana que no existe es vacío, no nulo
+        Igual("", Nativo.Titulo(muerta), "el título de una ventana muerta es vacío");
+    }
+    static void AbrirYCerrarLaVista()
+    {
+        Grupo("vista general: abrir y cerrar muchas veces");
+
+        // Lo que se rompe al abrir y cerrar es el aviso de cambio: si cada apertura se
+        // suscribe y ninguna se da de baja, a la décima vez la vista se repinta diez
+        // veces por ventana. Se comprueba que el contrato aguanta.
+        int avisos = 0;
+        var ultimo = GestorVentanas.Cambios.Nada;
+        void Oyente(GestorVentanas.Cambios que, GestorVentanas.Motivo m) { avisos++; ultimo = que; }
+
+        for (int i = 0; i < 20; i++) { GestorVentanas.Cambio += Oyente; GestorVentanas.Cambio -= Oyente; }
+        GestorVentanas.Refrescar();
+        Igual(0, avisos, "sin oyentes vivos no se avisa a nadie");
+
+        GestorVentanas.Cambio += Oyente;
+        GestorVentanas.Refrescar();
+        int trasElPrimero = avisos;
+        GestorVentanas.Cambio -= Oyente;
+        GestorVentanas.Refrescar();
+        Igual(trasElPrimero, avisos, "al darse de baja deja de avisar");
+
+        // ---------- Y el contrato NUEVO: sin cambios no se avisa ----------
+        //
+        // Esto es la mitad del arreglo del parpadeo. Antes se avisaba en CADA refresco, y
+        // como el refresco lo pedía cualquier evento de Windows —incluidos los de
+        // nuestras propias ventanas al animarse—, la vista se rehacía sola sin parar.
+        int sueltos = 0;
+        void Contador(GestorVentanas.Cambios que, GestorVentanas.Motivo m) => sueltos++;
+        GestorVentanas.Cambio += Contador;
+        GestorVentanas.Refrescar();          // este puede avisar: viene de los de arriba
+        sueltos = 0;
+        for (int i = 0; i < 8; i++) GestorVentanas.Refrescar();
+        GestorVentanas.Cambio -= Contador;
+        // Ocho refrescos seguidos sin tocar nada: como mucho avisa alguno si el usuario
+        // movió el ratón sobre otra ventana por el camino, pero no ocho.
+        Vale(sueltos <= 2, $"ocho refrescos sin cambios no dan ocho avisos (dio {sueltos})");
+
+        // Refrescar muchas veces seguidas deja la lista coherente y sin repetidos
+        for (int i = 0; i < 10; i++) GestorVentanas.Refrescar();
+        var handles = GestorVentanas.Todas.Select(v => v.Hwnd).ToList();
+        Igual(handles.Count, handles.Distinct().Count(), "no hay ventanas repetidas");
+        Vale(GestorVentanas.Todas.All(v => Nativo.Existe(v.Hwnd)), "todas las de la lista existen de verdad");
+        Vale(GestorVentanas.Todas.All(v => !Nativo.EsNuestra(v.Hwnd)), "y ninguna es de NubeBar");
+        Vale(GestorVentanas.Todas.Count(v => v.Activa) <= 1, "activa hay como mucho una");
+
+        // El orden que devuelve es el que dice Comparar
+        var copia = GestorVentanas.Todas.ToList();
+        var reordenada = copia.ToList();
+        reordenada.Sort(GestorVentanas.Comparar);
+        Vale(copia.Select(v => v.Hwnd).SequenceEqual(reordenada.Select(v => v.Hwnd)),
+             "la lista ya viene ordenada");
+
+        // Y filtrar por aplicación no inventa nada
+        foreach (var app in GestorVentanas.Aplicaciones())
+            Vale(GestorVentanas.Todas.Any(v => v.App.Equals(app, StringComparison.OrdinalIgnoreCase)),
+                 $"la aplicación \"{app}\" de la lista de filtros existe");
+    }
+
+    // ================= C4.3: congelar la vista =================
+
+    static void QueHacerConUnAviso()
+    {
+        Grupo("vista general: un aviso no rehace la cuadrícula");
+
+        const bool abierta = true;
+        var G = GestorVentanas.Cambios.Nada;
+
+        // Lo único que justifica tocar la rejilla es que la LISTA cambie.
+        Igual(MainWindow.QueHacerConElAviso.TocarLaRejilla,
+              MainWindow.QueHacer(GestorVentanas.Cambios.Lista, abierta, false, false),
+              "que aparezca o desaparezca una ventana sí toca la rejilla");
+
+        // Y esto es el parpadeo: antes, cada uno de estos rehacía la vista entera.
+        Igual(MainWindow.QueHacerConElAviso.SoloActualizar,
+              MainWindow.QueHacer(GestorVentanas.Cambios.Activa, abierta, false, false),
+              "cambiar de ventana activa solo actualiza el indicador");
+        Igual(MainWindow.QueHacerConElAviso.SoloActualizar,
+              MainWindow.QueHacer(GestorVentanas.Cambios.Titulos, abierta, false, false),
+              "un título nuevo solo cambia una línea de texto");
+        Igual(MainWindow.QueHacerConElAviso.SoloActualizar,
+              MainWindow.QueHacer(GestorVentanas.Cambios.Estados, abierta, false, false),
+              "minimizar o restaurar solo cambia el estado de su tarjeta");
+        Igual(MainWindow.QueHacerConElAviso.SoloActualizar,
+              MainWindow.QueHacer(GestorVentanas.Cambios.Sitios, abierta, false, false),
+              "y moverse de sitio, el subtítulo");
+
+        Igual(MainWindow.QueHacerConElAviso.Nada,
+              MainWindow.QueHacer(G, abierta, false, false),
+              "sin cambios, no se hace nada");
+        Igual(MainWindow.QueHacerConElAviso.Nada,
+              MainWindow.QueHacer(GestorVentanas.Cambios.Lista, false, false, false),
+              "con la vista cerrada, nada de nada");
+
+        // Con el menú abierto o una tarjeta cogida se aplaza: tocar la rejilla justo
+        // entonces destruye lo que el usuario está usando.
+        Igual(MainWindow.QueHacerConElAviso.Aplazar,
+              MainWindow.QueHacer(GestorVentanas.Cambios.Lista, abierta, menuAbierto: true, false),
+              "con el menú abierto se aplaza");
+        Igual(MainWindow.QueHacerConElAviso.Aplazar,
+              MainWindow.QueHacer(GestorVentanas.Cambios.Lista, abierta, false, arrastrandoTarjeta: true),
+              "y arrastrando una tarjeta, también");
+
+        // Lo importante, para todas las combinaciones: NADA que no sea un cambio de lista
+        // puede acabar tocando la rejilla.
+        foreach (GestorVentanas.Cambios c in Enum.GetValues<GestorVentanas.Cambios>())
+        {
+            if ((c & GestorVentanas.Cambios.Lista) != 0) continue;
+            Vale(MainWindow.QueHacer(c, abierta, false, false) != MainWindow.QueHacerConElAviso.TocarLaRejilla,
+                 $"{c} no toca la rejilla");
+        }
+
+        // Y con las banderas combinadas, la lista sigue mandando
+        var todo = GestorVentanas.Cambios.Lista | GestorVentanas.Cambios.Activa |
+                   GestorVentanas.Cambios.Titulos | GestorVentanas.Cambios.Estados;
+        Igual(MainWindow.QueHacerConElAviso.TocarLaRejilla,
+              MainWindow.QueHacer(todo, abierta, false, false),
+              "si entre todo lo que cambió está la lista, se toca la rejilla");
+    }
+
+    static void CuandoTocaFoto()
+    {
+        Grupo("vista general: las miniaturas no se rehacen por todo");
+
+        var minimo = TimeSpan.FromSeconds(3);
+        var reciente = TimeSpan.FromMilliseconds(200);
+        var vieja = TimeSpan.FromSeconds(10);
+        var M = GestorVentanas.Motivo.AMano;
+
+        Vale(MainWindow.TocaFoto(nueva: true, false, TimeSpan.Zero, M, minimo),
+             "una tarjeta recién creada pide su foto");
+        Vale(!MainWindow.TocaFoto(nueva: true, minimizada: true, TimeSpan.Zero, M, minimo),
+             "pero una minimizada no: PrintWindow no tiene nada que dibujar");
+        Vale(!MainWindow.TocaFoto(false, minimizada: true, vieja, M, minimo),
+             "y da igual cuánto haga de la última");
+
+        // Esto es lo que hacía que cada Alt+Tab disparara una captura por tarjeta
+        Vale(!MainWindow.TocaFoto(false, false, vieja, GestorVentanas.Motivo.PrimerPlano, minimo),
+             "cambiar de ventana activa NO vuelve a fotografiar nada");
+
+        Vale(!MainWindow.TocaFoto(false, false, reciente, M, minimo),
+             "recién hecha, no se repite");
+        Vale(MainWindow.TocaFoto(false, false, vieja, M, minimo),
+             "pasado el mínimo, sí");
+        Vale(MainWindow.TocaFoto(false, false, minimo, M, minimo),
+             "justo en el mínimo cuenta");
+
+        // Una ráfaga de avisos no puede dar una foto por aviso
+        int fotos = 0;
+        var desde = TimeSpan.Zero;
+        for (int i = 0; i < 50; i++)
+        {
+            desde += TimeSpan.FromMilliseconds(40);     // 2 segundos de ráfaga
+            if (MainWindow.TocaFoto(false, false, desde, M, minimo)) fotos++;
+        }
+        Igual(0, fotos, "cincuenta avisos en dos segundos no piden ninguna foto de más");
+    }
+
+    static void OrdenCongelado()
+    {
+        Grupo("vista general: el orden se congela al abrir");
+
+        // La instantánea pone la ACTIVA primero, y eso cambia al cambiar el foco. La
+        // vista no puede seguir ese orden mientras está abierta o las tarjetas se
+        // recolocan solas, que es lo que se veía.
+        var a = new VentanaReal { Hwnd = new IntPtr(1), Titulo = "A", App = "a", UltimaVez = 1 };
+        var b = new VentanaReal { Hwnd = new IntPtr(2), Titulo = "B", App = "b", UltimaVez = 2 };
+        var c = new VentanaReal { Hwnd = new IntPtr(3), Titulo = "C", App = "c", UltimaVez = 3 };
+
+        var lista = new List<VentanaReal> { a, b, c };
+        lista.Sort(GestorVentanas.Comparar);
+        var antes = lista.Select(v => v.Hwnd).ToList();
+
+        // Ahora A pasa a ser la activa: en la instantánea se va a la cabeza
+        a.Activa = true;
+        lista.Sort(GestorVentanas.Comparar);
+        var despues = lista.Select(v => v.Hwnd).ToList();
+        Vale(!antes.SequenceEqual(despues), "la instantánea SÍ reordena al cambiar la activa");
+        Igual(new IntPtr(1), despues[0], "y la activa se pone primera");
+
+        // Y la reconciliación de la vista, con el orden congelado, no se mueve
+        var congelado = new List<IntPtr> { new(1), new(2), new(3) };
+        var vivas = new List<IntPtr> { new(1), new(2), new(3) };
+        var reconciliado = MainWindow.OrdenReconciliado(congelado, vivas);
+        Vale(congelado.SequenceEqual(reconciliado), "con las mismas ventanas, el orden no cambia");
+
+        // Una que se va deja su hueco y las demás no se mueven
+        vivas = new List<IntPtr> { new(1), new(3) };
+        reconciliado = MainWindow.OrdenReconciliado(congelado, vivas);
+        Vale(new List<IntPtr> { new(1), new(3) }.SequenceEqual(reconciliado),
+             "la que desaparece se quita y las demás se quedan en su orden");
+
+        // Y una nueva se pone AL FINAL, nunca en medio
+        vivas.Add(new IntPtr(2));
+        vivas.Add(new IntPtr(9));
+        reconciliado = MainWindow.OrdenReconciliado(congelado, vivas);
+        Igual(new IntPtr(9), reconciliado[^1], "la nueva va al final");
+        Vale(new List<IntPtr> { new(1), new(2), new(3), new(9) }.SequenceEqual(reconciliado),
+             "y las que ya estaban no se han movido");
+
+        // Las filas, que es lo único que justifica remedir el panel
+        Igual(1, MainWindow.Filas(3, 4), "tres tarjetas en cuatro columnas son una fila");
+        Igual(2, MainWindow.Filas(5, 4), "cinco son dos");
+        Igual(0, MainWindow.Filas(0, 4), "ninguna son cero filas");
+        Igual(1, MainWindow.Filas(1, 0), "y con cero columnas no se divide por cero");
+    }
+
+    static void GlifoDelAspa()
+    {
+        Grupo("vista general: el icono del aspa");
+
+        // Mismo trato que el de la cuadrícula: construido desde el número, porque escrito
+        // como carácter literal de la zona de uso privado se pierde al reescribir el
+        // archivo y el botón se queda funcionando pero invisible.
+        var g = MainWindow.GlifoAspa;
+        Igual(1, g.Length, "es un solo carácter");
+        Igual(0xE711, (int)g[0], "y es el Cancel de Segoe Fluent");
+        Vale(g[0] >= 0xE000 && g[0] <= 0xF8FF, "está en la zona de uso privado de Unicode");
+        Vale(MainWindow.GlifoAspa != MainWindow.GlifoCuadricula, "y no es el mismo que el de la cuadrícula");
+    }
+
+    // ================= C4.1b: los cuatro fallos de la prueba visual =================
+
+    static void PlanDeAjuste()
+    {
+        Grupo("ajuste: restaurar, colocar y DESPUÉS activar");
+
+        // El fallo: la ventana se colocaba bien y se quedaba detrás. Mover no activa.
+        var elegida = ZonasAjuste.Plan(Zona.Izquierda, EstadoVentana.Normal, activar: true);
+        Vale(elegida.Contains(ZonasAjuste.Paso.Activar), "elegirla desde la vista la activa");
+        Igual(ZonasAjuste.Paso.Activar, elegida[^1], "y activar va al FINAL, después de colocarla");
+        Igual(ZonasAjuste.Paso.Colocar, elegida[0], "una ventana normal se coloca sin más");
+
+        // Restaurar va primero o Windows ignora el movimiento
+        foreach (var estado in new[] { EstadoVentana.Minimizada, EstadoVentana.Maximizada })
+        {
+            var p = ZonasAjuste.Plan(Zona.Derecha, estado, activar: true);
+            Igual(ZonasAjuste.Paso.Restaurar, p[0], $"una {estado} se restaura ANTES de colocarla");
+            Igual(ZonasAjuste.Paso.Colocar, p[1], "y después se coloca");
+            Igual(ZonasAjuste.Paso.Activar, p[2], "y al final se activa");
+            Igual(3, p.Count, "tres pasos, sin repetir");
+        }
+
+        // Maximizar se le pide a la ventana; no se le impone el rectángulo
+        var max = ZonasAjuste.Plan(Zona.Maximizar, EstadoVentana.Normal, activar: true);
+        Vale(max.Contains(ZonasAjuste.Paso.Maximizar), "maximizar usa el mensaje de maximizar");
+        Vale(!max.Contains(ZonasAjuste.Paso.Colocar), "y no coloca un rectángulo a mano");
+        Igual(ZonasAjuste.Paso.Activar, max[^1], "y también activa al final");
+
+        var maxDesdeMin = ZonasAjuste.Plan(Zona.Maximizar, EstadoVentana.Minimizada, activar: true);
+        Igual(ZonasAjuste.Paso.Restaurar, maxDesdeMin[0], "maximizar una minimizada la restaura primero");
+
+        // Sin elección del usuario no se roba el foco: una recolocación de fondo no activa
+        var fondo = ZonasAjuste.Plan(Zona.Izquierda, EstadoVentana.Normal, activar: false);
+        Vale(!fondo.Contains(ZonasAjuste.Paso.Activar), "colocar sin elegir NO activa");
+
+        Igual(0, ZonasAjuste.Plan(Zona.Ninguna, EstadoVentana.Normal, true).Count, "sin zona no hay plan");
+
+        // Y ninguna combinación produce un plan vacío o con pasos repetidos
+        foreach (Zona z in Enum.GetValues<Zona>())
+            foreach (EstadoVentana e in Enum.GetValues<EstadoVentana>())
+                foreach (bool act in new[] { true, false })
+                {
+                    if (z == Zona.Ninguna) continue;
+                    var p = ZonasAjuste.Plan(z, e, act);
+                    Vale(p.Count > 0, $"{z}/{e}/activar={act} tiene plan");
+                    Igual(p.Count, p.Distinct().Count(), $"{z}/{e}/activar={act} no repite pasos");
+                }
+    }
+
+    static void EscConPrioridad()
+    {
+        Grupo("vista general: Esc cierra primero el menú");
+
+        Igual(MainWindow.QueCierra.Menu, MainWindow.EscCierra(vistaAbierta: true, menuAbierto: true),
+              "con el menú abierto, Esc cierra el menú");
+        Igual(MainWindow.QueCierra.Vista, MainWindow.EscCierra(vistaAbierta: true, menuAbierto: false),
+              "y con la vista sola, cierra la vista");
+        Igual(MainWindow.QueCierra.Nada, MainWindow.EscCierra(vistaAbierta: false, menuAbierto: false),
+              "sin vista, Esc no es asunto suyo");
+        Igual(MainWindow.QueCierra.Nada, MainWindow.EscCierra(vistaAbierta: false, menuAbierto: true),
+              "ni aunque quedara un menú colgado");
+
+        // Dos Esc seguidos: menú y después vista. Nunca los dos de una.
+        bool menu = true;
+        var primero = MainWindow.EscCierra(true, menu);
+        if (primero == MainWindow.QueCierra.Menu) menu = false;
+        var segundo = MainWindow.EscCierra(true, menu);
+        Igual(MainWindow.QueCierra.Vista, segundo, "el segundo Esc cierra la vista");
+    }
+
+    static void QuienSeArrastra()
+    {
+        Grupo("vista general: arrastrar una tarjeta no mueve la nube");
+
+        Igual(MainWindow.QuienArrastra.Tarjeta,
+              MainWindow.ArrastraAlPulsar(vistaAbierta: true, enBotonDeLaTarjeta: false,
+                                          menuAbierto: false, islaArrastrable: true),
+              "con la vista abierta, el cuerpo de una tarjeta arrastra la VENTANA");
+
+        Igual(MainWindow.QuienArrastra.Isla,
+              MainWindow.ArrastraAlPulsar(false, false, false, islaArrastrable: true),
+              "sin la vista, la isla se arrastra como siempre");
+
+        Igual(MainWindow.QuienArrastra.Nadie,
+              MainWindow.ArrastraAlPulsar(false, false, false, islaArrastrable: false),
+              "y con el arrastre de la isla apagado, nadie");
+
+        // Los botones de la tarjeta y el menú no empiezan un arrastre
+        Igual(MainWindow.QuienArrastra.Nadie,
+              MainWindow.ArrastraAlPulsar(true, enBotonDeLaTarjeta: true, false, true),
+              "el aspa de la tarjeta no arrastra");
+        Igual(MainWindow.QuienArrastra.Nadie,
+              MainWindow.ArrastraAlPulsar(true, false, menuAbierto: true, true),
+              "con el menú abierto tampoco");
+
+        // Lo importante: con la vista abierta la isla NUNCA se arrastra
+        foreach (bool boton in new[] { true, false })
+            foreach (bool menu in new[] { true, false })
+                Vale(MainWindow.ArrastraAlPulsar(true, boton, menu, true) != MainWindow.QuienArrastra.Isla,
+                     $"con la vista abierta la nube no se mueve (boton={boton}, menu={menu})");
+    }
+
+    static void SoltarLaTarjeta()
+    {
+        Grupo("vista general: soltar la tarjeta");
+
+        Vale(MainWindow.AjustaAlSoltar(seMovio: true, Zona.Izquierda), "soltada en un borde, se ajusta");
+        Vale(MainWindow.AjustaAlSoltar(true, Zona.ArribaDerecha), "y en una esquina también");
+        Vale(!MainWindow.AjustaAlSoltar(true, Zona.Ninguna), "soltada en medio, no se toca nada");
+        Vale(!MainWindow.AjustaAlSoltar(seMovio: false, Zona.Izquierda),
+             "un clic sin mover no es un arrastre: eso es pulsar la tarjeta");
+        Vale(!MainWindow.AjustaAlSoltar(false, Zona.Ninguna), "ni lo uno ni lo otro");
+    }
+
+
+    static void GlifoDeLaCuadricula()
+    {
+        Grupo("vista general: el icono de la cuadrícula");
+
+        var g = MainWindow.GlifoCuadricula;
+        Vale(!string.IsNullOrEmpty(g), "el glifo no está vacío");
+        Igual(1, g.Length, "es un solo carácter");
+        Igual(0xE8A9, (int)g[0], "y es el de siempre (GridView de Segoe Fluent)");
+
+        // Zona de uso privado: fuera de ahí, la fuente de iconos no lo tendría y
+        // saldría una caja.
+        Vale(g[0] >= 0xE000 && g[0] <= 0xF8FF, "está en la zona de uso privado de Unicode");
+        Vale(!char.IsWhiteSpace(g[0]) && !char.IsControl(g[0]), "no es un espacio ni un carácter de control");
+
+        // Y la fuente de iconos sigue estando donde se la busca
+        Vale(!string.IsNullOrWhiteSpace(MainWindow.FuenteIconos), "la fuente de iconos tiene nombre");
+        Vale(MainWindow.FuenteIconos.Contains("Segoe", StringComparison.OrdinalIgnoreCase),
+             $"y es una Segoe ({MainWindow.FuenteIconos})");
+    }
     // ---------- El panel en los siete temas ----------
     //
     // Esto es la parte comprobable de la "verificación visual": que los colores que usa

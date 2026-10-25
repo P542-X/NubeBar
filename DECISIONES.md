@@ -3122,3 +3122,437 @@ en bucle.
 Que sea bonito. El contraste se mide; la composición hay que mirarla. Y la agrupación
 visual en la barra vertical depende de la ventana superpuesta de C1, que ya tenía su
 propia verificación pero no con este contenido dentro.
+
+## Fase C4.1 · Ventanas reales
+
+Hasta aquí, «qué ventanas hay» era una pregunta que cada sitio contestaba por su cuenta:
+el carrusel enumeraba y agrupaba, la vista general reusaba los grupos del carrusel, y el
+buscador miraba otra vez. Tres recorridos por segundo y tres criterios parecidos pero no
+iguales.
+
+Y lo peor: el criterio —qué ventana es «del usuario»— vivía dentro de una lambda de
+`EnumWindows`. Para comprobarlo había que abrir ventanas de verdad, que es justo lo que
+una prueba no debe hacer en el escritorio de alguien.
+
+### La decisión, en una función pura
+
+`GestorVentanas.EsDelUsuario` recibe una **ficha de datos planos** —visible, largo del
+título, si tiene dueño, los estilos, si está tapada, la clase, el pid— y devuelve si
+cuenta, y por qué no si no cuenta. Eso permite probarla con fichas inventadas, y es toda
+la diferencia entre tener pruebas de filtrado y no tenerlas.
+
+Las reglas, en orden, porque el orden importa:
+
+1. no visible, nuestra, o **tapada** (`DWMWA_CLOAKED`: otro escritorio virtual, o una
+   app de la Store suspendida);
+2. `WS_EX_TOOLWINDOW` — por definición no sale en la barra de tareas;
+3. `WS_EX_NOACTIVATE` — pulsarla no haría nada, así que en una vista de ventanas sobra;
+4. tiene dueño **y** no pide `WS_EX_APPWINDOW` — es un diálogo o una paleta. La
+   excepción es la forma documentada de decir «aunque cuelgue, trátame como aplicación»,
+   y sin ella se perdían ventanas de verdad;
+5. clase del sistema (`Progman`, `WorkerW`, `Shell_TrayWnd`, `Windows.UI.Core.CoreWindow`,
+   `MultitaskingViewFrame`…);
+6. y solo al final, el título vacío.
+
+**El título ya no es la primera regla ni la única.** Antes lo era, y por eso dejaba pasar
+el escritorio y la barra de tareas, que tienen título y son visibles.
+
+`Nativo.VentanasAbiertas` ahora delega en esta misma función: una regla, un sitio.
+
+### Windows avisa, no hace falta preguntar
+
+El carrusel sondeaba cada segundo. `SetWinEventHook` fuera de contexto dice cuándo se
+crea, se destruye, se activa, se minimiza, se restaura o cambia de nombre una ventana,
+**sin inyectar ninguna DLL en otros procesos y sin un proceso residente**.
+
+Dos cosas que hay que hacer bien o no funciona:
+
+- **El delegado se guarda en un campo estático.** Si se deja que lo recoja el recolector
+  de basura, la siguiente llamada de Windows salta a memoria liberada y tira el proceso.
+  Es el error clásico de esta API y no da ningún aviso hasta que pasa.
+- **Nada de tocar la interfaz en el callback.** Lo único que hace es encender un
+  temporizador del `Dispatcher`. Los eventos llegan a ráfagas —abrir el Explorador
+  dispara crear, mostrar, nombre y primer plano en pocos milisegundos— así que se marca
+  «hay que mirar» y se mira una vez, 90 ms después. Y mientras el usuario arrastra una
+  ventana, `EVENT_OBJECT_LOCATIONCHANGE` se ignora entero: son cientos de avisos por
+  segundo y lo que interesa es dónde la suelta.
+
+Se sueltan con `UnhookWinEvent` al cerrar. Morirían igualmente con el proceso, pero
+dejarlo explícito es lo que permite decir que no hay fugas.
+
+### Las miniaturas no son de DWM, y no es por pereza
+
+`DwmRegisterThumbnail` es la vía oficial y la que usa la barra de tareas. **Aquí no
+sirve**: una miniatura de DWM se compone encima de la ventana de destino y **no se
+compone dentro de una ventana por capas**. Todas las de NubeBar lo son — la isla es
+redondeada y translúcida, y eso en WPF es `AllowsTransparency`, que es `WS_EX_LAYERED`.
+Usarlas significaría renunciar a la isla.
+
+Así que se le pide a la ventana que se dibuje: `PrintWindow` con `PW_RENDERFULLCONTENT`.
+Sale un mapa de bits de verdad que va **dentro** del WPF, se recorta con las esquinas
+redondeadas como cualquier imagen y se desplaza con el panel. Lo que no da es vídeo en
+directo, y para una vista general no hace falta.
+
+Cada foto cuesta entre 5 y 20 ms, así que se sacan por detrás y cada tarjeta se rellena
+cuando llega la suya. Mientras tanto enseña su icono, que es también lo que queda si la
+foto no sale (juegos, algunas ventanas aceleradas por hardware). Y una ventana minimizada
+no se fotografía porque no tiene nada que dibujar: la tarjeta lo dice en vez de dejar un
+hueco gris que parece un fallo.
+
+### La vista general es un panel, no una ventana nueva
+
+Misma decisión que el centro de notificaciones de C3, por el mismo motivo: con la isla
+horizontal se despliega el cajón y con la barra vertical `AbrirPanel` deriva a la ventana
+superpuesta de C1. Los cuatro bordes salen gratis.
+
+Lo que sí cambió es **qué enseña**: antes solo las ventanas de ESTE monitor, agrupadas
+por ejecutable y recortadas por lo que cupiera; ahora todas, con su monitor escrito en la
+tarjeta. Y se entera sola de que una ventana desapareció mientras está abierta, porque
+escucha a `GestorVentanas.Cambio` y se da de baja al cerrarse.
+
+El menú de cada ventana es el de la casa —el mismo `CrearMenuContextual` del carrusel— y
+no un `ContextMenu` de WPF: eso sería una cajita blanca del sistema que no pega con nada
+y, en una ventana `WS_EX_NOACTIVATE`, con el foco siempre a medias. Abrirlo cierra la
+vista, porque los paneles son de uno en uno; es un clic más y a cambio no hay una segunda
+arquitectura de menús.
+
+Y un detalle que importa: **al activar una ventana se cierra el panel ANTES**. La vista
+pide el teclado, y cerrarla devuelve el foco a quien lo tenía; si se activara primero la
+ventana elegida, el cierre se lo quitaría para dárselo a la de antes.
+
+### El ajuste a los bordes, sin capturar nada
+
+`EVENT_SYSTEM_MOVESIZESTART` y `...MOVESIZEEND` dicen cuándo el usuario empieza y termina
+de mover una ventana. Esos avisos ya los recibe el gestor, así que el ajuste no instala
+ningún gancho más: escucha lo que él publica.
+
+Mientras dura el arrastre se pregunta dónde está el puntero cada 60 ms con `GetCursorPos`.
+**Eso no es capturar el ratón**: no hay gancho de entrada, no se intercepta nada, nadie
+deja de recibir sus clics, y se deja de preguntar en cuanto se suelta. Es la misma
+técnica con la que la isla se deja arrastrar desde B2.
+
+La previsualización es una `VentanaSuperpuesta` —la de los paneles verticales— con un
+rectángulo del color de acento dentro. Hacía falta algo que se dibuje encima de todo, que
+no coja el foco y que deje pasar los clics, y eso ya existía. Montar una segunda ventana
+flotante con reglas propias habría sido exactamente lo que esta fase no debía hacer.
+
+Una ventana maximizada no se ajusta: lo que hace Windows al arrastrarla es restaurarla, y
+meterse ahí sería pelearse con el gestor del sistema.
+
+Y hay una red: si el botón del ratón ya no está pulsado pero el aviso de Windows no ha
+llegado —pasa al arrastrar fuera de la pantalla—, el ajuste se cierra solo.
+
+### Qué es «el área útil»
+
+La del monitor menos lo que otros han reservado, que es lo que Windows llama área de
+trabajo. **Si NubeBar está registrada como AppBar, su franja ya está descontada ahí**: no
+hay que restarla otra vez ni saber dónde está.
+
+Y si NubeBar está flotando —lo de serie desde B6— la franja no se descuenta, y eso
+también es correcto: flotar significa precisamente ponerse encima de las ventanas. Quien
+quiera lo contrario tiene «Reservar espacio» en Ajustes, que es el interruptor que ya
+existe y que significa justo esto. Inventar aquí una tercera regla habría hecho que la
+misma opción quisiera decir dos cosas distintas según quién preguntara.
+
+Las mitades se calculan como «la mitad» y «lo que queda»: con `Ancho / 2` en las dos, un
+ancho impar deja una raya de un píxel por el medio, y eso se ve. Hay una prueba para eso.
+
+
+### Los cuatro fallos de la prueba visual
+
+C4.1 compilaba, pasaba sus 315 comprobaciones y tenía cuatro fallos que solo se ven
+usándola. Vale la pena anotar qué tenían en común: **los cuatro eran decisiones, no
+dibujo** —quién se arrastra, qué cierra Esc, qué pasa al soltar, en qué orden se ajusta—
+y ninguno se podía comprobar sin abrir ventanas de verdad. Por eso ninguno tenía prueba.
+
+El arreglo no fue solo corregirlos: fue **sacar la decisión a una función pura** en cada
+caso, igual que se hizo con el filtro de ventanas. Ahora los cuatro tienen prueba.
+
+**1. La ventana ajustada se quedaba detrás.** Se colocaba bien y no se veía. Mover una
+ventana no la activa —ni debe, o cualquier recolocación de fondo te robaría el foco— así
+que elegir una zona desde la vista tiene que activarla aparte. Y el orden importa:
+
+```
+Restaurar  →  Colocar  →  Activar
+```
+
+Restaurar primero porque a una maximizada Windows le ignora el `SetWindowPos` y a una
+minimizada la mueve sin enseñarla. Activar al final porque activar antes de colocar deja
+un parpadeo en el sitio viejo. Eso es `ZonasAjuste.Plan(zona, estado, activar)`, que
+devuelve los pasos y se puede comprobar sin tocar la ventana de nadie; `Ajustar` se
+limita a ejecutarlos. El `activar` es un parámetro porque no toda colocación es una
+elección del usuario.
+
+**2. El icono de la cuadrícula desapareció.** El glifo estaba escrito como **carácter
+literal de la zona de uso privado de Unicode** (U+E8A9, "GridView"). Al reescribir el
+archivo se perdió y quedó una cadena vacía: el botón seguía funcionando y no se veía
+nada — el peor tipo de fallo, porque no da error.
+
+La corrección de fondo es no volver a escribirlo así:
+
+```csharp
+internal const int CodigoCuadricula = 0xE8A9;
+internal static readonly string GlifoCuadricula = char.ConvertFromUtf32(CodigoCuadricula);
+```
+
+Construido desde el número no se puede perder, y además se puede comprobar: hay una
+prueba que verifica que mide un carácter, que es el 0xE8A9 y que cae en la zona de uso
+privado — fuera de ahí la fuente de iconos no lo tendría y saldría una caja.
+
+**3. El menú contextual cerraba la vista.** Se abría como panel, y los paneles de la
+isla son de uno en uno: abrir el menú cerraba la cuadrícula. Ahora se dibuja **dentro**
+de la vista, en una capa por encima, exactamente como el menú de aplicaciones del
+buscador resolvió lo mismo en C1. La rejilla se queda detrás, visible y en su sitio; el
+clic de fuera cierra el menú sin cerrar la vista.
+
+Dos detalles que hacían falta: cada opción cierra el menú antes de hacer lo suyo (las que
+solo colocan no cierran la vista, y el menú se quedaría puesto encima), y mientras el
+menú está abierto la vista **no se repinta** — bastaría con que otra ventana cambiara de
+título para destruir el menú justo mientras lo estás leyendo.
+
+Y Esc va por capas: `EscCierra(vistaAbierta, menuAbierto)` devuelve menú, vista o nada.
+Si cerrara siempre la vista, abrir un menú sin querer costaría volver a abrirlo todo.
+
+**4. Arrastrar una tarjeta movía la nube.** Faltaba la regla: con la vista abierta el
+gesto es suyo. `ArrastraAlPulsar(vistaAbierta, enBoton, menuAbierto, islaArrastrable)`
+decide quién se mueve, y la isla ya no empieza su arrastre si el panel abierto es la
+vista.
+
+El arrastre de tarjeta usa el patrón de la casa desde B2: `CompositionTarget.Rendering`
+una vez por fotograma preguntando `Nativo.BotonIzquierdoPulsado()` y dónde está el
+puntero. **No se depende de `MouseLeftButtonUp`**: si sueltas fuera del panel ese evento
+no llega nunca y el arrastre se quedaría colgado con la previsualización puesta. La
+previsualización es la misma que la del arrastre de ventanas de verdad.
+
+Distinguir el aspa del cuerpo de la tarjeta es contar botones: los dos son `Button`, y lo
+que caracteriza al aspa es estar **dentro** — dos botones por encima en vez de uno.
+
+Soltar fuera de una zona no cambia nada, y un clic sin mover tampoco: eso es pulsar la
+tarjeta, que es otra cosa. `AjustaAlSoltar(seMovio, zona)`.
+
+Las comprobaciones pasan de 315 a **445**.
+### Lo que queda para C4.2
+
+- **Zonas personalizadas** al estilo de las plantillas de Plasma o FancyZones: el modelo
+  (`Hueco`, `Zona`, `Colocacion`) está preparado para que una plantilla sea una lista de
+  huecos, pero no hay editor ni formato guardado.
+- **Dividir con el teclado** (Win+flechas propio). Hoy el ajuste es con el ratón o desde
+  el menú de la vista general.
+- **Recordar la pareja**: en Plasma, al ajustar una ventana a la izquierda, la otra mitad
+  ofrece las candidatas. Eso necesita un estado de «sesión de división» que no existe.
+- **Arrastrar entre monitores con DPI distinto**: funciona, pero la previsualización se
+  calcula con el monitor del puntero y en el salto justo entre dos pantallas puede
+  parpadear una vez.
+- **Reordenar ventanas arrastrando dentro de la vista general.**
+
+### Lo que se midió
+
+`--pruebas` pasa de 180 a **445 comprobaciones**. Las nuevas, todas con fichas inventadas
+salvo las que leen la lista real en modo solo lectura:
+
+- el filtro, regla por regla, incluida la excepción `WS_EX_APPWINDOW` y las siete clases
+  del sistema;
+- el orden: la activa primero, después por uso reciente, y a igualdad por aplicación,
+  título y handle — comprobado que no depende de cómo llegaron;
+- estados, nombres de aplicación y rutas imposibles;
+- las zonas: que las dos mitades suman el ancho exacto (también con ancho impar) y que
+  los cuatro cuartos cubren la pantalla sin solaparse;
+- qué zona pide cada punto, incluido un segundo monitor que no empieza en 0,0 y una
+  pantalla diminuta;
+- el área de trabajo con la barra **arriba, abajo, izquierda y derecha**, comprobando que
+  lo ajustado no se mete debajo;
+- DPI al 100, 125, 150 y 200 %, y dos monitores con DPI distinto;
+- el alto de la vista en cuatro pantallas;
+- lo que pasa cuando algo falla: handle muerto, foto imposible, icono imposible;
+- y abrir y cerrar en bucle, comprobando que no quedan oyentes colgados, que no hay
+  ventanas repetidas, que todas las de la lista existen y que ninguna es nuestra.
+
+
+## Fase C4.1c · El parpadeo de la vista
+
+Un fallo que solo se veía usándola y que ningún parche superficial iba a arreglar,
+porque era estructural. Lo que sigue es el diagnóstico, no el remiendo.
+
+### La vista se rehacía sola unas once veces por segundo
+
+El síntoma era "las aplicaciones parpadean y parece que se recolocan". Las dos mitades de
+la causa:
+
+**Mitad A — se avisaba de un cambio que no había habido.** `GestorVentanas.Refrescar`
+terminaba siempre en `Cambio?.Invoke()`, sin comparar nada. Y el refresco lo pedía
+cualquier evento de Windows, con 90 ms de poso.
+
+**Mitad B — al avisar se tiraba la vista entera.** `RepintarVista` hacía literalmente
+`Cajon.Content = CrearVista()`: todas las tarjetas nuevas, todos los `Image` nuevos, un
+`ScrollViewer` nuevo —así que el desplazamiento volvía arriba— y el orden recalculado.
+
+Juntas ya serían malas. Lo que las convierte en un parpadeo continuo es que **se
+alimentan solas**:
+
+```
+la isla se mueve o se redimensiona  (animación, abrir un panel, volver a su sitio)
+      └─> SetWindowPos sobre NUESTRA ventana
+            └─> EVENT_OBJECT_LOCATIONCHANGE   (hwnd de NubeBar)
+                  └─> HayQueMirar()  →  90 ms  →  Refrescar()
+                        └─> Cambio?.Invoke()   (aunque no haya cambiado nada)
+                              └─> RepintarVista()  →  CrearVista()  →  ReajustarPanel()
+                                    └─> mueve y redimensiona la ventana de la isla
+                                          └─> otro LOCATIONCHANGE …
+```
+
+El gancho de eventos cubre el tramo `EVENT_OBJECT_CREATE (0x8000)` a
+`EVENT_OBJECT_NAMECHANGE (0x800C)`, y **`EVENT_OBJECT_LOCATIONCHANGE` es 0x800B**: cae
+dentro. El callback filtraba por `objeto != 0` —lo de dentro de una ventana— pero **no
+filtraba nuestras propias ventanas**. Una ventana de NubeBar nunca entra en la lista
+(`EsDelUsuario` la descarta por `EsNuestra`), así que enterarse de lo que le pasa no podía
+cambiar nada de lo que se enseña: solo costaba un refresco y un repintado completo.
+
+Y encima el orden: la instantánea ordena con **la activa primero**, así que cambiar de
+aplicación desde fuera no solo repintaba, **recolocaba**. Eso es la segunda mitad de "se
+mueven solas", y pasaba aunque no hubiera bucle.
+
+#### Lo que se hizo
+
+**En `GestorVentanas`:**
+
+1. **Lo nuestro no se escucha.** `if (Nativo.EsNuestra(hwnd)) return;` como primera
+   pregunta del callback. Esto corta el bucle en la raíz.
+2. **`LOCATIONCHANGE` no refresca la lista.** Mover o redimensionar una ventana no la
+   añade, no la quita y no la renombra. Se cuenta, para poder verlo, y no se refresca.
+3. **Solo se avisa si cambió algo**, y se dice **qué**: cuatro huellas separadas (lista,
+   títulos, estados, sitios) más la activa, y el aviso lleva `Cambios` y `Motivo`.
+
+**En la vista:** la identidad de una tarjeta es su **HWND**, y hay reconciliación de
+verdad. `ConstruirVista` corre al abrir y nada más; después corre `ReconciliarVista`, que
+crea solo las que faltan, quita solo las muertas y actualiza el resto **en su sitio**.
+
+La regla que decide qué merece tocar la rejilla está aparte y es pura, porque era una
+decisión metida en un manejador —el mismo error que produjo los cuatro fallos de C4.1 y
+los tres de C4.2:
+
+```csharp
+QueHacer(cambios, vistaAbierta, menuAbierto, arrastrandoTarjeta)
+  → TocarLaRejilla    // SOLO si cambió la LISTA
+  → SoloActualizar    // activa, título, estado, sitio
+  → Aplazar           // con el menú abierto o una tarjeta cogida
+  → Nada
+```
+
+Y el orden también es una función pura, `OrdenReconciliado`: **el congelado**, menos las
+que ya no existen, más las nuevas **al final**. Congelado al abrir, nunca reordenado. Una
+que se va deja su hueco y nadie se mueve.
+
+Tres detalles que se ven si no se hacen:
+
+- **El filo de la tarjeta activa va siempre puesto** y lo que cambia es su color. Con el
+  grosor a 0 y a 1,4 según el foco, marcar la activa movía el contenido un píxel y medio,
+  y con el foco cambiando solo eso se lee como que las tarjetas tiemblan.
+- **El panel solo se remide si cambió el número de FILAS.** `ReajustarPanel` mide y, si el
+  alto cambia, mueve la ventana de la isla. Llamarlo por nada era pedir un `SetWindowPos`
+  gratis, y con la isla de por medio eso se ve.
+- **El filtro de aplicaciones solo se vuelve a montar si cambió el conjunto de apps.**
+
+**Las miniaturas**, con freno: se conserva la anterior mientras llega la nueva, no se
+sustituye si la captura falla (`if (img == null) return`), no se toca si es el mismo
+`ImageSource`, y hay un mínimo de **5 segundos** por ventana —cinco y no tres porque la
+caché de `Miniaturas` vale cuatro, y por debajo de eso una petición solo da un viaje a la
+caché para devolver la misma imagen—. Y lo más importante: **una activación no fotografía
+nada**. Antes, cada Alt+Tab disparaba una captura por tarjeta.
+
+### `--ventanas`: qué ve NubeBar
+
+Aparte, una herramienta de diagnóstico: `NubeBar.exe --ventanas [informe.txt]` enumera
+las ventanas de nivel superior, dice cuántas cuentan como del usuario y **agrupa las
+descartadas por el motivo** que dio `GestorVentanas.EsDelUsuario`, con un ejemplo de cada
+uno; después las agrupa por programa con su estado, su pantalla y su clase.
+
+Existe porque «me faltan aplicaciones» es una queja que no se puede investigar leyendo el
+código: hay que ver qué devuelve `EnumWindows` **en esa máquina** y qué regla se come cada
+ventana. Sin esto lo único que se puede hacer es adivinar y cambiar el filtro a ciegas,
+que es exactamente como se rompen estas cosas. Es de solo lectura: enumera, pregunta y
+escribe un informe; no activa, no mueve, no cierra ni cambia el estado de nada.
+
+En esta máquina: 422 ventanas de nivel superior, 11 del usuario, y las 411 descartadas
+reparten en tres motivos (391 «no está visible», 14 «está tapada», 6 «es una ventana de
+herramientas»). El filtro está sano.
+
+### El diagnóstico, para poder volver a medirlo
+
+Esto es lo que faltaba de verdad: **el código viejo no registraba nada al repintar**. En el
+log de la versión con el fallo, la vista estuvo abierta treinta y ocho segundos
+(`16:28:41` → `16:29:19`) y en ese tramo **no hay una sola línea**. Por eso no se podía
+investigar sin cambiar cosas a ciegas.
+
+Ahora cada reconciliación escribe una línea con todo lo que se pidió:
+
+```
+vista gen=3 motivo=Crear cambios=Lista, Titulos tarjetas 11->12 creadas=1
+  actualizadas=11 eliminadas=0 orden=crece o encoge por los extremos
+  rejilla=tocada reconstruida=no filas 3->3
+vista gen=3 tarjeta CREADA hwnd=0x00060D40
+vista gen=3 miniatura REEMPLAZADA hwnd=0x00060D40 motivo=Crear
+```
+
+Una reconstrucción completa sale como `reconstruida A PETICION` (el filtro, que es una
+elección del usuario) o como `ANOMALIA` en el log de errores. Las dos cosas que no pueden
+pasar nunca llevan su palabra: `ERROR: arrastre isla INICIADO CON LA VISTA ABIERTA` y
+`ANOMALIA`.
+
+Y los arrastres se distinguen uno a uno:
+
+```
+arrastre tarjeta INICIADO hwnd=0x...  /  destino=Mitad derecha pantalla=2 (...)  /  TERMINADO
+arrastre ventana INICIADO hwnd=0x...  /  destino=...  /  TERMINADO
+arrastre ventana: aviso AJENO hwnd=0x..., el gesto sigue siendo de 0x...
+arrastre isla NO EMPIEZA: el gesto es de la vista general (el clic sale de la vista)
+previsualización del ajuste: atravesable (WS_EX_TRANSPARENT + HTTRANSPARENT)
+```
+
+**`NubeBar.exe --diagvista [segundos]`** abre la vista, la deja quieta y cuenta:
+reconciliaciones, reconstrucciones, tarjetas creadas/actualizadas/eliminadas, miniaturas
+reemplazadas, veces que se remidió el panel, los eventos por tipo —y cuántos eran
+nuestros— y los arrastres de cada clase. Termina con un veredicto: con la vista quieta y
+nadie tocando nada, lo único que puede pasar es nada.
+
+Arranca una NubeBar **de verdad**, con su isla, sus animaciones y sus ganchos, porque el
+bucle solo existe con todo en marcha: medirlo con un arnés aparte habría medido otra cosa.
+Y como solo puede haber una NubeBar a la vez, hay que parar la que esté puesta antes.
+
+### Lo que se midió
+
+**Treinta y seis comprobaciones nuevas**, y son justamente las reglas que antes vivían
+dentro de los manejadores:
+
+- `QueHacer`: que **nada** que no sea un cambio de lista pueda acabar tocando la rejilla,
+  comprobado para todas las combinaciones de banderas; y que con el menú abierto o una
+  tarjeta cogida se aplace.
+- `TocaFoto`: que una activación no fotografíe nada, que una minimizada no se fotografíe
+  nunca, y que cincuenta avisos en dos segundos no pidan ni una foto de más.
+- `OrdenReconciliado`: que la instantánea **sí** reordene al cambiar la activa y que la
+  vista **no**; que la que desaparece deje su hueco y que la nueva vaya al final.
+- `Filas`, que es lo único que justifica remedir el panel, incluido no dividir por cero.
+- El glifo del aspa, por su número (0xE711) y no como carácter suelto, igual que el de la
+  cuadrícula en C4.1. Estaba bien escrito, pero escrito de la forma que ya se perdió una
+  vez.
+- Y el contrato nuevo del gestor: ocho refrescos seguidos sin tocar nada no dan ocho
+  avisos.
+
+#### Y una advertencia sobre el total
+
+**El número que imprime `--pruebas` no es una constante.** Unas pocas comprobaciones
+recorren las aplicaciones abiertas de la máquina —`la aplicación "X" de la lista de
+filtros existe`, y las que leen la lista real en modo solo lectura—, así que el total sube
+y baja con lo que haya abierto en ese momento. Con once aplicaciones abiertas dio 519; con
+siete, 479.
+
+Lo que tiene que ser **cero** es la cuenta de fallos. Citar el total como si fuera fijo es
+cómodo y engaña: si mañana sale un número distinto, lo primero que hay que mirar es
+cuántas aplicaciones hay abiertas, no el código.
+
+### Lo que queda por comprobar a mano
+
+La parte que no se puede automatizar, porque hace falta arrastrar ventanas de verdad en un
+escritorio de verdad: la vista quieta treinta segundos con muchas aplicaciones, cambiar el
+foco desde fuera, arrastrar una tarjeta a la mitad derecha y a una esquina, y arrastrar el
+Bloc de notas por su barra de título a los cuatro bordes y cruzando de monitor. El
+`--diagvista` cubre la primera con números; las demás dejan su rastro en el log.
