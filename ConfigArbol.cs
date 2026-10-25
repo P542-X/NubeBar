@@ -232,6 +232,54 @@ public sealed class ConfigArbol
         return porDefecto;
     }
 
+
+    // ---------- El fondo por monitor ----------
+    //
+    // `Fondo.PorMonitor` es un diccionario de clave de monitor a objeto, así que no encaja
+    // en `Poner(seccion, clave, valor)`, que es plano. Estos tres hacen lo mismo que
+    // `PonerDelPanel` hace con los paneles: tocar UNA clave de UN monitor sin reescribir el
+    // resto, que es lo que conserva lo que esta versión no conoce.
+    JsonObject FondoDeMonitor(string clave, bool crear)
+    {
+        var fondo = Seccion("Fondo");
+        if (fondo["PorMonitor"] is not JsonObject mapa)
+        {
+            if (!crear) return new JsonObject();
+            mapa = new JsonObject();
+            fondo["PorMonitor"] = mapa;
+        }
+        if (mapa[clave] is not JsonObject suyo)
+        {
+            if (!crear) return new JsonObject();
+            suyo = new JsonObject();
+            mapa[clave] = suyo;
+        }
+        return suyo;
+    }
+
+    // null = este monitor no dice nada de esa clave, así que hereda.
+    public string? TextoDeFondoDeMonitor(string monitor, string clave)
+    {
+        try { return FondoDeMonitor(monitor, false)[clave]?.GetValue<string>(); }
+        catch { return null; }
+    }
+
+    public void PonerEnFondoDeMonitor(string monitor, string clave, string valor)
+    {
+        try { FondoDeMonitor(monitor, true)[clave] = valor; }
+        catch (Exception ex) { Log.Error($"escribir Fondo.PorMonitor[{monitor}].{clave}", ex); }
+    }
+
+    // Quitar lo propio de un monitor = volver a heredar del fondo general.
+    public void QuitarFondoDeMonitor(string monitor)
+    {
+        try
+        {
+            if (Seccion("Fondo")["PorMonitor"] is JsonObject mapa) mapa.Remove(monitor);
+        }
+        catch (Exception ex) { Log.Error($"quitar Fondo.PorMonitor[{monitor}]", ex); }
+    }
+
     public void PonerLista(string seccion, string clave, IEnumerable<string> valores)
     {
         var a = new JsonArray();

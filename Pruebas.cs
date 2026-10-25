@@ -107,6 +107,10 @@ public static class Pruebas
             PropiedadDeWE();
             EsperaDeWE();
             MonitorDeWE();
+            FondosLogica();
+            FondosHuella();
+            FondosPresentacion();
+            FondosValidacion();
             PerfilesListaBlanca();
             PerfilesValidar();
             PerfilesNombres();
@@ -115,6 +119,15 @@ public static class Pruebas
             PerfilesEscrituras();
             PerfilesAplicarYDeshacer();
             PerfilesRestaurar();
+
+            // C5.2: el gestor de fondos
+            FondoDibujo();
+            FondoMonitores();
+            FondoPorMonitorEnElArbol();
+            FondoNoRecarga();
+            FondoRelojes();
+            FondoDelPerfilNoche();
+            FondoPngDeVerdad();
             GlifoDeLaCuadricula();
             AbrirYCerrar();
         }
@@ -1460,6 +1473,176 @@ public static class Pruebas
             }
     }
 
+    // ================= C5: el gestor de fondos =================
+
+    static void FondosLogica()
+    {
+        Grupo("fondos: tipos, ajustes y herencia por monitor");
+
+        Vale(Fondos.TipoValido("solido") && Fondos.TipoValido("degradado") &&
+             Fondos.TipoValido("imagen") && Fondos.TipoValido("presentacion") &&
+             Fondos.TipoValido("animado") && Fondos.TipoValido("ninguno"),
+             "los seis tipos valen");
+        Vale(!Fondos.TipoValido("video") && !Fondos.TipoValido(null), "y lo que no es un tipo, no");
+        Vale(Fondos.AjusteValido("rellenar") && Fondos.AjusteValido("ajustar") &&
+             Fondos.AjusteValido("centrar") && Fondos.AjusteValido("extender") &&
+             Fondos.AjusteValido("mosaico"), "los cinco ajustes valen");
+
+        // "Ajustar" tiene que respetar la proporción: Windows llama STRETCH a lo que
+        // deforma y FIT a lo que no. Confundirlos deforma todas las fotos del usuario.
+        Igual(3, Fondos.Posicion("ajustar"), "ajustar es FIT (3), que no deforma");
+        Igual(4, Fondos.Posicion("rellenar"), "rellenar es FILL (4)");
+        Igual(0, Fondos.Posicion("centrar"), "centrar es CENTER (0)");
+        Igual(5, Fondos.Posicion("extender"), "extender es SPAN (5)");
+        Igual(1, Fondos.Posicion("mosaico"), "mosaico es TILE (1)");
+        Igual(4, Fondos.Posicion("loquesea"), "lo desconocido cae a rellenar");
+
+        // Wallpaper Engine ausente: "animado" no se pierde del config, pero no se pinta
+        Igual("animado", Fondos.TipoEfectivo("animado", weDisponible: true), "con WE, animado es animado");
+        Igual("ninguno", Fondos.TipoEfectivo("animado", weDisponible: false),
+              "sin WE, animado no pinta nada (pero el config no se cambia)");
+        Igual("solido", Fondos.TipoEfectivo("solido", false), "los demás tipos no dependen de WE");
+        Igual("ninguno", Fondos.TipoEfectivo("inventado", true), "un tipo inválido cae a ninguno");
+
+        // Herencia por monitor
+        var f = new Fondo { Tipo = "imagen", Ruta = @"C:\a.jpg", Ajuste = "rellenar", Color1 = "#111111" };
+        var sinNada = Fondos.Efectivo(f, null);
+        Igual("imagen", sinNada.Tipo, "sin clave de monitor se usa lo general");
+        Igual(@"C:\a.jpg", sinNada.Ruta, "con su ruta");
+
+        f.PorMonitor["PANT2"] = new FondoDeMonitor { Ruta = @"C:\b.jpg" };
+        var dos = Fondos.Efectivo(f, "PANT2");
+        Igual(@"C:\b.jpg", dos.Ruta, "el monitor con lo suyo manda");
+        Igual("imagen", dos.Tipo, "y lo que no dice, lo hereda");
+        Igual("rellenar", dos.Ajuste, "incluido el ajuste");
+
+        var tres = Fondos.Efectivo(f, "PANT3");
+        Igual(@"C:\a.jpg", tres.Ruta, "un monitor nuevo no se queda sin fondo: hereda");
+    }
+
+    static void FondosHuella()
+    {
+        Grupo("fondos: no recargar por cualquier cambio");
+
+        var a = new Fondo { Tipo = "presentacion", CarpetaPresentacion = @"C:\fotos", SegundosPresentacion = 300 };
+        var antes = Fondos.Huella(a);
+
+        // Esto es la regla: mover el intervalo NO vuelve a leer ninguna imagen
+        a.SegundosPresentacion = 60;
+        Igual(antes, Fondos.Huella(a), "cambiar el intervalo no cambia la huella del fondo");
+        a.Aleatorio = true;
+        Igual(antes, Fondos.Huella(a), "ni poner el orden aleatorio");
+
+        // Pero el reloj sí se tiene que reprogramar
+        var relojAntes = Fondos.HuellaDelReloj(new Fondo { SegundosPresentacion = 300 });
+        Vale(relojAntes != Fondos.HuellaDelReloj(a), "el intervalo sí cambia la huella del RELOJ");
+
+        // Y lo que de verdad cambia el escritorio, sí
+        a.CarpetaPresentacion = @"C:\otras";
+        Vale(antes != Fondos.Huella(a), "cambiar de carpeta sí cambia la huella");
+
+        var b = new Fondo { Tipo = "degradado", Color1 = "#000000", Color2 = "#FFFFFF", Angulo = 90 };
+        var hb = Fondos.Huella(b);
+        b.Angulo = 45;
+        Vale(hb != Fondos.Huella(b), "y girar un degradado también");
+
+        // El por-monitor entra en la huella, y en un orden estable
+        var c1 = new Fondo { Tipo = "imagen", Ruta = "x" };
+        c1.PorMonitor["B"] = new FondoDeMonitor { Ruta = "b" };
+        c1.PorMonitor["A"] = new FondoDeMonitor { Ruta = "a" };
+        var c2 = new Fondo { Tipo = "imagen", Ruta = "x" };
+        c2.PorMonitor["A"] = new FondoDeMonitor { Ruta = "a" };
+        c2.PorMonitor["B"] = new FondoDeMonitor { Ruta = "b" };
+        Igual(Fondos.Huella(c1), Fondos.Huella(c2),
+              "el orden en que se guardaron los monitores no cambia la huella");
+    }
+
+    static void FondosPresentacion()
+    {
+        Grupo("fondos: la presentación y la imagen que falta");
+
+        var tres = new List<string> { @"C:\1.jpg", @"C:\2.jpg", @"C:\3.jpg" };
+
+        // En orden
+        Igual(@"C:\2.jpg", Fondos.Siguiente(tres, @"C:\1.jpg", false, 0), "en orden, la siguiente");
+        Igual(@"C:\1.jpg", Fondos.Siguiente(tres, @"C:\3.jpg", false, 0), "y al final vuelve al principio");
+        Igual(@"C:\1.jpg", Fondos.Siguiente(tres, null, false, 0), "sin ninguna puesta, la primera");
+
+        // Vacío y una sola
+        Vale(Fondos.Siguiente(new List<string>(), null, false, 0) == null, "sin imágenes no hay siguiente");
+        Igual(@"C:\1.jpg", Fondos.Siguiente(new List<string> { @"C:\1.jpg" }, @"C:\1.jpg", true, 7),
+              "con una sola, esa (aleatorio incluido)");
+
+        // Aleatorio: NUNCA repite la que está puesta mientras haya más de una. Un
+        // "aleatorio" que a veces no cambia nada se lee como que está roto.
+        for (int semilla = 0; semilla < 60; semilla++)
+        {
+            var s = Fondos.Siguiente(tres, @"C:\2.jpg", true, semilla);
+            Vale(s != @"C:\2.jpg", $"aleatorio no repite la actual (semilla {semilla}: {s})");
+            Vale(s != null && tres.Contains(s), "y siempre devuelve una de la lista");
+        }
+
+        // ---------- La imagen que ya no está ----------
+        var existentes = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { @"C:\2.jpg", @"C:\3.jpg" };
+        var antes = Fondos.Existe;
+        try
+        {
+            Fondos.Existe = r => existentes.Contains(r);
+
+            var r1 = Fondos.Resolver(@"C:\2.jpg", tres);
+            Igual(@"C:\2.jpg", r1.Ruta, "si la pedida existe, esa");
+            Vale(!r1.Falta, "y no falta nada");
+
+            var r2 = Fondos.Resolver(@"C:\1.jpg", tres);
+            Igual(@"C:\2.jpg", r2.Ruta, "si la pedida desapareció, la siguiente que exista");
+            Vale(r2.Falta, "se marca que faltaba");
+            Vale(r2.Porque.Contains("1.jpg"), $"y se dice cuál era ({r2.Porque})");
+
+            // Ninguna existe: NO se borra el fondo. Dejar el escritorio en negro porque
+            // falta un fichero es peor que dejar el fondo de ayer.
+            existentes.Clear();
+            var r3 = Fondos.Resolver(@"C:\1.jpg", tres);
+            Vale(r3.Ruta == null, "si no queda ninguna, no se pone nada");
+            Vale(r3.Falta, "se marca que falta");
+            Vale(r3.Porque.Contains("se deja el fondo actual"),
+                 $"y se dice que el fondo se queda como está ({r3.Porque})");
+
+            var r4 = Fondos.Resolver(null, new List<string>());
+            Vale(r4.Ruta == null && r4.Falta, "sin pedida y sin carpeta, tampoco se toca nada");
+        }
+        finally { Fondos.Existe = antes; }
+    }
+
+    static void FondosValidacion()
+    {
+        Grupo("fondos: validar lo que viene de un fichero");
+
+        Vale(Fondos.ValorMal("tipo", JsonValue.Create("solido")) == null, "un tipo bueno pasa");
+        Vale(Fondos.ValorMal("tipo", JsonValue.Create("video")) != null, "uno inventado, no");
+        Vale(Fondos.ValorMal("ajuste", JsonValue.Create("centrar")) == null, "un ajuste bueno pasa");
+        Vale(Fondos.ValorMal("ajuste", JsonValue.Create("estirar")) != null, "uno inventado, no");
+        Vale(Fondos.ValorMal("color1", JsonValue.Create("#112233")) == null, "un color bueno pasa");
+        Vale(Fondos.ValorMal("color1", JsonValue.Create("azulito")) != null, "\"azulito\" no es un color");
+        Vale(Fondos.ValorMal("angulo", JsonValue.Create(135.0)) == null, "135 grados vale");
+        Vale(Fondos.ValorMal("angulo", JsonValue.Create(400.0)) != null, "400 grados no");
+        Vale(Fondos.ValorMal("segundospresentacion", JsonValue.Create(300.0)) == null, "5 minutos vale");
+        Vale(Fondos.ValorMal("segundospresentacion", JsonValue.Create(1.0)) != null,
+             "un segundo no es una presentación, es un parpadeo");
+
+        // Una ruta que no existe NO invalida: la imagen puede estar en el otro equipo
+        Vale(Fondos.ValorMal("ruta", JsonValue.Create(@"Z:\no\existe.jpg")) == null,
+             "una ruta que hoy no existe se acepta: el disco puede no estar puesto");
+        Vale(Fondos.ValorMal("ruta", JsonValue.Create("http://ejemplo.com/a.jpg")) != null,
+             "pero una URL no, que esto se le pasa a Windows como fichero");
+        Vale(Fondos.ValorMal("ruta", JsonValue.Create("a\0b")) != null, "ni una ruta con un nulo dentro");
+
+        // Un tipo equivocado no revienta la validación
+        Vale(Fondos.ValorMal("angulo", JsonValue.Create("mucho")) != null, "un texto donde iba un número se rechaza");
+        Vale(Fondos.ValorMal("tipo", JsonValue.Create(7.0)) != null, "y un número donde iba un texto");
+        Vale(Fondos.ValorMal("loquesea", JsonValue.Create("x")) == null,
+             "una clave que no conocemos no la juzga esto: la poda la lista blanca");
+    }
+
     // ================= C5: los perfiles =================
 
     static void PerfilesListaBlanca()
@@ -1836,6 +2019,337 @@ public static class Pruebas
         Vale(deSerie.Protegido, "uno de serie está protegido");
         var copia = deSerie.Copia("copia-1", "Copia 1");
         Vale(!copia.Protegido, "su copia no, así que la copia sí se puede borrar");
+    }
+
+    // ================= C5.2: el gestor de fondos =================
+
+    static Monitores.Info Pant(int x, int y, int w, int h, bool principal = false, uint dpi = 96,
+                               string dispositivo = @"\\.\DISPLAY1") =>
+        new(IntPtr.Zero, dispositivo, x, y, w, h, x, y, w, h, principal, dpi);
+
+    static void FondoDibujo()
+    {
+        Grupo("fondo: dibujar el sólido y el degradado");
+
+        // ---------- El degradado va de un color al otro ----------
+        var negro = Color.FromRgb(0, 0, 0);
+        var blanco = Color.FromRgb(255, 255, 255);
+        var px = GestorFondos.PixelesDeDegradado(64, 16, negro, blanco, 0);
+        Igual(64 * 16 * 4, px.Length, "salen los píxeles que caben (Bgra32)");
+
+        // Bgra32: el primer píxel de la primera fila y el último de la misma
+        Igual(0, (int)px[0], "a 0° la izquierda es el primer color");
+        int ultimo = (63 * 4);
+        Igual(255, (int)px[ultimo], "y la derecha el segundo");
+        Igual(255, (int)px[3], "el alfa está a tope: un fondo no es translúcido");
+
+        // A 90° el cambio es de arriba abajo, no de izquierda a derecha
+        var v = GestorFondos.PixelesDeDegradado(16, 64, negro, blanco, 90);
+        Igual((int)v[0], (int)v[15 * 4], "a 90° la primera fila es toda del mismo color");
+        Vale(v[0] != v[63 * 16 * 4], "y la última es distinta de la primera");
+
+        // Un sólido es un degradado de un color a sí mismo: plano de verdad
+        var plano = GestorFondos.PixelesDeDegradado(8, 8, negro, negro, 135);
+        Vale(plano.Where((_, i) => i % 4 != 3).All(b => b == 0), "un color a sí mismo sale plano");
+
+        // Tamaños imposibles no revientan
+        Igual(0, GestorFondos.PixelesDeDegradado(0, 10, negro, blanco, 0).Length, "ancho 0 no da píxeles");
+        Igual(0, GestorFondos.PixelesDeDegradado(10, -5, negro, blanco, 0).Length, "alto negativo tampoco");
+
+        // Cualquier ángulo da una imagen completa y sin valores fuera de rango
+        foreach (double g in new double[] { 0, 45, 90, 135, 180, 270, 359, 360 })
+        {
+            var p = GestorFondos.PixelesDeDegradado(12, 12, negro, blanco, g);
+            Igual(12 * 12 * 4, p.Length, $"a {g}° la imagen está completa");
+        }
+
+        // ---------- El nombre del intermedio es determinista ----------
+        var n1 = GestorFondos.NombreDeIntermedio("degradado", "#000000", "#FFFFFF", 135, 1920, 1080);
+        var n2 = GestorFondos.NombreDeIntermedio("degradado", "#000000", "#FFFFFF", 135, 1920, 1080);
+        Igual(n1, n2, "los mismos parámetros dan el mismo fichero: no se redibuja lo que ya está");
+        Vale(n1 != GestorFondos.NombreDeIntermedio("degradado", "#000000", "#FFFFFF", 90, 1920, 1080),
+             "cambiar el ángulo da otro fichero");
+        Vale(n1 != GestorFondos.NombreDeIntermedio("degradado", "#010000", "#FFFFFF", 135, 1920, 1080),
+             "y cambiar un color también");
+        Vale(n1 != GestorFondos.NombreDeIntermedio("degradado", "#000000", "#FFFFFF", 135, 2560, 1440),
+             "y cambiar la resolución");
+        Vale(n1.EndsWith(".png"), "es un png");
+        Vale(!n1.Contains('/') && !n1.Contains('\\'), "y un nombre de fichero, no una ruta");
+    }
+
+    static void FondoMonitores()
+    {
+        Grupo("fondo: emparejar monitores de verdad");
+
+        var p1 = Pant(0, 0, 1920, 1080, principal: true);
+        var p2 = Pant(1920, 0, 2560, 1440, dispositivo: @"\\.\DISPLAY2");
+        var pantallas = new List<Monitores.Info> { p1, p2 };
+
+        // ---------- Lo normal: coinciden exactamente ----------
+        var deCom = new List<(string, int, int, int, int)>
+        {
+            (@"\\?\DISPLAY#B", 1920, 0, 2560, 1440),      // COM los da en otro orden
+            (@"\\?\DISPLAY#A", 0, 0, 1920, 1080),
+        };
+        var pares = Fondos.Emparejar(deCom, pantallas);
+        Igual(2, pares.Count, "se emparejan las dos");
+        Igual(p2.Clave, pares[0].Clave, "la primera de COM es la SEGUNDA de Windows: por rectángulo, no por índice");
+        Igual(p1.Clave, pares[1].Clave, "y la segunda de COM es la primera");
+
+        // Esto es lo que arregla: por índice, pares[0] habría sido p1 y el fondo del
+        // monitor grande se habría puesto en el pequeño.
+        Vale(pares[0].Clave != p1.Clave, "el emparejamiento por índice habría acertado al revés");
+
+        // ---------- Cambio de resolución: se empareja por la esquina ----------
+        var trasCambio = new List<(string, int, int, int, int)>
+        {
+            (@"\\?\DISPLAY#A", 0, 0, 1280, 720),          // misma esquina, otra resolución
+        };
+        var p3 = Fondos.Emparejar(trasCambio, pantallas);
+        Igual(p1.Clave, p3[0].Clave, "al cambiar de resolución se empareja por la esquina");
+
+        // ---------- Un monitor que COM ve y Windows no ----------
+        var fantasma = new List<(string, int, int, int, int)>
+        {
+            (@"\\?\DISPLAY#X", 5000, 5000, 1024, 768),
+        };
+        var p4 = Fondos.Emparejar(fantasma, pantallas);
+        Vale(p4[0].Clave == null, "una pantalla que no se corresponde se queda sin clave");
+        // Y eso es lo importante: sin clave, Poner la salta en vez de adivinar
+
+        // ---------- Un monitor sin rectángulo (COM no supo decir dónde) ----------
+        var sinRect = new List<(string, int, int, int, int)> { (@"\\?\DISPLAY#Y", int.MinValue, int.MinValue, 0, 0) };
+        Vale(Fondos.Emparejar(sinRect, pantallas)[0].Clave == null, "sin rectángulo no se empareja");
+
+        // ---------- Nunca se empareja la misma pantalla dos veces ----------
+        var dobles = new List<(string, int, int, int, int)>
+        {
+            (@"\\?\DISPLAY#A", 0, 0, 1920, 1080),
+            (@"\\?\DISPLAY#A2", 0, 0, 1920, 1080),
+        };
+        var p5 = Fondos.Emparejar(dobles, pantallas);
+        Igual(p1.Clave, p5[0].Clave, "la primera se lleva la pantalla");
+        Vale(p5[1].Clave == null, "y la segunda no se la roba");
+
+        // ---------- Monitor vertical y DPI distinto ----------
+        var vert = Pant(0, 0, 1080, 1920, dpi: 144, dispositivo: @"\\.\DISPLAY3");
+        var pv = Fondos.Emparejar(new List<(string, int, int, int, int)> { ("v", 0, 0, 1080, 1920) },
+                                  new List<Monitores.Info> { vert });
+        Igual(vert.Clave, pv[0].Clave, "un monitor vertical se empareja igual");
+        Vale(vert.Alto > vert.Ancho, "y sigue siendo más alto que ancho");
+        Igual(1.5, vert.Escala, "con su escala de 144 ppp");
+
+        // La clave es estable y distinta por pantalla: es lo que se guarda en el config
+        Vale(p1.Clave != p2.Clave, "dos pantallas tienen claves distintas");
+        Igual(p1.Clave, Pant(0, 0, 1920, 1080, true).Clave, "y la misma pantalla, la misma clave");
+
+        // Sin pantallas no se empareja nada y no revienta
+        Igual(0, Fondos.Emparejar(new List<(string, int, int, int, int)>(), pantallas).Count,
+              "sin pantallas de COM, no hay pares");
+        Vale(Fondos.Emparejar(deCom, new List<Monitores.Info>()).All(x => x.Clave == null),
+             "sin pantallas de Windows, ninguna se empareja");
+    }
+
+    static void FondoPorMonitorEnElArbol()
+    {
+        Grupo("fondo: escribir el de un monitor sin tocar el resto");
+
+        var carpeta = Path.Combine(Path.GetTempPath(), "nubebar-fondo-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(carpeta);
+        try
+        {
+            var ruta = Path.Combine(carpeta, "config.json");
+            File.WriteAllText(ruta, new JsonObject
+            {
+                ["Version"] = Esquema.Actual,
+                ["Fondo"] = new JsonObject { ["Tipo"] = "degradado", ["Color1"] = "#111111" },
+                ["Barra"] = new JsonObject { ["AtajoVistaGeneral"] = "Ctrl+Alt+W" },
+            }.ToJsonString());
+
+            var a = ConfigArbol.Cargar(ruta);
+            Vale(a.TextoDeFondoDeMonitor("PANT-A", "Tipo") == null,
+                 "un monitor sin nada propio devuelve null, que significa \"hereda\"");
+
+            a.PonerEnFondoDeMonitor("PANT-A", "Tipo", "imagen");
+            a.PonerEnFondoDeMonitor("PANT-A", "Ruta", @"C:\a.jpg");
+            a.PonerEnFondoDeMonitor("PANT-B", "Tipo", "solido");
+            a.Guardar();
+
+            var b = ConfigArbol.Cargar(ruta);
+            Igual("imagen", b.TextoDeFondoDeMonitor("PANT-A", "Tipo")!, "lo del monitor A se guarda");
+            Igual(@"C:\a.jpg", b.TextoDeFondoDeMonitor("PANT-A", "Ruta")!, "con su ruta");
+            Igual("solido", b.TextoDeFondoDeMonitor("PANT-B", "Tipo")!, "y lo del B, aparte");
+            Igual("degradado", b.Texto("Fondo", "Tipo", "x"), "el fondo general no se ha tocado");
+            Igual("#111111", b.Texto("Fondo", "Color1", "x"), "ni su color");
+            Igual("Ctrl+Alt+W", b.Texto("Barra", "AtajoVistaGeneral", "x"), "ni nada de fuera");
+
+            // Quitar lo propio = volver a heredar
+            b.QuitarFondoDeMonitor("PANT-A");
+            b.Guardar();
+            var d = ConfigArbol.Cargar(ruta);
+            Vale(d.TextoDeFondoDeMonitor("PANT-A", "Tipo") == null, "quitarlo lo devuelve a heredar");
+            Igual("solido", d.TextoDeFondoDeMonitor("PANT-B", "Tipo")!, "y no se lleva al otro monitor");
+
+            // Y la herencia de verdad, con el modelo
+            var cfg = new Fondo { Tipo = "degradado", Color1 = "#111111", Ajuste = "rellenar" };
+            cfg.PorMonitor["PANT-B"] = new FondoDeMonitor { Tipo = "solido" };
+            Igual("degradado", Fondos.Efectivo(cfg, "PANT-A").Tipo!, "A hereda el general");
+            Igual("solido", Fondos.Efectivo(cfg, "PANT-B").Tipo!, "B usa el suyo");
+            Igual("#111111", Fondos.Efectivo(cfg, "PANT-B").Color1!, "pero hereda el color, que no dice");
+            Igual("rellenar", Fondos.Efectivo(cfg, "PANT-B").Ajuste!, "y el ajuste");
+        }
+        finally { try { Directory.Delete(carpeta, true); } catch { } }
+    }
+
+    static void FondoNoRecarga()
+    {
+        Grupo("fondo: no recargar si no ha cambiado nada");
+
+        // Ya se comprueba la huella en C5; aquí lo que importa es lo que decide el gestor
+        // con esa huella. "ninguno" no toca el fondo de nadie, ni al arrancar.
+        var nada = new Fondo { Tipo = "ninguno" };
+        var r = GestorFondos.AplicarAsync(nada).GetAwaiter().GetResult();
+        Vale(r.Ok, "tipo ninguno no es un error");
+        Vale(!r.Cambio, "y no cambia nada");
+        Vale(r.Detalle.Contains("no gestiona"), $"lo dice claro ({r.Detalle})");
+        Vale(!GestorFondos.Corriendo, "y deja la presentación parada");
+
+        // "animado" no lo gestiona esto: es de la integración de a918e6c
+        var we = new Fondo { Tipo = "animado" };
+        var rw = GestorFondos.AplicarAsync(we).GetAwaiter().GetResult();
+        Vale(rw.Ok, "tipo animado no es un error");
+        Vale(!rw.Cambio, "el gestor de fondos no lo toca");
+        Vale(rw.Detalle.Contains("Wallpaper Engine"), $"y dice de quién es ({rw.Detalle})");
+        Vale(!GestorFondos.Corriendo, "sin dejar relojes en marcha");
+
+        // Un null no revienta
+        Vale(!GestorFondos.AplicarAsync(null!).GetAwaiter().GetResult().Ok, "sin configuración, no se aplica");
+
+        // Sin Wallpaper Engine, "animado" no pinta pero los demás tipos siguen valiendo
+        Igual("ninguno", Fondos.TipoEfectivo("animado", false), "sin WE, animado no pinta");
+        foreach (var t in new[] { "solido", "degradado", "imagen", "presentacion" })
+            Igual(t, Fondos.TipoEfectivo(t, false), $"pero \"{t}\" sigue funcionando sin WE");
+    }
+
+    static void FondoRelojes()
+    {
+        Grupo("fondo: los relojes de la presentación se sueltan");
+
+        // Esto es lo que se pidió comprobar: que no quede un reloj vivo. `Apagar` es lo
+        // que llama el cierre de NubeBar.
+        GestorFondos.PararPresentacion();
+        Vale(!GestorFondos.Corriendo, "parada, no corre");
+
+        GestorFondos.Apagar();
+        Vale(!GestorFondos.Corriendo, "apagado, tampoco");
+
+        // Y apagar dos veces no revienta
+        GestorFondos.Apagar();
+        Vale(!GestorFondos.Corriendo, "apagarlo dos veces es seguro");
+
+        // Sin hilo de interfaz, avanzar no hace nada en vez de fallar
+        Vale(!GestorFondos.Avanzar().GetAwaiter().GetResult(),
+             "sin presentación programada, avanzar no hace nada");
+
+        // El intervalo nunca baja del mínimo: una presentación cada segundo es un parpadeo
+        Vale(Fondos.MinSegundos >= 5, "el mínimo del intervalo es razonable");
+        Vale(Fondos.ValorMal("segundospresentacion", JsonValue.Create(1.0)) != null,
+             "un segundo se rechaza");
+        Vale(Fondos.ValorMal("segundospresentacion", JsonValue.Create(Fondos.MinSegundos)) == null,
+             "el mínimo se acepta");
+    }
+
+    static void FondoDelPerfilNoche()
+    {
+        Grupo("fondo: el perfil Noche trae un degradado válido");
+
+        var noche = Perfiles.DeSerie().First(p => p.Id == "noche");
+        Vale(noche.Ajustes["Fondo"] is JsonObject, "Noche trae una sección Fondo");
+
+        var f = noche.Ajustes["Fondo"]!.AsObject();
+        Igual("degradado", f["Tipo"]!.GetValue<string>(), "y es un degradado");
+        Vale(Paleta.EsColor(f["Color1"]!.GetValue<string>()), "con un primer color de verdad");
+        Vale(Paleta.EsColor(f["Color2"]!.GetValue<string>()), "y un segundo");
+
+        // Y el perfil entero sigue siendo válido con el fondo dentro
+        var v = Perfiles.Validar(noche);
+        Vale(v.Vale, "el perfil es válido: " + v.Resumen);
+        Igual(0, v.Ignoradas.Count, "y no lleva nada que no pueda tocar");
+
+        // Las claves de fondo están en la lista blanca, así que se APLICAN de verdad
+        var es = Perfiles.Escrituras(noche);
+        Vale(es.Any(e => e.Seccion == "Fondo" && e.Clave == "Tipo"),
+             "el tipo de fondo se traduce a una escritura");
+        Vale(es.Any(e => e.Seccion == "Fondo" && e.Clave == "Color1"), "y los colores");
+
+        // Un perfil SIN fondo no escribe nada de fondo: no borra el que tengas
+        var minimal = Perfiles.DeSerie().First(p => p.Id == "minimal");
+        Vale(!Perfiles.Escrituras(minimal).Any(e => e.Seccion == "Fondo"),
+             "un perfil sin fondo no toca el fondo");
+
+        // Y un perfil con un fondo inválido se rechaza entero
+        var malo = noche.Copia("malo", "Malo");
+        malo.Ajustes["Fondo"]!["Tipo"] = "video";
+        Vale(!Perfiles.Validar(malo).Vale, "un tipo de fondo inventado invalida el perfil");
+        var malColor = noche.Copia("malo2", "Malo 2");
+        malColor.Ajustes["Fondo"]!["Color1"] = "azulito";
+        Vale(!Perfiles.Validar(malColor).Vale, "y un color que no es un color, también");
+    }
+
+
+    static void FondoPngDeVerdad()
+    {
+        Grupo("fondo: el degradado se escribe como PNG y se puede leer");
+
+        // Los píxeles ya se comprueban puros; esto comprueba la otra mitad, que es la que
+        // puede fallar en silencio: que `BitmapSource.Create` + `PngBitmapEncoder` escriban
+        // un fichero de verdad desde este hilo. Si esto se rompiera, el degradado quedaría
+        // en "no se pudo dibujar" y el fondo no cambiaría sin que nadie supiera por qué.
+        var ruta = GestorFondos.Dibujar("degradado", "#102030", "#A0B0C0", 135, 320, 180);
+        Vale(ruta != null, "se dibuja y devuelve una ruta");
+        if (ruta == null) return;
+
+        Vale(File.Exists(ruta), "el fichero existe");
+        Vale(new FileInfo(ruta).Length > 100, $"y tiene contenido ({new FileInfo(ruta).Length} bytes)");
+        Vale(ruta.StartsWith(Fondos.CarpetaIntermedios, StringComparison.OrdinalIgnoreCase),
+             "vive en la carpeta de intermedios, que es caché y no configuración");
+
+        // Y se puede leer como imagen: es lo que hará Windows
+        try
+        {
+            var bmp = new System.Windows.Media.Imaging.BitmapImage();
+            bmp.BeginInit();
+            bmp.UriSource = new Uri(ruta);
+            bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            bmp.EndInit();
+            Igual(320, bmp.PixelWidth, "con el ancho que se pidió");
+            Igual(180, bmp.PixelHeight, "y el alto");
+        }
+        catch (Exception ex) { Vale(false, "el PNG no se pudo leer: " + ex.Message); }
+
+        // No se redibuja lo que ya está: la segunda vez devuelve el mismo fichero
+        var antes = File.GetLastWriteTimeUtc(ruta);
+        var otra = GestorFondos.Dibujar("degradado", "#102030", "#A0B0C0", 135, 320, 180);
+        Igual(ruta, otra!, "la segunda vez es el mismo fichero");
+        Igual(antes, File.GetLastWriteTimeUtc(ruta), "y no se ha reescrito");
+
+        // Un sólido también sale, y es otro fichero
+        var plano = GestorFondos.Dibujar("solido", "#102030", "#102030", 0, 64, 64);
+        Vale(plano != null && File.Exists(plano), "el sólido también se dibuja");
+        Vale(plano != ruta, "y es un fichero distinto del degradado");
+
+        // Un tamaño absurdo se acota en vez de escribir un PNG de 16K
+        var grande = GestorFondos.Dibujar("degradado", "#000000", "#FFFFFF", 0, 99999, 99999);
+        Vale(grande != null, "un tamaño absurdo se acota y sigue dibujando");
+        Vale(grande!.Contains("3840x2160"), $"acotado a 4K ({System.IO.Path.GetFileName(grande)})");
+
+        // Un color inválido no revienta: cae a negro, que es lo que hace Paleta.Leer
+        var malo = GestorFondos.Dibujar("solido", "azulito", "azulito", 0, 32, 32);
+        Vale(malo != null && File.Exists(malo), "un color inválido no rompe el dibujo");
+
+        // Limpieza: esto es caché, se puede borrar
+        foreach (var f in new[] { ruta, plano, grande, malo })
+            try { if (f != null) File.Delete(f); } catch { }
     }
 
     static void GlifoDelAspa()

@@ -170,6 +170,10 @@ public partial class MainWindow : Window
                     // El gestor de ventanas: una instantánea para toda la aplicación, al día
                     // por los eventos de Windows en vez de por un sondeo.
                     GestorVentanas.Arrancar(Dispatcher);
+                    // El gestor de fondos: un reloj para toda la aplicación, no uno por
+                    // ventana de ajustes. Ver GestorFondos.
+                    GestorFondos.Arrancar(Dispatcher);
+                    _ = GestorFondos.AplicarAsync(_cfg.Fondo);
                     MontarAjusteDeBordes();
                     if (_cfg.Barra.Notificaciones && Notificaciones.Disponible)
                     {
@@ -217,6 +221,7 @@ public partial class MainWindow : Window
 
             Nativo.QuitarAtajo(_self, IdAtajoVista);   // el atajo vuelve a quien lo quiera
             DesmontarAjusteDeBordes();                 // antes de Parar(): el reloj del ratón es nuestro
+            GestorFondos.Apagar();                     // y el reloj de la presentación se suelta
             GestorVentanas.Parar();                    // y los ganchos de ventanas se sueltan
             _gancho?.Dispose();                        // y la tecla Windows vuelve a la normalidad
             Bandeja.Apagar();                          // los iconos vuelven a la bandeja de Explorer
@@ -801,6 +806,16 @@ public partial class MainWindow : Window
 
         if (!antes.Equals(nueva.Barra.Monitores, StringComparison.OrdinalIgnoreCase)) Reorganizar();
         else foreach (var i in Islas.ToList()) i.Aplicar();
+
+        // Y el fondo. Va aquí y no en `Aplicar()` por dos razones: `Aplicar()` corre una
+        // vez por isla —con dos pantallas se pondría el fondo dos veces— y el fondo no es
+        // de una isla, es del escritorio.
+        //
+        // `AplicarAsync` no hace nada si la huella no cambió, así que recargar el config
+        // por cualquier otro motivo no vuelve a leer una imagen de 20 MB. Eso es lo que
+        // hace que aplicar un perfil con fondo —"Noche"— cambie el fondo de verdad, y que
+        // guardar cualquier otro ajuste no lo toque.
+        _ = GestorFondos.AplicarAsync(nueva.Fondo);
     }
 
     void ProgramarRecarga() => Dispatcher.InvokeAsync(() => { _recarga.Stop(); _recarga.Start(); });

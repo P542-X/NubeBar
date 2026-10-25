@@ -256,63 +256,10 @@ public static class Perfiles
             }
 
             if (seccion.Equals("Fondo", StringComparison.OrdinalIgnoreCase))
-                return ValorDeFondoMal(clave, valor);
+                return Fondos.ValorMal(clave, valor);
         }
         catch (Exception ex) { return "el tipo no es el que toca (" + ex.GetType().Name + ")"; }
         return null;
-    }
-
-
-    // ---------- Validar la sección Fondo que trae un perfil ----------
-    //
-    // Un perfil PUEDE llevar un fondo, y el gestor de fondos todavía no existe. Así que
-    // la validación vive aquí: lo que se guarda tiene que ser válido aunque nadie lo lea
-    // todavía, porque si no, el día que haya un consumidor se encontrará con perfiles ya
-    // escritos con basura dentro.
-    //
-    // Cuando exista el gestor, esta tabla se va con él y aquí quedará una llamada. Lo que
-    // no se puede hacer es dejar la sección sin validar "hasta entonces".
-    static readonly string[] TiposDeFondo = { "ninguno", "solido", "degradado", "imagen", "presentacion", "animado" };
-    static readonly string[] AjustesDeFondo = { "rellenar", "ajustar", "centrar", "extender", "mosaico" };
-
-    static string? ValorDeFondoMal(string clave, JsonNode? valor)
-    {
-        if (valor == null) return null;
-        switch (clave.ToLowerInvariant())
-        {
-            case "tipo":
-                return TiposDeFondo.Contains(valor.GetValue<string>(), StringComparer.OrdinalIgnoreCase)
-                    ? null : "no es uno de " + string.Join(", ", TiposDeFondo);
-            case "ajuste":
-                return AjustesDeFondo.Contains(valor.GetValue<string>(), StringComparer.OrdinalIgnoreCase)
-                    ? null : "no es uno de " + string.Join(", ", AjustesDeFondo);
-            case "color1":
-            case "color2":
-                var c = valor.GetValue<string>() ?? "";
-                return Paleta.EsColor(c) ? null : $"\"{c}\" no es un color";
-            case "angulo":
-                double g = valor.GetValue<double>();
-                return g >= 0 && g <= 360 ? null : "fuera de 0..360";
-            case "segundospresentacion":
-                double s = valor.GetValue<double>();
-                return s >= 5 && s <= 86400 ? null : "fuera de 5..86400";
-            case "aleatorio":
-            case "extraerpaleta":
-                _ = valor.GetValue<bool>();
-                return null;
-            case "ruta":
-            case "carpetapresentacion":
-                var r = valor.GetValue<string>() ?? "";
-                // Que no exista NO invalida: la imagen puede estar en el otro equipo o en
-                // un disco que hoy no está puesto. Lo que se rechaza es que no sea una
-                // ruta de fichero, porque esto acabará pasándoselo a Windows como tal.
-                if (r.Length > 32000) return "la ruta es absurdamente larga";
-                if (r.IndexOfAny(new[] { '\n', '\r' }) >= 0) return "la ruta lleva saltos de línea";
-                if (r.Contains("://", StringComparison.Ordinal)) return "una URL no es una ruta de fichero";
-                return null;
-            default:
-                return null;        // lo que no conocemos lo poda la lista blanca
-        }
     }
 
     static bool EsNombreDeColor(string clave) => clave is

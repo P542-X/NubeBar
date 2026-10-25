@@ -345,6 +345,7 @@ public class Config
     public Inicio Inicio { get; set; } = new();
     public Animaciones Animaciones { get; set; } = new();
     public List<PanelNube> Paneles { get; set; } = new();
+    public Fondo Fondo { get; set; } = new();
 
     public static string Carpeta =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NubeBar");
@@ -396,6 +397,8 @@ public class Config
             c.Barra ??= new();
             c.Modulos ??= new();
             c.Wallpaper ??= new();
+            c.Fondo ??= new();
+            c.Fondo.PorMonitor ??= new();
             if (c.Version < 1) c.Version = Esquema.Actual;
             c.Inicio ??= new();
             c.Barra.AppsFijadas ??= new();

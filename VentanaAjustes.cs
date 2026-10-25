@@ -10,6 +10,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Text.Json.Nodes;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
 namespace NubeBar;
@@ -220,6 +221,9 @@ public sealed class VentanaAjustes : Window
                            "teclado", "combinación", "vista general", "teclas");
         _modulos.Registrar("inicio", "Inicio", "Sistema", SeccionInicio,
                            "menú", "buscador", "archivos", "web", "saludo", "tecla windows");
+        _modulos.Registrar("fondo", "Fondo", "Aspecto", SeccionFondo,
+                           "fondo", "escritorio", "degradado", "color sólido", "imagen",
+                           "presentación", "wallpaper", "monitor", "rellenar", "ajustar");
         _modulos.Registrar("wallpaper", "Wallpaper", "Aspecto", SeccionWallpaper,
                            "fondo", "wallpaper engine", "monitor", "paleta", "integración",
                            "playlist", "escena", "inicio", "espera", "animado");
@@ -1545,6 +1549,397 @@ public sealed class VentanaAjustes : Window
 
         return trozos.Count == 0 ? "" : "Cambia " + string.Join(" · ", trozos) + ".";
     }
+
+    // ================= Fondo de escritorio =================
+    //
+    // Todo pinta con los roles del tema. El selector de monitor trabaja con la CLAVE del
+    // monitor (`Monitores.Info.Clave`), no con su índice: un índice cambia al reconectar
+    // una pantalla y acabarías editando el fondo de la otra.
+    string _monitorDelFondo = "";          // "" = todos los monitores
+
+    UIElement SeccionFondo()
+    {
+        var c = Columna();
+        c.Children.Add(Rotulo("Fondo de escritorio", true));
+
+        var pantallas = Monitores.Todos();
+        bool porMonitor = _monitorDelFondo.Length > 0;
+
+        // ---------- A qué pantalla se refiere lo de abajo ----------
+        var nombres = new List<string> { "Todos los monitores" };
+        var claves = new List<string> { "" };
+        for (int i = 0; i < pantallas.Count; i++)
+        {
+            var m = pantallas[i];
+            bool vertical = m.Alto > m.Ancho;
+            nombres.Add($"Pantalla {i + 1}{(m.EsPrincipal ? " (principal)" : "")} · " +
+                        $"{m.Ancho}x{m.Alto}{(vertical ? " vertical" : "")} · {m.Dpi} ppp");
+            claves.Add(m.Clave);
+        }
+        int elegida = Math.Max(0, claves.IndexOf(_monitorDelFondo));
+        c.Children.Add(Opciones("Editar el fondo de", nombres.ToArray(), nombres[elegida], v =>
+        {
+            int i = nombres.IndexOf(v);
+            _monitorDelFondo = i >= 0 ? claves[i] : "";
+            RehacerFondo();
+        }));
+
+        if (porMonitor)
+        {
+            var pista = Rotulo("Lo que no pongas aquí lo hereda del fondo de todos los monitores. " +
+                               "«Usar este fondo en todos los monitores» borra lo propio de esta pantalla.");
+            pista.TextWrapping = TextWrapping.Wrap;
+            pista.Opacity = 0.55;
+            c.Children.Add(pista);
+            c.Children.Add(BotonPlano("Usar este fondo en todos los monitores", () =>
+            {
+                QuitarFondoDeMonitor(_monitorDelFondo);
+                _monitorDelFondo = "";
+                RehacerFondo();
+            }, false));
+        }
+
+        // ---------- El tipo ----------
+        string tipo = LeerFondo("Tipo", "ninguno");
+        var etiquetas = new Dictionary<string, string>
+        {
+            ["ninguno"] = "No gestionar el fondo",
+            ["solido"] = "Color sólido",
+            ["degradado"] = "Degradado",
+            ["imagen"] = "Imagen",
+            ["presentacion"] = "Presentación de imágenes",
+            ["animado"] = "Wallpaper Engine",
+        };
+        var visibles = Fondos.Tipos.Select(t => etiquetas[t]).ToArray();
+        var actual = etiquetas.TryGetValue(tipo, out var e) ? e : etiquetas["ninguno"];
+        c.Children.Add(Opciones("Tipo", visibles, actual, v =>
+        {
+            var clave = etiquetas.First(p => p.Value == v).Key;
+            EscribirFondo("Tipo", clave);
+            RehacerFondo();
+        }));
+
+        // ---------- Vista previa ----------
+        c.Children.Add(VistaPreviaDelFondo(tipo));
+
+        // ---------- Lo propio de cada tipo ----------
+        switch (tipo)
+        {
+            case "solido":
+                c.Children.Add(Rotulo("Color"));
+                c.Children.Add(CampoDeColorDelFondo("Color1", "#1A1B26"));
+                break;
+
+            case "degradado":
+                c.Children.Add(Rotulo("De este color"));
+                c.Children.Add(CampoDeColorDelFondo("Color1", "#0B0D14"));
+                c.Children.Add(Rotulo("A este otro"));
+                c.Children.Add(CampoDeColorDelFondo("Color2", "#7AA2F7"));
+                c.Children.Add(Deslizador("Ángulo", 0, 360, LeerNumFondo("Angulo", 135),
+                                          v => { EscribirFondoNum("Angulo", Math.Round(v)); }, 5));
+                break;
+
+            case "imagen":
+                c.Children.Add(Rotulo("Imagen"));
+                c.Children.Add(CampoDeRutaDelFondo("Ruta", false));
+                break;
+
+            case "presentacion":
+                c.Children.Add(Rotulo("Carpeta con las imágenes"));
+                c.Children.Add(CampoDeRutaDelFondo("CarpetaPresentacion", true));
+                var cuantas = Fondos.ImagenesDe(LeerFondo("CarpetaPresentacion", "")).Count;
+                var info = Rotulo(cuantas == 0
+                    ? "No encuentro imágenes en esa carpeta."
+                    : $"{cuantas} imagen(es) encontradas.");
+                info.Opacity = 0.6;
+                c.Children.Add(info);
+                c.Children.Add(Deslizador("Cambiar cada (segundos)", Fondos.MinSegundos, 3600,
+                                          LeerNumFondo("SegundosPresentacion", 300),
+                                          v => EscribirFondoNum("SegundosPresentacion", Math.Round(v)), 5));
+                c.Children.Add(Interruptor("Orden aleatorio", LeerBanderaFondo("Aleatorio", false),
+                                           v => EscribirFondoBool("Aleatorio", v)));
+                c.Children.Add(BotonPlano("Pasar a la siguiente ahora", () => _ = GestorFondos.Avanzar(), false));
+                break;
+
+            case "animado":
+                var we = Rotulo(Fondos.AnimadoDisponible
+                    ? "El fondo animado lo gestiona la integración con Wallpaper Engine, que está en su " +
+                      "propia sección: ahí se elige el wallpaper, el monitor y qué hacer al salir. Aquí no " +
+                      "se duplica nada de eso."
+                    : "No encuentro Wallpaper Engine. Los demás tipos de fondo siguen funcionando; para " +
+                      "usar este, instálalo o indica su ruta en la sección Wallpaper.");
+                we.TextWrapping = TextWrapping.Wrap;
+                c.Children.Add(we);
+                c.Children.Add(BotonPlano("Ir a los ajustes de Wallpaper Engine", () =>
+                {
+                    int donde = _modulos.Indice("wallpaper");
+                    if (donde >= 0 && donde < _pestanas.Items.Count) _pestanas.SelectedIndex = donde;
+                }, false));
+                break;
+        }
+
+        // ---------- El ajuste, para los tipos que son una imagen ----------
+        if (tipo is "imagen" or "presentacion")
+        {
+            var ajustes = new Dictionary<string, string>
+            {
+                ["rellenar"] = "Rellenar (recorta, no deforma)",
+                ["ajustar"] = "Ajustar (cabe entera, no deforma)",
+                ["centrar"] = "Centrar (tamaño original)",
+                ["extender"] = "Extender (una imagen en todas las pantallas)",
+                ["mosaico"] = "Mosaico (se repite)",
+            };
+            var aj = LeerFondo("Ajuste", "rellenar");
+            c.Children.Add(Opciones("Cómo encaja", ajustes.Values.ToArray(),
+                ajustes.TryGetValue(aj, out var va) ? va : ajustes["rellenar"],
+                v => EscribirFondo("Ajuste", ajustes.First(p => p.Value == v).Key)));
+        }
+
+        // ---------- Los botones ----------
+        var estado = new TextBlock
+        {
+            Foreground = _textoAtenuado, TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 10, 0, 0)
+        };
+
+        var fila = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(-8, 12, 0, 0) };
+        fila.Children.Add(BotonPlano("Aplicar", () =>
+        {
+            // Se guarda primero —una escritura atómica— y se aplica después desde lo
+            // guardado: así lo que se ve es exactamente lo que queda en el config.
+            _arbol.Guardar();
+            var cfg = Config.Cargar()?.Fondo;
+            if (cfg == null) { estado.Text = "✗ No pude leer la configuración."; return; }
+            GestorFondos.GuardarInstantanea();
+            var r = GestorFondos.AplicarAsync(cfg, forzar: true).GetAwaiter().GetResult();
+            estado.Text = (r.Ok ? "✓ " : "✗ ") + r.Detalle;
+        }, true));
+
+        fila.Children.Add(BotonPlano("Cancelar", () =>
+        {
+            // Byte a byte como estaba al abrir la ventana: es lo que ya hacía ConfigArbol
+            // para el resto de los ajustes.
+            _arbol.Revertir();
+            var cfg = Config.Cargar()?.Fondo;
+            if (cfg != null) _ = GestorFondos.AplicarAsync(cfg, forzar: true);
+            estado.Text = "Cambios descartados.";
+            RehacerFondo();
+        }, false));
+
+        fila.Children.Add(BotonPlano("Restaurar el anterior", () =>
+        {
+            estado.Text = GestorFondos.RestaurarAnterior()
+                ? "✓ Puesto el fondo que había antes de que NubeBar lo tocara."
+                : "No hay fondo anterior guardado (NubeBar no ha cambiado el tuyo todavía).";
+        }, false));
+        c.Children.Add(fila);
+        c.Children.Add(estado);
+
+        // ---------- Qué hay puesto ahora mismo ----------
+        var ahora = new TextBlock
+        {
+            Foreground = _textoAtenuado, TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 12, 0, 0), Opacity = 0.75
+        };
+        var puestas = Fondos.LoQueHayPuesto();
+        ahora.Text =
+            $"Estado: tipo «{(etiquetas.TryGetValue(tipo, out var et) ? et : tipo)}». " +
+            $"{pantallas.Count} pantalla(s) detectada(s). " +
+            (puestas.Count > 0
+                ? "Windows tiene fondo en " + puestas.Count + " de ellas. "
+                : "No he podido leer el fondo actual de Windows. ") +
+            (GestorFondos.Corriendo ? "La presentación está en marcha. " : "") +
+            (GestorFondos.HayInstantanea ? "Hay un fondo anterior guardado." : "");
+        c.Children.Add(ahora);
+        return c;
+    }
+
+    void RehacerFondo() => RehacerPagina("fondo", SeccionFondo);
+
+    // ---------- Leer y escribir, con la herencia del monitor ----------
+    //
+    // Si estás editando una pantalla concreta, se lee lo suyo y si no lo tiene, lo
+    // general. Escribir siempre escribe en lo que estés editando.
+    string LeerFondo(string clave, string porDefecto)
+    {
+        if (_monitorDelFondo.Length > 0 &&
+            _arbol.TextoDeFondoDeMonitor(_monitorDelFondo, clave) is { } suyo) return suyo;
+        return _arbol.Texto("Fondo", clave, porDefecto);
+    }
+
+    double LeerNumFondo(string clave, double porDefecto) => _arbol.Numero("Fondo", clave, porDefecto);
+    bool LeerBanderaFondo(string clave, bool porDefecto) => _arbol.Bandera("Fondo", clave, porDefecto);
+
+    void EscribirFondo(string clave, string valor)
+    {
+        if (_monitorDelFondo.Length > 0) _arbol.PonerEnFondoDeMonitor(_monitorDelFondo, clave, valor);
+        else _arbol.Poner("Fondo", clave, valor);
+        Cambio();
+    }
+
+    // El ángulo, el intervalo, el aleatorio y la paleta son del fondo entero y no de una
+    // pantalla: un degradado con un ángulo por monitor no es una función, es un enredo.
+    void EscribirFondoNum(string clave, double valor) { _arbol.Poner("Fondo", clave, valor); Cambio(); }
+    void EscribirFondoBool(string clave, bool valor) { _arbol.Poner("Fondo", clave, valor); Cambio(); }
+
+    void QuitarFondoDeMonitor(string clave) { _arbol.QuitarFondoDeMonitor(clave); Cambio(); }
+
+    // ---------- Los campos ----------
+    //
+    // El selector de color es el MISMO que el de la sección Colores (`SelectorColor`
+    // montado en línea, no un diálogo), para que elegir un color se haga igual en toda la
+    // ventana. Lo que se guarda va sin opacidad: un fondo de escritorio translúcido no
+    // significa nada, debajo no hay nada.
+    UIElement CampoDeColorDelFondo(string clave, string porDefecto)
+    {
+        var fila = new StackPanel();
+        var sel = new SelectorColor { ConOpacidad = false }.Montar();
+        sel.Valor = Paleta.Leer(LeerFondo(clave, porDefecto), Colors.Black);
+        sel.Cambiado += v => EscribirFondo(clave, SelectorColor.AHex(v, false));
+        fila.Children.Add(sel);
+        return fila;
+    }
+
+    UIElement CampoDeRutaDelFondo(string clave, bool carpeta)
+    {
+        var fila = new StackPanel();
+        var caja = new TextBox
+        {
+            Text = LeerFondo(clave, ""), Height = 28,
+            Padding = new Thickness(8, 0, 8, 0),
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Background = _superficieAlta, Foreground = _texto, BorderThickness = new Thickness(0),
+        };
+        caja.TextChanged += (_, _) => EscribirFondo(clave, caja.Text);
+        fila.Children.Add(caja);
+
+        var aviso = Rotulo("");
+        aviso.Opacity = 0.6;
+        void Revisar()
+        {
+            var t = caja.Text;
+            if (string.IsNullOrWhiteSpace(t)) { aviso.Text = ""; return; }
+            bool hay = carpeta ? Directory.Exists(t) : File.Exists(t);
+            aviso.Text = hay ? "" : (carpeta ? "Esa carpeta no existe ahora mismo."
+                                             : "Ese archivo no existe ahora mismo. El fondo actual se queda puesto.");
+        }
+        Revisar();
+        caja.TextChanged += (_, _) => Revisar();
+        fila.Children.Add(aviso);
+
+        var bots = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(-8, 6, 0, 0) };
+        bots.Children.Add(BotonPlano(carpeta ? "Elegir carpeta…" : "Elegir imagen…", () =>
+        {
+            if (carpeta)
+            {
+                var d = new Microsoft.Win32.OpenFolderDialog { Title = "Carpeta con las imágenes" };
+                if (d.ShowDialog() == true) caja.Text = d.FolderName;
+            }
+            else
+            {
+                var d = new Microsoft.Win32.OpenFileDialog
+                {
+                    Title = "Qué imagen poner de fondo",
+                    Filter = "Imágenes|" + string.Join(";", Fondos.Extensiones.Select(x => "*" + x)) + "|Todos|*.*",
+                    CheckFileExists = true,
+                };
+                if (d.ShowDialog() == true) caja.Text = d.FileName;
+            }
+        }, false));
+        fila.Children.Add(bots);
+        return fila;
+    }
+
+    // ---------- La vista previa ----------
+    //
+    // Se dibuja con los mismos pinceles que el fondo de verdad, no con una aproximación:
+    // el degradado usa `GestorFondos.PixelesDeDegradado` a través de un `LinearGradientBrush`
+    // con los mismos dos colores y el mismo ángulo, así que lo que se ve es lo que saldrá.
+    UIElement VistaPreviaDelFondo(string tipo)
+    {
+        var marco = new Border
+        {
+            Height = 118,
+            CornerRadius = new CornerRadius(8),
+            BorderBrush = new SolidColorBrush(_roles.Borde),
+            BorderThickness = new Thickness(1),
+            Background = _superficieAlta,
+            Margin = new Thickness(0, 8, 0, 4),
+            ClipToBounds = true,
+        };
+
+        try
+        {
+            switch (tipo)
+            {
+                case "solido":
+                    marco.Background = new SolidColorBrush(Paleta.Leer(LeerFondo("Color1", "#1A1B26"), Colors.Black));
+                    break;
+
+                case "degradado":
+                {
+                    double g = LeerNumFondo("Angulo", 135);
+                    double rad = g * Math.PI / 180.0;
+                    marco.Background = new LinearGradientBrush(
+                        Paleta.Leer(LeerFondo("Color1", "#0B0D14"), Colors.Black),
+                        Paleta.Leer(LeerFondo("Color2", "#7AA2F7"), Colors.White),
+                        new Point(0.5 - Math.Cos(rad) / 2, 0.5 - Math.Sin(rad) / 2),
+                        new Point(0.5 + Math.Cos(rad) / 2, 0.5 + Math.Sin(rad) / 2));
+                    break;
+                }
+
+                case "imagen":
+                case "presentacion":
+                {
+                    var ruta = tipo == "imagen"
+                        ? LeerFondo("Ruta", "")
+                        : Fondos.ImagenesDe(LeerFondo("CarpetaPresentacion", "")).FirstOrDefault() ?? "";
+                    if (ruta.Length > 0 && File.Exists(ruta))
+                    {
+                        // `DecodePixelWidth` es lo que evita cargar 20 MB para una tira de
+                        // 118 px de alto, y `OnLoad` suelta el fichero: sin eso, la imagen
+                        // se queda bloqueada y no se puede borrar ni mover.
+                        var bmp = new BitmapImage();
+                        bmp.BeginInit();
+                        bmp.UriSource = new Uri(ruta);
+                        bmp.DecodePixelWidth = 640;
+                        bmp.CacheOption = BitmapCacheOption.OnLoad;
+                        bmp.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+                        bmp.EndInit();
+                        marco.Child = new Image { Source = bmp, Stretch = Stretch.UniformToFill };
+                    }
+                    else marco.Child = CentradoAtenuado(ruta.Length == 0
+                        ? "Elige una imagen para verla aquí"
+                        : "Esa imagen no está ahora mismo");
+                    break;
+                }
+
+                case "animado":
+                    marco.Child = CentradoAtenuado(Fondos.AnimadoDisponible
+                        ? "Lo dibuja Wallpaper Engine" : "Wallpaper Engine no está");
+                    break;
+
+                default:
+                    marco.Child = CentradoAtenuado("NubeBar no gestiona el fondo");
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error("dibujar la vista previa del fondo", ex);
+            marco.Child = CentradoAtenuado("No se pudo dibujar la vista previa");
+        }
+        return marco;
+    }
+
+    TextBlock CentradoAtenuado(string texto) => new()
+    {
+        Text = texto, Foreground = _textoAtenuado, FontSize = 11.5,
+        HorizontalAlignment = HorizontalAlignment.Center,
+        VerticalAlignment = VerticalAlignment.Center,
+        TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center,
+        Opacity = 0.8,
+    };
 
     UIElement SeccionSistema()
     {
