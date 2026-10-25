@@ -91,6 +91,12 @@ public static class Pruebas
             CuandoTocaFoto();
             OrdenCongelado();
             GlifoDelAspa();
+
+            // C5: la integración con Wallpaper Engine
+            CicloDeVidaWE();
+            PropiedadDeWE();
+            EsperaDeWE();
+            MonitorDeWE();
             GlifoDeLaCuadricula();
             AbrirYCerrar();
         }
@@ -998,6 +1004,134 @@ public static class Pruebas
         Igual(2, MainWindow.Filas(5, 4), "cinco son dos");
         Igual(0, MainWindow.Filas(0, 4), "ninguna son cero filas");
         Igual(1, MainWindow.Filas(1, 0), "y con cero columnas no se divide por cero");
+    }
+
+    // ================= C5: la integración con Wallpaper Engine =================
+
+    static void CicloDeVidaWE()
+    {
+        Grupo("Wallpaper Engine: qué se hace al arrancar");
+
+        var P = typeof(Integracion.Paso);
+
+        // Desactivada: no se mira ni el proceso
+        Igual(Integracion.Paso.NoHacerNada,
+              Integracion.QueHacer(integrar: false, iniciarConNubeBar: true, yaAbierto: false, hayExe: true),
+              "con la integración desactivada no se hace nada");
+        Igual(Integracion.Paso.NoHacerNada,
+              Integracion.QueHacer(false, true, true, true),
+              "ni aunque esté abierto y todo disponible");
+
+        // Ya abierto: solo se le pide el fondo, nunca se abre otra instancia
+        Igual(Integracion.Paso.SoloCargar,
+              Integracion.QueHacer(true, iniciarConNubeBar: false, yaAbierto: true, hayExe: true),
+              "si ya está abierto, solo se le carga el fondo");
+        Igual(Integracion.Paso.SoloCargar,
+              Integracion.QueHacer(true, true, true, true),
+              "y con permiso para abrirlo tampoco se abre una segunda vez");
+
+        // No está abierto
+        Igual(Integracion.Paso.NoHacerNada,
+              Integracion.QueHacer(true, iniciarConNubeBar: false, yaAbierto: false, hayExe: true),
+              "cerrado y sin autorización para abrirlo: no se abre");
+        Igual(Integracion.Paso.AbrirYCargar,
+              Integracion.QueHacer(true, true, false, true),
+              "cerrado y con autorización: se abre y se carga");
+        Igual(Integracion.Paso.NoSePuede,
+              Integracion.QueHacer(true, true, false, hayExe: false),
+              "sin ejecutable no se puede: y se dice, no se adivina otra ruta");
+
+        // Lo importante: NUNCA se abre una segunda instancia
+        foreach (bool iniciar in new[] { true, false })
+            foreach (bool exe in new[] { true, false })
+                Vale(Integracion.QueHacer(true, iniciar, yaAbierto: true, exe) != Integracion.Paso.AbrirYCargar,
+                     $"con el proceso ya abierto nunca se abre otro (iniciar={iniciar}, exe={exe})");
+    }
+
+    static void PropiedadDeWE()
+    {
+        Grupo("Wallpaper Engine: solo se cierra lo que abrimos nosotros");
+
+        // La regla de la que cuelga todo: si no lo abrimos nosotros, NO se toca, diga lo
+        // que diga la opción. La opción decide qué hacer con lo nuestro.
+        foreach (var opcion in new[] { "nada", "pausar", "cerrar", "CERRAR", "", null })
+            Igual(Integracion.Salida.NoTocar,
+                  Integracion.QueHacerAlSalir(opcion, loAbrimosNosotros: false),
+                  $"si ya estaba abierto no se toca al salir (opción={opcion ?? "null"})");
+
+        // Y si lo abrimos nosotros, se respeta la opción
+        Igual(Integracion.Salida.NoTocar, Integracion.QueHacerAlSalir("nada", true),
+              "lo nuestro, con \"nada\": se deja puesto");
+        Igual(Integracion.Salida.Pausar, Integracion.QueHacerAlSalir("pausar", true),
+              "lo nuestro, con \"pausar\": se pausa");
+        Igual(Integracion.Salida.Cerrar, Integracion.QueHacerAlSalir("cerrar", true),
+              "lo nuestro, con \"cerrar\": se cierra el wallpaper");
+
+        // Mayúsculas y espacios no cambian la decisión
+        Igual(Integracion.Salida.Cerrar, Integracion.QueHacerAlSalir("  Cerrar  ", true),
+              "da igual cómo esté escrito en el config");
+        // Un valor que no existe no puede acabar cerrando nada
+        Igual(Integracion.Salida.NoTocar, Integracion.QueHacerAlSalir("apagalotodo", true),
+              "un valor desconocido no cierra nada");
+    }
+
+    static void EsperaDeWE()
+    {
+        Grupo("Wallpaper Engine: el tope de espera");
+
+        Igual(8.0, Integracion.EsperaValida(8), "un valor normal se respeta");
+        Igual(Integracion.MinEspera, Integracion.EsperaValida(0), "cero se sube al mínimo");
+        Igual(Integracion.MinEspera, Integracion.EsperaValida(-5), "y un negativo también");
+        Igual(Integracion.MaxEspera, Integracion.EsperaValida(9999),
+              "un valor enorme se baja al máximo: la escena no puede esperar para siempre");
+        Igual(8.0, Integracion.EsperaValida(double.NaN), "un NaN del config no deja la espera en NaN");
+
+        // El tope siempre está dentro de lo que la escena puede aguantar
+        foreach (double v in new[] { -100, 0, 0.5, 1, 8, 30, 31, 1e9 })
+        {
+            double e = Integracion.EsperaValida(v);
+            Vale(e >= Integracion.MinEspera && e <= Integracion.MaxEspera,
+                 $"la espera de {v} queda acotada ({e})");
+        }
+    }
+
+    static void MonitorDeWE()
+    {
+        Grupo("Wallpaper Engine: a qué monitor va el fondo");
+
+        Igual(Integracion.TodosLosMonitores, Integracion.MonitorParaWE("todos", 2, out _),
+              "\"todos\" se queda en todos");
+        Igual(Integracion.TodosLosMonitores, Integracion.MonitorParaWE(null, 2, out _),
+              "sin elegir, todos");
+        Igual(Integracion.TodosLosMonitores, Integracion.MonitorParaWE("", 2, out _),
+              "vacío, todos");
+        Igual("0", Integracion.MonitorParaWE("0", 2, out _), "el monitor 0 de dos existe");
+        Igual("1", Integracion.MonitorParaWE("1", 2, out _), "y el 1 también");
+
+        // Monitor desconectado: NO se manda un índice que señala a otra pantalla
+        Igual(Integracion.TodosLosMonitores, Integracion.MonitorParaWE("5", 2, out string aviso1),
+              "un monitor que ya no está cae a todos");
+        Vale(aviso1.Length > 0, "y se avisa de por qué");
+        Vale(aviso1.Contains("5"), $"el aviso dice qué monitor era ({aviso1})");
+
+        Igual(Integracion.TodosLosMonitores, Integracion.MonitorParaWE("izquierda", 2, out string aviso2),
+              "algo que no es un número cae a todos");
+        Vale(aviso2.Length > 0, "y también se avisa");
+        Igual(Integracion.TodosLosMonitores, Integracion.MonitorParaWE("-1", 2, out _),
+              "un índice negativo no se manda");
+
+        // Con un solo monitor, pedir el segundo no puede acabar en el primero por error
+        Igual(Integracion.TodosLosMonitores, Integracion.MonitorParaWE("1", 1, out _),
+              "con una sola pantalla, pedir la segunda cae a todos y no a la 0");
+
+        // Nunca sale un índice fuera de rango
+        for (int cuantos = 0; cuantos <= 3; cuantos++)
+            for (int pedido = 0; pedido <= 5; pedido++)
+            {
+                var r = Integracion.MonitorParaWE(pedido.ToString(), cuantos, out _);
+                Vale(r == Integracion.TodosLosMonitores || (int.Parse(r) >= 0 && int.Parse(r) < cuantos),
+                     $"pedir {pedido} con {cuantos} pantallas nunca da un índice imposible ({r})");
+            }
     }
 
     static void GlifoDelAspa()

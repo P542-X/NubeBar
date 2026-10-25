@@ -251,6 +251,39 @@ public sealed class EscenaArranque : Window
         Log.Info($"escena de entrada: la interfaz avisa de que está lista ({e._reloj.ElapsedMilliseconds} ms)");
     });
 
+    // ---------- Y el fondo ----------
+    //
+    // Lo llama la integración con Wallpaper Engine cuando el wallpaper ya está cargado, o
+    // cuando se ha agotado su espera. Levanta la MISMA puerta que `InterfazLista`: no hay
+    // una segunda animación ni un segundo reloj, solo una condición menos que falta.
+    //
+    // Si llega después de que la nube ya se haya abierto, no pasa nada y no se fuerza
+    // nada: el wallpaper aparecerá donde ya estuviera destapado, que es el comportamiento
+    // correcto. Lo que no se hace nunca es volver a tapar para "enseñarlo bien".
+    public static void FondoListo(string porque) => EnLaEscena(e =>
+    {
+        bool esperaba = e._faltaFondo;
+        e._faltaFondo = false;
+        e._porqueElFondo = porque;
+        Log.Info($"escena de entrada: el fondo avisa ({porque}) a los {e._reloj.ElapsedMilliseconds} ms" +
+                 (esperaba ? "" : " — ya no se esperaba"));
+    });
+
+    // Que la escena espere al wallpaper, y cuánto como mucho. Se llama ANTES de que la
+    // nube llegue a su punto de apertura; después no tendría efecto, y así está bien.
+    public static void EsperarAlFondo(double segundos) => EnLaEscena(e =>
+    {
+        e._faltaFondo = true;
+        e._msEsperaFondo = Math.Max(0, segundos) * 1000;
+        // El tope duro se mueve con la espera: si no, pedir 8 s de espera y tener el
+        // cierre de seguridad a los 9 dejaría la escena sin su propio final. La red
+        // sigue estando —a los 9 s + la espera no hay escena, pase lo que pase—, solo
+        // que proporcionada a lo que se ha pedido.
+        e._tope.Interval = TimeSpan.FromMilliseconds(MsTope + e._msEsperaFondo);
+        Log.Info($"escena de entrada: esperará al fondo como máximo {segundos:0.#} s " +
+                 $"(cierre de seguridad a los {(MsTope + e._msEsperaFondo) / 1000:0.#} s)");
+    });
+
     // Cierre inmediato y sin ceremonia: --salir, un error, o el tope de seguridad.
     public static void Cerrar(string motivo) => EnLaEscena(e =>
     {
@@ -673,6 +706,20 @@ public sealed class EscenaArranque : Window
     readonly Stopwatch _reloj = Stopwatch.StartNew();
 
     bool _listo;                        // la interfaz ha avisado
+
+    // ---------- Y el fondo, que es la otra cosa que puede faltar ----------
+    //
+    // La integración con Wallpaper Engine puede pedir que la nube no se abra hasta que el
+    // fondo esté cargado, para que lo que se vea al destaparse sea el escritorio ya con
+    // su wallpaper y no el de antes.
+    //
+    // Es **la misma puerta** que `_listo`, y eso es lo único importante de este diseño:
+    // no hay un segundo reloj ni una segunda animación que puedan separarse. La nube
+    // espera a que no falte nada y entonces se abre, una vez. Lo que revela el escritorio
+    // sigue siendo el agujero de la nube y nada más.
+    bool _faltaFondo;                   // la integración dijo que esperásemos al wallpaper
+    double _msEsperaFondo;              // y cuánto, como mucho
+    string _porqueElFondo = "";         // para el log: qué pasó con él
     bool _revelando;                    // la brocha ya está destapando la pantalla
     double _esperandoDesde;             // cuándo empezó la espera a la nube (0 = no hizo falta)
 
@@ -815,7 +862,13 @@ public sealed class EscenaArranque : Window
             // avisa sobre los 600 ms y no se abre hasta los ~1420.
             //
             // Si te la has saltado NO se espera a nadie: has pedido verlo ya.
-            if (!_revelando && _prisa == 1 && t >= _guion.HastaDespierta && !_listo && bruto < MsTope * 0.6)
+            // Falta algo si no ha avisado la interfaz, o si estamos esperando al fondo y
+            // todavía no ha llegado. Cada uno tiene su tope y el suyo no afecta al otro:
+            // la interfaz, el 60 % del tope duro; el fondo, lo que se haya configurado.
+            bool faltaInterfaz = !_listo && bruto < MsTope * 0.6;
+            bool faltaFondoAun = _faltaFondo && bruto < _msEsperaFondo;
+
+            if (!_revelando && _prisa == 1 && t >= _guion.HastaDespierta && (faltaInterfaz || faltaFondoAun))
             {
                 if (_esperandoDesde == 0) _esperandoDesde = bruto;
                 _origen += delta;
@@ -827,10 +880,12 @@ public sealed class EscenaArranque : Window
                 _revelando = true;
                 if (_apuntarVista) ApuntarQueSeHaVisto();
                 string espera = _esperandoDesde > 0
-                    ? $"tras esperar {bruto - _esperandoDesde:0} ms a la nube"
+                    ? $"tras esperar {bruto - _esperandoDesde:0} ms"
                     : "sin esperar nada: retardo cero";
                 Log.Info($"escena de entrada: la nube se abre a los {bruto:0} ms, {espera}" +
-                         (_listo ? "" : " (la interfaz no avisó: se abre igual)"));
+                         (_listo ? "" : " (la interfaz no avisó: se abre igual)") +
+                         (_faltaFondo ? $" (el fondo no llegó en {_msEsperaFondo:0} ms: se abre igual)"
+                                      : _porqueElFondo.Length > 0 ? $" (fondo: {_porqueElFondo})" : ""));
             }
 
             e.Avanzar(t);

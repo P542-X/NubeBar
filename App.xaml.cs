@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 
@@ -100,6 +101,17 @@ public partial class App : Application
         // crea nada y esto no cuesta nada. Ver EscenaArranque.
         EscenaArranque.Arrancar();
 
+        // ---------- Y justo detrás, Wallpaper Engine ----------
+        //
+        // En este orden y no al revés: primero la capa de la escena protege la pantalla,
+        // y DESPUÉS se le pide el fondo. Al contrario se vería el escritorio viejo
+        // cambiando de wallpaper a la vista, que es justo el rato feo que la escena tapa.
+        //
+        // Va sin `await` a propósito: esto es `OnStartup` y bloquearlo aquí dejaría la
+        // escena sin montar las islas detrás. La escena ya sabe esperar por su cuenta
+        // (`EsperarAlFondo`) y abrirse igual si el fondo no llega.
+        ArrancarIntegracionDeFondo();
+
         try
         {
             MainWindow = NubeBar.MainWindow.Arrancar();
@@ -128,8 +140,84 @@ public partial class App : Application
         })));
     }
 
+
+    // ================= La integración con Wallpaper Engine =================
+    //
+    // El orden importa y es el que se pidió:
+    //
+    //   1. la capa de la escena ya está puesta (se hizo justo antes);
+    //   2. se le dice a la escena que espere al fondo, y cuánto como mucho;
+    //   3. se abre Wallpaper Engine si toca y se le pide el wallpaper o la playlist;
+    //   4. cuando el fondo está —o se agota la espera— se levanta esa condición;
+    //   5. la nube se abre y va revelando el escritorio CON el wallpaper ya puesto.
+    //
+    // El revelado progresivo no se programa aquí ni en ningún sitio: la escena es un
+    // rectángulo negro con un agujero del tamaño de la nube, así que el wallpaper asoma
+    // por donde la nube ya ha llegado, y nada más. No hay una segunda animación.
+    static CancellationTokenSource? _cortarFondo;
+
+    void ArrancarIntegracionDeFondo()
+    {
+        OpcionesWallpaper o;
+        try
+        {
+            o = Config.Cargar()?.Wallpaper ?? new OpcionesWallpaper();
+        }
+        catch (Exception ex) { Log.Error("leer las opciones de Wallpaper Engine", ex); return; }
+
+        if (!o.Integrar) return;
+
+        // Si la escena no está en marcha —porque no tocaba mostrarla— no hay a quién
+        // hacer esperar, pero el fondo se carga igual: la integración es del fondo, no
+        // de la escena.
+        double espera = Integracion.EsperaValida(o.SegundosEspera);
+        if (EscenaArranque.EnMarcha) EscenaArranque.EsperarAlFondo(espera);
+
+        _cortarFondo = new CancellationTokenSource(TimeSpan.FromSeconds(espera + 5));
+        var ct = _cortarFondo.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var r = await Integracion.PrepararAsync(o, ct).ConfigureAwait(false);
+                EscenaArranque.FondoListo(r.FondoListo ? r.Detalle : "no llegó: " + r.Detalle);
+                Log.Info($"Wallpaper Engine: integración terminada en {r.Ms} ms " +
+                         $"(estado={r.Estado}, fondo={(r.FondoListo ? "listo" : "no")})");
+            }
+            catch (OperationCanceledException)
+            {
+                // Te la has saltado con Esc, o se agotó el margen. Las dos cosas son
+                // normales y la escena ya se ha encargado de no dejar nada tapado.
+                EscenaArranque.FondoListo("cancelado");
+            }
+            catch (Exception ex)
+            {
+                Log.Error("la integración con Wallpaper Engine", ex);
+                // Pase lo que pase, se levanta la puerta: un fallo aquí no puede dejar la
+                // nube cerrada esperando a algo que no va a llegar.
+                EscenaArranque.FondoListo("falló: " + ex.GetType().Name);
+            }
+        }, ct);
+    }
+
+    // Al salir. Solo toca lo que NubeBar haya abierto: ver Integracion.QueHacerAlSalir.
+    internal static void CerrarIntegracionDeFondo()
+    {
+        try
+        {
+            _cortarFondo?.Cancel();
+            _cortarFondo?.Dispose();
+            _cortarFondo = null;
+            var o = Config.Cargar()?.Wallpaper;
+            if (o is { Integrar: true }) Integracion.AlSalir(o);
+        }
+        catch (Exception ex) { Log.Error("cerrar la integración con Wallpaper Engine", ex); }
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
+        CerrarIntegracionDeFondo();
         Instancia.Soltar();
         base.OnExit(e);
     }

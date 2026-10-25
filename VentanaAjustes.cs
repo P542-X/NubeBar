@@ -213,7 +213,8 @@ public sealed class VentanaAjustes : Window
         _modulos.Registrar("inicio", "Inicio", "Sistema", SeccionInicio,
                            "menú", "buscador", "archivos", "web", "saludo", "tecla windows");
         _modulos.Registrar("wallpaper", "Wallpaper", "Aspecto", SeccionWallpaper,
-                           "fondo", "wallpaper engine", "monitor", "paleta");
+                           "fondo", "wallpaper engine", "monitor", "paleta", "integración",
+                           "playlist", "escena", "inicio", "espera", "animado");
         _modulos.Registrar("sistema", "Sistema", "Sistema", SeccionSistema,
                            "arrancar", "windows", "notificaciones", "monitores", "diagnóstico");
 
@@ -1059,12 +1060,160 @@ public sealed class VentanaAjustes : Window
         });
         if (detectada != null)
             c.Children.Add(BotonPlano("Usar la ruta detectada", () => ruta.Text = detectada, false));
+        c.Children.Add(BotonPlano("Elegir el ejecutable…", () =>
+        {
+            var d = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Dónde está Wallpaper Engine",
+                Filter = "Wallpaper Engine (wallpaper64.exe;wallpaper32.exe)|wallpaper64.exe;wallpaper32.exe|Programas (*.exe)|*.exe",
+                CheckFileExists = true,
+            };
+            if (d.ShowDialog() == true) ruta.Text = d.FileName;
+        }, false));
 
-        c.Children.Add(Deslizador("Monitor", 0, 3, _arbol.Numero("Wallpaper", "Monitor", 0),
+        c.Children.Add(Deslizador("Monitor del que se leen los colores", 0, 3,
+                                  _arbol.Numero("Wallpaper", "Monitor", 0),
                                   v => _arbol.Poner("Wallpaper", "Monitor", Math.Round(v))));
         c.Children.Add(Interruptor("Enviar mi color de acento al wallpaper",
                                    _arbol.Bandera("Tema", "EnviarColorAlWallpaper", false),
                                    v => _arbol.Poner("Tema", "EnviarColorAlWallpaper", v)));
+
+        // ================= La integración =================
+        c.Children.Add(Rotulo("Integración con Wallpaper Engine", true));
+
+        var pista = Rotulo("Con esto puesto, NubeBar puede abrir Wallpaper Engine al arrancar, cargar el " +
+                           "wallpaper que elijas y esperar a que esté listo antes de que la nube se abra: " +
+                           "así la escena de inicio va descubriendo el escritorio con el fondo ya puesto. " +
+                           "Está desactivada de serie porque significa abrir y dar órdenes a un programa que " +
+                           "no es NubeBar.");
+        pista.TextWrapping = TextWrapping.Wrap;
+        pista.Opacity = 0.6;
+        c.Children.Add(pista);
+
+        c.Children.Add(Interruptor("Activar la integración",
+                                   _arbol.Bandera("Wallpaper", "Integrar", false),
+                                   v => _arbol.Poner("Wallpaper", "Integrar", v)));
+        c.Children.Add(Interruptor("Iniciar Wallpaper Engine con NubeBar",
+                                   _arbol.Bandera("Wallpaper", "IniciarConNubeBar", false),
+                                   v => _arbol.Poner("Wallpaper", "IniciarConNubeBar", v)));
+
+        // ---------- Qué cargar ----------
+        c.Children.Add(Rotulo("Wallpaper o playlist"));
+
+        var elegido = new TextBox
+        {
+            Text = _arbol.Texto("Wallpaper", "WallpaperElegido", "") ?? "",
+            Height = 28, Padding = new Thickness(8, 0, 8, 0),
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Background = _superficieAlta, Foreground = _texto, BorderThickness = new Thickness(0)
+        };
+        elegido.TextChanged += (_, _) => { _arbol.Poner("Wallpaper", "WallpaperElegido", elegido.Text); Cambio(); };
+        c.Children.Add(elegido);
+        c.Children.Add(BotonPlano("Elegir el wallpaper…", () =>
+        {
+            // Se abre en la carpeta de wallpapers de Wallpaper Engine si se sabe dónde
+            // está, pero no se adivina el fichero: lo elige el usuario.
+            var inicio = WallpaperEngine.Carpeta is { } dir
+                ? System.IO.Path.Combine(dir, "projects", "myprojects") : null;
+            var d = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Qué wallpaper cargar",
+                Filter = "Wallpaper (project.json;*.pkg)|project.json;*.pkg|Todos|*.*",
+                InitialDirectory = inicio != null && System.IO.Directory.Exists(inicio) ? inicio : "",
+            };
+            if (d.ShowDialog() == true) elegido.Text = d.FileName;
+        }, false));
+
+        var playlist = new TextBox
+        {
+            Text = _arbol.Texto("Wallpaper", "PlaylistElegida", "") ?? "",
+            Height = 28, Padding = new Thickness(8, 0, 8, 0),
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Background = _superficieAlta, Foreground = _texto, BorderThickness = new Thickness(0)
+        };
+        playlist.TextChanged += (_, _) => { _arbol.Poner("Wallpaper", "PlaylistElegida", playlist.Text); Cambio(); };
+        c.Children.Add(Rotulo("O el nombre de una playlist (manda sobre el wallpaper)"));
+        c.Children.Add(playlist);
+
+        // ---------- Dónde ----------
+        var cuantos = Math.Max(1, Monitores.Todos().Count);
+        var destinos = new List<string> { Integracion.TodosLosMonitores };
+        for (int i = 0; i < cuantos; i++) destinos.Add(i.ToString());
+        c.Children.Add(Opciones("Monitor de destino", destinos.ToArray(),
+                                _arbol.Texto("Wallpaper", "MonitorDestino", Integracion.TodosLosMonitores),
+                                v => _arbol.Poner("Wallpaper", "MonitorDestino", v)));
+
+        // ---------- Al salir ----------
+        c.Children.Add(Opciones("Al salir de NubeBar", new[] { "nada", "pausar", "cerrar" },
+                                _arbol.Texto("Wallpaper", "AlSalir", "nada"),
+                                v => _arbol.Poner("Wallpaper", "AlSalir", v)));
+        var pistaSalir = Rotulo("Solo se aplica a lo que haya abierto NubeBar. Si Wallpaper Engine ya estaba " +
+                                "abierto cuando arrancaste, no se toca al salir: no es nuestro.");
+        pistaSalir.TextWrapping = TextWrapping.Wrap;
+        pistaSalir.Opacity = 0.55;
+        c.Children.Add(pistaSalir);
+
+        // ---------- La espera ----------
+        c.Children.Add(Deslizador($"Esperar al fondo (segundos)",
+                                  Integracion.MinEspera, Integracion.MaxEspera,
+                                  _arbol.Numero("Wallpaper", "SegundosEspera", 8),
+                                  v => _arbol.Poner("Wallpaper", "SegundosEspera", Math.Round(v))));
+        var pistaEspera = Rotulo("Lo que la nube espera, como mucho, antes de abrirse. Si se agota, la escena " +
+                                 "se abre igual con el escritorio que haya: la pantalla no se queda en negro.");
+        pistaEspera.TextWrapping = TextWrapping.Wrap;
+        pistaEspera.Opacity = 0.55;
+        c.Children.Add(pistaEspera);
+
+        // ---------- Los dos botones ----------
+        var resultado = new TextBlock
+        {
+            Foreground = _textoAtenuado, TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 8, 0, 0)
+        };
+
+        c.Children.Add(BotonPlano("Probar wallpaper", () =>
+        {
+            // Se prueba con lo que hay ESCRITO ahora, no con lo guardado: si no, habría
+            // que cerrar los ajustes para poder probar un cambio.
+            var o = new OpcionesWallpaper
+            {
+                Ruta = ruta.Text,
+                Integrar = true,
+                IniciarConNubeBar = _arbol.Bandera("Wallpaper", "IniciarConNubeBar", false),
+                WallpaperElegido = elegido.Text,
+                PlaylistElegida = playlist.Text,
+                MonitorDestino = _arbol.Texto("Wallpaper", "MonitorDestino", Integracion.TodosLosMonitores),
+                SegundosEspera = _arbol.Numero("Wallpaper", "SegundosEspera", 8),
+            };
+            var p = Integracion.Probar(o);
+            resultado.Text = (p.Ok ? "✓ " : "✗ ") + p.Mensaje;
+            resultado.Foreground = p.Ok ? _texto : _textoAtenuado;
+        }, false));
+
+        c.Children.Add(BotonPlano("Ver escena de inicio", () =>
+        {
+            // La vista previa no espera a nadie: es para ver la escena, no para medir la
+            // integración. Si quieres probar la espera, reinicia NubeBar.
+            EscenaArranque.VistaPrevia();
+            resultado.Text = Animacion.Nivel == NivelAnimacion.Desactivado
+                ? "El movimiento está desactivado, así que no hay escena que ver."
+                : "Escena lanzada. Para probar la espera al fondo de verdad, reinicia NubeBar.";
+        }, false));
+
+        c.Children.Add(resultado);
+
+        // ---------- El estado, que es lo que hace falta para diagnosticar ----------
+        var estadoWE = new TextBlock
+        {
+            Foreground = _textoAtenuado, TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 10, 0, 0), Opacity = 0.8
+        };
+        estadoWE.Text =
+            $"Ahora mismo: {(WallpaperEngine.Abierto ? "Wallpaper Engine está abierto" : "Wallpaper Engine no está abierto")}. " +
+            $"Última vez que NubeBar lo tocó: {Integracion.Ahora}. " +
+            $"Pantallas detectadas: {Monitores.Todos().Count}.";
+        c.Children.Add(estadoWE);
+
         return c;
     }
 

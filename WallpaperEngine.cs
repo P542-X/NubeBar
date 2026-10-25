@@ -67,9 +67,14 @@ static class WallpaperEngine
         return null;
     }
 
+    // wallpaper64 primero SI el sistema es de 64 bits; en un Windows de 32 no sirve de
+    // nada intentarlo. "Compatible" es exactamente eso, y no una preferencia estética.
     static string? EnCarpeta(string carpeta)
     {
-        foreach (var n in new[] { "wallpaper64.exe", "wallpaper32.exe" })
+        var orden = Environment.Is64BitOperatingSystem
+            ? new[] { "wallpaper64.exe", "wallpaper32.exe" }
+            : new[] { "wallpaper32.exe" };
+        foreach (var n in orden)
         {
             var r = Path.Combine(carpeta, n);
             if (File.Exists(r)) return r;
@@ -78,6 +83,10 @@ static class WallpaperEngine
     }
 
     // ---------- Enviar comandos ----------
+    //
+    // Siempre con `ArgumentList`: cada argumento va por separado y lo escapa el runtime.
+    // Construir una cadena de shell con una ruta del usuario dentro es la forma clásica
+    // de que un wallpaper llamado  a" -control closeWallpaper "  haga algo que nadie pidió.
     static ProcessStartInfo Crear(string exe, params string[] args)
     {
         var psi = new ProcessStartInfo(exe) { UseShellExecute = false, CreateNoWindow = true };
@@ -91,6 +100,76 @@ static class WallpaperEngine
     {
         if (!Abierto || Exe is not { } exe) return;
         try { Process.Start(Crear(exe, args))?.Dispose(); } catch { }
+    }
+
+    // ---------- Los cinco comandos con nombre ----------
+    //
+    // Los que documenta Wallpaper Engine. Están juntos para que quien los lea vea de una
+    // vez qué le decimos al programa de otro: poco, y siempre lo mismo.
+    public static bool AbrirWallpaper(string ruta, string? monitor) =>
+        Mandar("openWallpaper", "-file", ruta, monitor);
+
+    public static bool AbrirPlaylist(string nombre, string? monitor) =>
+        Mandar("openPlaylist", "-playlist", nombre, monitor);
+
+    public static bool Reproducir(string? monitor) => Mandar("play", null, null, monitor);
+    public static bool Pausar(string? monitor) => Mandar("pause", null, null, monitor);
+    public static bool CerrarWallpaper(string? monitor) => Mandar("closeWallpaper", null, null, monitor);
+
+    static bool Mandar(string comando, string? bandera, string? valor, string? monitor)
+    {
+        if (!Abierto || Exe is not { } exe) return false;
+        try
+        {
+            var psi = new ProcessStartInfo(exe) { UseShellExecute = false, CreateNoWindow = true };
+            psi.ArgumentList.Add("-control");
+            psi.ArgumentList.Add(comando);
+            if (bandera != null && valor != null) { psi.ArgumentList.Add(bandera); psi.ArgumentList.Add(valor); }
+            // Sin -monitor, Wallpaper Engine lo aplica a todos. "todos" es nuestra forma
+            // de decir eso mismo sin que la config tenga un valor vacío con significado.
+            if (!string.IsNullOrWhiteSpace(monitor) && monitor != Integracion.TodosLosMonitores)
+            {
+                psi.ArgumentList.Add("-monitor");
+                psi.ArgumentList.Add(monitor);
+            }
+            using var p = Process.Start(psi);
+            Log.Info($"Wallpaper Engine: -control {comando}" +
+                     (valor != null ? $" {bandera} \"{valor}\"" : "") +
+                     (!string.IsNullOrWhiteSpace(monitor) && monitor != Integracion.TodosLosMonitores
+                        ? $" -monitor {monitor}" : " (todos los monitores)"));
+            return true;
+        }
+        catch (Exception ex) { Log.Error($"mandar -control {comando} a Wallpaper Engine", ex); return false; }
+    }
+
+    // ---------- Abrirlo ----------
+    //
+    // Sin `-control`: lanzar el exe a secas es lo que abre el programa. Devuelve false si
+    // ya estaba abierto, y eso NO es un fallo: es la respuesta a "lo has abierto tú?".
+    public static bool Abrir(out string porque)
+    {
+        if (Abierto) { porque = "ya estaba abierto"; return false; }
+        if (Exe is not { } exe) { porque = "no se encuentra el ejecutable"; return false; }
+        try
+        {
+            var psi = new ProcessStartInfo(exe)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                // Desde su propia carpeta: busca sus assets en relativo y lanzado desde
+                // otro directorio de trabajo arranca sin ellos.
+                WorkingDirectory = Path.GetDirectoryName(exe) ?? "",
+            };
+            using var p = Process.Start(psi);
+            porque = p == null ? "Process.Start no devolvió proceso" : "abierto por NubeBar";
+            return p != null;
+        }
+        catch (Exception ex)
+        {
+            Log.Error("abrir Wallpaper Engine", ex);
+            porque = "falló al abrirlo: " + ex.Message;
+            return false;
+        }
     }
 
     public static async Task<string?> WallpaperActual(int monitor)

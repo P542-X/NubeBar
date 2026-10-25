@@ -37,8 +37,30 @@ public class Tema
 
 public class OpcionesWallpaper
 {
-    public string? Ruta { get; set; }        // vacío = detectar automáticamente desde Steam
+    public string? Ruta { get; set; }        // ejecutable de Wallpaper Engine; vacío = buscarlo en Steam
     public int Monitor { get; set; } = 0;    // monitor del que se leen los colores
+
+    // ---------- La integración (opcional, y desactivada de serie) ----------
+    //
+    // Desactivada a propósito: activarla hace que NubeBar abra un programa de otro y le
+    // dé órdenes. Eso se pide, no se hereda al actualizar.
+    public bool Integrar { get; set; } = false;
+    public bool IniciarConNubeBar { get; set; } = false;
+
+    // Lo que se le pide cargar. La playlist manda si están las dos: es lo más específico
+    // que el usuario puede haber elegido.
+    public string? WallpaperElegido { get; set; }
+    public string? PlaylistElegida { get; set; }
+
+    // "todos" | "0" | "1" ... El índice es el de Wallpaper Engine.
+    public string MonitorDestino { get; set; } = "todos";
+
+    // "nada" | "pausar" | "cerrar". Solo se aplica a lo que NubeBar haya abierto:
+    // ver Integracion.QueHacerAlSalir.
+    public string AlSalir { get; set; } = "nada";
+
+    // Cuánto espera la escena de la nube a que el fondo esté disponible.
+    public double SegundosEspera { get; set; } = 8;
 }
 
 public class Barra
