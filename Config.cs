@@ -333,6 +333,11 @@ public class Inicio
 
 public class Config
 {
+    // La versión del esquema de este fichero. Ver Esquema.cs: lo que la mantiene al día
+    // son las migraciones, no esta propiedad — aquí está para que el modelo tipado no se
+    // coma la clave y para poder preguntarla sin volver a abrir el árbol.
+    public int Version { get; set; } = Esquema.Actual;
+
     public Tema Tema { get; set; } = new();
     public Barra Barra { get; set; } = new();
     public Modulos Modulos { get; set; } = new();
@@ -368,6 +373,18 @@ public class Config
                 File.WriteAllText(Ruta, JsonSerializer.Serialize(recien, Opc));
                 Log.Info("config nuevo creado con el tema Nube");
             }
+
+            // ---------- Las migraciones, antes de deserializar ----------
+            //
+            // Van aquí y no después por un motivo concreto: el modelo tipado solo ve las
+            // claves que conoce, así que migrar sobre el objeto deserializado no podría
+            // ni leer ni conservar lo que esta versión no entiende. `Esquema` trabaja
+            // sobre el árbol JSON, que lo conserva todo.
+            //
+            // Solo escribe si de verdad hay algo que migrar, y si falla no escribe nada:
+            // entonces se sigue adelante con el fichero tal cual, que es lo que había
+            // antes de existir esto y funciona. Ver Esquema.MigrarFichero.
+            Esquema.MigrarFichero(Ruta);
             var c = JsonSerializer.Deserialize<Config>(File.ReadAllText(Ruta), Opc);
             if (c == null) return null;
 
@@ -379,6 +396,7 @@ public class Config
             c.Barra ??= new();
             c.Modulos ??= new();
             c.Wallpaper ??= new();
+            if (c.Version < 1) c.Version = Esquema.Actual;
             c.Inicio ??= new();
             c.Barra.AppsFijadas ??= new();
             c.Barra.OrdenApps ??= new();

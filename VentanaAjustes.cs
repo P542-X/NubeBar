@@ -9,6 +9,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Text.Json.Nodes;
 using System.Windows.Threading;
 
 namespace NubeBar;
@@ -39,6 +40,11 @@ public sealed class VentanaAjustes : Window
     SolidColorBrush _superficie = new(Color.FromArgb(0x1E, 255, 255, 255));
     SolidColorBrush _superficieAlta = new(Color.FromArgb(0x33, 255, 255, 255));
     SolidColorBrush _textoAtenuado = new(Color.FromRgb(0xA0, 0xA0, 0xA0));
+    // El fondo de lo ELEGIDO y el acento cuando hace de texto. Salen de los roles, no de
+    // una mezcla a mano: es la regla desde la Fase A y lo que hace que funcionen igual en
+    // los siete temas, en claro y en oscuro.
+    SolidColorBrush _elegido = new(Color.FromArgb(0x33, 0x7A, 0xA2, 0xF7));
+    SolidColorBrush _acentoLegible = new(Color.FromRgb(0x7A, 0xA2, 0xF7));
     Roles _roles = Roles.PorDefecto();
 
     TabControl _pestanas = new();
@@ -120,6 +126,8 @@ public sealed class VentanaAjustes : Window
         _superficie = new SolidColorBrush(_roles.Superficie);
         _superficieAlta = new SolidColorBrush(_roles.SuperficieAlta);
         _textoAtenuado = new SolidColorBrush(_roles.TextoAtenuado);
+        _elegido = new SolidColorBrush(_roles.Seleccion);
+        _acentoLegible = new SolidColorBrush(_roles.AcentoTinta);
     }
 
     // Un Tema con lo que haya en el árbol, para poder pedirle los roles. Las claves de
@@ -215,6 +223,9 @@ public sealed class VentanaAjustes : Window
         _modulos.Registrar("wallpaper", "Wallpaper", "Aspecto", SeccionWallpaper,
                            "fondo", "wallpaper engine", "monitor", "paleta", "integración",
                            "playlist", "escena", "inicio", "espera", "animado");
+        _modulos.Registrar("perfiles", "Perfiles", "Aspecto", SeccionPerfiles,
+                           "perfil", "concentración", "creativo", "noche", "minimal",
+                           "aplicar", "deshacer", "exportar", "importar", "duplicar");
         _modulos.Registrar("sistema", "Sistema", "Sistema", SeccionSistema,
                            "arrancar", "windows", "notificaciones", "monitores", "diagnóstico");
 
@@ -592,6 +603,34 @@ public sealed class VentanaAjustes : Window
         };
         _pestanas.SelectedIndex = i;
     }
+
+
+    // ---------- Volver a construir una página ----------
+    //
+    // Por id y no por índice: con el registro de módulos el orden de las páginas puede
+    // cambiar, y un número escrito a mano recargaría la equivocada. Se conserva la
+    // pestaña elegida para que recargar no te saque de donde estabas.
+    void RehacerPagina(string id, Func<UIElement> construir)
+    {
+        int donde = _modulos.Indice(id);
+        if (donde < 0 || donde >= _pestanas.Items.Count)
+        {
+            Log.Info($"no encuentro la página \"{id}\" para recargarla");
+            return;
+        }
+        var i = _pestanas.SelectedIndex;
+        ((TabItem)_pestanas.Items[donde]).Content = new ScrollViewer
+        {
+            Content = construir(),
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Padding = new Thickness(8, 12, 8, 8)
+        };
+        _pestanas.SelectedIndex = i;
+    }
+
+    // La de perfiles se recarga a cada acción: aplicar, duplicar, renombrar o borrar
+    // cambia qué tarjetas hay y cuál va marcada como puesta.
+    void Rehacer() => RehacerPagina("perfiles", SeccionPerfiles);
 
     void ExportarTema()
     {
@@ -1215,6 +1254,296 @@ public sealed class VentanaAjustes : Window
         c.Children.Add(estadoWE);
 
         return c;
+    }
+
+    // ================= Perfiles de escritorio =================
+    //
+    // Una tarjeta por perfil, con lo que cambia y los botones. Todo pinta con los roles
+    // del tema (`_superficie`, `_elegido`, `_acento`, `_textoAtenuado`): ni una mezcla de
+    // color a mano, que es la regla desde la Fase A.
+    UIElement SeccionPerfiles()
+    {
+        var c = Columna();
+        Perfiles.CrearLosDeSerie();
+
+        var estado = Perfiles.LeerEstado();
+        var todos = Perfiles.Todos();
+        var arbol = ConfigArbol.Cargar();
+
+        c.Children.Add(Rotulo("Perfiles de escritorio", true));
+        var intro = Rotulo("Un perfil guarda el tema, el nivel de animación, el panel, los widgets, las " +
+                           "notificaciones, el No molestar y el fondo. Aplicarlo lo cambia todo de una vez " +
+                           "y con una sola escritura; lo que el perfil no menciona se queda como lo tengas.");
+        intro.TextWrapping = TextWrapping.Wrap;
+        intro.Opacity = 0.6;
+        c.Children.Add(intro);
+
+        // ---------- El aviso de deshacer, arriba y solo si hay algo que deshacer ----------
+        if (Perfiles.HayQueDeshacer)
+        {
+            var aviso = new Border
+            {
+                Background = _elegido,
+                BorderBrush = _acento,
+                BorderThickness = new Thickness(1.4),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(12, 9, 12, 9),
+                Margin = new Thickness(0, 8, 0, 4),
+            };
+            var fila = new StackPanel();
+            var t = Rotulo("Hay un perfil aplicado hace poco. Puedes volver a como estaba antes.");
+            t.TextWrapping = TextWrapping.Wrap;
+            fila.Children.Add(t);
+            var bots = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
+            bots.Children.Add(BotonPlano("Deshacer", () =>
+            {
+                if (Perfiles.Deshacer()) Rehacer();
+            }, true));
+            fila.Children.Add(bots);
+            aviso.Child = fila;
+            c.Children.Add(aviso);
+        }
+
+        if (todos.Count == 0)
+            c.Children.Add(Rotulo("No hay perfiles. Importa uno o duplica alguno de los de serie."));
+
+        foreach (var p in todos)
+            c.Children.Add(TarjetaDePerfil(p, estado, arbol));
+
+        // ---------- Importar ----------
+        c.Children.Add(Rotulo("Importar", true));
+        var resultado = Rotulo("");
+        resultado.TextWrapping = TextWrapping.Wrap;
+
+        var filaImp = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 0) };
+        filaImp.Children.Add(BotonPlano("Importar un perfil…", () =>
+        {
+            var d = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Qué perfil importar",
+                Filter = "Perfil de NubeBar (*.json)|*.json|Todos|*.*",
+                CheckFileExists = true,
+            };
+            if (d.ShowDialog() != true) return;
+
+            var imp = Perfiles.Importar(d.FileName, Perfiles.Todos());
+            if (imp.Perfil == null)
+            {
+                resultado.Text = "✗ No se pudo importar: " + imp.Veredicto.Resumen;
+                return;
+            }
+            if (!Perfiles.Guardar(imp.Perfil))
+            {
+                resultado.Text = "✗ Se validó pero no se pudo guardar. Mira el log.";
+                return;
+            }
+            resultado.Text = $"✓ Importado como «{imp.Perfil.Nombre}»." +
+                             (imp.Veredicto.Ignoradas.Count > 0
+                                ? $" Se ignoraron {imp.Veredicto.Ignoradas.Count} clave(s) que un perfil no puede tocar: " +
+                                  string.Join(", ", imp.Veredicto.Ignoradas)
+                                : "");
+            Rehacer();
+        }, false));
+        c.Children.Add(filaImp);
+        c.Children.Add(resultado);
+
+        var nota = Rotulo("Los perfiles se guardan en %APPDATA%\\NubeBar\\perfiles, uno por fichero y con su " +
+                          "versión. Un perfil de una versión más nueva se rechaza en vez de leerse a medias.");
+        nota.TextWrapping = TextWrapping.Wrap;
+        nota.Opacity = 0.5;
+        nota.Margin = new Thickness(0, 10, 0, 0);
+        c.Children.Add(nota);
+        return c;
+    }
+
+    UIElement TarjetaDePerfil(Perfil p, Perfiles.EstadoPerfiles estado, ConfigArbol arbol)
+    {
+        bool activo = estado.Activo == p.Id;
+        bool modificado = activo && Perfiles.Modificado(estado.HuellaAlAplicar, Perfiles.Huella(p, arbol));
+
+        var marco = new Border
+        {
+            // El filo va SIEMPRE puesto y lo que cambia es su color, igual que en las
+            // tarjetas de la vista general: con el grosor a 0 y a 1,4 según el estado, el
+            // contenido se movía un píxel y medio al cambiar de perfil activo.
+            Background = activo ? _elegido : _superficie,
+            BorderBrush = activo ? _acento : Brushes.Transparent,
+            BorderThickness = new Thickness(1.4),
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(14, 12, 14, 12),
+            Margin = new Thickness(0, 8, 0, 0),
+        };
+
+        var col = new StackPanel();
+
+        // ---------- Cabecera: nombre y si está puesto ----------
+        var cab = new StackPanel { Orientation = Orientation.Horizontal };
+        cab.Children.Add(new TextBlock
+        {
+            Text = p.Nombre,
+            Foreground = activo ? _acentoLegible : _texto,
+            FontSize = 14,
+            FontWeight = activo ? FontWeights.SemiBold : FontWeights.Normal,
+            VerticalAlignment = VerticalAlignment.Center,
+        });
+        if (activo)
+            cab.Children.Add(new TextBlock
+            {
+                Text = modificado ? "  ·  puesto (modificado)" : "  ·  puesto",
+                Foreground = _textoAtenuado, FontSize = 11,
+                VerticalAlignment = VerticalAlignment.Center,
+            });
+        if (p.Protegido)
+            cab.Children.Add(new TextBlock
+            {
+                Text = "  ·  de serie", Foreground = _textoAtenuado, FontSize = 11,
+                Opacity = 0.7, VerticalAlignment = VerticalAlignment.Center,
+            });
+        col.Children.Add(cab);
+
+        // ---------- Descripción ----------
+        if (p.Descripcion.Length > 0)
+        {
+            var d = new TextBlock
+            {
+                Text = p.Descripcion,
+                Foreground = _textoAtenuado, FontSize = 11.5,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 5, 0, 0),
+            };
+            col.Children.Add(d);
+        }
+
+        // ---------- Qué cambia ----------
+        var que = ResumenDelPerfil(p);
+        if (que.Length > 0)
+            col.Children.Add(new TextBlock
+            {
+                Text = que,
+                Foreground = _textoAtenuado, FontSize = 10.5,
+                TextWrapping = TextWrapping.Wrap,
+                Opacity = 0.75,
+                Margin = new Thickness(0, 7, 0, 0),
+            });
+
+        // ---------- Los botones ----------
+        var b1 = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(-8, 11, 0, 0) };
+        b1.Children.Add(BotonPlano(activo ? "Volver a aplicar" : "Aplicar", () =>
+        {
+            var r = Perfiles.Aplicar(p);
+            Rehacer();
+            if (!r.Ok) Log.Info("perfiles: no se aplicó — " + r.Detalle);
+        }, !activo));
+
+        // "Vista previa" es aplicar de verdad y poder volver: un perfil cambia el tema, el
+        // panel y los widgets de TODA la interfaz, así que una vista previa que no aplique
+        // tendría que simular el escritorio entero. Aplicar con deshacer a un clic es más
+        // honesto y es lo que el usuario quiere comprobar.
+        b1.Children.Add(BotonPlano("Vista previa", () =>
+        {
+            var r = Perfiles.Aplicar(p);
+            Rehacer();
+            if (!r.Ok) Log.Info("perfiles: la vista previa no se aplicó — " + r.Detalle);
+        }, false));
+
+        b1.Children.Add(BotonPlano("Duplicar", () =>
+        {
+            var todos = Perfiles.Todos();
+            var copia = p.Copia(Perfiles.IdLibre(p.Nombre, todos.Select(x => x.Id)),
+                                Perfiles.NombreLibre(p.Nombre, todos.Select(x => x.Nombre)));
+            if (Perfiles.Guardar(copia)) Rehacer();
+        }, false));
+        col.Children.Add(b1);
+
+        // ---------- Renombrar, en su propia fila para que quepa el campo ----------
+        var b2 = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(-8, 6, 0, 0) };
+
+        var nuevoNombre = new TextBox
+        {
+            Text = p.Nombre,
+            Width = 170, Height = 28,
+            Margin = new Thickness(8, 0, 0, 0),
+            Padding = new Thickness(8, 0, 8, 0),
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Background = _superficieAlta, Foreground = _texto, BorderThickness = new Thickness(0),
+        };
+        b2.Children.Add(nuevoNombre);
+        b2.Children.Add(BotonPlano("Renombrar", () =>
+        {
+            var n = (nuevoNombre.Text ?? "").Trim();
+            if (n.Length == 0 || n == p.Nombre) return;
+            // El id NO cambia al renombrar: es lo que permite saber qué perfil está puesto
+            // después de cambiarle el nombre.
+            p.Nombre = n;
+            if (Perfiles.Guardar(p)) Rehacer();
+        }, false));
+
+        b2.Children.Add(BotonPlano("Exportar…", () =>
+        {
+            var d = new Microsoft.Win32.SaveFileDialog
+            {
+                Title = "Dónde guardar el perfil",
+                Filter = "Perfil de NubeBar (*.json)|*.json",
+                FileName = p.Id + ".json",
+            };
+            if (d.ShowDialog() == true) Perfiles.Exportar(p, d.FileName);
+        }, false));
+
+        if (p.Protegido)
+            b2.Children.Add(BotonPlano("Restaurar", () =>
+            {
+                if (Perfiles.Restaurar(p.Id) != null) Rehacer();
+            }, false));
+        else
+            b2.Children.Add(BotonPlano("Eliminar", () =>
+            {
+                if (Perfiles.Borrar(p)) Rehacer();
+            }, false));
+
+        col.Children.Add(b2);
+
+        marco.Child = col;
+        return marco;
+    }
+
+    // Una línea con lo que el perfil toca. Se saca del propio perfil y no de una lista
+    // escrita a mano: así un perfil importado dice la verdad de lo que lleva.
+    static string ResumenDelPerfil(Perfil p)
+    {
+        var trozos = new List<string>();
+        var a = p.Ajustes;
+
+        if (a["Tema"] is JsonObject tema && tema.Count > 0)
+            trozos.Add($"tema ({tema.Count} valores)");
+        if (a["Animaciones"]?["Nivel"] is { } niv)
+            trozos.Add("animación: " + niv.GetValue<string>());
+        if (a["Panel"] is JsonObject panel && panel.Count > 0)
+        {
+            var modo = panel["Modo"]?.GetValue<string>();
+            var pos = panel["Posicion"]?.GetValue<string>();
+            trozos.Add("panel" + (modo != null ? " " + modo : "") + (pos != null ? " " + pos : ""));
+        }
+        if (a["Modulos"] is JsonObject mods && mods.Count > 0)
+        {
+            int cuantos = 0;
+            foreach (var zona in new[] { "Izquierda", "Centro", "Derecha" })
+                if (mods[zona] is JsonArray arr) cuantos += arr.Count;
+            int ocultos = mods["Ocultos"] is JsonArray oc ? oc.Count : 0;
+            trozos.Add($"widgets ({cuantos}" + (ocultos > 0 ? $", {ocultos} ocultos" : "") + ")");
+        }
+        if (a["Fondo"]?["Tipo"] is { } tipo)
+            trozos.Add("fondo: " + tipo.GetValue<string>());
+        if (a["Barra"] is JsonObject barra && barra.Count > 0)
+        {
+            if (barra["Notificaciones"] is { } n)
+                trozos.Add("notificaciones: " + (n.GetValue<bool>() ? "sí" : "no"));
+            if (barra["PulsoAudio"] is { } pu)
+                trozos.Add("pulso de audio: " + (pu.GetValue<bool>() ? "sí" : "no"));
+        }
+        if (p.NoMolestar is { } nm)
+            trozos.Add("No molestar: " + (nm ? "puesto" : "quitado"));
+
+        return trozos.Count == 0 ? "" : "Cambia " + string.Join(" · ", trozos) + ".";
     }
 
     UIElement SeccionSistema()

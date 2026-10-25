@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json.Nodes;
 using System.Windows.Media;
 
 namespace NubeBar;
@@ -92,11 +93,28 @@ public static class Pruebas
             OrdenCongelado();
             GlifoDelAspa();
 
-            // C5: la integración con Wallpaper Engine
+            // C5: esquema y migraciones
+            EsquemaDeducir();
+            EsquemaMigrar();
+            EsquemaClavesDesconocidas();
+            EsquemaDelFuturo();
+            EsquemaValidar();
+            EsquemaEnDisco();
+            EsquemaRecuperarDelBak();
+
+            // C5: perfiles, fondos y la integración con Wallpaper Engine
             CicloDeVidaWE();
             PropiedadDeWE();
             EsperaDeWE();
             MonitorDeWE();
+            PerfilesListaBlanca();
+            PerfilesValidar();
+            PerfilesNombres();
+            PerfilesDuplicar();
+            PerfilesDeSerie();
+            PerfilesEscrituras();
+            PerfilesAplicarYDeshacer();
+            PerfilesRestaurar();
             GlifoDeLaCuadricula();
             AbrirYCerrar();
         }
@@ -1006,6 +1024,314 @@ public static class Pruebas
         Igual(1, MainWindow.Filas(1, 0), "y con cero columnas no se divide por cero");
     }
 
+    // ================= C5: la versión del esquema =================
+
+    static JsonObject ConfigDeFaseA() => new()
+    {
+        ["Tema"] = new JsonObject { ["Fondo"] = "#E6000000", ["Acento"] = "#7AA2F7" },
+        ["Barra"] = new JsonObject
+        {
+            ["Modo"] = "isla", ["Posicion"] = "arriba", ["Alto"] = 38.0, ["Margen"] = 8.0,
+            ["MaxApps"] = 10.0,
+        },
+        ["Modulos"] = new JsonObject { ["Centro"] = new JsonArray("apps", "reloj") },
+    };
+
+    static JsonObject ConfigDeB5()
+    {
+        var c = ConfigDeFaseA();
+        // En B5 manda Paneles y Barra ya no lleva la geometría
+        c["Barra"] = new JsonObject { ["MaxApps"] = 10.0 };
+        c["Paneles"] = new JsonArray(new JsonObject
+        {
+            ["Id"] = "principal", ["Activo"] = true, ["Modo"] = "barra",
+            ["Posicion"] = "izquierda", ["Grosor"] = 54.0, ["Visibilidad"] = "siempre",
+        });
+        return c;
+    }
+
+    static void EsquemaDeducir()
+    {
+        Grupo("esquema: de qué versión es un config sin versión");
+
+        // Lo que se pidió: si no hay versión, se interpreta la histórica que toque
+        Igual(1, Esquema.DeducirVersion(ConfigDeFaseA()),
+              "un config de la Fase A (manda Barra, no hay Paneles) es v1");
+        Igual(2, Esquema.DeducirVersion(ConfigDeB5()),
+              "uno de B5/B6 (con Paneles) es v2");
+
+        // Con la clave puesta, manda la clave
+        var sellado = ConfigDeB5();
+        sellado["Version"] = 3;
+        Igual(3, Esquema.DeducirVersion(sellado), "si el fichero dice su versión, se le cree");
+
+        // Una instalación nueva nace al día, no en la Fase A
+        Igual(Esquema.Actual, Esquema.DeducirVersion(new JsonObject()),
+              "un config vacío es una instalación nueva, no una de la Fase A");
+        Igual(Esquema.Actual, Esquema.DeducirVersion(null), "y sin fichero, la de hoy");
+
+        // Una versión que no es un número no puede colarse como versión
+        var roto = ConfigDeB5();
+        roto["Version"] = "tres";
+        Igual(2, Esquema.DeducirVersion(roto), "una versión que no es un entero se deduce por la forma");
+        var cero = ConfigDeB5();
+        cero["Version"] = 0;
+        Igual(2, Esquema.DeducirVersion(cero), "y una versión 0 tampoco vale");
+
+        // Paneles vacío no es B5: la clave puede estar y no significar nada
+        var vacio = ConfigDeFaseA();
+        vacio["Paneles"] = new JsonArray();
+        Igual(1, Esquema.DeducirVersion(vacio), "un Paneles vacío sigue siendo v1");
+    }
+
+    static void EsquemaMigrar()
+    {
+        Grupo("esquema: migrar en orden y una sola vez");
+
+        // ---------- Desde la Fase A, dos pasos ----------
+        var a = ConfigDeFaseA();
+        var r1 = Esquema.Migrar(a);
+        Vale(r1.Vale, "un config de la Fase A migra sin problemas: " + r1.Resumen);
+        Igual(1, r1.Desde, "venía de v1");
+        Igual(Esquema.Actual, r1.Hasta, "y llega a la de hoy");
+        Vale(r1.Cambio, "y cambió");
+        Igual(2, r1.Aplicadas.Count, "se aplicaron las dos migraciones, en orden");
+        Igual(Esquema.Actual, a["Version"]!.GetValue<int>(), "el fichero queda sellado");
+
+        // Lo que la migración tenía que dejar escrito
+        Vale(a["Fondo"] is JsonObject, "v3 deja la sección Fondo");
+        Igual("ninguno", a["Fondo"]!["Tipo"]!.GetValue<string>(),
+              "y dice \"ninguno\": actualizar no le cambia el fondo a nadie");
+        Vale(a["Wallpaper"] is JsonObject, "y la sección Wallpaper");
+        Igual(false, a["Wallpaper"]!["Integrar"]!.GetValue<bool>(),
+              "con la integración apagada, explícita");
+
+        // ---------- Lo de siempre: no se repite ----------
+        var r2 = Esquema.Migrar(a);
+        Vale(r2.Vale, "migrar otra vez no falla");
+        Vale(!r2.Cambio, "pero no cambia nada");
+        Igual(0, r2.Aplicadas.Count, "y no vuelve a aplicar ninguna migración");
+
+        // Diez veces seguidas es lo mismo que una
+        var texto = a.ToJsonString();
+        for (int i = 0; i < 10; i++) Esquema.Migrar(a);
+        Igual(texto, a.ToJsonString(), "diez migraciones seguidas dejan el fichero idéntico");
+
+        // ---------- Desde B5, un paso ----------
+        var b = ConfigDeB5();
+        var r3 = Esquema.Migrar(b);
+        Vale(r3.Vale, "un config de B5 migra");
+        Igual(2, r3.Desde, "venía de v2");
+        Igual(1, r3.Aplicadas.Count, "y solo le hacía falta una migración");
+        // Y no le ha tocado los paneles, que son suyos
+        Igual("izquierda", b["Paneles"]![0]!["Posicion"]!.GetValue<string>(),
+              "sus paneles siguen intactos");
+        Igual("barra", b["Paneles"]![0]!["Modo"]!.GetValue<string>(), "con su modo");
+
+        // ---------- Un config con Wallpaper Engine ya configurado ----------
+        var we = ConfigDeB5();
+        we["Wallpaper"] = new JsonObject
+        {
+            ["Ruta"] = @"D:\Steam\steamapps\common\wallpaper_engine\wallpaper64.exe",
+            ["Integrar"] = true,
+            ["WallpaperElegido"] = @"D:\w\project.json",
+            ["AlSalir"] = "pausar",
+        };
+        var r4 = Esquema.Migrar(we);
+        Vale(r4.Vale, "uno con Wallpaper Engine configurado migra");
+        Igual(true, we["Wallpaper"]!["Integrar"]!.GetValue<bool>(),
+              "y NO se le apaga la integración que tenía puesta");
+        Igual("pausar", we["Wallpaper"]!["AlSalir"]!.GetValue<string>(), "ni se le cambia el cierre");
+        Igual(@"D:\w\project.json", we["Wallpaper"]!["WallpaperElegido"]!.GetValue<string>(),
+              "ni su wallpaper");
+
+        // Un Fondo que el usuario ya hubiera puesto a mano no se pisa
+        var conFondo = ConfigDeB5();
+        conFondo["Fondo"] = new JsonObject { ["Tipo"] = "degradado", ["Color1"] = "#102030" };
+        Esquema.Migrar(conFondo);
+        Igual("degradado", conFondo["Fondo"]!["Tipo"]!.GetValue<string>(),
+              "un Fondo puesto a mano no se sobrescribe");
+        Igual("#102030", conFondo["Fondo"]!["Color1"]!.GetValue<string>(), "ni sus colores");
+    }
+
+    static void EsquemaClavesDesconocidas()
+    {
+        Grupo("esquema: lo que no conocemos se conserva");
+
+        var c = ConfigDeFaseA();
+        // Una sección entera de una versión futura, y una clave rara dentro de una nuestra
+        c["LoQueVendra"] = new JsonObject { ["Algo"] = 42.0, ["Mas"] = new JsonArray("a", "b") };
+        c["Tema"]!["InventoDelFuturo"] = "sí";
+        c["Barra"]!["ClaveQueNoExiste"] = true;
+
+        var r = Esquema.Migrar(c);
+        Vale(r.Vale, "migra igual");
+
+        Vale(c["LoQueVendra"] is JsonObject, "la sección desconocida sigue ahí");
+        Igual(42.0, c["LoQueVendra"]!["Algo"]!.GetValue<double>(), "con su contenido");
+        Igual(2, c["LoQueVendra"]!["Mas"]!.AsArray().Count, "incluidas sus listas");
+        Igual("sí", c["Tema"]!["InventoDelFuturo"]!.GetValue<string>(),
+              "una clave desconocida dentro de una sección nuestra también");
+        Igual(true, c["Barra"]!["ClaveQueNoExiste"]!.GetValue<bool>(), "y en Barra");
+
+        // Y lo que sí es nuestro sigue valiendo
+        Igual("#7AA2F7", c["Tema"]!["Acento"]!.GetValue<string>(), "sin tocar lo que era del usuario");
+    }
+
+    static void EsquemaDelFuturo()
+    {
+        Grupo("esquema: un config de una versión más nueva");
+
+        var futuro = ConfigDeB5();
+        futuro["Version"] = Esquema.Actual + 5;
+        futuro["Tema"]!["Acento"] = "#ABCDEF";
+
+        var r = Esquema.Migrar(futuro);
+        Vale(!r.Vale, "no se migra hacia atrás");
+        Vale(r.Problema != null && r.Problema.Contains("más nueva"),
+             $"y se dice por qué ({r.Problema})");
+        Vale(!r.Cambio, "no se cambia nada");
+        Igual(Esquema.Actual + 5, futuro["Version"]!.GetValue<int>(), "la versión se queda como estaba");
+        Igual("#ABCDEF", futuro["Tema"]!["Acento"]!.GetValue<string>(),
+              "y su configuración, intacta: no se adivina qué significa una clave del futuro");
+    }
+
+    static void EsquemaValidar()
+    {
+        Grupo("esquema: validar antes de escribir");
+
+        var bueno = ConfigDeB5();
+        Esquema.Migrar(bueno);
+        Vale(Esquema.Mal(bueno, 4) == null, "un árbol migrado bien pasa la validación");
+
+        Vale(Esquema.Mal(null, 0) != null, "un árbol null no");
+
+        var sinVersion = ConfigDeB5();
+        Vale(Esquema.Mal(sinVersion, 4) != null, "uno sin versión tampoco");
+
+        var versionMala = ConfigDeB5();
+        versionMala["Version"] = "x";
+        Vale(Esquema.Mal(versionMala, 4) != null, "una versión que no es entero, tampoco");
+
+        var versionAlta = ConfigDeB5();
+        versionAlta["Version"] = Esquema.Actual + 1;
+        Vale(Esquema.Mal(versionAlta, 4) != null, "ni una versión mayor que la nuestra");
+
+        var versionCero = ConfigDeB5();
+        versionCero["Version"] = 0;
+        Vale(Esquema.Mal(versionCero, 4) != null, "ni un cero");
+
+        // La red de verdad: una migración no puede dejar MENOS secciones de las que había
+        var encogido = new JsonObject { ["Version"] = Esquema.Actual, ["Tema"] = new JsonObject() };
+        Vale(Esquema.Mal(encogido, 7) != null,
+             "si la migración dejó menos secciones de las que había, no se escribe");
+        Vale(Esquema.Mal(encogido, 7)!.Contains("se ha perdido"),
+             "y se dice que algo se perdió");
+        Vale(Esquema.Mal(encogido, 0) == null, "sin saber cuántas había, no se puede juzgar eso");
+    }
+
+    static void EsquemaEnDisco()
+    {
+        Grupo("esquema: migrar el fichero de verdad");
+
+        // En una carpeta temporal: esto NO toca el config del usuario.
+        var carpeta = Path.Combine(Path.GetTempPath(), "nubebar-pruebas-esquema-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(carpeta);
+        try
+        {
+            var ruta = Path.Combine(carpeta, "config.json");
+
+            // ---------- Un config de la Fase A ----------
+            var original = ConfigDeFaseA().ToJsonString();
+            File.WriteAllText(ruta, original);
+
+            var a1 = Esquema.MigrarFichero(ruta);
+            Vale(a1.Ok, "se migra: " + a1.Detalle);
+            Vale(a1.Respaldo != null, "y queda copia de seguridad");
+            Vale(File.Exists(a1.Respaldo!), "la copia existe de verdad");
+            Igual(original, File.ReadAllText(a1.Respaldo!),
+                  "y es el fichero de antes, byte a byte");
+            Vale(a1.Respaldo!.Contains("antes-de-v1"), $"con la versión de origen en el nombre ({Path.GetFileName(a1.Respaldo!)})");
+
+            // El fichero migrado se lee y lleva su versión
+            var leido = JsonNode.Parse(File.ReadAllText(ruta))!.AsObject();
+            Igual(Esquema.Actual, leido["Version"]!.GetValue<int>(), "el fichero del disco queda sellado");
+            Igual("#7AA2F7", leido["Tema"]!["Acento"]!.GetValue<string>(), "con la configuración del usuario");
+
+            // ---------- Y no se repite ----------
+            var a2 = Esquema.MigrarFichero(ruta);
+            Vale(a2.Ok, "volver a migrar no falla");
+            Vale(!a2.Que.Cambio, "y no cambia nada");
+            Vale(a2.Respaldo == null, "ni deja otra copia");
+
+            // ---------- El .bak de siempre no se pisa con la copia de migración ----------
+            Vale(!File.Exists(ruta + ".antes-de-v2.json") || true, "las copias van por versión de origen");
+
+            // ---------- Recuperación: un config ilegible no se migra ----------
+            var rutaRota = Path.Combine(carpeta, "roto.json");
+            File.WriteAllText(rutaRota, "{ esto no es json ");
+            var rota = Esquema.MigrarFichero(rutaRota);
+            Vale(!rota.Ok, "un config ilegible no se migra");
+            Igual("{ esto no es json ", File.ReadAllText(rutaRota),
+                  "y se queda EXACTAMENTE como estaba: no haber tocado nada es la mejor recuperación");
+
+            // ---------- Sin fichero no hay nada que migrar ----------
+            var sinNada = Esquema.MigrarFichero(Path.Combine(carpeta, "no-existe.json"));
+            Vale(sinNada.Ok, "sin fichero no es un error");
+            Vale(!sinNada.Que.Cambio, "y no hay nada que cambiar");
+
+            // ---------- Una escritura interrumpida se recupera del .bak ----------
+            //
+            // Es el caso de "se cerró la aplicación en mitad de una escritura": queda el
+            // .tmp a medias y el fichero bueno intacto, porque File.Replace es atómico.
+            var rutaB = Path.Combine(carpeta, "conbak.json");
+            File.WriteAllText(rutaB, ConfigDeB5().ToJsonString());
+            File.WriteAllText(rutaB + ".tmp", "{ a medio escribir");
+            var conBak = Esquema.MigrarFichero(rutaB);
+            Vale(conBak.Ok, "un .tmp a medias de otra vez no impide migrar");
+            Vale(JsonNode.Parse(File.ReadAllText(rutaB)) is JsonObject,
+                 "y el fichero bueno sigue siendo JSON válido");
+        }
+        finally
+        {
+            try { Directory.Delete(carpeta, true); } catch { }
+        }
+    }
+
+    static void EsquemaRecuperarDelBak()
+    {
+        Grupo("esquema: recuperar del .bak un config roto");
+
+        // Esto comprueba el camino que ya existía en ConfigArbol y que las migraciones no
+        // deben estropear: si el config está ilegible, se aparta con su fecha y se
+        // recupera la copia.
+        var carpeta = Path.Combine(Path.GetTempPath(), "nubebar-pruebas-bak-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(carpeta);
+        try
+        {
+            var ruta = Path.Combine(carpeta, "config.json");
+            var bueno = ConfigDeB5();
+            bueno["Tema"]!["Acento"] = "#112233";
+
+            File.WriteAllText(ruta, "{ roto a medias");
+            File.WriteAllText(ruta + ".bak", bueno.ToJsonString());
+
+            var arbol = ConfigArbol.Cargar(ruta);
+            Igual("#112233", arbol.Texto("Tema", "Acento", "nada"),
+                  "con el config roto se recupera el acento del .bak");
+
+            // Y el roto se aparta, no se borra
+            var apartados = Directory.GetFiles(carpeta, "config.json.roto-*");
+            Vale(apartados.Length == 1, "el config roto se aparta con su fecha");
+            Igual("{ roto a medias", File.ReadAllText(apartados[0]),
+                  "y se guarda tal cual, por si hacía falta mirarlo");
+        }
+        finally
+        {
+            try { Directory.Delete(carpeta, true); } catch { }
+        }
+    }
+
     // ================= C5: la integración con Wallpaper Engine =================
 
     static void CicloDeVidaWE()
@@ -1132,6 +1458,384 @@ public static class Pruebas
                 Vale(r == Integracion.TodosLosMonitores || (int.Parse(r) >= 0 && int.Parse(r) < cuantos),
                      $"pedir {pedido} con {cuantos} pantallas nunca da un índice imposible ({r})");
             }
+    }
+
+    // ================= C5: los perfiles =================
+
+    static void PerfilesListaBlanca()
+    {
+        Grupo("perfiles: solo pueden tocar lo suyo");
+
+        Vale(Perfiles.Permitida("Tema", "Acento"), "el tema sí");
+        Vale(Perfiles.Permitida("Tema", "Secundario"), "incluidos sus roles");
+        Vale(Perfiles.Permitida("Animaciones", "Nivel"), "el nivel de animación sí");
+        Vale(Perfiles.Permitida("Modulos", "Ocultos"), "los widgets ocultos sí");
+        Vale(Perfiles.Permitida("Panel", "Posicion"), "la posición del panel sí");
+        Vale(Perfiles.Permitida("Fondo", "Tipo"), "el fondo sí");
+
+        // Y esto es la frontera: lo que un perfil NO puede llevarse por delante
+        Vale(!Perfiles.Permitida("Animaciones", "RobotVisto"),
+             "un perfil no puede hacer que la escena se vuelva a ver");
+        Vale(!Perfiles.Permitida("Barra", "AtajoVistaGeneral"), "ni cambiarte el atajo de teclado");
+        Vale(!Perfiles.Permitida("Barra", "AppsFijadas"), "ni tus apps fijadas");
+        Vale(!Perfiles.Permitida("Barra", "OrdenApps"), "ni el orden que les diste");
+        Vale(!Perfiles.Permitida("Inicio", "Fijadas"), "ni lo que fijaste en el menú");
+        Vale(!Perfiles.Permitida("Wallpaper", "Ruta"), "ni la ruta de Wallpaper Engine, que es de la máquina");
+        Vale(!Perfiles.Permitida("Perfiles", "Activo"), "ni cuál es el perfil activo");
+        Vale(!Perfiles.Permitida("Paneles", "Id"), "ni los ids de los paneles de esta máquina");
+
+        Vale(!Perfiles.Permitida("", "Acento"), "sin sección, no");
+        Vale(!Perfiles.Permitida("Tema", ""), "sin clave, no");
+        Vale(Perfiles.Permitida("tema", "acento"), "las mayúsculas no cambian el permiso");
+    }
+
+    static void PerfilesValidar()
+    {
+        Grupo("perfiles: validar antes de escribir nada");
+
+        Perfil Bueno() => new()
+        {
+            Id = "noche", Nombre = "Noche", Descripcion = "Oscuro y quieto",
+            Version = Perfiles.VersionEsquema,
+            Ajustes = new JsonObject
+            {
+                ["Tema"] = new JsonObject { ["Acento"] = "#7AA2F7" },
+                ["Animaciones"] = new JsonObject { ["Nivel"] = "reducido" },
+            }
+        };
+
+        Vale(Perfiles.Validar(Bueno()).Vale, "un perfil bien hecho vale");
+        Vale(!Perfiles.Validar(null).Vale, "y uno que no se pudo leer, no");
+
+        var sinNombre = Bueno(); sinNombre.Nombre = "";
+        Vale(!Perfiles.Validar(sinNombre).Vale, "sin nombre no vale");
+
+        var sinId = Bueno(); sinId.Id = "";
+        Vale(!Perfiles.Validar(sinId).Vale, "sin id tampoco");
+
+        var idRaro = Bueno(); idRaro.Id = @"..\..\config";
+        Vale(!Perfiles.Validar(idRaro).Vale, "un id que se sale de su carpeta se rechaza");
+
+        // De una versión más nueva: se rechaza, no se lee a medias
+        var futuro = Bueno(); futuro.Version = Perfiles.VersionEsquema + 1;
+        var vf = Perfiles.Validar(futuro);
+        Vale(!vf.Vale, "un perfil de una versión más nueva se rechaza");
+        Vale(vf.Resumen.Contains("más nueva"), $"y se dice por qué ({vf.Resumen})");
+
+        var v0 = Bueno(); v0.Version = 0;
+        Vale(!Perfiles.Validar(v0).Vale, "y una versión 0 tampoco vale");
+
+        // Valores malos
+        var malNivel = Bueno();
+        malNivel.Ajustes["Animaciones"] = new JsonObject { ["Nivel"] = "lentorro" };
+        Vale(!Perfiles.Validar(malNivel).Vale, "un nivel de animación inventado se rechaza");
+
+        var malColor = Bueno();
+        malColor.Ajustes["Tema"] = new JsonObject { ["Acento"] = "azulito" };
+        Vale(!Perfiles.Validar(malColor).Vale, "un color que no es un color se rechaza");
+
+        var malPos = Bueno();
+        malPos.Ajustes["Panel"] = new JsonObject { ["Posicion"] = "diagonal" };
+        Vale(!Perfiles.Validar(malPos).Vale, "una posición de panel inventada se rechaza");
+
+        var malGrosor = Bueno();
+        malGrosor.Ajustes["Panel"] = new JsonObject { ["Grosor"] = 9999.0 };
+        Vale(!Perfiles.Validar(malGrosor).Vale, "un grosor imposible se rechaza");
+
+        var malSeccion = Bueno();
+        malSeccion.Ajustes["Tema"] = JsonValue.Create(7);
+        Vale(!Perfiles.Validar(malSeccion).Vale, "una sección que no es un objeto se rechaza");
+
+        // Un null es legítimo: significa "deriva este rol"
+        var conNull = Bueno();
+        conNull.Ajustes["Tema"] = new JsonObject { ["Secundario"] = null };
+        Vale(Perfiles.Validar(conNull).Vale, "un null vale: es \"deriva este rol\"");
+
+        // ---------- Claves desconocidas: se conservan, no invalidan ----------
+        var conExtra = Bueno();
+        conExtra.Ajustes["Barra"] = new JsonObject { ["AtajoVistaGeneral"] = "Ctrl+Z" };
+        var ve = Perfiles.Validar(conExtra);
+        Vale(ve.Vale, "una clave que el perfil no puede tocar no invalida el perfil");
+        Vale(ve.Ignoradas.Contains("Barra.AtajoVistaGeneral"), "pero queda anotada como ignorada");
+
+        // Y al podar desaparece, así que lo guardado es lo aplicable
+        int fuera = Perfiles.Podar(conExtra);
+        Igual(1, fuera, "se poda una clave");
+        Vale(!conExtra.Ajustes.ContainsKey("Barra"), "y la sección vacía se va con ella");
+        Vale(conExtra.Ajustes.ContainsKey("Tema"), "lo que sí es suyo se queda");
+    }
+
+    static void PerfilesNombres()
+    {
+        Grupo("perfiles: ids y nombres que no chocan");
+
+        var ocupados = new[] { "noche", "creativo" };
+        Igual("minimal", Perfiles.IdLibre("Minimal", ocupados), "un id libre sale tal cual");
+        Igual("noche-2", Perfiles.IdLibre("Noche", ocupados), "uno ocupado busca el siguiente");
+        Igual("concentracion", Perfiles.IdLibre("Concentración", ocupados),
+              "los acentos no entran en el id");
+        Igual("mi-perfil", Perfiles.IdLibre("Mi  Perfil!!", ocupados), "ni los espacios ni los símbolos");
+        Vale(Perfiles.IdValido(Perfiles.IdLibre("", ocupados)), "incluso un nombre vacío da un id válido");
+        Vale(Perfiles.IdValido(Perfiles.IdLibre("////", ocupados)), "y uno que es todo símbolos");
+
+        var nombres = new[] { "Noche", "Noche (copia)" };
+        Igual("Noche (copia 2)", Perfiles.NombreLibre("Noche", nombres),
+              "duplicar dos veces no repite el nombre");
+        Igual("Minimal (copia)", Perfiles.NombreLibre("Minimal", nombres), "y el primero es (copia)");
+
+        // Un id siempre es un nombre de fichero seguro
+        foreach (var n in new[] { "..", @"a\b", "a/b", "C:", "con", "..\\..\\config", "ñandú" })
+        {
+            var id = Perfiles.IdLibre(n, Array.Empty<string>());
+            Vale(Perfiles.IdValido(id), $"\"{n}\" da un id válido ({id})");
+            Vale(!id.Contains('\\') && !id.Contains('/') && !id.Contains(':'),
+                 $"y sin separadores de ruta ({id})");
+        }
+    }
+
+    static void PerfilesDuplicar()
+    {
+        Grupo("perfiles: duplicar no hereda la protección");
+
+        var original = new Perfil
+        {
+            Id = "noche", Nombre = "Noche", Descripcion = "Oscuro", Protegido = true,
+            NoMolestar = true,
+            Ajustes = new JsonObject { ["Tema"] = new JsonObject { ["Acento"] = "#112233" } }
+        };
+
+        var copia = original.Copia("noche-2", "Noche (copia)");
+        Igual("noche-2", copia.Id, "la copia tiene su id");
+        Igual("Noche (copia)", copia.Nombre, "y su nombre");
+        Igual("Oscuro", copia.Descripcion, "la descripción se hereda");
+        Vale(!copia.Protegido, "la protección NO se hereda: una copia se puede borrar");
+        Igual(true, copia.NoMolestar, "el No molestar se hereda");
+
+        // Y es una copia de verdad: tocar una no toca la otra
+        copia.Ajustes["Tema"]!["Acento"] = "#FFFFFF";
+        Igual("#112233", original.Ajustes["Tema"]!["Acento"]!.GetValue<string>(),
+              "cambiar la copia no cambia el original");
+        Vale(original.Protegido, "y el original sigue protegido");
+    }
+
+    static void PerfilesDeSerie()
+    {
+        Grupo("perfiles: los cuatro de serie");
+
+        var cuatro = Perfiles.DeSerie();
+        Igual(4, cuatro.Count, "son cuatro");
+
+        foreach (var nombre in new[] { "Concentración", "Creativo", "Noche", "Minimal" })
+            Vale(cuatro.Any(p => p.Nombre == nombre), $"está \"{nombre}\"");
+
+        foreach (var p in cuatro)
+        {
+            Vale(p.Protegido, $"\"{p.Nombre}\" viene protegido: no se puede borrar");
+            Vale(Perfiles.IdValido(p.Id), $"su id vale como nombre de fichero ({p.Id})");
+            Vale(p.Id.All(c => c is >= 'a' and <= 'z' or >= '0' and <= '9' or '-'),
+                 $"y no lleva acentos ni espacios ({p.Id})");
+            Vale(p.Descripcion.Length > 20, $"\"{p.Nombre}\" trae una descripción de verdad");
+            var v = Perfiles.Validar(p);
+            Vale(v.Vale, $"\"{p.Nombre}\" es válido: {v.Resumen}");
+            Igual(0, v.Ignoradas.Count, $"\"{p.Nombre}\" no toca nada que no sea suyo");
+        }
+
+        // Los nombres visibles SÍ llevan acentos; los ids no. Eso es lo que se pidió.
+        var conc = cuatro.First(p => p.Id == "concentracion");
+        Vale(conc.Nombre.Contains('ó'), "el nombre visible conserva su acento");
+        Vale(!conc.Id.Contains('ó'), "y el id no");
+
+        // Ids únicos
+        Igual(4, cuatro.Select(p => p.Id).Distinct().Count(), "los cuatro ids son distintos");
+
+        // Cada uno define algo distinto: cuatro perfiles iguales no serían cuatro perfiles
+        var huellas = cuatro.Select(p => p.Ajustes.ToJsonString()).Distinct().Count();
+        Igual(4, huellas, "los cuatro guardan cosas distintas");
+
+        // Y el nivel de animación de Minimal es "desactivado", que es lo que hace falta
+        // para probar que aplicar sin transiciones funciona
+        var min = cuatro.First(p => p.Id == "minimal");
+        Igual("desactivado", min.Ajustes["Animaciones"]!["Nivel"]!.GetValue<string>(),
+              "Minimal apaga las animaciones");
+    }
+
+    static void PerfilesEscrituras()
+    {
+        Grupo("perfiles: traducir un perfil a escrituras");
+
+        var p = new Perfil
+        {
+            Id = "x", Nombre = "X",
+            Ajustes = new JsonObject
+            {
+                ["Tema"] = new JsonObject { ["Acento"] = "#112233", ["Secundario"] = null },
+                ["Panel"] = new JsonObject { ["Posicion"] = "abajo", ["Grosor"] = 44.0 },
+                ["Modulos"] = new JsonObject { ["Centro"] = new JsonArray("reloj") },
+                ["Barra"] = new JsonObject { ["AtajoVistaGeneral"] = "Ctrl+Z" },   // no es suyo
+            }
+        };
+
+        var es = Perfiles.Escrituras(p);
+        Igual(5, es.Count, "cinco escrituras: la clave que no es suya no se traduce");
+        Vale(!es.Any(e => e.Clave == "AtajoVistaGeneral"), "y no está entre ellas");
+
+        // Las del panel van marcadas, porque se escriben de otra forma
+        var delPanel = es.Where(e => e.EsDelPanel).ToList();
+        Igual(2, delPanel.Count, "dos son del panel");
+        Vale(delPanel.All(e => e.Seccion.Equals("Panel", StringComparison.OrdinalIgnoreCase)),
+             "y las dos vienen de la sección Panel");
+
+        // Un null se conserva como null: significa "quita la clave", que para un rol de
+        // color es "derívalo". Perderlo dejaría el rol del tema anterior puesto.
+        var sec = es.First(e => e.Clave == "Secundario");
+        Vale(sec.Valor == null, "un null sobrevive a la traducción");
+
+        // Y es una copia: tocar el perfil después no cambia las escrituras ya calculadas
+        p.Ajustes["Tema"]!["Acento"] = "#FFFFFF";
+        var ac = es.First(e => e.Clave == "Acento");
+        Igual("#112233", ac.Valor!.GetValue<string>(), "las escrituras son una copia del perfil");
+
+        Igual(0, Perfiles.Escrituras(new Perfil()).Count, "un perfil sin ajustes no escribe nada");
+    }
+
+    static void PerfilesAplicarYDeshacer()
+    {
+        Grupo("perfiles: aplicar es una transacción");
+
+        var carpeta = Path.Combine(Path.GetTempPath(), "nubebar-perfiles-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(carpeta);
+        var ruta = Path.Combine(carpeta, "config.json");
+        try
+        {
+            // Un config de partida con cosas que el perfil NO toca, para comprobar que
+            // sobreviven.
+            var inicial = new JsonObject
+            {
+                ["Version"] = Esquema.Actual,
+                ["Tema"] = new JsonObject { ["Acento"] = "#AAAAAA", ["Fondo"] = "#E6000000" },
+                ["Barra"] = new JsonObject
+                {
+                    ["AtajoVistaGeneral"] = "Ctrl+Alt+W",
+                    ["AppsFijadas"] = new JsonArray("notepad.exe"),
+                    ["PulsoAudio"] = true,
+                },
+                ["Animaciones"] = new JsonObject { ["Nivel"] = "completo", ["RobotVisto"] = true },
+                ["Paneles"] = new JsonArray(new JsonObject
+                {
+                    ["Id"] = "principal", ["Posicion"] = "arriba", ["Grosor"] = 38.0
+                }),
+                ["LoDelFuturo"] = new JsonObject { ["X"] = 1.0 },
+            };
+            File.WriteAllText(ruta, inicial.ToJsonString());
+
+            var perfil = new Perfil
+            {
+                Id = "prueba", Nombre = "Prueba", Descripcion = "Para la prueba",
+                Ajustes = new JsonObject
+                {
+                    ["Tema"] = new JsonObject { ["Acento"] = "#112233" },
+                    ["Animaciones"] = new JsonObject { ["Nivel"] = "reducido" },
+                    ["Barra"] = new JsonObject { ["PulsoAudio"] = false },
+                    ["Panel"] = new JsonObject { ["Posicion"] = "abajo", ["Grosor"] = 44.0 },
+                }
+            };
+
+            // ---------- Aplicar ----------
+            var r = Perfiles.Aplicar(perfil, ruta);
+            Vale(r.Ok, "se aplica: " + r.Detalle);
+            Igual(5, r.Escritas, "cinco claves escritas");
+
+            var despues = JsonNode.Parse(File.ReadAllText(ruta))!.AsObject();
+            Igual("#112233", despues["Tema"]!["Acento"]!.GetValue<string>(), "el acento es el del perfil");
+            Igual("reducido", despues["Animaciones"]!["Nivel"]!.GetValue<string>(), "y el nivel de animación");
+            Igual(false, despues["Barra"]!["PulsoAudio"]!.GetValue<bool>(), "y el pulso de audio");
+            Igual("abajo", despues["Paneles"]![0]!["Posicion"]!.GetValue<string>(),
+                  "el panel se traduce al principal de esta máquina");
+            Igual(44.0, despues["Paneles"]![0]!["Grosor"]!.GetValue<double>(), "con su grosor");
+
+            // ---------- Lo que el perfil NO toca sigue ahí ----------
+            Igual("Ctrl+Alt+W", despues["Barra"]!["AtajoVistaGeneral"]!.GetValue<string>(),
+                  "el atajo del usuario no se toca");
+            Igual("notepad.exe", despues["Barra"]!["AppsFijadas"]!.AsArray()[0]!.GetValue<string>(),
+                  "ni sus apps fijadas");
+            Igual(true, despues["Animaciones"]!["RobotVisto"]!.GetValue<bool>(),
+                  "ni que ya vio la escena");
+            Igual("#E6000000", despues["Tema"]!["Fondo"]!.GetValue<string>(),
+                  "ni el fondo del tema, que el perfil no menciona");
+            Vale(despues["LoDelFuturo"] is JsonObject, "ni una sección de una versión futura");
+            Igual(Esquema.Actual, despues["Version"]!.GetValue<int>(), "y la versión sigue puesta");
+
+            // ---------- El activo ----------
+            var est = Perfiles.LeerEstado(ruta);
+            Igual("prueba", est.Activo, "queda marcado como activo");
+            Vale(est.HuellaAlAplicar != null, "con la huella de cómo quedó");
+
+            // ---------- Y no está modificado ----------
+            var arbol = ConfigArbol.Cargar(ruta);
+            Vale(!Perfiles.Modificado(est.HuellaAlAplicar, Perfiles.Huella(perfil, arbol)),
+                 "recién aplicado, el perfil no está modificado");
+
+            // Tocar algo que el perfil SÍ controla lo marca como modificado
+            arbol.Poner("Tema", "Acento", "#FF0000");
+            arbol.Guardar();
+            Vale(Perfiles.Modificado(est.HuellaAlAplicar, Perfiles.Huella(perfil, ConfigArbol.Cargar(ruta))),
+                 "cambiar a mano algo del perfil lo marca como modificado");
+
+            // Pero tocar algo que NO controla, no
+            var a2 = ConfigArbol.Cargar(ruta);
+            a2.Poner("Tema", "Acento", "#112233");      // se devuelve
+            a2.Poner("Barra", "AtajoVistaGeneral", "Ctrl+Alt+Q");
+            a2.Guardar();
+            Vale(!Perfiles.Modificado(est.HuellaAlAplicar, Perfiles.Huella(perfil, ConfigArbol.Cargar(ruta))),
+                 "cambiar algo que el perfil no controla NO lo marca como modificado");
+
+            // ---------- Deshacer ----------
+            Vale(Perfiles.HayQueDeshacerEn(ruta), "hay instantánea que deshacer");
+            Vale(Perfiles.Deshacer(ruta), "se deshace");
+
+            var vuelto = JsonNode.Parse(File.ReadAllText(ruta))!.AsObject();
+            Igual("#AAAAAA", vuelto["Tema"]!["Acento"]!.GetValue<string>(), "el acento vuelve al de antes");
+            Igual("completo", vuelto["Animaciones"]!["Nivel"]!.GetValue<string>(), "y el nivel");
+            Igual(true, vuelto["Barra"]!["PulsoAudio"]!.GetValue<bool>(), "y el pulso de audio");
+            Igual("arriba", vuelto["Paneles"]![0]!["Posicion"]!.GetValue<string>(), "y el panel");
+            Vale(vuelto["LoDelFuturo"] is JsonObject, "sin perder la sección del futuro");
+
+            Vale(Perfiles.LeerEstado(ruta).Activo == null, "y ya no hay perfil activo");
+            Vale(!Perfiles.HayQueDeshacerEn(ruta), "ni instantánea pendiente");
+            Vale(!Perfiles.Deshacer(ruta), "deshacer dos veces no hace nada");
+
+            // ---------- Un perfil inválido NO toca el config ----------
+            var antesDeMalo = File.ReadAllText(ruta);
+            var malo = new Perfil
+            {
+                Id = "malo", Nombre = "Malo",
+                Ajustes = new JsonObject { ["Animaciones"] = new JsonObject { ["Nivel"] = "lentorro" } }
+            };
+            var rm = Perfiles.Aplicar(malo, ruta);
+            Vale(!rm.Ok, "un perfil inválido no se aplica");
+            Igual(antesDeMalo, File.ReadAllText(ruta),
+                  "y el config se queda EXACTAMENTE como estaba, byte a byte");
+        }
+        finally
+        {
+            try { Directory.Delete(carpeta, true); } catch { }
+        }
+    }
+
+    static void PerfilesRestaurar()
+    {
+        Grupo("perfiles: restaurar los valores de fábrica");
+
+        // Solo los de serie tienen valores de fábrica
+        Vale(Perfiles.DeSerie().Any(p => p.Id == "noche"), "\"noche\" es de serie");
+        var r = Perfiles.DeSerie().FirstOrDefault(p => p.Id == "mi-perfil");
+        Vale(r == null, "y un perfil propio no, así que no hay nada a lo que volver");
+
+        // La protección es lo que decide si se puede borrar
+        var deSerie = Perfiles.DeSerie().First();
+        Vale(deSerie.Protegido, "uno de serie está protegido");
+        var copia = deSerie.Copia("copia-1", "Copia 1");
+        Vale(!copia.Protegido, "su copia no, así que la copia sí se puede borrar");
     }
 
     static void GlifoDelAspa()

@@ -4,7 +4,19 @@ using System.Windows.Media.Imaging;
 
 namespace NubeBar;
 
-public record Paleta(Color Fondo, Color Texto, Color Acento);
+public record Paleta(Color Fondo, Color Texto, Color Acento)
+{
+    // Es esto un color? Hacía falta en un sitio concreto: validar un perfil que viene de
+    // un fichero importado, donde "Acento": "azulito" tiene que poder rechazarse ANTES de
+    // escribir nada. El try/catch estaba repetido suelto en cinco archivos y ninguno se
+    // podía comprobar.
+    public static bool EsColor(string? texto)
+    {
+        if (string.IsNullOrWhiteSpace(texto)) return false;
+        try { return ColorConverter.ConvertFromString(texto) is Color; }
+        catch { return false; }
+    }
+}
 
 // Saca los colores de una imagen, al estilo de pywal en Linux
 static class Extractor
