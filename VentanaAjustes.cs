@@ -434,9 +434,10 @@ public sealed class VentanaAjustes : Window
         // Verla sin tener que reiniciar la nube. No gasta la "primera vez": una vista
         // previa es para decidir si la quieres, no para estrenarla.
         c.Children.Add(BotonPlano("Ver la escena ahora", () => EscenaArranque.VistaPrevia(), false));
-        var pistaEscena = Rotulo("El robot cruza la pantalla con el pincel, la deja en negro un " +
-                                 "momento y al levantarse ya está la nube montada debajo. Se salta con Esc " +
-                                 "o con un clic, y con el movimiento desactivado no aparece.");
+        var pistaEscena = Rotulo("Una nubecita aparece en el centro, saluda y se abre: por dentro de " +
+                                 "ella va apareciendo el escritorio ya montado. Al final se recoge y se " +
+                                 "mete en la barra. Se salta con Esc o con un clic, y con el movimiento " +
+                                 "desactivado no aparece.");
         pistaEscena.TextWrapping = TextWrapping.Wrap;
         pistaEscena.Opacity = 0.55;
         c.Children.Add(pistaEscena);

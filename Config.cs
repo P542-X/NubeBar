@@ -110,7 +110,10 @@ public class Animaciones
     // volver a pedirlo aquí. "completo", "equilibrado" y "reducido" mandan sobre él.
     public string Nivel { get; set; } = "auto";
 
-    // Cuándo se ve la escena del robot que pinta la pantalla.
+    // Cuándo se ve la escena de entrada —la nube que despierta y construye el
+    // escritorio—. La clave se sigue llamando "Robot" porque está escrita en el config
+    // de la gente desde la Fase A: renombrarla les dejaría la escena en su valor de
+    // serie sin avisar, y lo que cambió fue el personaje, no el ajuste.
     // "primera-vez" | "cada-inicio" | "al-cambiar-tema" | "nunca"
     public string Robot { get; set; } = "primera-vez";
     public bool RobotVisto { get; set; } = false;        // lo escribe la propia escena al terminar

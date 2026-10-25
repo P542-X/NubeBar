@@ -150,4 +150,79 @@ public static class Monitores
     // La ventana que hay bajo el puntero (la de más arriba)
     public static IntPtr VentanaBajoElRaton() =>
         GetCursorPos(out var p) ? WindowFromPoint(p) : IntPtr.Zero;
+
+    // ---------- A cuántos hercios va esa pantalla ----------
+    //
+    // No se usa para marcar el ritmo —de eso se encarga el compositor, y la escena de
+    // entrada avanza por tiempo transcurrido, no por fotogramas contados— sino para
+    // saber contra qué comparar: sin el refresco real no hay forma de decir si 97
+    // fotogramas por segundo están bien o están mal.
+    //
+    // Primero el modo de pantalla, que es el dato exacto de ese monitor. Si no se puede
+    // (sesión remota, driver raro), la cadencia de presentación que publica DWM, que es
+    // la que de verdad manda. Y si tampoco, 60, que es lo más probable.
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    struct DEVMODE
+    {
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmDeviceName;
+        public ushort dmSpecVersion, dmDriverVersion, dmSize, dmDriverExtra;
+        public uint dmFields;
+        public int dmPositionX, dmPositionY;
+        public uint dmDisplayOrientation, dmDisplayFixedOutput;
+        public short dmColor, dmDuplex, dmYResolution, dmTTOption, dmCollate;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmFormName;
+        public ushort dmLogPixels;
+        public uint dmBitsPerPel, dmPelsWidth, dmPelsHeight, dmDisplayFlags, dmDisplayFrequency;
+        public uint dmICMMethod, dmICMIntent, dmMediaType, dmDitherType;
+        public uint dmReserved1, dmReserved2, dmPanningWidth, dmPanningHeight;
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    static extern bool EnumDisplaySettings(string? dispositivo, int modo, ref DEVMODE dm);
+
+    [DllImport("dwmapi.dll")] static extern int DwmGetCompositionTimingInfo(IntPtr hwnd, ref DWM_TIMING_INFO info);
+    [DllImport("kernel32.dll")] static extern bool QueryPerformanceFrequency(out long f);
+
+    // Solo hacen falta los tres primeros campos, pero la estructura va entera: DWM
+    // comprueba cbSize y rechaza la llamada si no cuadra.
+    [StructLayout(LayoutKind.Sequential)]
+    struct DWM_TIMING_INFO
+    {
+        public int cbSize;
+        public double rateRefreshNum, rateRefreshDen;
+        public long qpcRefreshPeriod;
+        public double rateCompose1, rateCompose2;
+        public long qpcVBlank, cRefresh; public uint cDXRefresh;
+        public long qpcCompose, cFrame; public uint cDXPresent;
+        public long cRefreshFrame, cFrameSubmitted; public uint cDXPresentSubmitted;
+        public long cFrameConfirmed; public uint cDXPresentConfirmed;
+        public long cRefreshConfirmed; public uint cDXRefreshConfirmed;
+        public long cFramesLate; public uint cFramesOutstanding;
+        public long cFrameDisplayed, qpcFrameDisplayed, cRefreshFrameDisplayed;
+        public long cFrameComplete, qpcFrameComplete, cFramePending, qpcFramePending;
+        public long cFramesDisplayed, cFramesComplete, cFramesPending, cFramesAvailable;
+        public long cFramesDropped, cFramesMissed, cRefreshNextDisplayed, cRefreshNextPresented;
+        public long cRefreshesDisplayed, cRefreshesPresented, cRefreshStarted;
+        public long cPixelsReceived, cPixelsDrawn, cBuffersEmpty;
+    }
+
+    public static double Hercios(string dispositivo)
+    {
+        try
+        {
+            var dm = new DEVMODE { dmSize = (ushort)Marshal.SizeOf<DEVMODE>() };
+            if (EnumDisplaySettings(dispositivo, -1, ref dm) && dm.dmDisplayFrequency > 1)
+                return dm.dmDisplayFrequency;
+        }
+        catch { }
+        try
+        {
+            var info = new DWM_TIMING_INFO { cbSize = Marshal.SizeOf<DWM_TIMING_INFO>() };
+            if (DwmGetCompositionTimingInfo(IntPtr.Zero, ref info) == 0 && info.qpcRefreshPeriod > 0 &&
+                QueryPerformanceFrequency(out long f))
+                return (double)f / info.qpcRefreshPeriod;
+        }
+        catch { }
+        return 60;
+    }
 }

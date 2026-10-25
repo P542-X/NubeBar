@@ -2228,7 +2228,8 @@ esperar a nadie para saberlo.
 ### Las reglas que no se negocian
 
 - **Nunca dejar la pantalla negra.** Tres redes: el revelado se dispara aunque la
-  interfaz no avise (a los ~5,4 s), un temporizador cierra la ventana pase lo que pase a
+  interfaz no avise (a los ~5,4 s; hoy lo que arranca igual es la pasada, ver más
+  abajo), un temporizador cierra la ventana pase lo que pase a
   los 9 s, y `App` la cierra si `MainWindow.Arrancar()` revienta o si salta una excepción
   sin capturar. Si algo falla, se cae del lado de «no hay escena», nunca del de «pantalla
   negra».
@@ -2248,6 +2249,9 @@ esperar a nadie para saberlo.
 
 ### Los cuatro niveles
 
+> Estos tiempos son los del primer diseño. La sección «La escena, tres veces del revés»
+> —más abajo— cuenta en qué acabaron y por qué; la tabla de ahí es la buena.
+
 | | robot | pintar | negro | revelar |
 |---|---|---|---|---|
 | Completo | sí | 1150 ms | 1000 ms | 460 ms |
@@ -2259,12 +2263,670 @@ Los tiempos no pasan por `Animacion.Escalar` como el resto del proyecto, y es a
 propósito: esto no es una animación de la isla, es una escena con tres tiempos que tienen
 que guardar una proporción entre ellos. Un factor único los estiraría mal.
 
-En «reducido» no hay pincelada que dibujar: el negro se pone de una vez y lo que queda es
-el fundido de entrada y el de salida — la versión «muy breve y simplificada» del nivel.
-
 ### Lo que falta
 
 El modo `al-cambiar-tema` del desplegable **se comporta hoy como `primera-vez`**: sale al
 arrancar si no la has visto. El disparo por cambio de tema necesita un gancho en
 `AplicarTema` que distinga un cambio de color de verdad de una recarga cualquiera del
 config, y meterlo en esta tanda habría tocado código ya verificado por un extra.
+
+## Fase C2 · La escena, tres veces del revés
+
+> La composición que se describe aquí —la brocha— **ya no es la que hay**: se sustituyó
+> entera por «La construcción de la nube», más abajo. Las lecciones de esta sección
+> siguen valiendo enteras; la brocha no.
+
+La escena de arriba funcionaba y se veía mal. Lo que vino después fueron tres tandas
+seguidas sobre el mismo archivo —el tirón, la secuencia, la composición— y cada una tiró
+abajo una suposición de la anterior. Vale la pena dejarlas escritas porque las tres
+fallaban por el mismo motivo de fondo: **confundir lo que se dibuja con cuándo se
+dibuja**.
+
+### 1. Iba a 3 FPS, y no era el dibujo
+
+Síntoma: entrecortada. Primera hipótesis mía, y era **falsa**: el trazo se rehacía en
+cada fotograma —una línea de 1458 px de grosor a la que se le movía el punto final— y
+rasterizar eso entero sobre toda la pantalla tenía que ser lo caro. Se reescribió como
+una figura estática movida con un solo `TranslateTransform`. Medido antes y después:
+**exactamente los mismos 5 fotogramas**. La hipótesis no valía nada.
+
+Lo que sí era: **`CompositionTarget.Rendering` solo salta cuando su `Dispatcher` está
+libre**. Y justo detrás de crear la escena, `App` llama a `MainWindow.Arrancar()`, que se
+queda con el hilo de interfaz durante todo el arranque. La escena no iba lenta: **no se
+dibujaba**. Cinco fotogramas en 1339 ms, o sea 3,0 FPS, y los cinco eran los huecos que
+dejaba el montaje de la nube.
+
+El arreglo es dónde vive, no qué dibuja: la escena se abre en **su propio hilo de
+interfaz** (STA, `IsBackground`, su `Dispatcher.Run()`, `InvokeShutdown()` al cerrarse).
+Su `Dispatcher` no tiene nada más que hacer, así que `Rendering` salta en cada
+presentación aunque el hilo principal esté hasta arriba.
+
+Medido después, en una pantalla de 165 Hz (periodo 6,06 ms):
+
+| | antes | después |
+|---|---|---|
+| fotogramas | 5 en 1339 ms | 371 en 3111 ms |
+| FPS efectivos | **3,0** | **118,9** |
+| frame p50 | — | 6,27 ms |
+| frame p95 | — | 14,47 ms |
+| con tirón (> 1,5 periodos) | — | 26,2 % |
+| presentaciones saltadas | — | 147 |
+
+**No son 165 FPS sostenidos y no conviene decir que lo sean.** La mediana va clavada al
+refresco (6,27 contra 6,06), pero uno de cada cuatro fotogramas pierde al menos una
+presentación, y eso es esperable: esto corre *mientras* arranca el escritorio entero. El
+resumen de una línea que escribe cada ejecución en el log —fotogramas, FPS efectivos
+contra los Hz de verdad, p50/p95/peor, cuántos con tirón y cuántas presentaciones
+saltadas— se ha dejado permanente justo por esto: si algún día vuelve a ir a tirones, lo
+primero que hace falta es el número, no una impresión.
+
+Dos cosas más que se midieron y **no** se quedaron: `BitmapCache` sobre el grupo de la
+pintura salió neutro (4018 × 1458 = 23 MB de mapa de bits para rellenar negro, que es lo
+más barato que hay) y se quitó; sobre el robot sí se queda, que lleva dos desenfoques y
+se mueve entero en cada fotograma.
+
+### 2. Fluidez, velocidad y calidad son tres cosas
+
+La corrección anterior destapó una confusión que merece su párrafo, porque es la que
+lleva a «animaciones a 60 FPS» mal hechas:
+
+- **fluidez** = cuántos fotogramas salen. La pone la pantalla.
+- **velocidad** = cuánto dura la escena. La pone el guion.
+- **calidad** = cuánto se dibuja en cada fotograma. La pone el dibujo.
+
+A 240 Hz tiene que haber **más fotogramas suaves, no una escena más rápida**. Eso sale
+gratis si el fotograma no *suma* un paso sino que *coloca*: `Avanzar(ms)` recibe los
+milisegundos transcurridos y pone la escena en ese instante. No hay `Thread.Sleep`, ni
+`DispatcherTimer` lento, ni tope de FPS en ningún sitio; los Hz reales se leen con
+`EnumDisplaySettings` (y `DwmGetCompositionTimingInfo` de reserva) **solo para el
+informe**, nunca para animar.
+
+Comprobado a 60, 75, 120, 144, 165 y 240 Hz: el estado de la escena en un instante dado
+es idéntico en los seis casos, **diferencia máxima 0,000000**, y lo único que cambia son
+los fotogramas (179 a 60 Hz, 716 a 240, ×4,0 para ×4 de refresco).
+
+Y la calidad no se tocó para ganar fotogramas: `EdgeMode.Unspecified`,
+`BitmapScalingMode.HighQuality`, sin `UseLayoutRounding` ni `SnapsToDevicePixels`. Lo que
+se arregló fue de dónde salían los fotogramas, no cuánto se dibuja en cada uno.
+
+### 3. El saludo, y dos brazos en vez de uno
+
+La secuencia pasó a ser: aparece, **saluda de forma reconocible**, hace una pausa
+expresiva, baja la brocha y da la pasada. «Reconocible» obligó a cambiar el robot: ahora
+tiene **dos brazos con su propio giro**, el derecho para saludar y el izquierdo para la
+brocha, y la mano es una palma con **tres dedos que asoman por encima** más el pulgar.
+Con las rayas dentro de un disco —la primera versión— parecía una pelota con marcas; lo
+que tiene que leerse de un vistazo es «esto es una mano y está saludando».
+
+El vaivén es un seno, no una ida y vuelta por tramos: `-(38 + 16·sin(k·2π·n))`, con `n`
+saludos según el nivel. Un seno no tiene esquinas, así que no hay tirón en los extremos.
+
+### 4. Las dos pausas negras, que eran dos cosas distintas
+
+El guion original dejaba la pantalla **un segundo en negro** entre el final de la
+pincelada y el revelado. Se quitó por decisión de UX: la pasada ya cubre la pantalla
+mientras avanza, así que al llegar al final no hay nada nuevo que enseñar — solo un
+segundo de pantalla apagada que alarga el arranque.
+
+Al quitarla apareció **otra pausa de 708 ms** que no era una etapa, era geometría. El
+extremo del trazo era un casquete redondo de 0,675 × el alto de la pantalla, así que
+**tapaba la pantalla entera mucho antes de que su centro llegara al borde derecho**: el
+pincel seguía viajando por fuera, invisible, y lo que se veía era una pausa. El último
+píxel en taparse es el de la esquina más lejana del eje del trazo, y a esa altura el
+casquete solo alcanza `sqrt(radio² − distancia²)`. Con esa cuenta, la cola acortada y la
+pasada casi lineal, los 708 + 1000 ms se quedaron en **64 ms**.
+
+Esta es la lección que se repite en toda la fase: *un tiempo muerto que parece una etapa
+suele ser geometría mal contada*.
+
+### 5. La composición, al revés
+
+Y aun así la escena estaba montada del revés. Tapaba primero y destapaba después, con lo
+que el revelado era un **segundo barrido** detrás del primero. Lo que se pidió —y lo que
+tiene sentido— es que la brocha vaya **destapando a su paso**: lo que ha pasado está
+visible, lo que no, sigue tapado.
+
+La versión final no sincroniza dos cosas: **no hay dos cosas**. El negro está desde el
+primer fotograma, lo que tapa el escritorio es la propia mancha, y el filo de la mancha
+**es** donde está la brocha. No pueden desincronizarse ni puede asomar nada por delante,
+porque no hay nada que coordinar. Un progreso temporal, una figura.
+
+Con el negro a la derecha del filo, la forma de la mancha deja de ser libre:
+
+- **El filo es una elipse ancha y poco profunda** (semieje horizontal 0,10 × el alto),
+  no media circunferencia. Y no es estética: *lo que se curva el filo es lo que el robot
+  tiene que estar fuera de cuadro*. El filo más adelantado está a la altura del eje y el
+  más retrasado en las esquinas; si el robot no va con el retrasado, parte del borde se
+  destapa por delante de la brocha. Con el casquete de 0,675 × alto de la versión
+  anterior eran **245 px** fuera de la pantalla: el robot empezaba la pasada cortado por
+  el borde y volvía a entrar. Con la elipse plana son **39 px**. Que además es la forma
+  que tiene una brocha plana de verdad.
+- **El robot va con la punta más retrasada del filo**, `X − alcance`. A la altura del
+  eje eso deja lo destapado unos 39 px por detrás del canto de la brocha: el retraso que
+  pide el efecto para leerse, en el sentido correcto. La revelación nunca se adelanta.
+- **La pasada acaba en el píxel exacto**, `w + lo que más asoma`. Y ahí se acaba también
+  el robot sin inventarle una salida: como va del lado todavía tapado, cuando el filo
+  llega al borde derecho su cuerpo ya está fuera de cuadro. *Destapar del todo y quedarse
+  sin robot son el mismo fotograma.* La primera versión de esto se dejaba 290 ms de
+  pantalla quieta al final — no negra, pero quieta.
+- **Los pelos de la brocha son casi negros, no negros.** Van cargados de la misma pintura
+  que tapa la pantalla, así que sobre ella un negro puro desaparecía y la brocha parecía
+  acabarse en la virola.
+
+Dos consecuencias en la máquina de la escena:
+
+- **La espera a la nube se mudó.** Si al terminar de bajar la brocha la nube todavía no
+  ha avisado de que está montada, el reloj de la escena se queda quieto **antes** de
+  destapar, no a mitad del revelado. Esperar a mitad enseñaría medio escritorio a medio
+  montar, que es justo lo que esta escena viene a tapar. Medido en esta máquina no llega
+  a ocurrir: la nube avisa sobre los 600 ms y la brocha no arranca hasta los ~1660.
+- **Saltársela ya no corta, acelera.** Esc o un clic colocan el reloj al principio de la
+  pasada —si no había llegado— y lo ponen al cuádruple: se ve la misma brocha destapando,
+  en 330 ms en vez de 1320. Cortar en seco dejaría un salto de negro a escritorio, y lo
+  que hay debajo del negro es justo lo que se quiere ver. Y si te la saltas **no se
+  espera a nadie**: has pedido verlo ya.
+
+### Los cuatro niveles, como quedaron
+
+| | entra | saluda | pausa | baja la brocha | pasada = revelado | total |
+|---|---|---|---|---|---|---|
+| Completo | 320 ms | 820 (×3) | 220 | 300 | 1320 | **2980 ms** |
+| Equilibrado | 200 | 520 (×2) | 140 | 190 | 900 | **1950 ms** |
+| Reducido | 140 | 360 (×1) | 80 | 120 | 560 | **1260 ms** |
+| Desactivado | — | — | — | — | — | no se crea la escena |
+
+«Reducido» **conserva el saludo**, al contrario que en el primer diseño: uno solo y todo
+lo demás al mínimo. Es el nivel de quien ha pedido menos movimiento en Windows, así que
+se le enseña la escena entera sin florituras ni esperas largas, no media escena.
+
+No hay etapa detrás de la pasada: `Total == HastaPasada`.
+
+### Lo que se midió de la versión final
+
+Fuera de pantalla, dibujando la escena sobre un fondo magenta puro —que no usa ni el
+robot ni la pintura, así que «magenta = destapado»— y contando píxeles, en seis pantallas
+(1366×768, 1080p, 1440p, la de esta máquina, 4K al 225 % y una 21:9) y en los tres
+niveles:
+
+- **tapado al 100 % desde el primer fotograma** hasta que arranca la pasada (medido 1664
+  ms contra los 1660 del guion, que es el paso del muestreo);
+- destapado **progresivo y monótono**: 0 % → 8 % → 29 % → 59 % → 81 % → 100 %, sin que
+  vuelva a taparse nada en ningún instante;
+- **cero píxeles destapados por delante del filo** en ninguna fila, comparando el mapa de
+  bits contra el límite calculado fila a fila (la elipse del filo más los dos mechones);
+- **cero filas con huecos**: lo destapado es siempre un bloque pegado al borde izquierdo,
+  nunca islas;
+- **todo destapado exactamente al acabar**: cola de 0–2 ms, y 0 ms de pausa negra
+  después;
+- el robot, **fuera de cuadro en ese mismo fotograma**.
+
+Lo que esta prueba **no** puede ver —y por eso hace falta mirarla— es si el ritmo gusta.
+Los números dicen que no hay parpadeos, zonas sin destapar, elementos que asomen antes de
+tiempo ni pausa negra final; no dicen si 1320 ms de pasada se hacen largos.
+
+## Fase C2 · La construcción de la nube
+
+> **Superada.** Tanto esta sección como «El asistente, y marcharse andando» describen la
+> escena del robot humanoide, que se tiró entera: ver «La nube despierta», al final. Las
+> lecciones de rendimiento y de método siguen valiendo; el personaje y la cuadrícula no.
+
+La escena de la brocha funcionaba —medida, verificada y aceptada— y aun así se cambió
+entera. El motivo no fue técnico: **la idea era genérica**. Una brocha que destapa el
+escritorio es el mismo efecto de cortinilla que hace cualquier cosa, y lo que arranca
+aquí no es una cortina, es un entorno de escritorio montándose. Lo que queda de aquella
+tanda son las lecciones, que se aplican enteras a esta; lo que se fue es la brocha.
+
+La escena de ahora: la pantalla empieza negra, el robot aparece **en el centro**,
+saluda, y saca de la mano una **semilla de nube** —un núcleo azul con detalles coral—
+que lleva al centro y activa. Desde ahí el núcleo echa líneas a los bordes, las líneas
+cuajan en una **cuadrícula holográfica**, y la cuadrícula se convierte en escritorio por
+zonas: primero el fondo, después la franja de la barra —del centro hacia los extremos,
+como la barra de verdad— y encima los **fragmentos de luz** que encajan donde van los
+widgets. Cuando está todo, el robot da el visto bueno y se apaga.
+
+### Lo único que de verdad importa: una sola lista de números
+
+Toda la escena sale de **una lista de piezas, cada una con un número**, su `orden`, y de
+un único `Avanzar(ms)`. Esa pieza hace cuatro cosas distintas a lo largo de la escena
+—dibujar su contorno en la cuadrícula, destaparse, apagar el contorno y soltar su
+fragmento— y las cuatro se calculan del mismo número. No hay dos animaciones que
+sincronizar porque no hay dos animaciones.
+
+Esto no es elegancia: es la lección de las tres tandas anteriores. Dos relojes que
+tienen que ir a la par se separan en cuanto la máquina va cargada, y «la máquina
+cargada» es, literalmente, el instante en que esto se ejecuta.
+
+```
+contorno (etapa malla) = (malla − orden·0,72) / 0,28
+q        (etapa obra)  = (obra  − orden·0,78) / 0,22
+tapa                   = 1 − q/0,60          ← la tapa se va primero
+contorno (etapa obra)  = 1 − (q−0,25)/0,75   ← y el contorno después
+```
+
+Ese desfase entre las dos últimas líneas es el efecto entero: durante un instante se ve
+el escritorio de verdad **con la retícula todavía encima**, que es lo que hace que
+parezca construido en vez de descubierto.
+
+### El orden de construcción no es la distancia al centro
+
+La cuenta obvia —ordenar las casillas por lo lejos que están del centro— sale mal, y no
+por poco. El área de un anillo de radio r crece con r, así que con el orden puesto a la
+distancia el escritorio aparece despacio al principio y de golpe al final. Medido:
+**10 % construido a tres cuartos de la obra y 71 % trescientos milisegundos después**.
+
+Lo que se quiere es que aparezca siempre al mismo ritmo, y para eso el orden no es la
+distancia sino el **puesto en la lista ordenada por distancia**: la casilla número n de
+N se destapa en n/N. Así el ritmo es el mismo en 16:9, en 21:9 y en vertical, sin
+depender de la forma de la pantalla. Medido después: 29 % → 75 % → 100 % en los mismos
+tres cuartos, y **ningún salto mayor del 4 % entre muestras consecutivas**.
+
+El ruido que rompe la circunferencia perfecta del frente se suma **antes** de ordenar, no
+después: así desordena de verdad el borde sin alterar el ritmo. Y es un ruido
+determinista escrito a mano, no un `Random`: la escena tiene que ser una función pura del
+tiempo para que la prueba pueda compararla consigo misma.
+
+### Siete filas eran un damero
+
+La primera rejilla tenía siete filas —casillas de 150 px— y se veía el tablero: cuadrados
+grandes apagándose enteros. Con diez filas la casilla baja a unos 100 px y el frente se
+lee como una zona que se construye. Más de diez y las líneas de la cuadrícula empiezan a
+ensuciar en vez de estructurar.
+
+Y un detalle que no es obvio: las tapas llevan `EdgeMode.Aliased` y un píxel de solape.
+Son ciento y pico rectángulos negros pegados, y si WPF suaviza sus cantos queda una
+costura clarita en cada junta. En un rectángulo recto el suavizado no aporta nada, así
+que se quita **solo ahí** — el robot, los contornos y el núcleo lo conservan.
+
+### La barra se construye la última, y por separado
+
+La franja de la barra no son «las casillas que la tocan»: una casilla mide 100 px y la
+barra 54, así que eso se llevaría por delante una décima parte de la pantalla. Son
+**piezas propias, por encima de las de la cuadrícula**, con su propio orden en el último
+tramo (0,80–0,98) y del centro de la barra hacia sus extremos.
+
+Que quede negra mientras el resto ya está construido es a propósito, pero sola parecía un
+trozo que faltaba. Por eso su contorno va en **coral** y no en azul: marca el hueco como
+reservado, no como roto.
+
+Los fragmentos de los widgets salen de **esa misma cuenta**: el momento en que vuela cada
+uno se calcula del orden de su trozo de barra, así que por construcción no pueden
+adelantarse a la barra que los sostiene. Vienen desde dentro hacia fuera, encajan y se
+apagan: cero opacidad en los dos extremos, para que al final no quede ni uno encendido.
+
+Esto es, de paso, lo **único** que la escena sabe de la nube de verdad: por qué borde
+sale y cuánto ocupa, leído de `Paneles[principal]`. Con cualquier cosa rara en el config
+asume «arriba»: una escena bonita en el sitio equivocado es mejor que ninguna escena.
+
+### La nube de verdad se colaba por encima
+
+Un problema que la escena anterior escondía sin saberlo. Las islas se crean **después**
+que la escena y también son `Topmost`, así que Windows las pone por encima: la barra de
+verdad aparecía sobre el negro a mitad de escena. Con la brocha apenas se notaba —la
+pantalla ya estaba casi destapada cuando ocurría—; con una construcción que enseña el
+escritorio por zonas, ver la barra entera aparecer de golpe a los 600 ms rompe el efecto.
+
+El pulso de 60 ms —el que ya miraba Esc y el botón del ratón— reclama ahora también el
+primer plano mientras la escena está tapando, y deja de hacerlo en cuanto empieza a
+destaparse, que es justo cuando la nube tiene que verse.
+
+### El robot ya no lleva brocha
+
+Lleva una **mano abierta con la palma hacia arriba** en el brazo izquierdo: es la que
+ofrece la semilla. El derecho sigue siendo el del saludo, y es también el del gesto de
+aprobación del final. Los dos gestos van en brazos distintos a propósito: si el mismo
+brazo saludara y ofreciera, el saludo parecería parte del lanzamiento.
+
+Dos cosas pequeñas que costaron un fotograma cada una:
+
+- **La semilla se dibuja por encima del robot y los rayos por debajo.** Con el núcleo
+  debajo, el robot tapaba la semilla justo cuando la tenía en la mano; con los rayos
+  encima, le cruzaban la cara.
+- **El brazo se mueve después de soltar.** Mientras la semilla está en la mano el brazo
+  se queda quieto, y así la semilla puede ir en su sitio sin tener que girarla con el
+  brazo: una cuenta menos que cuadrar, y una cuenta menos que pueda desincronizarse.
+- **El escalado del anillo de activación va centrado en el propio anillo**, no en el
+  origen del lienzo. Un óvalo colocado en (−r, −r) y escalado desde su esquina se abre
+  hacia abajo y a la derecha: el anillo salía descentrado del núcleo.
+
+Y el tamaño del robot sale del alto de la pantalla **limitado también por el ancho**: el
+robot mide casi dos altos de ancho, y en una pantalla vertical de 1080×1920 un robot «de
+1920» se salía 108 px por la izquierda al apartarse.
+
+### Los cuatro niveles
+
+| | entra | saluda | pausa | semilla | rayos | malla | obra | total |
+|---|---|---|---|---|---|---|---|---|
+| Completo | 300 ms | 760 (×3) | 200 | 380 | 260 | 220 | 860 | **2980 ms** |
+| Equilibrado | 200 | 480 (×2) | 130 | 250 | 170 | 150 | 570 | **1950 ms** |
+| Reducido | 140 | 330 (×1) | 80 | 160 | 110 | 100 | 340 | **1260 ms** |
+| Desactivado | — | — | — | — | — | — | — | no se crea la escena |
+
+Los totales son **los mismos que tenía la escena de la brocha**: lo que cambió es el
+relato, no cuánto dura. «Reducido» conserva las seis etapas, simplificadas; es el nivel
+de quien ha pedido menos movimiento en Windows, así que se le enseña la escena entera sin
+esperas largas, no media escena.
+
+La espera a la nube se mudó a **antes de la obra**, con la cuadrícula ya dibujada:
+esperar a mitad de la construcción dejaría media pantalla con la nube a medio montar, que
+es justo lo que esto viene a tapar. Medido en esta máquina no llega a ocurrir — la nube
+avisa sobre los 600 ms y la obra no empieza hasta los ~2120.
+
+Y saltársela no corta: coloca el reloj al principio de la obra y lo pone al cuádruple, así
+que se ve la misma construcción, con sus zonas y sus fragmentos, en 215 ms en vez de 860.
+Esa cuenta vive en un método aparte (`AlSaltar`) para poder probarla desde cada etapa sin
+abrir ninguna ventana.
+
+### Lo que se midió
+
+Fuera de pantalla, dibujando la escena sobre un fondo magenta puro —que no usa ningún
+elemento del dibujo— y contando píxeles. Una nota de método que costó un falso fallo: hay
+que medir **dos** cosas, porque una tapa a medio desvanecer no está terminada pero
+tampoco es negra. Con un solo umbral estricto la prueba cantaba «165 ms de negro al
+empezar la obra» cuando lo que había era la primera tanda de casillas desvaneciéndose a
+la vista.
+
+- **El saludo va primero**: durante toda su etapa y la pausa no hay semilla (0,0000), ni
+  estructura, ni un solo píxel destapado. El brazo llega a 54°.
+- **La semilla llega al centro** con menos de 2 px de error, y los rayos no salen hasta
+  que está activada.
+- **Se construye por zonas**: 0 % → 29 % → 75 % → 100 %, y el mayor salto entre dos
+  muestras consecutivas (de 150) es del **4,0 %**. No aparece nada de golpe.
+- **La barra nunca va por delante del fondo**, comprobado muestra a muestra.
+- **Sin negro después de empezar**: la pantalla deja de ser negra 26 ms (Completo),
+  11 ms (Equilibrado) y 12 ms (Reducido) después de arrancar la obra.
+- **Sin restos al final**: 100 % construido, y tapas, núcleo, fragmentos y robot a cero.
+- **7 resoluciones × 4 bordes de barra** —incluida una pantalla vertical y una 21:9—:
+  tapadas al empezar, monótonas, sin restos, y el robot cabe entero en todas.
+- **Esc y clic en las siete etapas** y en los tres niveles: nunca retrocede, nunca deja
+  restos, y termina en 215 / 143 / 85 ms.
+- **60, 75, 120, 144, 165 y 240 Hz**: el estado en un instante dado es idéntico en los
+  seis; lo que cambia son los fotogramas (179 a 60 Hz, 716 a 240).
+- **Decidir un fotograma cuesta 0,019 ms** en la pantalla de esta máquina — un 0,5 % del
+  presupuesto de 240 Hz. Las seiscientas piezas no son un problema de CPU, y además casi
+  ninguna cambia en un fotograma dado: solo las que están dentro del frente.
+
+Lo que esta prueba **no** puede ver —y por eso hace falta mirarla— es si el ritmo gusta.
+
+## Fase C2 · El asistente, y marcharse andando
+
+> **Superada.** El robot humanoide está borrado: ver «La nube despierta», al final.
+
+Dos cosas que faltaban para que la escena dejara de parecer una demo: el robot se
+**apagaba** al terminar la construcción, y era un monigote hecho de prisa. Ninguna de las
+dos se arregla con parámetros.
+
+### El robot se va por su propio pie
+
+Antes, al acabar la obra, la opacidad del robot bajaba a cero en 190 ms y ya está. Eso no
+es irse: es que alguien lo borra. Ahora hay una **séptima etapa** detrás de la obra —con
+el escritorio entero ya construido y a la vista, así que no es ninguna pausa negra— en la
+que revisa la nube, asiente, saluda por última vez y **cruza el borde izquierdo volando**.
+
+Por la izquierda y no por otro sitio: el robot nace en el centro y lo primero que hace es
+apartarse a la izquierda para dejarle el centro a la semilla. Ese es su sentido de marcha
+durante toda la escena, y salir por donde vino es lo único que no se lee como un salto.
+
+Lo que hace que se lea como marcharse y no como desaparecer:
+
+- **El apagado se decide por la POSICIÓN, no por el tiempo.** Mientras le quede un píxel
+  dentro de la pantalla está dibujado al 100 %; en cuanto su lienzo entero cruza el
+  borde, deja de dibujarse. Para entonces no hay nada visible que apagar, así que el
+  cambio no se ve — y como la condición es geométrica, vale igual en 1366×768 que en una
+  pantalla vertical. La prueba comprueba exactamente eso: en 3 niveles × 8 pantallas,
+  **nunca se apaga estando dentro**.
+- **La curva de salida es una mezcla, no una `EaseInOut` pelada.** Con la curva limpia se
+  pasaba el primer tercio prácticamente quieto y después cruzaba la pantalla en 170 ms,
+  que se lee como un tirón. Un 35 % de recta le da empuje desde el principio y el 65 % de
+  curva deja la suavidad en los dos extremos. Medido: empieza a moverse en el 58 % de la
+  etapa y está fuera del todo en el 91 %.
+- **Flota mientras se va**: un vaivén en vertical que no para y que se marca más según
+  coge velocidad. Es lo que lo separa de una caja deslizándose.
+- **Se inclina hacia donde va**, como quien echa el cuerpo al arrancar, y lleva un
+  **aura** azul nube bajo los propulsores que se enciende con la aceleración.
+- **Deja una estela** de catorce chispas azul nube y coral. Nacen de la MISMA curva de
+  salida —no de una animación aparte—, así que caen sobre su camino de verdad; y la
+  última se apaga en el 98 % de la etapa, así que no queda ni una encendida.
+- Y el saludo de despedida **se solapa un 10 % con la marcha**: empieza a irse mientras
+  termina de saludar. Sin solape eran dos cosas en fila; con él, un gesto seguido.
+
+Esc o un clic aceleran también esto: la escena entera corre al cuádruple, así que la
+salida se ve igual —con su estela y su aceleración— en 68 ms en vez de 270. Lo que no
+hace nunca es cortarla.
+
+### De monigote a asistente
+
+El robot anterior era una nube con visera, dos palos por brazos y un cono por propulsor.
+Funcionaba de lejos y no aguantaba una mirada. El de ahora conserva **exactamente la
+identidad** —la nube con el visor cruzándola, que es la silueta que hay que reconocer— y
+reparte el resto como es debido:
+
+- la nube pasa a ser **la cabeza**, no la cabeza y el cuerpo a la vez (por eso parecía un
+  sello y no un personaje);
+- debajo hay un **torso compacto y redondeado** con el **emblema de la nube en el pecho**
+  en azul nube y una chispa coral. La nube grande es quién es; la del pecho, para quién
+  trabaja;
+- los **brazos tienen codo**: hombro, antebrazo y mano, con la línea de la junta marcada
+  encima del trazo grueso. Solo con el trazo parecía un tubo doblado;
+- **manos abiertas** de palma y cuatro dedos. La izquierda presenta con la palma hacia
+  arriba —ahí se apoya la semilla—, la derecha saluda;
+- **no tiene piernas, tiene flotación**: anillo, chorro y halo bajo el torso. Una nube no
+  anda, y unas piernas colgando lo dirían todo al revés;
+- y **cara con expresión**: las pupilas se mueven (mira hacia donde ha quedado la barra,
+  leído del config) y los ojos se entrecierran. En una cara sin boca, entornar los ojos es
+  la única sonrisa posible, y es lo que hace legible el gesto de aprobación.
+
+Tres cosas de dibujo que costaron un fotograma cada una:
+
+1. **El brazo que saluda va por DELANTE de la cabeza.** La nube es ancha, y con el brazo
+   detrás la mano levantada asomaba por el borde del cabezón en vez de saludar. El otro
+   brazo sigue detrás del torso, que es lo que hace que el hombro se lea como una
+   articulación y no como un palo pegado.
+2. **El tamaño sale del alto de la pantalla pero limitado por el ancho.** El robot mide
+   1,6 altos de ancho, y en una pantalla vertical de 1080×1920 un robot «de 1920» se
+   salía 108 px por la izquierda al apartarse.
+3. **Dos lienzos, uno dentro del otro.** El de fuera lo mueve la escena por la pantalla y
+   el de dentro es el que se inclina al asentir. Con uno solo, las dos transformaciones
+   se pisan.
+
+Y una decisión de rendimiento al revés que antes: **se quitó el `BitmapCache`** del
+robot. Cachear sale a cuenta cuando lo único que cambia es la posición; aquí cambian los
+brazos, las pupilas, los ojos y la inclinación en cada fotograma, así que el mapa de bits
+habría que rehacerlo igualmente. Y ya no hay nada que lo justifique: los brillos pasaron
+de `BlurEffect` a degradados radiales, que se calculan una vez y después se mueven y
+escalan gratis. Todo el robot es geometría vectorial, así que al 100, 125, 150 o 200 % de
+DPI no hay nada que tocar y no hay nada que pueda salir borroso.
+
+### Los cuatro niveles, otra vez
+
+| | entra | saluda | pausa | semilla | rayos | malla | obra | salida | total |
+|---|---|---|---|---|---|---|---|---|---|
+| Completo | 300 ms | 760 (×3) | 200 | 380 | 260 | 220 | 860 | 900 | **3880 ms** |
+| Equilibrado | 200 | 480 (×2) | 130 | 250 | 170 | 150 | 570 | 600 | **2550 ms** |
+| Reducido | 140 | 330 (×1) | 80 | 160 | 110 | 100 | 340 | 380 | **1640 ms** |
+
+La construcción no se tocó: dura exactamente lo que duraba. Lo que se añade es la
+despedida, y el total sigue dentro de los 2,5–4,5 s acordados.
+
+Los gestos de aprobación y despedida **se mudaron de la obra a la salida**. Antes el
+visto bueno iba repartido por encima de la construcción y se quedaba a medias; además
+hacía que el escritorio y el robot compitieran por la atención en el mismo momento.
+Durante la obra el robot ahora solo mira.
+
+### Lo que se midió
+
+Mismo método de siempre: la escena dibujada fuera de pantalla sobre magenta puro y
+contada píxel a píxel. Con una corrección de método que costó un falso fallo: **los
+píxeles del robot hay que descontarlos**. Con la escena entera construida y el robot
+todavía encima, la pantalla daba 97 % y la prueba cantaba un 3 % sin construir que era,
+literalmente, el robot.
+
+- **El orden**: durante toda la obra, cero saludos, cero estela y el robot al 100 %. Los
+  gestos empiezan cuando la construcción termina, no antes.
+- **La salida**, en 3 niveles × 8 pantallas (incluidas una vertical, una 21:9 y las
+  equivalencias de 125, 150, 200 y 225 % de DPI): nunca se apaga estando dentro, nunca
+  retrocede, siempre sale entero, siempre con aceleración (la velocidad punta cae entre
+  el 70 % y el 95 % de la etapa) y sin restos al final.
+- **El escritorio durante la salida**: nunca baja del **100,0 %** construido.
+- **Al final**: tapado 0, núcleo 0, estela 0, aura 0, robot sin dibujar.
+- **Esc y clic en las ocho etapas** × 3 niveles: nunca retrocede, nunca apaga al robot
+  dentro de la pantalla, siempre termina con él fuera y sin restos.
+- **60–240 Hz**: estado idéntico en el mismo instante; 233 fotogramas a 60 Hz y 932 a 240.
+- **Decidir un fotograma: 0,020 ms** en la pantalla de esta máquina, un 0,5 % del
+  presupuesto de 240 Hz.
+
+## Fase C2 · La nube despierta
+
+El robot humanoide está borrado. No fallaba nada medible —tenía su verificación entera
+en verde— pero visualmente no funcionaba, y el motivo es de concepto, no de parámetros:
+**un humanoide pide una animación de humanoide**. Brazos que se levantan, posturas,
+anatomía que leer. Para contar «el escritorio se enciende», todo eso es ruido compitiendo
+con lo único que importa. Lo que queda es la nube, y ya está.
+
+La escena de ahora: la pantalla empieza negra, una nubecita aparece en el centro, da un
+par de botes con su pulso de brillo y su parpadeo —eso es el saludo—, se enciende desde
+dentro y **se abre**: crece hasta ocupar la pantalla y por dentro de ella va apareciendo
+el escritorio de verdad. Cuando está todo a la vista se recoge, viaja a donde está la
+barra y se funde con ella como su icono.
+
+### El agujero con forma de nube
+
+La regla que el usuario puso por delante de todo —«la nube debe ser la única fuente de
+verdad de la revelación»— tiene una respuesta exacta en WPF, y no es una máscara animada
+en paralelo:
+
+```csharp
+var hueco = new GeometryGroup { FillRule = FillRule.EvenOdd };
+hueco.Children.Add(new RectangleGeometry(new Rect(0, 0, w, h)));
+hueco.Children.Add(nube.Trazo);           // ← la MISMA geometría que se dibuja
+var tapa = new Path { Fill = Brushes.Black, Data = hueco };
+```
+
+Un rectángulo del tamaño de la pantalla y la nube, los dos en el mismo grupo con regla
+par-impar: lo que está dentro de los dos se queda fuera del relleno. O sea, **un agujero
+con forma de nube**, que crece cuando crece la nube porque *es* la nube. El mismo
+`Geometry` lo comparten el agujero, el cuerpo, el halo y el filo, y las tres
+transformaciones —escala, giro, posición— viven **dentro de la geometría**, no en los
+`Path`. Así no hay nada que acordarse de mover a la vez.
+
+No hay dos relojes que se puedan separar, y el escritorio no puede asomar donde la nube
+no ha llegado. No es una propiedad que haya que vigilar: es la construcción.
+
+Y la capa negra solo empieza a irse cuando la nube **ya tapa la pantalla entera**:
+
+```csharp
+opTapa = 1 - clamp((escala - escalaLlena) / (escalaLlena * 0.05));
+```
+
+Mientras eso no pasa vale 1, así que no hay un solo instante en que se pueda ver
+escritorio por fuera de la nube. Medido píxel a píxel, en los tres niveles: **cero**.
+
+### Cuánto hay que agrandar la nube
+
+`escalaLlena` no se puede poner a ojo ni deducir del ancho y el alto: la nube tiene la
+base recta, los lados redondos y arriba bultos, así que lo que tarda en taparse son las
+esquinas y eso depende de la forma. Se busca por bisección preguntándole al propio
+contorno si contiene el borde de la pantalla — la misma figura que luego se dibuja, así
+que la respuesta vale para cualquier resolución sin repasar nada a mano.
+
+La primera versión preguntaba con `Geometry.FillContains`, y eso **aplana la figura en
+cada llamada**: la prueba se fue a más de dos minutos. Con el contorno aplanado una vez a
+polígono y un lanzamiento de rayo de toda la vida, montar la escena cuesta **0,4 ms**.
+
+### Dos cuentas que había que hacer al cuadrado, y no lineales
+
+Las dos salieron de medir, no de mirar:
+
+1. **Al crecer, la escala se interpola por el ÁREA.** Lo que se ve aparecer es
+   superficie, y la superficie va con el cuadrado del ancho. Interpolando el ancho a
+   secas, a mitad de la expansión solo se había destapado una cuarta parte de la pantalla
+   y el resto salía de golpe: medido, **del 3 % al 69 % en 320 ms**. Con
+   `escala = sqrt(lerp(a₀², a₁², t))` el escritorio aparece a ritmo parejo y el mayor
+   salto entre muestras baja al 9,8 %.
+
+2. **Al encoger, la escala va en PROPORCIÓN.** De 3360 px a 34 en línea recta, la nube se
+   pasaría media etapa siendo enorme y la otra media encogiendo un pelo. Con
+   `escala = tope · (icono/tope)^q` —misma razón en cada tramo de tiempo— llega a tamaño
+   de mascota a mitad de camino, que es cuando tiene que volver a parecer un personaje.
+
+### El cuerpo se enciende por tamaño, no por tiempo
+
+Un fallo que la prueba cazó y que a ojo habría parecido «un fogonazo raro»: al recogerse,
+el cuerpo de la nube vuelve a ser opaco. Atado al tiempo, se encendía cuando la nube
+todavía ocupaba la pantalla entera y la convertía en una cortina azul que tapaba el
+escritorio que acababa de destapar. Medido: **al 25 % de la etapa de llegada, el
+escritorio se iba del 100 % al 26 %**.
+
+Atado al tamaño —`opRelleno = clamp((escalaMini·2,4 − escala) / (escalaMini·1,6))`— no
+puede pasar: mientras sea grande es una ventana, y solo al volver a ser pequeña es un
+cuerpo.
+
+Lo mismo con la cara, y de ahí sale gratis un detalle bonito: los ojos valen lo que valga
+el cuerpo y además se van cuando la nube deja de tener tamaño de personaje. Una ventana
+del tamaño de la pantalla no tiene cara; una nube de 34 px en la barra, sí. Nadie tiene
+que acordarse de encenderlos al final — vuelven solos.
+
+### El saludo sin brazos
+
+Cuatro cosas a la vez y se lee mejor que una mano: **rebote** vertical (48 px, con `|sin|`
+para que haya un bote por pulso), **ladeo** de 5,5° que acompaña el bote, **pulso de
+brillo** en el halo, y **un parpadeo** en lo alto del primer bote. El número de botes y
+pulsos lo pone el guion: dos en Completo, uno en los otros dos.
+
+### Los cuatro niveles
+
+| | aparece | saluda | despierta | crece | llega | total |
+|---|---|---|---|---|---|---|
+| Completo | 340 ms | 820 (×2 pulsos) | 260 | 1000 | 780 | **3200 ms** |
+| Equilibrado | 220 | 480 (×1) | 170 | 680 | 520 | **2070 ms** |
+| Reducido | 110 | 300 (×1) | 110 | 420 | 320 | **1260 ms** |
+| Desactivado | — | — | — | — | — | no se crea la escena |
+
+«Reducido» no quita etapas, las acorta: se cuenta lo mismo en menos tiempo, no media
+historia.
+
+### Detalles que no son obvios
+
+- **La nube aparece creciendo desde un punto, no fundiéndose desde transparente.** Si
+  apareciera por opacidad, su agujero en la capa negra ya estaría abierto y se vería el
+  escritorio asomando dentro de una nube a medio aparecer. Mientras es una mascota, el
+  cuerpo opaco tapa su propio agujero.
+- **`Geometry.Parse` devuelve una figura congelada**, y además la misma instancia para la
+  misma cadena. Hay que clonarla antes de ponerle transformaciones propias o la segunda
+  llamada revienta.
+- **El grosor del halo y del filo va en píxeles de pantalla**, no en unidades de la nube:
+  si fuera proporcional, al tamaño de ventana el borde sería una franja de 200 px y al
+  tamaño de icono no se vería.
+- **La clave del config se sigue llamando `Animaciones.Robot`.** Está escrita en el
+  config de la gente desde la Fase A; renombrarla les dejaría la escena en su valor de
+  serie sin avisar. Lo que cambió fue el personaje, no el ajuste.
+
+### Lo que costaba y lo que cuesta
+
+| | robot humanoide | la nube |
+|---|---|---|
+| elementos en la escena | ~700 | 6 |
+| decidir un fotograma (esta máquina) | 0,020 ms | **0,006 ms** |
+| montar la escena | — | 0,4 ms |
+
+Seiscientos elementos menos, y lo que queda es una figura con tres transformaciones.
+
+### Lo que se midió
+
+- **El saludo**: rebote de 48 px, ladeo de 5,5°, el número de pulsos que dice el guion y
+  parpadeo hasta el 0,10 de apertura. Y la pantalla, negra del todo hasta que se abre.
+- **Cero píxeles de escritorio fuera de la nube** en los tres niveles, contrastando cada
+  fotograma contra la propia figura dibujada aparte.
+- **La nube no se deforma**: su proporción se mantiene dentro del ±2,7 % medido sobre el
+  mapa de bits (lo que queda es el suavizado del borde).
+- **El revelado es monótono** mientras se abre, con un salto máximo del 9,8 % entre
+  muestras, y llega al 100 %.
+- **Durante la llegada el escritorio nunca baja del 97,3 %**: lo que falta es la propia
+  nube y su halo volando hacia la barra, que es lo que se quiere ver.
+- **3 niveles × 8 pantallas × 4 bordes** —incluidas una vertical, una 21:9 y las
+  equivalencias de 125, 150, 200 y 225 % de DPI—: empiezan tapadas, la capa negra solo se
+  abre cuando la nube ya tapa la pantalla, la nube llega a la franja de la barra con su
+  cara puesta, se funde sin cortes y no quedan restos.
+- **Esc y clic en las cinco etapas** × 3 niveles: nunca retrocede, nunca abre la capa
+  negra con la nube pequeña, siempre acaba en la barra y sin restos. Entre 445 y 32 ms
+  según desde dónde se salte.
+- **60–240 Hz**: el estado en un instante dado es idéntico en los seis.
