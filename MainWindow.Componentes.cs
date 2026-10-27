@@ -292,7 +292,7 @@ public partial class MainWindow
 
         var t = new TextBlock
         {
-            Text = titulo,
+            Text = Textos.T(titulo),
             FontSize = 12.5,
             FontWeight = FontWeights.SemiBold,
             Foreground = est.TintaDeAcento ? _acentoLegible : _texto,
@@ -387,14 +387,14 @@ public partial class MainWindow
         var textos = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         var t = new TextBlock
         {
-            Text = titulo, FontSize = 12.5, FontWeight = FontWeights.SemiBold,
+            Text = Textos.T(titulo), FontSize = 12.5, FontWeight = FontWeights.SemiBold,
             Foreground = _texto, TextTrimming = TextTrimming.CharacterEllipsis,
         };
         textos.Children.Add(t);
         if (debajo is { Length: > 0 })
             textos.Children.Add(new TextBlock
             {
-                Text = debajo, FontSize = 10.5, Foreground = _texto, Opacity = 0.55,
+                Text = Textos.T(debajo), FontSize = 10.5, Foreground = _texto, Opacity = 0.55,
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 Margin = new Thickness(0, 1, 0, 0),
             });

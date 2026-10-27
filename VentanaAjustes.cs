@@ -1157,10 +1157,13 @@ public sealed partial class VentanaAjustes : Window
         }
 
         // Abre una tarjeta. La anterior se queda cerrada con lo que se le echó.
+        // Se traduce aquí, no en las ~300 llamadas: ver la nota de `MainWindow.Texto`.
         public Pagina Grupo(string titulo, int icono, string? descripcion = null)
         {
             _dentro = new StackPanel();
-            _raiz.Children.Add(_v.Tarjeta(titulo, icono, descripcion, _dentro));
+            _raiz.Children.Add(_v.Tarjeta(Textos.T(titulo), icono,
+                                          descripcion == null ? null : Textos.T(descripcion),
+                                          _dentro));
             return this;
         }
 
@@ -1372,7 +1375,7 @@ public sealed partial class VentanaAjustes : Window
 
     internal TextBlock Rotulo(string t, bool titulo = false) => new()
     {
-        Text = t,
+        Text = Textos.T(t),
         Foreground = _texto,
         Opacity = titulo ? 1 : 0.75,
         FontSize = titulo ? 15 : 13,
@@ -1435,7 +1438,7 @@ public sealed partial class VentanaAjustes : Window
     {
         var c = new CheckBox
         {
-            Content = etiqueta,
+            Content = Textos.T(etiqueta),
             IsChecked = valor,
             Foreground = _texto,
             Margin = new Thickness(0, 6, 0, 6),
@@ -1778,7 +1781,7 @@ public sealed partial class VentanaAjustes : Window
         fila.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
         fila.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-        var rot = new TextBlock { Text = etiqueta, Foreground = _texto, VerticalAlignment = VerticalAlignment.Center };
+        var rot = new TextBlock { Text = Textos.T(etiqueta), Foreground = _texto, VerticalAlignment = VerticalAlignment.Center };
         var combo = Desplegable(valores);
         combo.SelectedItem = actual;
         combo.SelectionChanged += (_, _) =>
@@ -1838,6 +1841,31 @@ public sealed partial class VentanaAjustes : Window
         // para tener su escritorio bonito; y debajo los tres números, para quien sí quiera
         // afinar. El que está puesto se enseña por su nombre — ver `Neon.NombreDe`— para que
         // no haya que deducirlo de tres cifras.
+        // ================= El idioma =================
+        //
+        // Va en Apariencia porque es una preferencia de presentación, y lo primero del grupo
+        // de estilo porque es lo que más cambia de golpe lo que lees.
+        p.Grupo("Idioma", IconoDeGrupo("Idioma"));
+        p.Mas(Opciones("Idioma de la interfaz",
+                       new[] { "Automático", "Español", "English" },
+                       Textos.Elegida switch
+                       {
+                           Textos.Lengua.Espanol => "Español",
+                           Textos.Lengua.Ingles => "English",
+                           _ => "Automático",
+                       },
+                       nombre => _arbol.Poner("Tema", "Idioma", nombre switch
+                       {
+                           "Español" => "es",
+                           "English" => "en",
+                           _ => "auto",
+                       })));
+        p.Pista("«Automático» pregunta a Windows: con el sistema en español verás NubeBar en " +
+                "español, y en cualquier otro idioma lo verás en inglés.");
+        p.Pista("La traducción al inglés cubre la interfaz; lo que falte sale en español en " +
+                "vez de salir en blanco. El registro se queda siempre en español a propósito: " +
+                "un log traducido no se puede buscar ni comparar entre máquinas.");
+
         p.Grupo("Halo del neón", IconoDeGrupo("Color"));
 
         p.Mas(Opciones("Preajuste",

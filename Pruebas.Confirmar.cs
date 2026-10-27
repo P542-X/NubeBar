@@ -33,6 +33,83 @@ public static partial class Pruebas
         NeonLoQueDebeCumplir();
         LateralesSeMuevenDeSitio();
         PanicoCuandoHayQueRendirse();
+        IdiomaInglesSinRomperElEspanol();
+    }
+
+    // ================= El inglés, sin romper el español =================
+    //
+    // La traducción usa la cadena ESPAÑOLA como clave, no un identificador. Esa decisión es
+    // la que hace que se pueda ir completando poco a poco: lo que falte sale en español, que
+    // es lo que ya había. Pero tiene dos formas de romperse en silencio, y son estas.
+    static void IdiomaInglesSinRomperElEspanol()
+    {
+        Grupo("idioma: el inglés no puede empeorar el español");
+
+        var antes = Textos.Elegida;
+        try
+        {
+            // ---------- En español no toca nada ----------
+            //
+            // Lo primero que hay que garantizar: quien lo tenga en español ve exactamente lo
+            // de siempre. Si `T` devolviera otra cosa aquí, habríamos roto la versión que
+            // funciona para añadir una que no existía.
+            Textos.Elegir("es");
+            Vale(!Textos.HayQueTraducir, "en español no se traduce nada");
+            Igual("Acciones rápidas", Textos.T("Acciones rápidas"), "la cadena sale tal cual");
+            Igual("inventada", Textos.T("inventada"), "incluso una que no está en la tabla");
+
+            // ---------- En inglés traduce lo que hay y deja pasar lo que no ----------
+            Textos.Elegir("en");
+            Vale(Textos.HayQueTraducir, "en inglés sí se traduce");
+            Igual("Quick actions", Textos.T("Acciones rápidas"), "lo que está en la tabla, traducido");
+
+            // ESTO es lo que hace que la traducción se pueda dejar a medias sin romper nada:
+            // una cadena sin traducir sale en español, no en blanco y no con su clave.
+            Igual("una frase que nadie tradujo", Textos.T("una frase que nadie tradujo"),
+                  "lo que falta sale en español, nunca vacío ni con un identificador");
+
+            Igual("", Textos.T(null), "y un null no revienta: da cadena vacía");
+            Igual("", Textos.T(""), "ni una vacía");
+
+            // ---------- Lo que no se entiende es «auto», no un idioma inventado ----------
+            Textos.Elegir("klingon");
+            Igual(Textos.Lengua.Auto, Textos.Elegida, "un idioma desconocido cae en automático");
+            Textos.Elegir(null);
+            Igual(Textos.Lengua.Auto, Textos.Elegida, "y un config sin la clave, también");
+
+            // ---------- Ida y vuelta por el fichero ----------
+            foreach (var l in new[] { Textos.Lengua.Espanol, Textos.Lengua.Ingles, Textos.Lengua.Auto })
+            {
+                Textos.Elegir(Textos.Clave(l));
+                Igual(l, Textos.Elegida, $"«{Textos.Clave(l)}» se guarda y se lee igual");
+            }
+
+            // ---------- Y la tabla no puede tener traducciones vacías ----------
+            //
+            // Una entrada con el inglés en blanco es peor que no tenerla: en español saldría
+            // el texto y en inglés un hueco. Es el fallo silencioso que esta tabla permite,
+            // así que se exige que no exista.
+            Textos.Elegir("en");
+            foreach (var es in new[]
+            {
+                "Acciones rápidas", "Carpetas", "Notificaciones", "Calendario",
+                "Espacios de trabajo", "Conexión y batería", "Clima y sistema",
+                "No molestar", "Guardar", "Cancelar",
+            })
+            {
+                var en = Textos.T(es);
+                Vale(en.Length > 0, $"«{es}» no se traduce a vacío");
+                Vale(en != es, $"«{es}» está traducida de verdad, no copiada");
+            }
+
+            Vale(Textos.Traducidas > 100,
+                 $"la tabla cubre la interfaz principal ({Textos.Traducidas} cadenas)");
+        }
+        finally
+        {
+            // Las pruebas no pueden dejar el idioma cambiado para las que vengan después.
+            Textos.Elegir(Textos.Clave(antes));
+        }
     }
 
     // ================= Cuándo NubeBar se rinde y te devuelve el escritorio =================

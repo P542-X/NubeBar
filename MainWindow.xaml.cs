@@ -419,6 +419,10 @@ public partial class MainWindow : Window
         // Antes de montar nada: el nivel de animación lo leen Kf y Ms, por los que
         // pasa todo lo que se mueve, así que tiene que estar puesto ya.
         Animacion.Elegir(_cfg.Animaciones.Nivel);
+        // El idioma, antes de montar nada: lo que se construya a partir de aquí ya se traduce
+        // al pintarse. Cambiarlo en Ajustes recarga el config y vuelve a pasar por aquí, así
+        // que no hace falta reiniciar.
+        Textos.Elegir(_cfg.Tema.Idioma);
 
         // Y con él, el estilo de los botones, que también depende del nivel. Va aquí y
         // no en el constructor porque los botones se vuelven a crear unas líneas más
@@ -1308,9 +1312,17 @@ public partial class MainWindow : Window
         }
     }
 
+    // ---------- Aquí se traduce ----------
+    //
+    // Y no en las ~1900 llamadas. Las cadenas de interfaz de este proyecto se pasan como
+    // argumento a un puñado de ayudantes, así que traduciendo DENTRO de ellos se cubren
+    // cientos de sitios tocando diez funciones — y sin riesgo de romper una llamada.
+    //
+    // `Textos.T` devuelve la cadena tal cual si no está traducida, así que lo que falte sale
+    // en español: nunca peor que antes. Ver `Textos.cs`.
     TextBlock Texto(string t, double tamano) => new()
     {
-        Text = t, FontSize = tamano, Foreground = _texto,
+        Text = Textos.T(t), FontSize = tamano, Foreground = _texto,
         HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center
     };
 
@@ -1327,7 +1339,9 @@ public partial class MainWindow : Window
     {
         var b = new Button
         {
-            Content = contenido, ToolTip = tip, Foreground = _texto,
+            // El tooltip también: es texto que el usuario lee, y en media interfaz es lo
+            // único que explica qué hace un icono.
+            Content = contenido, ToolTip = Textos.T(tip), Foreground = _texto,
             Height = Math.Max(20, _cfg.Barra.Alto - 8)
         };
 

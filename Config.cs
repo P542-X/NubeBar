@@ -31,6 +31,15 @@ public class Tema
     // no se entienda cae en «normal» y nunca en el más llamativo (ver `Estilos.Leer`).
     public string Estilo { get; set; } = "normal";
 
+    // ---------- El idioma de la interfaz ----------
+    //
+    // "auto" pregunta a Windows: quien lo tenga en español ve NubeBar en español sin tocar
+    // nada, y el resto del mundo lo ve en inglés. "es" o "en" lo fuerzan.
+    //
+    // Va en `Tema` porque es una preferencia de presentación y porque ahí ya está el resto de
+    // lo que decide cómo se ve. El registro NO se traduce — ver `Textos`.
+    public string Idioma { get; set; } = "auto";
+
     // ---------- Roles de color (todos opcionales) ----------
     // Un tema puede seguir siendo tres colores: lo que no se ponga aquí, Roles lo
     // deriva del fondo y del texto. Así los seis temas de serie y los que ya tenga
