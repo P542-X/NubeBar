@@ -32,6 +32,99 @@ public static partial class Pruebas
         BarraLosIdsSeVenDentroDeLosGrupos();
         NeonLoQueDebeCumplir();
         LateralesSeMuevenDeSitio();
+        PanicoCuandoHayQueRendirse();
+    }
+
+    // ================= Cuándo NubeBar se rinde y te devuelve el escritorio =================
+    //
+    // NubeBar esconde la barra de tareas de Windows. Si se rompe y se queda a medias, el
+    // usuario se queda **sin barra de tareas y sin NubeBar**: ni inicio, ni reloj, ni bandeja.
+    // Es el peor estado posible — peor que cerrarse.
+    //
+    // Lo pidió el usuario: «un detector de crasheos o errores graves, y que estos activen un
+    // exit que haga que al usuario se le active la barra de tareas normal, igual que salirse
+    // de NubeBar».
+    //
+    // Lo que se exige aquí son las dos equivocaciones posibles, que son simétricas y las dos
+    // malas: rendirse por un fallo tonto (te cierra la barra sin motivo) y no rendirse con la
+    // barra rota (te deja el escritorio secuestrado).
+    static void PanicoCuandoHayQueRendirse()
+    {
+        Grupo("pánico: cuándo hay que devolverle el escritorio al usuario");
+
+        var t0 = new DateTime(2026, 10, 28, 1, 0, 0);
+        static Panico.Apunte A(Panico.Clase q, string donde, DateTime cuando) => new(q, donde, cuando);
+
+        // ---------- Un fallo suelto se perdona ----------
+        //
+        // Un módulo que revienta una vez al pintar es un módulo tonto. Cerrar la barra por
+        // eso sería el remedio peor que la enfermedad: te quedas sin escritorio por un
+        // widget.
+        Vale(!Panico.HayQueRendirse(new[] { A(Panico.Clase.Interfaz, "ModuloReloj.Pintar", t0) }, t0),
+             "un fallo de pintado, solo, se perdona");
+        Vale(!Panico.HayQueRendirse(Array.Empty<Panico.Apunte>(), t0), "y sin fallos, menos todavía");
+
+        // ---------- El mismo fallo repitiéndose, no ----------
+        //
+        // Cinco veces el MISMO sitio en veinte segundos no es un módulo tonto: es una barra
+        // que no se puede dibujar. Y una barra que no se dibuja ya ha dejado al usuario sin
+        // escritorio, aunque el proceso siga técnicamente vivo.
+        var bucle = Enumerable.Range(0, 5)
+            .Select(i => A(Panico.Clase.Interfaz, "ModuloReloj.Pintar", t0.AddSeconds(i * 2)))
+            .ToList();
+        Vale(Panico.HayQueRendirse(bucle, t0.AddSeconds(10)),
+             "cinco veces el mismo fallo en veinte segundos: se rinde");
+        Vale(Panico.Motivo(bucle, t0.AddSeconds(10)).Contains("ModuloReloj.Pintar"),
+             "y el motivo dice QUÉ falló, que es lo último que alguien va a leer");
+
+        // Cuatro no bastan: el umbral tiene que ser un umbral de verdad, no un adorno.
+        Vale(!Panico.HayQueRendirse(bucle.Take(4).ToList(), t0.AddSeconds(10)),
+             "cuatro todavía no: el umbral es el umbral");
+
+        // ---------- Y repartido entre sitios distintos, tampoco ----------
+        //
+        // Cinco módulos fallando una vez cada uno es un mal día —o un tema raro—, no una
+        // barra rota. Contar el total en vez de por sitio habría cerrado NubeBar aquí.
+        var repartido = new[] { "Reloj", "Cpu", "Ram", "Bandeja", "Red" }
+            .Select((d, i) => A(Panico.Clase.Interfaz, d, t0.AddSeconds(i))).ToList();
+        Vale(!Panico.HayQueRendirse(repartido, t0.AddSeconds(6)),
+             "cinco módulos distintos fallando una vez NO son una barra rota");
+
+        // ---------- La ventana de tiempo importa ----------
+        //
+        // Cinco fallos repartidos en una hora son una barra que funciona con un módulo
+        // regular. Sin ventana, una sesión larga acabaría rindiéndose sola.
+        var lento = Enumerable.Range(0, 6)
+            .Select(i => A(Panico.Clase.Interfaz, "ModuloReloj.Pintar", t0.AddMinutes(i * 10)))
+            .ToList();
+        Vale(!Panico.HayQueRendirse(lento, t0.AddMinutes(60)),
+             "seis fallos en una hora no son un bucle: cuentan los de los últimos 20 s");
+
+        // ---------- Lo que no se perdona ni una vez ----------
+        //
+        // Una excepción sin capturar en un hilo de fondo mata el proceso quiera uno o no. No
+        // hay nada que deliberar: hay que soltar la bandeja, los ganchos y la reserva de
+        // pantalla ANTES de irse, o el usuario se queda sin las dos barras.
+        Vale(Panico.EsGraveDeEntrada(Panico.Clase.Fondo),
+             "una excepción sin capturar en un hilo es grave de entrada");
+        Vale(Panico.EsGraveDeEntrada(Panico.Clase.Arranque),
+             "y reventar al montar la barra, también");
+        Vale(!Panico.EsGraveDeEntrada(Panico.Clase.Interfaz),
+             "pero un fallo de pintado no: más vale un módulo tonto que quedarte sin barra");
+        Vale(!Panico.EsGraveDeEntrada(Panico.Clase.Tarea), "ni una tarea que nadie miró");
+
+        Vale(Panico.HayQueRendirse(new[] { A(Panico.Clase.Fondo, "GestorVentanas.Mirar", t0) }, t0),
+             "y basta UNA para rendirse");
+
+        // ---------- Y el tope de la salida limpia ----------
+        //
+        // Al rendirse se intenta la misma salida que al cerrar a mano. Pero estamos aquí
+        // porque algo está roto, así que esa salida puede colgarse — y entonces el usuario se
+        // queda sin barra igual, que es lo que se quería evitar. Tiene que haber tope, y
+        // tiene que ser corto: son segundos sin escritorio.
+        Vale(Panico.EsperaDeLaSalidaLimpia > TimeSpan.Zero, "la salida limpia tiene tope");
+        Vale(Panico.EsperaDeLaSalidaLimpia <= TimeSpan.FromSeconds(10),
+             "y es corto: cada segundo de más es un segundo sin barra de tareas");
     }
 
     // ================= Mover las secciones de los paneles =================

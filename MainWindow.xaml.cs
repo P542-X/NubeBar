@@ -112,12 +112,33 @@ public partial class MainWindow : Window
         {
             Log.Nuevo();
             // Ningún error tumba la app: se apunta en el log y se sigue
-            Application.Current.DispatcherUnhandledException += (_, e) => { Log.Error("interfaz", e.Exception); e.Handled = true; };
-            TaskScheduler.UnobservedTaskException += (_, e) => { Log.Error("tarea", e.Exception); e.SetObserved(); };
+            // ---------- Todo fallo pasa por `Apuntar` ----------
+            //
+            // Antes cada manejador hacía lo suyo: la interfaz apuntaba y perdonaba, la tarea
+            // apuntaba, y el fatal enseñaba la barra de Windows y ya. Ese último dejaba
+            // NubeBar a medio morir — con la bandeja secuestrada, los ganchos puestos y la
+            // reserva de pantalla sin soltar: barra de Windows visible y NubeBar zombi.
+            //
+            // Ahora los tres apuntan en el mismo sitio y `Panico` decide. Perdonar un fallo
+            // de pintado sigue siendo lo correcto —más vale un módulo tonto que quedarte sin
+            // barra—, pero el MISMO fallo cinco veces en veinte segundos ya no se perdona:
+            // eso no es un módulo, es una barra que no se puede dibujar.
+            Application.Current.DispatcherUnhandledException += (_, e) =>
+            {
+                Apuntar(Panico.Clase.Interfaz, DondeFallo(e.Exception), e.Exception);
+                e.Handled = true;
+            };
+            TaskScheduler.UnobservedTaskException += (_, e) =>
+            {
+                Apuntar(Panico.Clase.Tarea, DondeFallo(e.Exception), e.Exception);
+                e.SetObserved();
+            };
             AppDomain.CurrentDomain.UnhandledException += (_, e) =>
             {
-                Log.Error("FATAL", e.ExceptionObject);
-                Nativo.MostrarBarraWindows(true);   // nunca dejarte sin barra de tareas
+                // Esta mata el proceso quiera uno o no, así que `Panico` la da por grave de
+                // entrada: hay que soltar el escritorio ANTES de irnos.
+                Apuntar(Panico.Clase.Fondo, DondeFallo(e.ExceptionObject as Exception),
+                        e.ExceptionObject);
             };
         }
         Islas.Add(this);
