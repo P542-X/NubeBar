@@ -161,7 +161,11 @@ public sealed class Roles
     // Lo que se ve de verdad cuando ese color se pinta encima del fondo: si es opaco,
     // él mismo; si trae alfa, el resultado de componerlo. Hace falta para medir
     // contraste, porque un #1EFFFFFF no se "lee" claro ni oscuro por sí solo.
-    static Color Aplanar(Color c, Color fondo) =>
+    //
+    // `internal` desde que existen los azulejos de los paneles: su relleno es el color del
+    // icono rebajado, y para saber qué tinta poner ENCIMA hay que saber antes de qué color
+    // queda ese relleno una vez compuesto. Es justo la pregunta que contesta.
+    internal static Color Aplanar(Color c, Color fondo) =>
         c.A == 0xFF ? c : Contraste.Mezclar(fondo, Color.FromRgb(c.R, c.G, c.B), c.A / 255.0);
 
     // Un hex del config, o null si no está puesto o está mal escrito. Un color mal

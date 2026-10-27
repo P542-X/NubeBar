@@ -26,7 +26,7 @@ namespace NubeBar;
 //
 // Nada de lo que hay aquí toca el disco del usuario: el centro de notificaciones se
 // prueba con instancias propias y la persistencia, en una carpeta temporal que se borra.
-public static class Pruebas
+public static partial class Pruebas
 {
     internal const string Bandera = "--pruebas";
 
@@ -162,6 +162,145 @@ public static class Pruebas
             // C5.12: la bandeja se actualiza en caliente
             BandejaComparaMuestras();
             BandejaIdentidadDeUnIcono();
+
+            // D0: el contrato de seguridad de NubeHypr
+            HyprNaceApagado();
+            HyprLoQueNoSeToca();
+            HyprCicloYVersiones();
+            HyprGeometriaDeclarada();
+            HyprApagadoNoMueveNada();
+            HyprMigracionV4();
+            HyprDiagnosticoNoEscribe();
+
+            // D1: el modelo puro de layouts y comandos
+            D1AreaUtil();
+            D1RepartoSinCosturas();
+            D1LosCuatroLayouts();
+            D1CalcularYNoMoverLoQueNoToca();
+            D1AplicarDosVecesNoDeriva();
+            D1InsertarYQuitar();
+            D1ComandosValidos();
+            D1ComandosInvalidos();
+
+            // D2: el motor real de posicionamiento
+            D2Conversion();
+            D2SimulacionPorDefecto();
+            D2ElSnapshotViejoNoGana();
+            D2RecuentoYTrazas();
+            D2ElAreaSaleDelMonitorQueEs();
+            D2SoloUnaVentana();
+
+            // D3: foco, teclado y gestos
+            D3MapaDeAtajos();
+            D3ConflictosDeAtajos();
+            D3PasosDeMoverYTamano();
+            D3GestoCancelaDeVerdad();
+            D3MaximizadasFueraPorDefecto();
+            D3DevolverLasVentanas();
+
+            // D4: escritorios virtuales
+            D4NombresYOrden();
+            D4ElVecino();
+            D4ModoDeUnSoloEscritorio();
+            D4ResolverComandos();
+            D4MapaTolerante();
+            D4CambiosDeFuera();
+
+            // D3 cerrada: los atajos registrados de verdad
+            D3RangoDeIdsYConflictos();
+            D3MapaDeTresFuentes();
+            D3LimpiezaDeAtajos();
+
+            // D5: reglas, perfiles y persistencia
+            D5UnaReglaVaciaNoCoincideConNada();
+            D5CriteriosYCoincidencia();
+            D5PrioridadesYEmpates();
+            D5LaExplicacion();
+            D5GuardarDeshacerYRollback();
+            D5ReglasEnLaConfiguracion();
+
+            // D5.1: las reglas, conectadas al momento en que aparece una ventana
+            D51ReglaAplicable();
+            D51ReglaAmbigua();
+            D51Prioridad();
+            D51Empate();
+            D51VentanaDesconocida();
+            D51VariasReglasAportanCamposDistintos();
+            D51Idempotencia();
+            D51ConfiguracionAntiguaConCadenas();
+            D51ReglasYAtajosEnLosPerfiles();
+
+            // D6: la integración visual. Los grupos viven en Pruebas.D6.cs — este archivo
+            // pasó de 7.000 líneas, y seguir metiendo grupos aquí convierte cada edición en
+            // un riesgo para todo lo demás.
+            CorrerD6();
+
+            // D7: fiabilidad, recuperación y modo seguro (Pruebas.D7.cs).
+            CorrerD7();
+
+            // D8: estabilización y regresión (Pruebas.D8.cs). Sin funciones nuevas: son las
+            // pruebas que faltaban sobre lo que ya existía.
+            CorrerD8();
+
+            // D9.1: las tres redes que tienen que existir antes de aplicar (Pruebas.D9.cs).
+            CorrerD9();
+
+            // La guía de reglas: los ejemplos, la frase en castellano y los avisos
+            // (Pruebas.Guia.cs).
+            CorrerGuia();
+
+            // E0: el gestor de superficies simultáneas (Pruebas.E0.cs).
+            CorrerE0();
+
+            // E1: la composición de la barra (Pruebas.E1.cs).
+            CorrerE1();
+
+            // E2: el dock (Pruebas.E2.cs).
+            CorrerE2();
+
+            // E3: los paneles laterales (Pruebas.E3.cs).
+            CorrerE3();
+
+            // E4: el calendario y el panel derecho (Pruebas.E4.cs).
+            CorrerE4();
+
+            // E5: el área de trabajo con las superficies de E (Pruebas.E5.cs).
+            CorrerE5();
+
+            // E6: las transiciones de la nube (Pruebas.E6.cs).
+            CorrerE6();
+
+            // E7: configuración por contexto y perfiles (Pruebas.E7.cs).
+            CorrerE7();
+
+            // E8: estabilización transversal (Pruebas.E8.cs).
+            CorrerE8();
+
+            // El modelo de módulos: añadir, quitar, mover, ocultar, guardar y releer
+            // (Pruebas.Modulos.cs).
+            CorrerModulos();
+
+            // El panel de red: los siete estados y que los botones no desaparecen
+            // (Pruebas.Red.cs).
+            CorrerRed();
+
+            // La cuadrícula de ventanas: adaptativa, en todas las pantallas
+            // (Pruebas.Vista.cs).
+            CorrerVista();
+
+            // El editor de módulos: estado de cada chip, acciones y arrastre
+            // (Pruebas.Editor.cs).
+            CorrerEditor();
+
+            // Los paneles: que caben en la pantalla o se desplazan por dentro
+            // (Pruebas.Paneles.cs).
+            CorrerPaneles();
+
+            // D9.5: la decisión de una regla, convertida en efectos (Pruebas.Colocar.cs).
+            CorrerColocar();
+
+            // Preguntar antes de mover ventanas de verdad (Pruebas.Confirmar.cs).
+            CorrerConfirmar();
 
             // C5.9: la superficie de Inicio
             PanelRaizOpaca();
@@ -1147,7 +1286,12 @@ public static class Pruebas
         Igual(1, r1.Desde, "venía de v1");
         Igual(Esquema.Actual, r1.Hasta, "y llega a la de hoy");
         Vale(r1.Cambio, "y cambió");
-        Igual(2, r1.Aplicadas.Count, "se aplicaron las dos migraciones, en orden");
+        // Cuántas migraciones hacían falta no es un número que se escriba a mano: es la
+        // distancia de la versión del fichero a la de hoy. Escrito como "2" esta prueba se
+        // caía cada vez que el esquema crecía, y lo que falla entonces es la prueba, no el
+        // código.
+        Igual(Esquema.Actual - 1, r1.Aplicadas.Count,
+              $"se aplicaron las {Esquema.Actual - 1} migraciones que le faltaban, en orden");
         Igual(Esquema.Actual, a["Version"]!.GetValue<int>(), "el fichero queda sellado");
 
         // Lo que la migración tenía que dejar escrito
@@ -1174,7 +1318,8 @@ public static class Pruebas
         var r3 = Esquema.Migrar(b);
         Vale(r3.Vale, "un config de B5 migra");
         Igual(2, r3.Desde, "venía de v2");
-        Igual(1, r3.Aplicadas.Count, "y solo le hacía falta una migración");
+        Igual(Esquema.Actual - 2, r3.Aplicadas.Count,
+              $"y le hacían falta {Esquema.Actual - 2}, las que van de la v2 a la de hoy");
         // Y no le ha tocado los paneles, que son suyos
         Igual("izquierda", b["Paneles"]![0]!["Posicion"]!.GetValue<string>(),
               "sus paneles siguen intactos");
@@ -2660,17 +2805,32 @@ public static class Pruebas
 
     static void PanelesMedidas()
     {
-        Grupo("paneles: las medidas son las mismas en todos");
+        Grupo("paneles: las medidas son las mismas en todos, lo elija quien lo elija");
 
-        // Si cada panel elige sus números, cada panel mide distinto. Están en un sitio.
-        Vale(MainWindow.RadioCard >= 10 && MainWindow.RadioCard <= 14,
-             $"el radio de tarjeta está en el rango pedido de 10..14 ({MainWindow.RadioCard})");
-        Vale(MainWindow.RadioShell >= MainWindow.RadioCard,
-             "el contenedor redondea al menos tanto como sus tarjetas");
-        Vale(MainWindow.HuecoCard >= 8 && MainWindow.HuecoCard <= 20,
-             $"la separación entre tarjetas es consistente ({MainWindow.HuecoCard})");
-        Vale(MainWindow.DentroCard >= 10,
-             $"las tarjetas no pegan el contenido al filo ({MainWindow.DentroCard})");
+        // ---------- Esto miraba cuatro constantes; ahora son TRES estilos ----------
+        //
+        // Las medidas salían de `MainWindow.RadioCard` y compañía, que eran `const`. Desde
+        // que el usuario puede elegir la decoración, salen del estilo — así que la pregunta
+        // ya no es «¿este número es razonable?» sino «¿lo es en **los tres**?».
+        //
+        // Y eso es más fuerte que lo de antes: un estilo nuevo que se pasara de rosca con el
+        // redondeo, o que pegara el texto al filo, lo caza esto sin que nadie se acuerde de
+        // volver aquí.
+        foreach (var e in Estilos.Todos)
+        {
+            Vale(e.RadioCard >= 8 && e.RadioCard <= 20,
+                 $"«{e.Nombre}»: el radio de tarjeta es razonable ({e.RadioCard})");
+            Vale(e.RadioShell >= e.RadioCard,
+                 $"«{e.Nombre}»: el contenedor redondea al menos tanto como sus tarjetas");
+            Vale(e.Hueco >= 8 && e.Hueco <= 20,
+                 $"«{e.Nombre}»: la separación entre tarjetas es consistente ({e.Hueco})");
+            Vale(e.Dentro >= 10,
+                 $"«{e.Nombre}»: no pega el contenido al filo ({e.Dentro})");
+        }
+
+        // Y el mínimo para poder pulsar NO sale del estilo: eso no es decoración. Un estilo
+        // que lo encogiera haría los controles más difíciles de usar a cambio de verse más
+        // compacto, y ése es un trato que ningún estilo puede ofrecer.
         Vale(MainWindow.AltoTocable >= 32,
              $"los controles tienen un mínimo cómodo de pulsación ({MainWindow.AltoTocable})");
     }
@@ -2834,20 +2994,29 @@ public static class Pruebas
         Vale(MainWindow.TopeDeAlto < 768 - 100, "y cabe en un portátil de 768 px");
 
         // ---------- Las medidas de las tarjetas, compactas ----------
-        Vale(MainWindow.DentroCard <= 16, $"las tarjetas no son acolchadas ({MainWindow.DentroCard})");
-        Vale(MainWindow.HuecoCard <= 12,
-             $"ni se separan tanto que parezcan botones sueltos ({MainWindow.HuecoCard})");
+        //
+        // En LOS TRES estilos. Esto miraba las constantes de antes; ahora el usuario elige la
+        // decoración, así que lo que hay que exigir es que el centro de control siga cabiendo
+        // y siendo cómodo **con cualquiera de ellos**. Un estilo que se pasara de acolchado
+        // dejaría las cuatro acciones rápidas apretadas, y eso se caza aquí sin que nadie se
+        // acuerde de volver.
+        foreach (var e in Estilos.Todos)
+        {
+            Vale(e.Dentro <= 16, $"«{e.Nombre}»: las tarjetas no son acolchadas ({e.Dentro})");
+            Vale(e.Hueco <= 12,
+                 $"«{e.Nombre}»: ni se separan tanto que parezcan botones sueltos ({e.Hueco})");
 
-        // Cuatro acciones en el ancho del centro dan un botón de tamaño cómodo y no una
-        // tira de iconos perdidos: es lo que se pidió de la rejilla.
-        double porAccion = (MainWindow.AnchoDelCentro - 2 * MainWindow.DentroCard - 24) / 4;
-        Vale(porAccion >= 60 && porAccion <= 130,
-             $"cada acción rápida mide {porAccion:0} px de ancho: ni diminuta ni desperdigada");
+            // Cuatro acciones en el ancho del centro dan un botón cómodo y no una tira de
+            // iconos perdidos: es lo que se pidió de la rejilla.
+            double porAccion = (MainWindow.AnchoDelCentro - 2 * e.Dentro - 24) / 4;
+            Vale(porAccion >= 60 && porAccion <= 130,
+                 $"«{e.Nombre}»: cada acción rápida mide {porAccion:0} px: ni diminuta ni desperdigada");
 
-        // Y dos métricas lado a lado caben sin quedarse anchas
-        double porMetrica = (MainWindow.AnchoDelCentro - 2 * MainWindow.DentroCard) / 2;
-        Vale(porMetrica >= 140 && porMetrica <= 240,
-             $"cada métrica mide {porMetrica:0} px: no se queda con sitio de sobra");
+            // Y dos métricas lado a lado caben sin quedarse anchas.
+            double porMetrica = (MainWindow.AnchoDelCentro - 2 * e.Dentro) / 2;
+            Vale(porMetrica >= 140 && porMetrica <= 240,
+                 $"«{e.Nombre}»: cada métrica mide {porMetrica:0} px: no se queda con sitio de sobra");
+        }
     }
 
     // ================= C5.6: el deslizador no se queda agarrado =================
@@ -3640,6 +3809,21 @@ public static class Pruebas
             Igual(255, (int)r.SuperficieSolida.A, $"[{t.Nombre}] la superficie sólida es opaca");
             Igual(255, (int)r.SuperficieAltaSolida.A, $"[{t.Nombre}] y la levantada también");
             Igual(255, (int)r.FondoOpaco.A, $"[{t.Nombre}] y el fondo del panel");
+
+            // ---------- Y por qué `FondoOpaco` no es `Tema.Fondo` ----------
+            //
+            // Porque el del tema PUEDE traer alfa, y de hecho el de serie lo trae
+            // (`#E6000000`). Ese alfa es deliberado para la ISLA —se quiere ver un poco el
+            // escritorio por detrás— y es justo lo que no se quiere dentro de un panel, donde
+            // dos capas translúcidas seguidas dejan pasar lo que haya al fondo.
+            //
+            // Por eso son dos colores y no uno, y por eso `PanelShell` usa el opaco.
+            Vale(MainWindow.EsShellOpaco(new Border { Background = new SolidColorBrush(r.FondoOpaco) }),
+                 $"[{t.Nombre}] el fondo opaco vale como raíz de un panel flotante");
+
+            if (fondo.A < 255)
+                Vale(!MainWindow.EsShellOpaco(new Border { Background = new SolidColorBrush(fondo) }),
+                     $"[{t.Nombre}] y el del tema, con alfa, NO vale como raíz de un panel");
         }
     }
 
@@ -4089,5 +4273,2918 @@ public static class Pruebas
         Igual("Steam [hwnd:1/uid:1]", F("hwnd:1/uid:1", "Steam").ToString(), "la ficha se lee");
         Igual("Steam [hwnd:1/uid:1] (oculto)", F("hwnd:1/uid:1", "Steam", true).ToString(),
               "y dice si el icono está en los ocultos");
+    }
+    // ================= D0: el contrato de seguridad de NubeHypr =================
+    //
+    // D0 no organiza ninguna ventana. Lo que deja es el cortafuegos, y es eso lo que se
+    // comprueba aquí: que la capa nace apagada, que no se puede encender por accidente,
+    // que sabe lo que no debe tocar, que una notificación atrasada no gana y que apagada
+    // no mueve nada.
+
+    static void HyprNaceApagado()
+    {
+        Grupo("D0: la capa nace apagada y no se enciende por accidente");
+
+        // ---------- `Activo = false` manda sobre todo lo demás ----------
+        //
+        // Una configuración vieja, editada a mano o traída de otro equipo no puede
+        // encender esto, y menos ponerlo a mover ventanas. Por eso se comprueba contra
+        // TODOS los modos, incluido el que aplica.
+        foreach (var modo in new[] { "simulacion", "aplicar", "apagado", "lo que sea", "", null })
+            Igual(NubeHypr.Modo.Apagado, NubeHypr.ModoEfectivo(false, modo),
+                  $"apagado con Modo=«{modo ?? "null"}» sigue apagado");
+
+        // ---------- Encendida, lo desconocido cae en SIMULACIÓN ----------
+        //
+        // Nunca en aplicar. Si el fichero dice algo que no entendemos, lo que toca es
+        // calcular y apuntar, no empezar a mover las ventanas de alguien por si acaso.
+        foreach (var modo in new[] { "lo que sea", "", "APLICAR?", "simulación", null })
+            Igual(NubeHypr.Modo.Simulacion, NubeHypr.ModoEfectivo(true, modo),
+                  $"encendida con Modo=«{modo ?? "null"}» calcula pero no aplica");
+
+        // Y los tres modos buenos se leen, con mayúsculas y espacios de más
+        Igual(NubeHypr.Modo.Simulacion, NubeHypr.ModoEfectivo(true, "simulacion"), "simulacion");
+        Igual(NubeHypr.Modo.Aplicar, NubeHypr.ModoEfectivo(true, "aplicar"), "aplicar");
+        Igual(NubeHypr.Modo.Aplicar, NubeHypr.ModoEfectivo(true, "  APLICAR  "), "aplicar, con ruido");
+        Igual(NubeHypr.Modo.Apagado, NubeHypr.ModoEfectivo(true, "apagado"),
+              "encendida pero en modo apagado: apagada");
+
+        // Lo que se reconoce y lo que no, para poder avisar en el log en vez de callarse
+        Vale(NubeHypr.ModoConocido("simulacion") && NubeHypr.ModoConocido("aplicar") &&
+             NubeHypr.ModoConocido("apagado"), "los tres modos se reconocen");
+        Vale(!NubeHypr.ModoConocido("turbo") && !NubeHypr.ModoConocido(null) &&
+             !NubeHypr.ModoConocido(""), "y lo demás no, para poder avisarlo");
+
+        // ---------- Y de serie, en el objeto de configuración ----------
+        var opc = new OpcionesHypr();
+        Vale(!opc.Activo, "la sección de configuración nace con Activo=false");
+        Igual("simulacion", opc.Modo, "y en simulación, no en aplicar");
+        Igual(NubeHypr.Modo.Apagado, NubeHypr.ModoEfectivo(opc.Activo, opc.Modo),
+              "así que de serie la capa está apagada");
+        Igual(0, opc.Reglas.Count, "sin reglas de serie");
+        Igual(0, opc.Atajos.Count, "sin atajos de serie");
+        Igual(0, opc.Espacios.Count, "sin espacios de serie");
+        Vale(opc.Gap is >= 0 and <= 200 && opc.Margen is >= 0 and <= 200,
+             "y con huecos razonables");
+    }
+
+    static void HyprLoQueNoSeToca()
+    {
+        Grupo("D0: lo que no se puede organizar, y por qué");
+
+        // Una ventana normal sí se puede
+        Vale(NubeHypr.SePuedeOrganizar(@"C:\Windows\notepad.exe", "Notepad", false, true, true, out var p),
+             "una ventana normal se puede organizar");
+        Igual("", p, "y sin motivo de descarte");
+
+        // ---------- Las nuestras ----------
+        Vale(!NubeHypr.SePuedeOrganizar(@"C:\x\NubeBar.exe", "Window", true, true, true, out p),
+             "una ventana nuestra no se toca");
+        Igual(NubeHypr.PorqueNuestra, p, "y se dice que es nuestra");
+        // Aunque no se sepa que es nuestra, el proceso la delata
+        Vale(!NubeHypr.SePuedeOrganizar(@"C:\x\NubeBar.exe", "Window", false, true, true, out _),
+             "y por el nombre del proceso también");
+
+        // ---------- El shell ----------
+        foreach (var exe in new[] { "explorer.exe", "StartMenuExperienceHost.exe", "SearchHost.exe",
+                                    "ShellExperienceHost.exe", "consent.exe", "LockApp.exe", "dwm.exe" })
+        {
+            Vale(!NubeHypr.SePuedeOrganizar(exe, "Window", false, true, true, out var q),
+                 $"{exe} no se organiza");
+            Igual(NubeHypr.PorqueSistema, q, $"y es por ser del sistema ({exe})");
+        }
+
+        // ---------- El fondo animado ----------
+        //
+        // Aparte, porque el síntoma es muy distinto: no es "una ventana del sistema", es
+        // "el escritorio se queda negro".
+        foreach (var exe in new[] { @"C:\Steam\wallpaper32.exe", "wallpaper64.exe" })
+        {
+            Vale(!NubeHypr.SePuedeOrganizar(exe, "Window", false, true, true, out var q),
+                 $"{exe} no se organiza");
+            Igual(NubeHypr.PorqueFondo, q, "y se dice que es el fondo del escritorio");
+        }
+
+        // ---------- Las clases del escritorio y del conmutador ----------
+        foreach (var clase in new[] { "Progman", "WorkerW", "Shell_TrayWnd",
+                                      "MultitaskingViewFrame", "XamlExplorerHostIslandWindow" })
+            Vale(!NubeHypr.SePuedeOrganizar("app.exe", clase, false, true, true, out _),
+                 $"la clase {clase} no se organiza");
+
+        // ---------- Lo que Windows no nos deja ----------
+        Vale(!NubeHypr.SePuedeOrganizar("app.exe", "Window", false, sePuedeActivar: false, true, out p),
+             "una ventana elevada no se organiza");
+        Igual(NubeHypr.PorqueElevada, p, "y se dice que es por los permisos");
+
+        Vale(!NubeHypr.SePuedeOrganizar("app.exe", "Window", false, true, rectValido: false, out p),
+             "una ventana sin rectángulo válido no se organiza");
+        Igual(NubeHypr.PorqueSinSitio, p, "y se dice por qué");
+
+        // ---------- Sin datos no se adivina ----------
+        //
+        // Muchas ventanas no dejan leer su ejecutable. Eso NO las convierte en
+        // protegidas: se juzgan por lo demás. Negarse a mover todo lo que no se puede
+        // identificar dejaría la capa sin hacer nada en media sesión.
+        Vale(NubeHypr.SePuedeOrganizar(null, "Window", false, true, true, out _),
+             "sin nombre de ejecutable, se juzga por lo demás");
+        Vale(NubeHypr.SePuedeOrganizar("", "", false, true, true, out _),
+             "y con los datos vacíos tampoco se inventa un motivo");
+
+        // El orden importa: lo nuestro se mira primero, para que el motivo sea el útil
+        Vale(!NubeHypr.SePuedeOrganizar("explorer.exe", "Progman", true, false, false, out p),
+             "con varios motivos a la vez, se descarta");
+        Igual(NubeHypr.PorqueNuestra, p, "y gana el más informativo: que es nuestra");
+
+        // El nombre del proceso, sin ruta y sin extensión
+        Igual("wallpaper64", NubeHypr.NombreDeProceso(@"C:\Program Files\x\wallpaper64.exe"),
+              "el nombre sale de la ruta");
+        Igual("notepad", NubeHypr.NombreDeProceso("notepad.exe"), "y sin ruta también");
+        Igual("", NubeHypr.NombreDeProceso(null), "null da vacío");
+        Igual("", NubeHypr.NombreDeProceso("   "), "y los espacios también");
+
+        // La lista es consultable: es un entregable de D0, no un detalle privado
+        Vale(NubeHypr.Protegidos.Count >= 10, $"la lista de procesos protegidos existe ({NubeHypr.Protegidos.Count})");
+        Vale(NubeHypr.ClasesProtegidasVisibles.Count >= 5,
+             $"y la de clases ({NubeHypr.ClasesProtegidasVisibles.Count})");
+    }
+
+    static void HyprCicloYVersiones()
+    {
+        Grupo("D0: una notificación atrasada no gana");
+
+        NubeHypr.OlvidarVersion();
+
+        // Las versiones suben, y la última es la que vale
+        long a = NubeHypr.SiguienteVersion();
+        long b = NubeHypr.SiguienteVersion();
+        long c = NubeHypr.SiguienteVersion();
+        Vale(a < b && b < c, $"las versiones suben ({a} < {b} < {c})");
+        Igual(c, NubeHypr.UltimaVersion, "y la última es la última");
+
+        // ---------- La regla que evita el parpadeo ----------
+        //
+        // Es el mismo fallo que hizo parpadear la vista general: recolocar la isla
+        // disparaba un evento sobre nuestra propia ventana que pedía refrescar, que
+        // recolocaba la isla. Esta vez la regla está escrita antes de que ocurra.
+        Vale(NubeHypr.EsVieja(a), "una versión de antes es vieja");
+        Vale(NubeHypr.EsVieja(b), "la anterior también");
+        Vale(!NubeHypr.EsVieja(c), "y la última no");
+        Vale(NubeHypr.EsVieja(c + 1), "una versión del futuro tampoco vale: solo la última");
+
+        // Un snapshot nuevo invalida al anterior, sin excepciones
+        long d = NubeHypr.SiguienteVersion();
+        Vale(NubeHypr.EsVieja(c), "al llegar uno nuevo, el de antes queda viejo");
+        Vale(!NubeHypr.EsVieja(d), "y el nuevo es el que manda");
+
+        // ---------- Las trazas, con el formato de la especificación ----------
+        //
+        // Se comprueban al pie de la letra para que un log de una sesión se pueda leer
+        // con el documento al lado.
+        Igual("[D2]  snapshot=184 ventanas=12 foco=0x000A92",
+              NubeHypr.LineaSnapshot(184, 12, (IntPtr)0x000A92), "la línea del snapshot");
+        Igual("[D2]  policy=split-main target=monitor:1 rect=1280,0,1280,720",
+              NubeHypr.LineaPolitica("split-main", 1, new NubeHypr.Rect(1280, 0, 1280, 720)),
+              "la de la política");
+        Igual("[D2]  apply hwnd=0x000B15 result=ok elapsed=3.4ms",
+              NubeHypr.LineaAplicar((IntPtr)0x000B15, "ok", 3.4), "la de aplicar");
+        Igual("[D2]  confirm version=184 moved=1 skipped=2 stale=0",
+              NubeHypr.LineaConfirmar(184, 1, 2, 0), "la de confirmar");
+        Igual("[D3]  gesture=resize state=clean reason=button-released",
+              NubeHypr.LineaGesto("resize", "clean", "button-released"), "la del gesto");
+        Igual("[D7]  safe-mode=false adapter=ready config-version=7",
+              NubeHypr.LineaSalud(false, true, 7), "la de salud");
+
+        // El decimal no depende del idioma del equipo: con la coma española, un log se
+        // volvería ilegible para cualquier herramienta
+        Vale(NubeHypr.LineaAplicar((IntPtr)1, "ok", 3.5).Contains("3.5"),
+             "el decimal va con punto, no con la coma del sistema");
+    }
+
+    static void HyprGeometriaDeclarada()
+    {
+        Grupo("D0: la geometría se declara, no se adivina");
+
+        var r = new NubeHypr.Rect(100, 200, 800, 600);
+        Igual(900.0, r.Derecha, "la derecha");
+        Igual(800.0, r.Abajo, "y el bajo");
+        Vale(r.Valido, "un rectángulo con tamaño es válido");
+        Vale(!new NubeHypr.Rect(0, 0, 0, 600).Valido, "sin ancho no");
+        Vale(!new NubeHypr.Rect(0, 0, 800, 0).Valido, "sin alto tampoco");
+        Vale(!NubeHypr.Rect.Nada.Valido, "y el vacío no es válido");
+        Igual("100,200,800,600", r.ToString(), "se lee como en el log");
+
+        // ---------- Dentro del área, con tolerancia de un píxel ----------
+        //
+        // La tolerancia no es pereza: repartir columnas con redondeo deja diferencias de
+        // medio píxel, y una comprobación exacta las convertiría en falsos fallos.
+        var area = new NubeHypr.Rect(0, 0, 1920, 1080);
+        Vale(new NubeHypr.Rect(0, 0, 1920, 1080).DentroDe(area), "el área cabe en sí misma");
+        Vale(new NubeHypr.Rect(10, 10, 100, 100).DentroDe(area), "y algo pequeño dentro");
+        Vale(new NubeHypr.Rect(-0.5, 0, 1920, 1080).DentroDe(area), "medio píxel fuera se tolera");
+        Vale(!new NubeHypr.Rect(-20, 0, 1920, 1080).DentroDe(area), "veinte píxeles fuera, no");
+        Vale(!new NubeHypr.Rect(0, 0, 1921, 1080).DentroDe(area, 0.5), "ni pasarse por la derecha");
+
+        // Monitores con origen negativo: el segundo monitor a la izquierda del principal
+        var izquierda = new NubeHypr.Rect(-1920, 0, 1920, 1080);
+        Vale(new NubeHypr.Rect(-1920, 0, 960, 1080).DentroDe(izquierda),
+             "media pantalla de un monitor con origen negativo cabe en él");
+        Vale(!new NubeHypr.Rect(0, 0, 960, 1080).DentroDe(izquierda),
+             "y lo que está en el otro monitor, no");
+
+        Vale(r.CasiIgual(new NubeHypr.Rect(100.4, 200, 800, 600)), "medio píxel es el mismo sitio");
+        Vale(!r.CasiIgual(new NubeHypr.Rect(140, 200, 800, 600)), "cuarenta píxeles no");
+    }
+
+    static void HyprApagadoNoMueveNada()
+    {
+        Grupo("D0: apagado, no se mueve ni una ventana");
+
+        // La prueba que pide D0: "comparativa de geometría antes y después en modo
+        // apagado". Dicho de otro modo: con el interruptor puesto pero el modo apagado,
+        // ninguna ventana puede haberse movido.
+        var antes = new List<(IntPtr, string, NubeHypr.Rect)>
+        {
+            ((IntPtr)1, "code",     new NubeHypr.Rect(0, 0, 960, 1080)),
+            ((IntPtr)2, "firefox",  new NubeHypr.Rect(960, 0, 960, 1080)),
+            ((IntPtr)3, "explorer", new NubeHypr.Rect(100, 100, 800, 600)),
+        };
+
+        // Nada se movió
+        Igual(0, NubeHypr.Comparar(antes, antes).Count, "la misma foto dos veces: cero divergencias");
+
+        // Una se movió: se caza y se dice cuál, de dónde a dónde
+        var movida = new List<(IntPtr, string, NubeHypr.Rect)>(antes);
+        movida[1] = ((IntPtr)2, "firefox", new NubeHypr.Rect(960, 0, 480, 1080));
+        var d = NubeHypr.Comparar(antes, movida);
+        Igual(1, d.Count, "una ventana movida es una divergencia");
+        Igual((IntPtr)2, d[0].Hwnd, "y se sabe cuál");
+        Vale(d[0].ToString().Contains("firefox") && d[0].ToString().Contains("->"),
+             $"y se lee de dónde a dónde ({d[0]})");
+
+        // ---------- Lo que NO es una regresión ----------
+        //
+        // Si confundiéramos esto con un fallo, la prueba fallaría sola en cualquier
+        // equipo: entre dos fotos siempre se abre o se cierra algo.
+        var sinLaTercera = antes.Take(2).ToList();
+        Igual(0, NubeHypr.Comparar(antes, sinLaTercera).Count,
+              "una ventana que se cerró entre las dos fotos no es una regresión");
+
+        var conUnaNueva = new List<(IntPtr, string, NubeHypr.Rect)>(antes)
+            { ((IntPtr)4, "nueva", new NubeHypr.Rect(0, 0, 100, 100)) };
+        Igual(0, NubeHypr.Comparar(antes, conUnaNueva).Count,
+              "y una que se abrió, tampoco");
+
+        // Medio píxel de diferencia no es un movimiento
+        var redondeada = new List<(IntPtr, string, NubeHypr.Rect)>(antes);
+        redondeada[0] = ((IntPtr)1, "code", new NubeHypr.Rect(0.4, 0, 960, 1080));
+        Igual(0, NubeHypr.Comparar(antes, redondeada).Count, "medio píxel no es moverse");
+        Igual(1, NubeHypr.Comparar(antes, redondeada, tolerancia: 0.1).Count,
+              "pero con la tolerancia apretada sí se ve");
+
+        // Las dos listas vacías: no hay nada que comparar y no revienta
+        var vacia = new List<(IntPtr, string, NubeHypr.Rect)>();
+        Igual(0, NubeHypr.Comparar(vacia, vacia).Count, "dos listas vacías dan cero");
+        Igual(0, NubeHypr.Comparar(vacia, antes).Count, "de vacío a tres, nada que comparar");
+    }
+
+    static void HyprMigracionV4()
+    {
+        Grupo("D0: la migración declara la capa y no la enciende");
+
+        Igual(4, Esquema.Actual, "el esquema va por la versión 4");
+
+        // Un config de la v3 al migrar: aparece la sección, apagada
+        var v3 = new JsonObject
+        {
+            ["Version"] = 3,
+            ["Tema"] = new JsonObject { ["Fondo"] = "#FF000000" },
+            ["Fondo"] = new JsonObject { ["Tipo"] = "ninguno" },
+        };
+        Vale(!Esquema.ActivoAntes(v3), "antes de migrar no había capa encendida");
+
+        var r = Esquema.Migrar(v3);
+        Igual(4, r.Hasta, "se migra a la 4");
+        Vale(r.Cambio, "y el fichero cambia");
+        Vale(v3["NubeHypr"] is JsonObject, "la sección NubeHypr aparece");
+        Igual(false, v3["NubeHypr"]!["Activo"]!.GetValue<bool>(), "APAGADA");
+        Igual("simulacion", v3["NubeHypr"]!["Modo"]!.GetValue<string>(),
+              "y en simulación: si alguien pone Activo a mano, calcula pero no mueve");
+        Vale(v3["NubeHypr"]!["Atajos"] is JsonObject, "con sus atajos vacíos");
+        Vale(v3["NubeHypr"]!["Reglas"] is JsonArray, "sus reglas vacías");
+        Vale(!Esquema.ActivoAntes(v3), "y después de migrar sigue apagada");
+
+        // ---------- Y las tres que ya no se escriben ----------
+        //
+        // Esta prueba exigía `Espacios` —un `List<string>` que **no lee nadie** en todo el
+        // producto—. Exigir que una clave muerta se escriba en el fichero del usuario es
+        // blindar justo lo que había que quitar, así que ahora se exige lo contrario.
+        //
+        // Cuidado al comprobarlo a mano: `HyprLayout` lee un `Espacios` que NO es éste —es
+        // `EstadoNubeHypr.Espacios`, el del estado en marcha—, así que un `grep` del nombre
+        // a secas dice que se usa. Lo que sale a cero es `_cfg.NubeHypr.Espacios`.
+        Vale(v3["NubeHypr"]!["Espacios"] == null,
+             "«Espacios» ya no se escribe: no la lee nadie");
+        Vale(v3["NubeHypr"]!["EspacioInicial"] == null,
+             "ni «EspacioInicial»");
+        Vale(v3["NubeHypr"]!["MostrarPrevisualizacion"] == null,
+             "ni «MostrarPrevisualizacion»");
+
+        // Pero las que SÍ significan algo siguen estando, que es la otra mitad: dejar de
+        // escribir las muertas no puede llevarse por delante las vivas.
+        Vale(v3["NubeHypr"]!["ConfirmarMovimientos"] != null,
+             "y «ConfirmarMovimientos» sigue, que desde D9.7 hace algo de verdad");
+        Vale(v3["NubeHypr"]!["Gap"] != null, "y «Gap», que tiene deslizador");
+
+        // Lo que ya había no se toca
+        var conLoSuyo = new JsonObject
+        {
+            ["Version"] = 3,
+            ["NubeHypr"] = new JsonObject { ["Gap"] = 20, ["Layout"] = "flotante" },
+        };
+        Esquema.Migrar(conLoSuyo);
+        Igual(20, conLoSuyo["NubeHypr"]!["Gap"]!.GetValue<int>(), "un Gap puesto a mano se conserva");
+        Igual("flotante", conLoSuyo["NubeHypr"]!["Layout"]!.GetValue<string>(), "y el layout elegido");
+        Igual(false, conLoSuyo["NubeHypr"]!["Activo"]!.GetValue<bool>(),
+              "y lo que faltaba se rellena apagado");
+
+        // ---------- Y si el usuario la tenía encendida, no se la apagamos ----------
+        //
+        // El contrato es "la migración no la enciende", no "la migración decide por ti".
+        var encendida = new JsonObject
+        {
+            ["Version"] = 3,
+            ["NubeHypr"] = new JsonObject { ["Activo"] = true, ["Modo"] = "aplicar" },
+        };
+        Vale(Esquema.ActivoAntes(encendida), "venía encendida");
+        Esquema.Migrar(encendida);
+        Igual(true, encendida["NubeHypr"]!["Activo"]!.GetValue<bool>(),
+              "y sigue encendida: era su decisión, no la nuestra");
+
+        // Migrar dos veces no cambia nada la segunda
+        var dosVeces = new JsonObject { ["Version"] = 3 };
+        Esquema.Migrar(dosVeces);
+        var segunda = Esquema.Migrar(dosVeces);
+        Vale(!segunda.Cambio, "migrar un fichero ya migrado no lo toca");
+
+        // Desde la v1, pasando por todas: la capa también acaba declarada y apagada
+        var v1 = new JsonObject { ["Tema"] = new JsonObject() };
+        var largo = Esquema.Migrar(v1);
+        Igual(4, largo.Hasta, "desde un config sin versión se llega a la 4");
+        Igual(3, largo.Aplicadas.Count, "con las tres migraciones");
+        Igual(false, v1["NubeHypr"]!["Activo"]!.GetValue<bool>(), "y la capa acaba apagada");
+
+        // ---------- La validación ----------
+        Vale(Esquema.Mal(v3, 0) == null, "un árbol migrado bien no da queja");
+
+        var modoRaro = new JsonObject
+        {
+            ["Version"] = 4,
+            ["NubeHypr"] = new JsonObject { ["Modo"] = "turbo" },
+        };
+        Vale(Esquema.Mal(modoRaro, 0)?.Contains("no es un modo conocido") == true,
+             $"un modo desconocido se rechaza al escribir ({Esquema.Mal(modoRaro, 0)})");
+
+        var gapAbsurdo = new JsonObject
+        {
+            ["Version"] = 4,
+            ["NubeHypr"] = new JsonObject { ["Gap"] = 4000 },
+        };
+        Vale(gapAbsurdo is not null && Esquema.Mal(gapAbsurdo, 0)?.Contains("Gap") == true,
+             "un Gap de 4000 se rechaza: con el motor en marcha dejaría las ventanas fuera");
+
+        var margenNegativo = new JsonObject
+        {
+            ["Version"] = 4,
+            ["NubeHypr"] = new JsonObject { ["Margen"] = -5 },
+        };
+        Vale(Esquema.Mal(margenNegativo, 0)?.Contains("Margen") == true, "y un margen negativo");
+
+        // Un modo ausente no es un error: significa "no elegido"
+        var sinModo = new JsonObject { ["Version"] = 4, ["NubeHypr"] = new JsonObject() };
+        Vale(Esquema.Mal(sinModo, 0) == null, "una sección a medias no es un error de validación");
+    }
+    static void HyprDiagnosticoNoEscribe()
+    {
+        Grupo("D0: un diagnóstico no escribe en la configuración");
+
+        // ---------- El fallo que esto fija ----------
+        //
+        // Ejecutar un binario de desarrollo con un esquema más nuevo migró el config REAL
+        // del usuario a una versión que su NubeBar instalada ya no sabía migrar, y le
+        // dejaba un error en cada arranque. Y no lo hizo la migración: lo hizo un guardado
+        // rutinario del arranque, porque el modelo tipado lleva `Version = Esquema.Actual`
+        // y cualquier escritura sube la versión del fichero.
+        //
+        // Así que la regla es de brocha gorda a propósito: mientras corre una herramienta
+        // de medida, NO se escribe el config. Ni la migración, ni los módulos de serie, ni
+        // el orden de las apps.
+        var carpeta = Path.Combine(Path.GetTempPath(), "nubebar-solo-lectura-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(carpeta);
+        var ruta = Path.Combine(carpeta, "config.json");
+        bool antes = Config.SoloLectura;
+        try
+        {
+            const string original = "{\"Version\": 3, \"Tema\": {\"Fondo\": \"#FF000000\"}}";
+            File.WriteAllText(ruta, original);
+
+            // ---------- La decisión, que es lo comprobable ----------
+            //
+            // No se puede probar escribiendo en el config de verdad para ver si se
+            // protege: eso es exactamente lo que no se puede hacer. Lo que se prueba es
+            // la función que decide.
+            Config.SoloLectura = true;
+            Vale(ConfigArbol.NoSeDebeGuardar(Config.Ruta),
+                 "con una herramienta en marcha, el config del usuario NO se guarda");
+            Vale(!ConfigArbol.NoSeDebeGuardar(ruta),
+                 "pero un árbol en una carpeta temporal sí: las pruebas tienen que poder");
+            Config.SoloLectura = false;
+            Vale(!ConfigArbol.NoSeDebeGuardar(Config.Ruta),
+                 "y sin herramienta, el config se guarda como siempre");
+
+            // Y el guardado de un temporal funciona con el guardia puesto
+            Config.SoloLectura = true;
+            var arbol = ConfigArbol.Cargar(ruta);
+            arbol.Poner("Tema", "Fondo", "#FF112233");
+            arbol.Guardar();
+            Vale(File.ReadAllText(ruta).Contains("#FF112233"),
+                 "un árbol temporal se escribe aunque haya un diagnóstico en marcha");
+
+            // Sin el guardia, sí: si esto fallara, el guardia habría roto el guardado normal
+            Config.SoloLectura = false;
+            var arbol2 = ConfigArbol.Cargar(ruta);
+            arbol2.Poner("Tema", "Fondo", "#FFFFFFFF");
+            arbol2.Guardar();
+            Vale(File.ReadAllText(ruta).Contains("#FFFFFFFF"),
+                 "y sin diagnóstico, guardar escribe como siempre");
+
+            // Y el fichero sigue siendo JSON válido después de las dos
+            Vale(JsonNode.Parse(File.ReadAllText(ruta)) is JsonObject,
+                 "el fichero sigue siendo JSON válido");
+        }
+        finally
+        {
+            Config.SoloLectura = antes;
+            try { Directory.Delete(carpeta, true); } catch { }
+        }
+    }
+    // ================= D1: el modelo puro de layouts y comandos =================
+    //
+    // Ni una ventana real. Lo que se comprueba aquí es la parte que decide, y se comprueba
+    // con los casos que en una pantalla no se tienen a mano: cero ventanas, cien, un
+    // monitor con origen negativo, el DPI al 200 %, un área más pequeña que el mínimo.
+
+    static VentanaModelo V(long h, int esp = 0, bool flot = false, bool min = false,
+                           bool max = false, bool vis = true, double x = 0, double y = 0,
+                           double w = 400, double alto = 300, string proc = "app") =>
+        new((IntPtr)h, proc, "t" + h, new NubeHypr.Rect(x, y, w, alto), vis, min, max, flot, esp);
+
+    static EstadoNubeHypr Est(params VentanaModelo[] v) =>
+        EstadoNubeHypr.Vacio with { Ventanas = v.ToList(), Foco = v.Length > 0 ? v[0].Hwnd : IntPtr.Zero };
+
+    static void D1AreaUtil()
+    {
+        Grupo("D1: el área útil de un monitor");
+
+        var mon = new NubeHypr.Rect(0, 0, 1920, 1080);
+
+        // La barra se descuenta solo por SU borde, y el margen después, por los cuatro
+        var arriba = NubeHypr.AreaUtil(mon, NubeHypr.Borde.Arriba, 54, 12);
+        Igual(12.0, arriba.X, "con la barra arriba, el margen izquierdo es el margen");
+        Igual(66.0, arriba.Y, "y arriba se suman la barra y el margen");
+        Igual(1896.0, arriba.Ancho, "el ancho pierde los dos márgenes");
+        Igual(1002.0, arriba.Alto, "y el alto, la barra y los dos márgenes");
+
+        var abajo = NubeHypr.AreaUtil(mon, NubeHypr.Borde.Abajo, 54, 12);
+        Igual(12.0, abajo.Y, "con la barra abajo, arriba solo hay margen");
+        Igual(1002.0, abajo.Alto, "y el alto es el mismo que con la barra arriba");
+        Vale(abajo.Abajo <= mon.Abajo, "sin salirse por abajo");
+
+        var izq = NubeHypr.AreaUtil(mon, NubeHypr.Borde.Izquierda, 56, 8);
+        Igual(64.0, izq.X, "con la barra a la izquierda se suman barra y margen");
+        Igual(1848.0, izq.Ancho, "y el ancho pierde la barra y los dos márgenes");
+        Igual(1064.0, izq.Alto, "el alto solo pierde los márgenes");
+
+        var der = NubeHypr.AreaUtil(mon, NubeHypr.Borde.Derecha, 56, 8);
+        Igual(8.0, der.X, "con la barra a la derecha, la izquierda solo tiene margen");
+        Vale(der.Derecha <= mon.Derecha - 56, "y el área acaba antes de la barra");
+
+        // Sin reserva —NubeBar flotando sobre las ventanas— el área es la pantalla menos
+        // el margen: las ventanas pasan por debajo de la isla a propósito
+        var sinReserva = NubeHypr.AreaUtil(mon, NubeHypr.Borde.Arriba, 0, 12);
+        Igual(12.0, sinReserva.Y, "sin reserva, arriba solo hay margen");
+        Igual(1056.0, sinReserva.Alto, "y el alto es la pantalla menos los márgenes");
+
+        // ---------- Monitores con origen negativo ----------
+        //
+        // El segundo monitor a la izquierda del principal tiene X negativa. Es el caso que
+        // rompe cualquier cuenta escrita suponiendo que la pantalla empieza en cero.
+        var zurdo = new NubeHypr.Rect(-1920, 0, 1920, 1080);
+        var aZurdo = NubeHypr.AreaUtil(zurdo, NubeHypr.Borde.Arriba, 54, 12);
+        Igual(-1908.0, aZurdo.X, "un monitor con origen negativo mantiene su origen");
+        Vale(aZurdo.DentroDe(zurdo), "y su área cabe dentro de él");
+
+        var arriba_izq = new NubeHypr.Rect(-1920, -1080, 1920, 1080);
+        Vale(NubeHypr.AreaUtil(arriba_izq, NubeHypr.Borde.Abajo, 54, 12).DentroDe(arriba_izq),
+             "y con las dos coordenadas negativas, también");
+
+        // ---------- Lo que no da área ----------
+        Igual(NubeHypr.Rect.Nada, NubeHypr.AreaUtil(new NubeHypr.Rect(0, 0, 100, 100),
+                                                    NubeHypr.Borde.Arriba, 54, 40),
+              "una pantalla diminuta con barra gruesa y mucho margen no da área");
+        Vale(!NubeHypr.AreaUtil(mon, NubeHypr.Borde.Arriba, 2000, 0).Valido,
+             "ni una barra más gruesa que la pantalla");
+        Vale(NubeHypr.AreaUtil(mon, NubeHypr.Borde.Arriba, -50, -10).Valido,
+             "y los negativos se tratan como cero, no como un área rota");
+
+        // ---------- DPI ----------
+        //
+        // El modelo trabaja en píxeles de pantalla, así que el DPI entra como un monitor
+        // de otro tamaño. Lo que se comprueba es que la cuenta vale para los cuatro.
+        foreach (var (w, h, que) in new[]
+        {
+            (1920.0, 1080.0, "1080p al 100 %"), (1536.0, 864.0, "1080p al 125 %"),
+            (1280.0, 720.0, "1080p al 150 %"), (960.0, 540.0, "1080p al 200 %"),
+            (2560.0, 1440.0, "1440p"), (3840.0, 2160.0, "4K"),
+        })
+        {
+            var m = new NubeHypr.Rect(0, 0, w, h);
+            var a = NubeHypr.AreaUtil(m, NubeHypr.Borde.Arriba, 54, 12);
+            Vale(a.Valido, $"[{que}] hay área útil");
+            Vale(a.DentroDe(m), $"[{que}] y cabe en el monitor");
+        }
+    }
+
+    static void D1RepartoSinCosturas()
+    {
+        Grupo("D1: el reparto no deja costuras ni se desborda");
+
+        // ---------- El fallo que esto evita ----------
+        //
+        // El reparto obvio —`ancho / n` y colocar en `i * trozo`— deja rayas de un píxel
+        // entre ventanas y la última se pasa del área. Se reparten los BORDES, no los
+        // tamaños, así que los bordes coinciden por construcción.
+        var area = new NubeHypr.Rect(0, 0, 1000, 800);
+
+        foreach (int n in new[] { 1, 2, 3, 5, 7, 11 })
+        {
+            foreach (double hueco in new[] { 0.0, 8.0, 13.0 })
+            {
+                var t = NubeHypr.Tramos(area.X, area.Ancho, n, hueco);
+                Igual(n, t.Count, $"[{n} tramos, hueco {hueco:0}] salen los {n}");
+
+                // Ninguno se sale
+                Vale(t[0].Inicio >= area.X - 0.01,
+                     $"[{n}, {hueco:0}] el primero no empieza antes del área");
+                var ultimo = t[^1];
+                Vale(ultimo.Inicio + ultimo.Tamano <= area.Derecha + 0.01,
+                     $"[{n}, {hueco:0}] el último no se pasa ({ultimo.Inicio + ultimo.Tamano:0} de {area.Derecha:0})");
+
+                // Y entre uno y el siguiente hay exactamente el hueco: ni raya ni solape
+                for (int i = 0; i + 1 < t.Count; i++)
+                {
+                    double separacion = t[i + 1].Inicio - (t[i].Inicio + t[i].Tamano);
+                    Vale(Math.Abs(separacion - hueco) <= 1.01,
+                         $"[{n}, {hueco:0}] entre el {i} y el {i + 1} hay {separacion:0} y toca {hueco:0}");
+                }
+
+                // Todos con tamaño positivo
+                Vale(t.All(x => x.Tamano > 0), $"[{n}, {hueco:0}] ninguno sale de tamaño cero");
+            }
+        }
+
+        // Un hueco más grande que el área: antes de dar tamaños negativos, se queda sin hueco
+        var apretado = NubeHypr.Tramos(0, 100, 5, 500);
+        Igual(5, apretado.Count, "con un hueco imposible siguen saliendo los cinco");
+        Vale(apretado.All(x => x.Tamano >= 0), "y ninguno con tamaño negativo");
+        Vale(apretado[^1].Inicio + apretado[^1].Tamano <= 100.01, "ni se sale del área");
+
+        // Casos de borde
+        Igual(0, NubeHypr.Tramos(0, 1000, 0, 8).Count, "cero tramos son cero");
+        Igual(0, NubeHypr.Tramos(0, 0, 3, 8).Count, "y sin largo tampoco hay tramos");
+        Igual(0, NubeHypr.Tramos(0, 1000, -1, 8).Count, "un número negativo no da tramos");
+
+        // Cuántas caben sin bajar del mínimo
+        Igual(1, NubeHypr.CuantasCaben(200, 8, 120), "en 200 px con mínimo 120 cabe una");
+        Igual(2, NubeHypr.CuantasCaben(248, 8, 120), "en 248 caben dos justas");
+        Igual(1, NubeHypr.CuantasCaben(247, 8, 120), "y en 247 ya no");
+        Igual(0, NubeHypr.CuantasCaben(50, 8, 120), "en 50 no cabe ninguna");
+        Igual(0, NubeHypr.CuantasCaben(-5, 8, 120), "ni en un largo negativo");
+    }
+
+    static void D1LosCuatroLayouts()
+    {
+        Grupo("D1: los cuatro layouts reparten dentro del área");
+
+        var area = new NubeHypr.Rect(100, 50, 1800, 1000);
+        const double hueco = 8;
+
+        foreach (var layout in new[] { NubeHypr.Layout.Horizontal, NubeHypr.Layout.Vertical,
+                                       NubeHypr.Layout.Principal })
+        {
+            // ---------- Una sola ventana ocupa el área entera ----------
+            var una = NubeHypr.Repartir(layout, area, 1, hueco, 0.6);
+            Igual(1, una.Count, $"[{layout}] con una ventana sale un sitio");
+            Vale(una[0].CasiIgual(area), $"[{layout}] y es el área entera");
+
+            // ---------- Y con muchas, ninguna se sale ----------
+            foreach (int n in new[] { 2, 3, 4, 6, 9 })
+            {
+                var sitios = NubeHypr.Repartir(layout, area, n, hueco, 0.6);
+                Vale(sitios.Count > 0, $"[{layout}, {n}] se reparte algo");
+                Vale(sitios.Count <= n, $"[{layout}, {n}] y nunca más sitios que ventanas");
+                foreach (var s in sitios)
+                {
+                    Vale(s.Valido, $"[{layout}, {n}] todos los sitios tienen tamaño");
+                    Vale(s.DentroDe(area), $"[{layout}, {n}] y ninguno se sale del área ({s})");
+                    Vale(s.Ancho >= 1 && s.Alto >= 1, $"[{layout}, {n}] ni degenerado");
+                }
+            }
+        }
+
+        // ---------- Horizontal reparte el ancho y conserva el alto ----------
+        var h3 = NubeHypr.Repartir(NubeHypr.Layout.Horizontal, area, 3, hueco, 0.6);
+        Igual(3, h3.Count, "tres columnas");
+        Vale(h3.All(s => Math.Abs(s.Alto - area.Alto) < 0.01), "todas con el alto del área");
+        Vale(h3.All(s => Math.Abs(s.Y - area.Y) < 0.01), "y empezando arriba");
+        Vale(h3[0].X < h3[1].X && h3[1].X < h3[2].X, "de izquierda a derecha");
+
+        // ---------- Vertical, al revés ----------
+        var v3 = NubeHypr.Repartir(NubeHypr.Layout.Vertical, area, 3, hueco, 0.6);
+        Vale(v3.All(s => Math.Abs(s.Ancho - area.Ancho) < 0.01), "todas con el ancho del área");
+        Vale(v3[0].Y < v3[1].Y && v3[1].Y < v3[2].Y, "de arriba abajo");
+
+        // ---------- Principal: una grande y el resto apiladas ----------
+        var p4 = NubeHypr.Repartir(NubeHypr.Layout.Principal, area, 4, hueco, 0.6);
+        Igual(4, p4.Count, "cuatro sitios");
+        Vale(Math.Abs(p4[0].Alto - area.Alto) < 0.01, "la principal ocupa todo el alto");
+        Vale(p4[0].Ancho > p4[1].Ancho, "y es más ancha que las de la columna");
+        Vale(p4.Skip(1).All(s => Math.Abs(s.X - p4[1].X) < 0.01), "las demás comparten columna");
+        Vale(p4[1].Y < p4[2].Y && p4[2].Y < p4[3].Y, "apiladas de arriba abajo");
+        Vale(Math.Abs(p4[1].X - (p4[0].Derecha + hueco)) < 1.01,
+             "y la columna empieza justo después de la principal, con su hueco");
+
+        // La proporción se respeta y se acota
+        var estrecha = NubeHypr.Repartir(NubeHypr.Layout.Principal, area, 2, hueco, 0.3);
+        var ancha = NubeHypr.Repartir(NubeHypr.Layout.Principal, area, 2, hueco, 0.75);
+        Vale(estrecha[0].Ancho < ancha[0].Ancho, "más proporción, principal más ancha");
+        foreach (var p in new[] { 0.0, -5.0, 0.05, 0.95, 50.0 })
+        {
+            var s = NubeHypr.Repartir(NubeHypr.Layout.Principal, area, 3, hueco, p);
+            Vale(s.All(r => r.DentroDe(area) && r.Ancho >= NubeHypr.MinimoLado - 1),
+                 $"con proporción {p} nadie se sale ni baja del mínimo");
+        }
+
+        // ---------- Flotante no coloca a nadie ----------
+        Igual(0, NubeHypr.Repartir(NubeHypr.Layout.Flotante, area, 5, hueco, 0.6).Count,
+              "el layout flotante no reparte: manda el usuario");
+
+        // ---------- Cero ventanas y áreas imposibles ----------
+        Igual(0, NubeHypr.Repartir(NubeHypr.Layout.Horizontal, area, 0, hueco, 0.6).Count,
+              "cero ventanas, cero sitios");
+        Igual(0, NubeHypr.Repartir(NubeHypr.Layout.Horizontal, NubeHypr.Rect.Nada, 3, hueco, 0.6).Count,
+              "sin área no se reparte nada");
+
+        // ---------- Más ventanas que sitio ----------
+        //
+        // La especificación es clara: antes que repartir entre todas y dar ventanas de
+        // 20 px, mejor no organizar las que no caben.
+        var estrecho = new NubeHypr.Rect(0, 0, 400, 300);
+        var muchas = NubeHypr.Repartir(NubeHypr.Layout.Horizontal, estrecho, 20, 8, 0.6);
+        Vale(muchas.Count < 20, $"en 400 px no caben 20 ventanas: se reparten {muchas.Count}");
+        Vale(muchas.All(s => s.Ancho >= NubeHypr.MinimoLado - 1),
+             "y las que se reparten no bajan del mínimo");
+        Vale(muchas.All(s => s.DentroDe(estrecho)), "ni se salen");
+
+        // Un área en la que no cabe ni una columna del mínimo: principal se cae a vertical
+        var muyEstrecho = new NubeHypr.Rect(0, 0, 200, 900);
+        var pEstrecho = NubeHypr.Repartir(NubeHypr.Layout.Principal, muyEstrecho, 3, 8, 0.6);
+        Vale(pEstrecho.All(s => Math.Abs(s.Ancho - muyEstrecho.Ancho) < 0.01),
+             "si no caben dos columnas, principal reparte en filas");
+        Vale(pEstrecho.All(s => s.DentroDe(muyEstrecho)), "y sin salirse");
+
+        // ---------- Cien ventanas no revientan ----------
+        var cien = NubeHypr.Repartir(NubeHypr.Layout.Principal, new NubeHypr.Rect(0, 0, 3840, 2160),
+                                     100, 8, 0.6);
+        Vale(cien.Count is > 0 and <= 100, $"con cien ventanas se reparten {cien.Count}");
+        Vale(cien.All(s => s.DentroDe(new NubeHypr.Rect(0, 0, 3840, 2160))), "y ninguna se sale");
+    }
+
+    static void D1CalcularYNoMoverLoQueNoToca()
+    {
+        Grupo("D1: quién entra en el reparto y quién se queda");
+
+        var area = new NubeHypr.Rect(0, 0, 1920, 1080);
+
+        // Cero ventanas: cero efectos, y no revienta
+        Igual(0, NubeHypr.Calcular(EstadoNubeHypr.Vacio, area, 8).Count,
+              "sin ventanas no hay efectos");
+
+        // Una normal se coloca
+        var una = NubeHypr.Calcular(Est(V(1)), area, 8);
+        Igual(1, una.Count, "una ventana, un efecto");
+        Igual(TipoEfecto.Colocar, una[0].Tipo, "y es colocarla");
+        Vale(una[0].Destino.CasiIgual(area), "en el área entera");
+
+        // ---------- Lo que NO se enlosa sale con su motivo ----------
+        //
+        // Que salgan en la lista —en vez de desaparecer de ella— es lo que permite que el
+        // log diga por qué no se movió algo, que es la pregunta que se hace siempre.
+        var mezcla = Est(V(1), V(2, min: true), V(3, max: true), V(4, flot: true), V(5, vis: false));
+        var efectos = NubeHypr.Calcular(mezcla, area, 8);
+        Igual(5, efectos.Count, "las cinco salen en la lista");
+        Igual(1, efectos.Count(x => x.Tipo == TipoEfecto.Colocar), "pero solo una se coloca");
+
+        var quedan = efectos.Where(x => x.Tipo == TipoEfecto.SeQueda).ToList();
+        Igual(4, quedan.Count, "y cuatro se quedan");
+        Vale(quedan.All(q => q.Porque.Length > 0), "todas con un motivo escrito");
+        Vale(quedan.Any(q => q.Porque.Contains("minimizada")), "la minimizada lo dice");
+        Vale(quedan.Any(q => q.Porque.Contains("maximizada")), "la maximizada también");
+        Vale(quedan.Any(q => q.Porque.Contains("flotante")), "la flotante también");
+        Vale(quedan.Any(q => q.Porque.Contains("visible")), "y la que no está visible");
+
+        // ---------- Solo el espacio actual ----------
+        var dosEspacios = Est(V(1, esp: 0), V(2, esp: 0), V(3, esp: 1), V(4, esp: 1));
+        var enCero = NubeHypr.Calcular(dosEspacios, area, 8);
+        Igual(2, enCero.Count, "en el espacio 0 solo se miran sus dos ventanas");
+        var enUno = NubeHypr.Calcular(dosEspacios with { EspacioActual = 1 }, area, 8);
+        Igual(2, enUno.Count, "y en el 1, las otras dos");
+        Vale(enUno.All(x => x.Hwnd == (IntPtr)3 || x.Hwnd == (IntPtr)4), "las que son");
+
+        // ---------- El layout flotante no coloca, pero informa ----------
+        var flot = NubeHypr.Calcular(Est(V(1), V(2)) with { Layout = NubeHypr.Layout.Flotante }, area, 8);
+        Igual(0, flot.Count(x => x.Tipo == TipoEfecto.Colocar), "en flotante no se coloca a nadie");
+        Igual(2, flot.Count, "pero las dos salen informadas");
+
+        // ---------- Sin área, nadie se mueve ----------
+        var sinArea = NubeHypr.Calcular(Est(V(1), V(2)), NubeHypr.Rect.Nada, 8);
+        Igual(0, sinArea.Count(x => x.Tipo == TipoEfecto.Colocar), "sin área no se coloca nada");
+        Vale(sinArea.All(x => x.Porque.Contains("área")), "y se dice que es por el área");
+
+        // ---------- Ningún rectángulo sale del área, salvo flotantes ----------
+        //
+        // Es la propiedad que la especificación pide mantener, probada contra una tanda
+        // amplia en vez de contra un caso.
+        foreach (var layout in new[] { NubeHypr.Layout.Horizontal, NubeHypr.Layout.Vertical,
+                                       NubeHypr.Layout.Principal })
+            foreach (int n in new[] { 1, 2, 3, 8, 25 })
+            {
+                var est = EstadoNubeHypr.Vacio with
+                {
+                    Ventanas = Enumerable.Range(1, n).Select(i => V(i)).ToList(),
+                    Layout = layout,
+                };
+                foreach (var ef in NubeHypr.Calcular(est, area, 8).Where(x => x.Tipo == TipoEfecto.Colocar))
+                    Vale(ef.Destino.DentroDe(area),
+                         $"[{layout}, {n}] 0x{ef.Hwnd.ToInt64():X} cae dentro del área");
+            }
+    }
+
+    static void D1AplicarDosVecesNoDeriva()
+    {
+        Grupo("D1: aplicar dos veces no mueve nada nuevo");
+
+        var area = new NubeHypr.Rect(0, 0, 1920, 1080);
+        var est = Est(V(1), V(2), V(3), V(4));
+
+        // ---------- La propiedad de §14.2 ----------
+        //
+        // "Aplicar el mismo estado dos veces no mueve ni reescribe nada." Se comprueba de
+        // la única forma que vale: se calcula, se mete el resultado en el estado —como
+        // haría el adaptador al confirmar— y se vuelve a calcular. Los destinos tienen
+        // que ser los mismos.
+        var primera = NubeHypr.Calcular(est, area, 8);
+        var movidas = est.Ventanas.Select(v =>
+        {
+            var ef = primera.FirstOrDefault(x => x.Hwnd == v.Hwnd && x.Tipo == TipoEfecto.Colocar);
+            return ef == null ? v : v with { Rectangulo = ef.Destino };
+        }).ToList();
+
+        var segunda = NubeHypr.Calcular(est with { Ventanas = movidas }, area, 8);
+        Igual(primera.Count, segunda.Count, "el segundo cálculo da los mismos efectos");
+        for (int i = 0; i < primera.Count; i++)
+        {
+            Igual(primera[i].Hwnd, segunda[i].Hwnd, $"el efecto {i} es de la misma ventana");
+            Vale(primera[i].Destino.CasiIgual(segunda[i].Destino, 0.01),
+                 $"y al mismo sitio ({primera[i].Destino} == {segunda[i].Destino})");
+        }
+
+        // Diez veces seguidas tampoco derivan
+        var estado = est;
+        var destinos = NubeHypr.Calcular(estado, area, 8)
+            .Where(x => x.Tipo == TipoEfecto.Colocar).Select(x => x.Destino).ToList();
+        for (int i = 0; i < 10; i++)
+        {
+            var d = NubeHypr.Calcular(estado, area, 8)
+                .Where(x => x.Tipo == TipoEfecto.Colocar).Select(x => x.Destino).ToList();
+            Vale(d.Count == destinos.Count && d.Zip(destinos).All(p => p.First.CasiIgual(p.Second, 0.01)),
+                 $"la vuelta {i + 1} da exactamente los mismos rectángulos");
+        }
+    }
+
+    static void D1InsertarYQuitar()
+    {
+        Grupo("D1: insertar al final, quitar sin recolocar");
+
+        // ---------- La regla que evita que abrir el navegador te reorganice todo ----------
+        var e = EstadoNubeHypr.Vacio;
+        e = NubeHypr.Insertar(e, V(1));
+        e = NubeHypr.Insertar(e, V(2));
+        e = NubeHypr.Insertar(e, V(3));
+        Vale(e.Ventanas.Select(v => v.Hwnd.ToInt64()).SequenceEqual(new long[] { 1, 2, 3 }),
+             "se insertan al final, en orden");
+
+        // ---------- La misma dos veces no se duplica: se actualiza ----------
+        e = NubeHypr.Insertar(e, V(2, x: 500, proc: "otro"));
+        Igual(3, e.Ventanas.Count, "insertar la misma ventana no la duplica");
+        Igual("otro", e.De((IntPtr)2)!.Proceso, "se actualiza con los datos nuevos");
+        Vale(e.Ventanas.Select(v => v.Hwnd.ToInt64()).SequenceEqual(new long[] { 1, 2, 3 }),
+             "y NO cambia de sitio en el orden: por eso no da saltos");
+
+        // Veinte inserciones repetidas siguen dando tres
+        for (int i = 0; i < 20; i++) e = NubeHypr.Insertar(e, V(2));
+        Igual(3, e.Ventanas.Count, "veinte inserciones repetidas no duplican nada");
+
+        // ---------- Quitar no recoloca a los demás ----------
+        e = NubeHypr.Quitar(e, (IntPtr)2);
+        Vale(e.Ventanas.Select(v => v.Hwnd.ToInt64()).SequenceEqual(new long[] { 1, 3 }),
+             "quitar la de en medio deja a las otras en su orden");
+
+        // Quitar una que no está no cambia nada
+        var antes = e;
+        e = NubeHypr.Quitar(e, (IntPtr)99);
+        Vale(ReferenceEquals(antes, e), "quitar una que no estaba devuelve el mismo estado");
+
+        // ---------- Si se va la que tenía el foco, el foco se suelta ----------
+        //
+        // Dejarlo apuntando a una ventana que ya no existe es como se cuelan los
+        // "enfocar 0x0" en el log, y en D2 sería una llamada a Win32 con un hwnd muerto.
+        var conFoco = Est(V(1), V(2)) with { Foco = (IntPtr)1 };
+        var sinElla = NubeHypr.Quitar(conFoco, (IntPtr)1);
+        Igual(IntPtr.Zero, sinElla.Foco, "al cerrarse la ventana con el foco, el foco se suelta");
+
+        var otraFuera = NubeHypr.Quitar(conFoco, (IntPtr)2);
+        Igual((IntPtr)1, otraFuera.Foco, "y si se va otra, el foco se queda donde estaba");
+    }
+
+    static void D1ComandosValidos()
+    {
+        Grupo("D1: los comandos hacen lo que dicen");
+
+        // ---------- Enfocar siguiente y anterior, rotando ----------
+        var e = Est(V(1), V(2), V(3)) with { Foco = (IntPtr)1 };
+        var r = NubeHypr.Ejecutar(e, new Comando.EnfocarSiguiente());
+        Igual((IntPtr)2, r.Estado.Foco, "siguiente va a la segunda");
+        Igual(1, r.Efectos.Count, "y pide un efecto");
+        Igual(TipoEfecto.Enfocar, r.Efectos[0].Tipo, "de enfocar");
+
+        // Dar la vuelta completa deja el foco donde empezó: rotar no deriva
+        var vuelta = e;
+        for (int i = 0; i < 3; i++) vuelta = NubeHypr.Ejecutar(vuelta, new Comando.EnfocarSiguiente()).Estado;
+        Igual((IntPtr)1, vuelta.Foco, "tres siguientes con tres ventanas vuelven al principio");
+
+        Igual((IntPtr)3, NubeHypr.Ejecutar(e, new Comando.EnfocarAnterior()).Estado.Foco,
+              "anterior desde la primera da la vuelta a la última");
+
+        // Sin foco conocido se empieza por la primera, no se queda quieto
+        var sinFoco = Est(V(1), V(2)) with { Foco = IntPtr.Zero };
+        Igual((IntPtr)1, NubeHypr.Ejecutar(sinFoco, new Comando.EnfocarSiguiente()).Estado.Foco,
+              "sin foco, siguiente enfoca la primera");
+
+        // ---------- Enfocar por dirección ----------
+        var enCruz = Est(
+            V(1, x: 0, y: 500, w: 400, alto: 100),      // izquierda
+            V(2, x: 900, y: 500, w: 400, alto: 100),    // derecha
+            V(3, x: 450, y: 0, w: 400, alto: 100),      // arriba
+            V(4, x: 450, y: 900, w: 400, alto: 100),    // abajo
+            V(5, x: 450, y: 500, w: 400, alto: 100))    // el centro
+            with { Foco = (IntPtr)5 };
+
+        Igual((IntPtr)1, NubeHypr.Ejecutar(enCruz, new Comando.EnfocarHacia(Direccion.Izquierda)).Estado.Foco,
+              "hacia la izquierda, la de la izquierda");
+        Igual((IntPtr)2, NubeHypr.Ejecutar(enCruz, new Comando.EnfocarHacia(Direccion.Derecha)).Estado.Foco,
+              "hacia la derecha, la de la derecha");
+        Igual((IntPtr)3, NubeHypr.Ejecutar(enCruz, new Comando.EnfocarHacia(Direccion.Arriba)).Estado.Foco,
+              "hacia arriba, la de arriba");
+        Igual((IntPtr)4, NubeHypr.Ejecutar(enCruz, new Comando.EnfocarHacia(Direccion.Abajo)).Estado.Foco,
+              "y hacia abajo, la de abajo");
+
+        // ---------- Mover en el orden ----------
+        var tres = Est(V(1), V(2), V(3)) with { Foco = (IntPtr)1 };
+        var movida = NubeHypr.Ejecutar(tres, new Comando.MoverEnElOrden(true)).Estado;
+        Vale(movida.Ventanas.Select(v => v.Hwnd.ToInt64()).SequenceEqual(new long[] { 2, 1, 3 }),
+             "mover adelante intercambia con la siguiente");
+
+        // ---------- Redimensionar mueve la frontera, acotada ----------
+        var p = NubeHypr.Ejecutar(tres, new Comando.Redimensionar(0.05));
+        Igual(0.65, Math.Round(p.Estado.Proporcion, 2), "la proporción sube");
+        var tope = tres with { Proporcion = 0.8 };
+        Vale(!NubeHypr.Ejecutar(tope, new Comando.Redimensionar(0.2)).Hizo,
+             "y en el tope no se mueve más");
+        Igual(0.8, NubeHypr.Ejecutar(tope, new Comando.Redimensionar(0.2)).Estado.Proporcion,
+              "la proporción se queda acotada en 0,8");
+
+        // ---------- Alternar flotante, dos veces, vuelve ----------
+        var f1 = NubeHypr.Ejecutar(tres, new Comando.AlternarFlotante()).Estado;
+        Vale(f1.De((IntPtr)1)!.Flotante, "la ventana con el foco pasa a flotante");
+        var f2 = NubeHypr.Ejecutar(f1, new Comando.AlternarFlotante()).Estado;
+        Vale(!f2.De((IntPtr)1)!.Flotante, "y alternar otra vez la devuelve al reparto");
+
+        // ---------- Cambiar de espacio ----------
+        var conEspacios = Est(V(1), V(2)) with
+        {
+            Espacios = new List<EspacioTrabajo> { new("a", "Uno", 0), new("b", "Dos", 1) },
+            Foco = (IntPtr)1,
+        };
+        var ir = NubeHypr.Ejecutar(conEspacios, new Comando.CambiarEspacio(1, false));
+        Igual(1, ir.Estado.EspacioActual, "ir al espacio 1 cambia el espacio actual");
+        Igual(0, ir.Estado.De((IntPtr)1)!.Escritorio, "y no se lleva la ventana");
+
+        var llevar = NubeHypr.Ejecutar(conEspacios, new Comando.CambiarEspacio(1, true));
+        Igual(1, llevar.Estado.De((IntPtr)1)!.Escritorio, "llevándola, la ventana cambia de escritorio");
+        Igual(1, llevar.Estado.EspacioActual, "y se va con ella");
+        Igual(TipoEfecto.AEspacio, llevar.Efectos[0].Tipo, "con su efecto de espacio");
+
+        // ---------- Cambiar de layout ----------
+        var otro = NubeHypr.Ejecutar(tres, new Comando.PonerLayout(NubeHypr.Layout.Vertical));
+        Igual(NubeHypr.Layout.Vertical, otro.Estado.Layout, "el layout cambia");
+    }
+
+    static void D1ComandosInvalidos()
+    {
+        Grupo("D1: un comando inválido no cambia el estado");
+
+        // ---------- La propiedad de §14.2, caso por caso ----------
+        //
+        // Ni lanza, ni deja el estado a medias, ni se inventa una ventana. Y se comprueba
+        // comparando el estado entero, no solo un campo: es lo que atrapa un comando que
+        // "no hizo nada" pero dejó el foco movido.
+        var vacio = EstadoNubeHypr.Vacio;
+        foreach (Comando c in new Comando[]
+        {
+            new Comando.EnfocarSiguiente(), new Comando.EnfocarAnterior(),
+            new Comando.EnfocarHacia(Direccion.Izquierda),
+            new Comando.MoverEnElOrden(true), new Comando.MoverEnElOrden(false),
+            new Comando.AlternarFlotante(), new Comando.CambiarEspacio(0, true),
+        })
+        {
+            var r = NubeHypr.Ejecutar(vacio, c);
+            Vale(!r.Hizo, $"{c.GetType().Name} sin ventanas no hace nada");
+            Igual(vacio, r.Estado, $"{c.GetType().Name} devuelve el mismo estado");
+            Vale(r.Porque.Length > 0, $"{c.GetType().Name} dice por qué ({r.Porque})");
+        }
+
+        var e = Est(V(1), V(2)) with
+        {
+            Espacios = new List<EspacioTrabajo> { new("a", "Uno", 0) },
+            Foco = (IntPtr)1,
+        };
+
+        // Un espacio que no existe
+        var malEspacio = NubeHypr.Ejecutar(e, new Comando.CambiarEspacio(7, true));
+        Vale(!malEspacio.Hizo, "ir a un espacio que no existe no hace nada");
+        Igual(e, malEspacio.Estado, "y no cambia el estado");
+        Vale(malEspacio.Porque.Contains("7"), $"y lo dice ({malEspacio.Porque})");
+
+        var negativo = NubeHypr.Ejecutar(e, new Comando.CambiarEspacio(-1, false));
+        Vale(!negativo.Hizo, "un espacio negativo tampoco");
+        Igual(e, negativo.Estado, "sin tocar el estado");
+
+        // Ir al espacio en el que ya estás
+        Vale(!NubeHypr.Ejecutar(e, new Comando.CambiarEspacio(0, false)).Hizo,
+             "ir al espacio en el que ya estás no hace nada");
+
+        // Mover en los extremos NO da la vuelta: mantener pulsado el atajo no puede
+        // mandar la ventana de un extremo al otro sin parar
+        var primera = e with { Foco = (IntPtr)1 };
+        Vale(!NubeHypr.Ejecutar(primera, new Comando.MoverEnElOrden(false)).Hizo,
+             "la primera no se mueve más hacia atrás");
+        var ultima = e with { Foco = (IntPtr)2 };
+        Vale(!NubeHypr.Ejecutar(ultima, new Comando.MoverEnElOrden(true)).Hizo,
+             "ni la última hacia adelante");
+
+        // El foco en una ventana que no existe
+        var focoFantasma = e with { Foco = (IntPtr)999 };
+        Vale(!NubeHypr.Ejecutar(focoFantasma, new Comando.AlternarFlotante()).Hizo,
+             "alternar flotante con el foco en una ventana que no existe no hace nada");
+        Vale(!NubeHypr.Ejecutar(focoFantasma, new Comando.MoverEnElOrden(true)).Hizo,
+             "ni moverla");
+
+        // Una ventana flotante no entra en el reparto, así que no se mueve en el orden
+        var conFlotante = Est(V(1, flot: true), V(2)) with { Foco = (IntPtr)1 };
+        Vale(!NubeHypr.Ejecutar(conFlotante, new Comando.MoverEnElOrden(true)).Hizo,
+             "una flotante no tiene sitio en el orden del reparto");
+
+        // Redimensionar en flotante no tiene sentido y se dice
+        var flotante = e with { Layout = NubeHypr.Layout.Flotante };
+        var sinFrontera = NubeHypr.Ejecutar(flotante, new Comando.Redimensionar(0.1));
+        Vale(!sinFrontera.Hizo, "en flotante no hay frontera que mover");
+        Igual(flotante, sinFrontera.Estado, "y el estado no cambia");
+
+        // Poner el layout que ya estaba
+        Vale(!NubeHypr.Ejecutar(e, new Comando.PonerLayout(e.Layout)).Hizo,
+             "poner el layout que ya era no hace nada");
+
+        // Y enfocar la única ventana que hay, estando ya enfocada
+        var sola = Est(V(1)) with { Foco = (IntPtr)1 };
+        Vale(!NubeHypr.Ejecutar(sola, new Comando.EnfocarSiguiente()).Hizo,
+             "con una sola ventana ya enfocada, siguiente no hace nada");
+    }
+    // ================= D2: el motor real de posicionamiento =================
+    //
+    // El adaptador es la única parte de NubeHypr que habla con Windows, así que no todo él
+    // se puede probar en frío. Lo que SÍ se prueba aquí —y es la mayoría de lo que puede
+    // salir mal— es: la conversión de coordenadas, el modo por defecto, el descarte de un
+    // snapshot viejo, el recuento de movidas y saltadas, y que en simulación no se mueva
+    // nada. Mover de verdad se comprueba con una sola ventana de prueba y a mano.
+
+    static EfectoVentana Colocar(long h, double x, double y, double w, double alto) =>
+        new(TipoEfecto.Colocar, (IntPtr)h, new NubeHypr.Rect(x, y, w, alto));
+
+    static void D2Conversion()
+    {
+        Grupo("D2: la conversión de coordenadas, en un solo sitio");
+
+        // ---------- Por qué esto es una prueba y no una línea obvia ----------
+        //
+        // `Nativo.RECT` lleva los cuatro BORDES y `NubeHypr.Rect` lleva origen y TAMAÑO.
+        // Hacer la resta a mano en cada sitio es como se cuela un ancho que en realidad
+        // era un borde — y el síntoma es una ventana del doble de ancha, no un error.
+        var r = new Nativo.RECT { Izq = 100, Arr = 50, Der = 900, Aba = 650 };
+        var c = HyprAdaptador.DeRect(r);
+        Igual(100.0, c.X, "la x es el borde izquierdo");
+        Igual(50.0, c.Y, "la y es el borde de arriba");
+        Igual(800.0, c.Ancho, "el ancho es la diferencia, no el borde derecho");
+        Igual(600.0, c.Alto, "y el alto, la diferencia");
+        Igual(900.0, c.Derecha, "y de vuelta sale el borde original");
+        Igual(650.0, c.Abajo, "los dos");
+
+        // Un monitor a la izquierda del principal: bordes negativos
+        var zurdo = new Nativo.RECT { Izq = -1920, Arr = 0, Der = -960, Aba = 1080 };
+        var cz = HyprAdaptador.DeRect(zurdo);
+        Igual(-1920.0, cz.X, "con origen negativo, la x es negativa");
+        Igual(960.0, cz.Ancho, "y el ancho sigue siendo positivo");
+        Vale(cz.Valido, "el rectángulo es válido");
+
+        // Un rectángulo vacío —una ventana que no deja leer su sitio— no es válido
+        Vale(!HyprAdaptador.DeRect(default).Valido, "un RECT vacío no da un rectángulo válido");
+
+        var alReves = new Nativo.RECT { Izq = 900, Arr = 650, Der = 100, Aba = 50 };
+        Vale(!HyprAdaptador.DeRect(alReves).Valido,
+             "y uno con los bordes al revés tampoco: mejor descartarlo que mover a un tamaño negativo");
+    }
+
+    static void D2SimulacionPorDefecto()
+    {
+        Grupo("D2: en simulación no se mueve nada");
+
+        // ---------- El comportamiento por defecto ----------
+        //
+        // `SetWindowPos` tiene efectos visibles inmediatos y no se deshace con una
+        // disculpa. Así que el camino por defecto calcula, apunta y NO toca. Lo que se
+        // comprueba es que el resultado lo dice (`Simulado`) y que cuenta lo que habría
+        // movido, para que el log sirva de algo.
+        NubeHypr.OlvidarVersion();
+        long v = NubeHypr.SiguienteVersion();
+
+        var efectos = new List<EfectoVentana>
+        {
+            Colocar(1, 0, 0, 960, 1080),
+            Colocar(2, 968, 0, 952, 536),
+            new(TipoEfecto.SeQueda, (IntPtr)3, Porque: "está minimizada"),
+        };
+
+        foreach (var modo in new[] { NubeHypr.Modo.Apagado, NubeHypr.Modo.Simulacion })
+        {
+            var r = HyprAdaptador.Aplicar(v, efectos, modo, confirmar: false);
+            Vale(r.Simulado, $"[{modo}] el resultado se marca como simulado");
+            Igual(2, r.Movidas, $"[{modo}] cuenta las dos que habría colocado");
+            Igual(1, r.Saltadas, $"[{modo}] y la que se queda");
+            Vale(r.Lineas.Any(l => l.Contains("simular")), $"[{modo}] y lo apunta como simulación");
+            Vale(!r.Lineas.Any(l => l.Contains("apply hwnd")),
+                 $"[{modo}] sin una sola línea de haber aplicado");
+            Vale(!r.Divergio, $"[{modo}] y no se confirma nada, que no se movió nada");
+        }
+
+        // El motivo de las que se quedan viaja hasta el log
+        var sim = HyprAdaptador.Aplicar(v, efectos, NubeHypr.Modo.Simulacion, confirmar: false);
+        Vale(sim.Lineas.Any(l => l.Contains("minimizada")),
+             "el motivo de la que se queda llega al log");
+
+        // Un destino inválido se salta aunque estemos simulando: simular un movimiento
+        // imposible daría un log que promete algo que no se podría hacer
+        var malo = new List<EfectoVentana> { new(TipoEfecto.Colocar, (IntPtr)9, NubeHypr.Rect.Nada) };
+        var rm = HyprAdaptador.Aplicar(v, malo, NubeHypr.Modo.Simulacion, confirmar: false);
+        Igual(0, rm.Movidas, "un destino inválido no se simula como movimiento");
+        Igual(1, rm.Saltadas, "se salta");
+        Vale(rm.Lineas.Any(l => l.Contains("destino-invalido")), "y se dice por qué");
+    }
+
+    static void D2ElSnapshotViejoNoGana()
+    {
+        Grupo("D2: un reparto de una versión vieja se descarta entero");
+
+        // ---------- La propiedad de §14.2 ----------
+        //
+        // "Una actualización vieja no puede sobrescribir un snapshot más nuevo." Y se
+        // descarta ENTERO, no a medias: aplicar la mitad de un reparto viejo deja la
+        // pantalla peor que no tocarla.
+        NubeHypr.OlvidarVersion();
+        long vieja = NubeHypr.SiguienteVersion();
+        var efectos = new List<EfectoVentana> { Colocar(1, 0, 0, 500, 500), Colocar(2, 0, 0, 500, 500) };
+
+        // Con su propia versión, se aplica (en simulación)
+        var alDia = HyprAdaptador.Aplicar(vieja, efectos, NubeHypr.Modo.Simulacion, confirmar: false);
+        Igual(2, alDia.Movidas, "con la versión al día se procesan los dos efectos");
+        Igual(0, alDia.Viejas, "y no hay nada viejo");
+
+        // Llega otra observación: la de antes queda vieja
+        long nueva = NubeHypr.SiguienteVersion();
+        var tarde = HyprAdaptador.Aplicar(vieja, efectos, NubeHypr.Modo.Simulacion, confirmar: false);
+        Igual(0, tarde.Movidas, "con la versión vieja no se procesa ni uno");
+        Igual(2, tarde.Viejas, "los dos se cuentan como viejos");
+        Vale(tarde.Lineas.Any(l => l.Contains("descartado")), "y se dice que se descartó");
+        Vale(tarde.Lineas.Any(l => l.Contains(nueva.ToString())),
+             "diciendo cuál es la última, para poder seguir el rastro");
+
+        // Y la nueva sí
+        Igual(2, HyprAdaptador.Aplicar(nueva, efectos, NubeHypr.Modo.Simulacion, confirmar: false).Movidas,
+              "la versión nueva se procesa");
+
+        // Una versión del futuro tampoco vale: solo la última
+        Igual(0, HyprAdaptador.Aplicar(nueva + 5, efectos, NubeHypr.Modo.Simulacion, confirmar: false).Movidas,
+              "una versión que no existe se descarta igual");
+    }
+
+    static void D2RecuentoYTrazas()
+    {
+        Grupo("D2: el recuento y las trazas por ventana");
+
+        NubeHypr.OlvidarVersion();
+        long v = NubeHypr.SiguienteVersion();
+
+        var efectos = new List<EfectoVentana>
+        {
+            Colocar(1, 0, 0, 100, 100),
+            Colocar(2, 0, 0, 100, 100),
+            new(TipoEfecto.SeQueda, (IntPtr)3, Porque: "es flotante"),
+            new(TipoEfecto.SeQueda, (IntPtr)4, Porque: "está maximizada"),
+            new(TipoEfecto.Enfocar, (IntPtr)5),
+        };
+
+        var r = HyprAdaptador.Aplicar(v, efectos, NubeHypr.Modo.Simulacion, confirmar: false);
+        Igual(2, r.Movidas, "dos a colocar");
+        Igual(2, r.Saltadas, "dos que se quedan");
+        Igual(v, r.Version, "el resultado lleva su versión");
+
+        // ---------- Una línea por ventana, con el formato del documento ----------
+        Vale(r.Lineas.Count >= 5, $"hay una línea por cada cosa que pasó ({r.Lineas.Count})");
+        Vale(r.Lineas.Any(l => l.StartsWith("[D2]")), "todas con la etiqueta de la fase");
+        var confirmacion = r.Lineas.Last();
+        Vale(confirmacion.Contains($"confirm version={v}"), $"la última confirma la versión ({confirmacion})");
+        Vale(confirmacion.Contains("moved=2") && confirmacion.Contains("skipped=2") &&
+             confirmacion.Contains("stale=0"),
+             $"con el recuento en el formato de la especificación ({confirmacion})");
+
+        // Un efecto de enfocar no cuenta como movida ni como saltada: no es un
+        // movimiento. Contarlo inflaría el recuento y el log mentiría.
+        Vale(r.Movidas + r.Saltadas == 4, "el efecto de enfocar no se cuenta como movimiento");
+
+        // Sin efectos, el ciclo no revienta y lo dice
+        var vacio = HyprAdaptador.Aplicar(v, Array.Empty<EfectoVentana>(), NubeHypr.Modo.Simulacion, confirmar: false);
+        Igual(0, vacio.Movidas, "sin efectos no se mueve nada");
+        Vale(vacio.Lineas.Count > 0, "pero queda constancia de la vuelta");
+    }
+
+    static void D2ElAreaSaleDelMonitorQueEs()
+    {
+        Grupo("D2: se calcula con el monitor y el borde de verdad");
+
+        // ---------- Lo que la especificación prohíbe ----------
+        //
+        // "Nunca se debe calcular una previsualización con un monitor y aplicar con otro
+        // implícito." Aquí se comprueba la parte que se puede: que el área depende del
+        // monitor Y del borde que se le pasan, y que dos monitores distintos dan áreas
+        // distintas y cada una dentro de su pantalla.
+        var principal = new NubeHypr.Rect(0, 0, 2560, 1440);
+        var segundo = new NubeHypr.Rect(-1920, 0, 1920, 1080);
+
+        var aP = NubeHypr.AreaUtil(principal, NubeHypr.Borde.Arriba, 54, 12);
+        var aS = NubeHypr.AreaUtil(segundo, NubeHypr.Borde.Arriba, 54, 12);
+
+        Vale(aP.DentroDe(principal), "el área del principal cae en el principal");
+        Vale(aS.DentroDe(segundo), "y la del segundo, en el segundo");
+        Vale(!aS.DentroDe(principal), "y NO se confunden: la del segundo no cabe en el principal");
+        Vale(aP.X != aS.X, "tienen orígenes distintos");
+
+        // El mismo monitor con la barra en cada borde da cuatro áreas distintas
+        var cuatro = new[] { NubeHypr.Borde.Arriba, NubeHypr.Borde.Abajo,
+                             NubeHypr.Borde.Izquierda, NubeHypr.Borde.Derecha }
+            .Select(b => NubeHypr.AreaUtil(principal, b, 54, 12)).ToList();
+        Igual(4, cuatro.Select(a => a.ToString()).Distinct().Count(),
+              "los cuatro bordes dan cuatro áreas distintas");
+        Vale(cuatro.All(a => a.DentroDe(principal)), "y las cuatro caben en el monitor");
+
+        // Y el reparto que sale de cada área cae dentro de ESA área
+        foreach (var (area, i) in cuatro.Select((a, i) => (a, i)))
+            foreach (var s in NubeHypr.Repartir(NubeHypr.Layout.Principal, area, 4, 8, 0.6))
+                Vale(s.DentroDe(area), $"[borde {i}] el reparto cae dentro de su área");
+    }
+
+    static void D2SoloUnaVentana()
+    {
+        Grupo("D2: empezar por una sola ventana");
+
+        // ---------- Por qué se calcula el reparto COMPLETO ----------
+        //
+        // La especificación pide empezar por una ventana elegida. Lo que no puede hacerse
+        // es calcular el reparto "como si solo hubiera una": entonces esa ventana se
+        // llevaría la pantalla entera y el destino no sería el de verdad. Se calcula el
+        // reparto de todas y se aplica a una.
+        var area = new NubeHypr.Rect(0, 0, 1920, 1080);
+        var est = Est(V(1), V(2), V(3));
+
+        var todos = NubeHypr.Calcular(est, area, 8);
+        var deLaPrimera = todos.First(e => e.Hwnd == (IntPtr)1 && e.Tipo == TipoEfecto.Colocar);
+
+        // El destino de la primera con tres ventanas NO es el área entera
+        Vale(!deLaPrimera.Destino.CasiIgual(area),
+             "con tres ventanas, la primera no se lleva la pantalla entera");
+
+        // Y si se calculara con una sola, sí — que es el error que se evita
+        var comoSiFueraSola = NubeHypr.Calcular(Est(V(1)), area, 8)
+            .First(e => e.Tipo == TipoEfecto.Colocar);
+        Vale(comoSiFueraSola.Destino.CasiIgual(area),
+             "calculado como si estuviera sola, se llevaría todo: ese es el error que se evita");
+        Vale(!deLaPrimera.Destino.CasiIgual(comoSiFueraSola.Destino),
+             "y los dos destinos son distintos, así que la diferencia importa");
+
+        // Filtrar a una sola deja un efecto, y es el del reparto completo
+        var soloUna = todos.Where(e => e.Hwnd == (IntPtr)1).ToList();
+        Igual(1, soloUna.Count, "filtrando a una queda un efecto");
+        Vale(soloUna[0].Destino.CasiIgual(deLaPrimera.Destino),
+             "y es el destino del reparto completo, no el de una ventana sola");
+    }
+    // ================= D3: foco, teclado y gestos =================
+
+    static void D3MapaDeAtajos()
+    {
+        Grupo("D3: el mapa de atajos, con nombres y no con acciones");
+
+        // ---------- La normalización ----------
+        //
+        // "ctrl+alt+w", "Alt+Ctrl+W" y "CTRL + ALT + W" son el MISMO atajo. Si el mapa las
+        // guardara como tres claves, el usuario tendría tres atajos donde quería uno y
+        // ninguno detectado como conflicto.
+        Igual("Ctrl+Alt+W", HyprAtajos.Normalizar("ctrl+alt+w"), "se normaliza a un orden fijo");
+        Igual("Ctrl+Alt+W", HyprAtajos.Normalizar("Alt+Ctrl+W"), "sin importar el orden que se escriba");
+        Igual("Ctrl+Alt+W", HyprAtajos.Normalizar("  CTRL + ALT + w  "), "ni los espacios ni las mayúsculas");
+        Igual("Ctrl+Alt+W", HyprAtajos.Normalizar("control+alt+w"), "y «control» es «ctrl»");
+        Igual("Win+Alt+RIGHT", HyprAtajos.Normalizar("alt+win+right"),
+              "y Win va primero, como se escriben y se leen los atajos de Windows");
+
+        Igual("", HyprAtajos.Normalizar(null), "null no es una combinación");
+        Igual("", HyprAtajos.Normalizar(""), "ni la cadena vacía");
+        Igual("", HyprAtajos.Normalizar("ctrl+alt"), "ni solo modificadores: eso no es un atajo");
+        Igual("", HyprAtajos.Normalizar("+++"), "ni un montón de signos");
+
+        // ---------- Qué es válido ----------
+        //
+        // Se exige un modificador: un atajo global de una sola tecla te deja sin esa tecla
+        // en TODO el sistema. Y lo valida quien ya registra atajos, no una tabla paralela.
+        Vale(HyprAtajos.Valida("Win+Alt+Right"), "Win+Alt+Right vale");
+        Vale(HyprAtajos.Valida("Ctrl+Alt+W"), "Ctrl+Alt+W vale");
+        Vale(!HyprAtajos.Valida("W"), "una tecla sola NO vale: te la quitaría en todo el sistema");
+        Vale(!HyprAtajos.Valida("Ctrl"), "ni un modificador solo");
+        Vale(!HyprAtajos.Valida(""), "ni nada");
+
+        // ---------- De nombre a comando ----------
+        Vale(HyprAtajos.Comando(HyprAtajos.FocoSiguiente) is Comando.EnfocarSiguiente,
+             "foco.siguiente da el comando de enfocar el siguiente");
+        Vale(HyprAtajos.Comando(HyprAtajos.FocoDerecha) is Comando.EnfocarHacia { Hacia: Direccion.Derecha },
+             "foco.derecha da el comando con su dirección");
+        Vale(HyprAtajos.Comando(HyprAtajos.LayoutVertical) is Comando.PonerLayout { Cual: NubeHypr.Layout.Vertical },
+             "layout.vertical da el layout que es");
+        Vale(HyprAtajos.Comando(HyprAtajos.MasAncho) is Comando.Redimensionar { Delta: > 0 },
+             "tamano.mas crece");
+        Vale(HyprAtajos.Comando(HyprAtajos.MasEstrecho) is Comando.Redimensionar { Delta: < 0 },
+             "y tamano.menos encoge");
+
+        // Un nombre que no existe da null, NO un comando inventado: un atajo mal escrito
+        // no puede acabar haciendo algo distinto de lo que dice.
+        Vale(HyprAtajos.Comando("foco.diagonal") == null, "un comando que no existe da null");
+        Vale(HyprAtajos.Comando(null) == null, "y null también");
+        Vale(HyprAtajos.Comando("") == null, "y la cadena vacía");
+
+        // Todos los nombres de la lista se resuelven o están declarados como de espacios
+        // (que son de D4). Ninguno puede quedar como un nombre huérfano.
+        foreach (var n in HyprAtajos.Nombres)
+        {
+            Vale(HyprAtajos.EsNombre(n), $"{n} está en la lista de nombres");
+            Vale(HyprAtajos.Rotulo(n).Length > 0, $"{n} tiene un rótulo para el indicador");
+        }
+
+        // ---------- El mapa de serie ----------
+        var serie = HyprAtajos.Construir(HyprAtajos.DeSerie());
+        Vale(serie.Bien, "el mapa de serie no tiene problemas: " + string.Join(" | ", serie.Problemas));
+        Vale(serie.Atajos.Count >= 10, $"y trae unos cuantos atajos ({serie.Atajos.Count})");
+        // Escrito con el PREFIJO y no con una combinación fija: el prefijo de serie se
+        // eligió midiendo (ver `--diagprefijos`) y puede volver a cambiar, y una prueba que
+        // lo clave a mano se rompe el día que cambie sin que nada esté mal de verdad.
+        var flechaDerecha = $"{HyprAtajos.Prefijo}+Right";
+        Vale(serie.Resolver(flechaDerecha) is Comando.EnfocarHacia { Hacia: Direccion.Derecha },
+             $"{flechaDerecha} enfoca a la derecha");
+        Vale(serie.Resolver(flechaDerecha.ToLowerInvariant()) is Comando.EnfocarHacia,
+             "y se resuelve escrito de cualquier forma");
+        Vale(serie.Resolver("Ctrl+Shift+Z") == null, "una combinación sin asignar da null");
+
+        // De serie no se pisa nada de Windows: Win+flechas es el ajuste de Windows y
+        // Win+Ctrl+flechas los escritorios virtuales
+        Vale(!serie.Atajos.Keys.Any(k => k.Equals("Win+RIGHT", StringComparison.OrdinalIgnoreCase)),
+             "de serie no se coge Win+Right, que es de Windows");
+        Vale(serie.Atajos.Keys.All(k => k.Contains("Alt", StringComparison.OrdinalIgnoreCase)),
+             "todos los de serie llevan Alt, para no pisar los de Windows");
+    }
+
+    static void D3ConflictosDeAtajos()
+    {
+        Grupo("D3: los conflictos se dicen, no se tragan");
+
+        // ---------- Un atajo mal escrito no puede tumbar el arranque ----------
+        //
+        // Ni quedarse muerto en silencio, que es peor: el usuario lo pulsa y no entiende
+        // por qué no pasa nada. Los problemas se DEVUELVEN para que el log los apunte y
+        // Ajustes los enseñe.
+        var malos = HyprAtajos.Construir(new Dictionary<string, string>
+        {
+            ["Win+Alt+Right"] = HyprAtajos.FocoDerecha,      // bien
+            ["Z"] = HyprAtajos.FocoIzquierda,                // sin modificador
+            ["Win+Alt+Q"] = "foco.diagonal",                 // comando que no existe
+            ["+++"] = HyprAtajos.FocoArriba,                 // no es una combinación
+        });
+
+        Igual(1, malos.Atajos.Count, "solo entra el que está bien");
+        Igual(3, malos.Problemas.Count, "y los tres malos se cuentan");
+        Vale(!malos.Bien, "el mapa se marca como problemático");
+        Vale(malos.Problemas.Any(p => p.Contains("modificador")), "se dice el que no tiene modificador");
+        Vale(malos.Problemas.Any(p => p.Contains("no existe")), "el comando que no existe");
+        Vale(malos.Problemas.Any(p => p.Contains("no es una combinación")), "y el que no es combinación");
+
+        // ---------- Dos veces la misma combinación ----------
+        var repetido = HyprAtajos.Construir(new Dictionary<string, string>
+        {
+            ["Win+Alt+Right"] = HyprAtajos.FocoDerecha,
+            ["alt+win+right"] = HyprAtajos.FocoIzquierda,    // la MISMA, escrita de otra forma
+        });
+        Igual(1, repetido.Atajos.Count, "la combinación repetida solo entra una vez");
+        Vale(repetido.Problemas.Any(p => p.Contains("dos veces")),
+             $"y se dice que estaba dos veces ({string.Join(" | ", repetido.Problemas)})");
+        Vale(repetido.Nombre("Win+Alt+Right") == HyprAtajos.FocoDerecha,
+             "se queda el primero, no el último: así el orden del fichero manda y es predecible");
+
+        // ---------- Lo que ya está cogido ----------
+        //
+        // El atajo de la vista general de NubeBar no se resuelve "por orden de llegada":
+        // se rechaza el nuevo y se dice contra qué chocaba.
+        var choca = HyprAtajos.Construir(
+            new Dictionary<string, string> { ["Ctrl+Alt+W"] = HyprAtajos.FocoSiguiente },
+            reservados: new[] { "Ctrl+Alt+W" });
+        Igual(0, choca.Atajos.Count, "un atajo que ya está cogido no se asigna");
+        Vale(choca.Problemas.Any(p => p.Contains("ya está cogido")), "y se dice");
+
+        // Y reservado escrito de otra forma también choca: si no, la normalización no
+        // serviría de nada justo donde más importa
+        var chocaIgual = HyprAtajos.Construir(
+            new Dictionary<string, string> { ["alt+ctrl+w"] = HyprAtajos.FocoSiguiente },
+            reservados: new[] { "Ctrl+Alt+W" });
+        Igual(0, chocaIgual.Atajos.Count, "escrito de otra forma, choca igual");
+
+        // Un mapa vacío o nulo no es un error: es "no has puesto atajos"
+        Vale(HyprAtajos.Construir(null).Bien, "un mapa nulo no da problemas");
+        Igual(0, HyprAtajos.Construir(null).Atajos.Count, "y queda vacío");
+        Vale(HyprAtajos.Construir(new Dictionary<string, string>()).Bien, "y uno vacío tampoco");
+    }
+
+    static void D3PasosDeMoverYTamano()
+    {
+        Grupo("D3: mover y redimensionar con pasos, sin salirse");
+
+        var area = new NubeHypr.Rect(0, 0, 1920, 1080);
+        var v = new NubeHypr.Rect(500, 400, 400, 300);
+
+        // Los cuatro sentidos mueven en el sentido que dicen
+        Igual(468.0, NubeHypr.PasoDeMover(v, area, Direccion.Izquierda, 32).X, "izquierda resta en x");
+        Igual(532.0, NubeHypr.PasoDeMover(v, area, Direccion.Derecha, 32).X, "derecha suma");
+        Igual(368.0, NubeHypr.PasoDeMover(v, area, Direccion.Arriba, 32).Y, "arriba resta en y");
+        Igual(432.0, NubeHypr.PasoDeMover(v, area, Direccion.Abajo, 32).Y, "abajo suma");
+
+        // El tamaño no cambia al mover
+        var movida = NubeHypr.PasoDeMover(v, area, Direccion.Derecha, 32);
+        Igual(v.Ancho, movida.Ancho, "mover no cambia el ancho");
+        Igual(v.Alto, movida.Alto, "ni el alto");
+
+        // ---------- Nunca se sale ----------
+        //
+        // Una ventana que se va de la pantalla con el teclado es imposible de recuperar
+        // sin el ratón, y es el tipo de fallo que obliga a reiniciar la sesión.
+        var pegada = new NubeHypr.Rect(0, 0, 400, 300);
+        Igual(0.0, NubeHypr.PasoDeMover(pegada, area, Direccion.Izquierda, 999).X,
+              "pegada a la izquierda, no se va más");
+        Igual(0.0, NubeHypr.PasoDeMover(pegada, area, Direccion.Arriba, 999).Y,
+              "ni por arriba");
+
+        var alFinal = NubeHypr.PasoDeMover(v, area, Direccion.Derecha, 9999);
+        Vale(alFinal.DentroDe(area), "empujada mil píxeles a la derecha, sigue dentro");
+        Igual(1520.0, alFinal.X, "y se queda pegada al borde derecho");
+        Vale(NubeHypr.PasoDeMover(v, area, Direccion.Abajo, 9999).DentroDe(area), "y por abajo igual");
+
+        // Una ventana más grande que el área se pega al origen, sin dar un salto absurdo
+        var enorme = new NubeHypr.Rect(100, 100, 4000, 3000);
+        var pegadaAlOrigen = NubeHypr.PasoDeMover(enorme, area, Direccion.Derecha, 32);
+        Igual(area.X, pegadaAlOrigen.X, "una ventana más grande que el área se pega al origen");
+
+        // Un monitor con origen negativo: el borde es el suyo, no el cero
+        var zurdo = new NubeHypr.Rect(-1920, 0, 1920, 1080);
+        var enZurdo = new NubeHypr.Rect(-1900, 100, 400, 300);
+        Igual(-1920.0, NubeHypr.PasoDeMover(enZurdo, zurdo, Direccion.Izquierda, 999).X,
+              "en un monitor con origen negativo, el tope es su borde");
+
+        // ---------- El tamaño ----------
+        Igual(432.0, NubeHypr.PasoDeTamano(v, area, Direccion.Derecha, 32).Ancho, "derecha ensancha");
+        Igual(368.0, NubeHypr.PasoDeTamano(v, area, Direccion.Izquierda, 32).Ancho, "izquierda estrecha");
+        Igual(332.0, NubeHypr.PasoDeTamano(v, area, Direccion.Abajo, 32).Alto, "abajo alarga");
+        Igual(268.0, NubeHypr.PasoDeTamano(v, area, Direccion.Arriba, 32).Alto, "arriba acorta");
+
+        // El origen no se mueve al redimensionar
+        var cambiada = NubeHypr.PasoDeTamano(v, area, Direccion.Derecha, 32);
+        Igual(v.X, cambiada.X, "redimensionar no mueve la x");
+        Igual(v.Y, cambiada.Y, "ni la y");
+
+        // Nunca por debajo del mínimo
+        var achicada = NubeHypr.PasoDeTamano(v, area, Direccion.Izquierda, 9999);
+        Igual(NubeHypr.MinimoLado, achicada.Ancho, "encogida mil veces, se queda en el mínimo");
+        Vale(achicada.Valido, "y sigue siendo una ventana");
+
+        // Ni creciendo se sale de la pantalla
+        var crecida = NubeHypr.PasoDeTamano(v, area, Direccion.Derecha, 9999);
+        Vale(crecida.Derecha <= area.Derecha + 0.01,
+             $"crecida mil píxeles, su borde no pasa del área ({crecida.Derecha:0})");
+        Vale(NubeHypr.PasoDeTamano(v, area, Direccion.Abajo, 9999).Abajo <= area.Abajo + 0.01,
+             "y por abajo tampoco");
+
+        // Rectángulos imposibles se devuelven tal cual, sin inventar
+        Igual(NubeHypr.Rect.Nada, NubeHypr.PasoDeMover(NubeHypr.Rect.Nada, area, Direccion.Derecha, 32),
+              "un rectángulo vacío no se mueve");
+        Igual(v, NubeHypr.PasoDeMover(v, NubeHypr.Rect.Nada, Direccion.Derecha, 32),
+              "y sin área tampoco");
+
+        // Cincuenta pasos seguidos acaban pegados al borde y ahí se quedan: no hay deriva
+        var paseada = v;
+        for (int i = 0; i < 50; i++) paseada = NubeHypr.PasoDeMover(paseada, area, Direccion.Derecha, 32);
+        Vale(paseada.DentroDe(area), "cincuenta pasos y sigue dentro");
+        var unoMas = NubeHypr.PasoDeMover(paseada, area, Direccion.Derecha, 32);
+        Vale(unoMas.CasiIgual(paseada), "y el paso 51 ya no la mueve");
+    }
+
+    static void D3GestoCancelaDeVerdad()
+    {
+        Grupo("D3: cancelar devuelve la ventana a donde estaba");
+
+        var area = new NubeHypr.Rect(0, 0, 1920, 1080);
+        var original = new NubeHypr.Rect(500, 400, 400, 300);
+
+        var colocadas = new List<NubeHypr.Rect>();
+        var apuntes = new List<string>();
+        var g = new HyprGesto();
+        g.Colocar = (_, r) => colocadas.Add(r);
+        g.Apuntar = m => apuntes.Add(m);
+
+        // ---------- Empezar ----------
+        Vale(!g.EnMarcha, "antes de empezar no hay gesto");
+        Vale(g.Empezar((IntPtr)1, original), "el gesto empieza");
+        Vale(g.EnMarcha, "y queda en marcha");
+        Igual(original, g.Original, "con el rectángulo original apuntado");
+        Igual(0, g.Pasos, "y sin pasos todavía");
+
+        // ---------- Tres pasos ----------
+        var r = original;
+        for (int i = 0; i < 3; i++)
+        {
+            r = NubeHypr.PasoDeMover(r, area, Direccion.Derecha, 32);
+            Vale(g.Paso(r), $"el paso {i + 1} se da y el gesto sigue vivo");
+        }
+        Igual(3, g.Pasos, "tres pasos");
+        Igual(3, colocadas.Count, "y tres colocaciones de verdad");
+        Igual(596.0, g.Actual.X, "la ventana ha avanzado 96 px");
+
+        // ---------- Cancelar: vuelve al sitio ----------
+        //
+        // Un Esc que deja la ventana a medio camino es peor que no tener Esc: el usuario
+        // ya no sabe dónde la tenía.
+        g.Cancelar("Esc");
+        Vale(!g.EnMarcha, "cancelar termina el gesto");
+        Igual(4, colocadas.Count, "y coloca una vez más: la vuelta");
+        Igual(original, colocadas[^1], "exactamente donde estaba al empezar");
+        Vale(apuntes.Any(a => a.Contains("cancelled")), "y queda apuntado como cancelado");
+        Vale(apuntes.Any(a => a.Contains("devuelta")), "diciendo que se devolvió");
+
+        // ---------- Cancelar sin pasos no coloca nada ----------
+        //
+        // Pedirle a Windows que ponga la ventana donde ya está es una llamada de más y un
+        // parpadeo posible.
+        colocadas.Clear();
+        g.Empezar((IntPtr)2, original);
+        g.Cancelar("Esc");
+        Igual(0, colocadas.Count, "cancelar sin haber dado un paso no coloca nada");
+
+        // ---------- Terminar bien se queda donde esté ----------
+        colocadas.Clear();
+        g.Empezar((IntPtr)3, original);
+        var movida = NubeHypr.PasoDeMover(original, area, Direccion.Abajo, 32);
+        g.Paso(movida);
+        g.Terminar("soltado");
+        Vale(!g.EnMarcha, "terminar acaba el gesto");
+        Igual(1, colocadas.Count, "y NO devuelve nada: se queda donde la dejaste");
+        Igual(movida, colocadas[^1], "en el sitio nuevo");
+
+        // ---------- Idempotencia ----------
+        int limpios = g.VecesLimpiado;
+        for (int i = 0; i < 5; i++) { g.Terminar("otra vez"); g.Cancelar("y otra"); }
+        Vale(!g.EnMarcha, "terminar y cancelar diez veces deja el gesto parado");
+        Vale(g.VecesLimpiado > limpios, "se limpia, sin volver a soltar lo ya soltado");
+
+        // ---------- Un paso con el gesto parado no mueve nada ----------
+        //
+        // Es el caso de una tecla que llega tarde, después de haber soltado.
+        colocadas.Clear();
+        Vale(!g.Paso(movida), "un paso con el gesto parado devuelve que no está vivo");
+        Igual(0, colocadas.Count, "y no coloca nada");
+
+        // ---------- El fotograma manda, como en los deslizadores ----------
+        g.Empezar((IntPtr)4, original);
+        Vale(g.Fotograma(teclaPulsada: true), "con la tecla pulsada el gesto sigue");
+        Vale(!g.Fotograma(teclaPulsada: false), "al soltarla, el gesto acaba AHÍ");
+        Vale(!g.EnMarcha, "sin depender de ningún evento que pueda perderse");
+
+        // ---------- Empezar con datos imposibles no empieza nada ----------
+        Vale(!g.Empezar(IntPtr.Zero, original), "sin ventana no se empieza");
+        Vale(!g.Empezar((IntPtr)1, NubeHypr.Rect.Nada), "ni sin rectángulo");
+        Vale(!g.EnMarcha, "y no queda un gesto a medias");
+
+        // ---------- Empezar otro cierra el anterior ----------
+        g.Empezar((IntPtr)5, original);
+        g.Paso(NubeHypr.PasoDeMover(original, area, Direccion.Derecha, 32));
+        g.Empezar((IntPtr)6, new NubeHypr.Rect(100, 100, 200, 200));
+        Vale(g.EnMarcha, "el segundo gesto queda vivo");
+        Igual((IntPtr)6, g.Hwnd, "y es el de la ventana nueva");
+        Igual(0, g.Pasos, "con su cuenta de pasos a cero: no hereda la del anterior");
+    }
+
+    static void D3MaximizadasFueraPorDefecto()
+    {
+        Grupo("D3: las maximizadas y minimizadas se quedan fuera por defecto");
+
+        var area = new NubeHypr.Rect(0, 0, 1920, 1080);
+        var est = Est(V(1), V(2, max: true), V(3, min: true), V(4, max: true));
+        var memoria = new HyprRestaurar.Memoria();
+
+        // ---------- Apagado: es el comportamiento de D2 ----------
+        //
+        // Sacar una ventana de maximizada es una acción VISIBLE y sorprendente: el usuario
+        // la dejó a pantalla completa a propósito.
+        var sinRestaurar = HyprRestaurar.Preparar(est, memoria, restaurarAlOrganizar: false);
+        Igual(0, sinRestaurar.Count, "apagado, no se prepara ninguna restauración");
+        Igual(0, memoria.Cuantas, "y no se recuerda nada: no hay nada que deshacer");
+
+        var efectos = NubeHypr.Calcular(est, area, 8);
+        Igual(1, efectos.Count(e => e.Tipo == TipoEfecto.Colocar), "solo se coloca la normal");
+        Igual(3, efectos.Count(e => e.Tipo == TipoEfecto.SeQueda), "y las otras tres se quedan");
+        Vale(efectos.Count(e => e.Porque.Contains("maximizada")) == 2, "las dos maximizadas lo dicen");
+        Vale(efectos.Any(e => e.Porque.Contains("minimizada")), "y la minimizada también");
+
+        // Y la opción nace apagada en la configuración
+        Vale(!new OpcionesHypr().RestaurarAlOrganizar,
+             "la opción de restaurar nace APAGADA en la configuración");
+
+        // ---------- Encendido: se preparan, y se recuerda qué eran ----------
+        var conRestaurar = HyprRestaurar.Preparar(est, memoria, restaurarAlOrganizar: true);
+        Igual(3, conRestaurar.Count, "encendido, se preparan las tres");
+        Vale(conRestaurar.All(e => e.Tipo == TipoEfecto.Restaurar), "como efectos de restaurar");
+        Vale(conRestaurar.All(e => e.Porque.Length > 0), "con su motivo escrito");
+        Igual(3, memoria.Cuantas, "y se recuerda lo que eran las tres");
+        Vale(memoria.Sabe((IntPtr)2) && memoria.Sabe((IntPtr)3) && memoria.Sabe((IntPtr)4),
+             "las tres, por su ventana");
+        Vale(!memoria.Sabe((IntPtr)1), "y de la normal no hay nada que recordar");
+
+        // Lo que se recordó es lo que era
+        var q2 = memoria.Consultar((IntPtr)2)!.Value;
+        Vale(q2.Maximizada && !q2.Minimizada, "de la 2 se recuerda que estaba maximizada");
+        var q3 = memoria.Consultar((IntPtr)3)!.Value;
+        Vale(q3.Minimizada && !q3.Maximizada, "y de la 3, que estaba minimizada");
+        Vale(q2.Rectangulo.Valido, "con su rectángulo, que hace falta para devolverla bien");
+
+        // ---------- Recordar una segunda vez NO machaca ----------
+        //
+        // Si no, "devolver" dejaría la ventana donde la puso NubeHypr, no donde estaba.
+        var yaRestaurada = V(2, max: false, x: 999, y: 999);
+        Vale(!memoria.Recordar(yaRestaurada), "recordar dos veces devuelve que no apuntó nada");
+        Vale(memoria.Consultar((IntPtr)2)!.Value.Maximizada,
+             "y lo guardado sigue siendo el estado ORIGINAL, no el intermedio");
+
+        // ---------- Y con las restauradas, el reparto ya las cuenta ----------
+        var comoSi = HyprRestaurar.ComoSiYaEstuvieranRestauradas(est, conRestaurar);
+        var efectos2 = NubeHypr.Calcular(comoSi, area, 8);
+        Igual(4, efectos2.Count(e => e.Tipo == TipoEfecto.Colocar),
+              "con las tres restauradas, se colocan las cuatro");
+        Vale(efectos2.All(e => e.Tipo != TipoEfecto.Colocar || e.Destino.DentroDe(area)),
+             "y las cuatro dentro del área");
+
+        // Las flotantes NO se restauran: el usuario dijo que las lleva a mano
+        var conFlotante = Est(V(1, flot: true, max: true));
+        var m2 = new HyprRestaurar.Memoria();
+        Igual(0, HyprRestaurar.Preparar(conFlotante, m2, true).Count,
+              "una flotante maximizada no se restaura: está así porque su dueño quiso");
+    }
+
+    static void D3DevolverLasVentanas()
+    {
+        Grupo("D3: lo que se toca se puede devolver");
+
+        var est = Est(V(1, max: true, x: 0, y: 0, w: 1920, alto: 1080),
+                      V(2, min: true, x: 300, y: 200, w: 800, alto: 600));
+        var memoria = new HyprRestaurar.Memoria();
+        HyprRestaurar.Preparar(est, memoria, restaurarAlOrganizar: true);
+        Igual(2, memoria.Cuantas, "se recuerdan las dos");
+
+        // ---------- Devolver una ----------
+        var ef = HyprRestaurar.Devolver(memoria, (IntPtr)1);
+        Vale(ef != null, "se puede devolver");
+        Igual(TipoEfecto.Devolver, ef!.Tipo, "con su tipo de efecto");
+        Vale(ef.Porque.Contains("maximizada"), $"diciendo a qué vuelve ({ef.Porque})");
+        Vale(ef.Destino.Valido, "y con el rectángulo que tenía");
+        Igual(1, memoria.Cuantas, "y se olvida al devolverla");
+
+        // Devolverla otra vez no hace nada: ya no se recuerda
+        Vale(HyprRestaurar.Devolver(memoria, (IntPtr)1) == null,
+             "devolver dos veces la misma no hace nada");
+
+        // Una que nunca se tocó tampoco: inventar un estado anterior es peor que no tener
+        Vale(HyprRestaurar.Devolver(memoria, (IntPtr)99) == null,
+             "una ventana que nunca se tocó no se devuelve a ningún sitio");
+
+        // ---------- Devolverlo todo: el "apagar NubeHypr y dejarlo como estaba" ----------
+        var m2 = new HyprRestaurar.Memoria();
+        HyprRestaurar.Preparar(est, m2, true);
+        var todos = HyprRestaurar.DevolverTodo(m2);
+        Igual(2, todos.Count, "devolverlo todo da un efecto por ventana");
+        Igual(0, m2.Cuantas, "y la memoria queda vacía");
+        Vale(todos.All(e => e.Tipo == TipoEfecto.Devolver), "todos de devolver");
+
+        // Y sobre una memoria vacía no revienta
+        Igual(0, HyprRestaurar.DevolverTodo(new HyprRestaurar.Memoria()).Count,
+              "devolverlo todo sin nada que devolver da cero");
+
+        // ---------- La memoria no crece sin fin ----------
+        //
+        // Una ventana que ya no existe no puede devolverse a ningún sitio.
+        var m3 = new HyprRestaurar.Memoria();
+        HyprRestaurar.Preparar(est, m3, true);
+        Igual(1, m3.Limpiar(new[] { (IntPtr)1 }), "limpiar con una viva quita la otra");
+        Igual(1, m3.Cuantas, "y queda la que vive");
+        Igual(1, m3.Limpiar(Array.Empty<IntPtr>()), "sin ninguna viva se quita todo");
+        Igual(0, m3.Cuantas, "y la memoria queda vacía");
+        Igual(0, m3.Limpiar(Array.Empty<IntPtr>()), "limpiar una memoria vacía no quita nada");
+    }
+    // ================= D4: escritorios virtuales =================
+    //
+    // La API de escritorios de Windows NO es pública y ya vive envuelta en try/catch. Lo
+    // que se prueba aquí es la política: ordenar, nombrar sin repetir, elegir el vecino,
+    // reconciliar un cambio que vino de fuera, el mapa tolerante y el modo de un solo
+    // escritorio. Nada de esto se puede provocar con la API de verdad —no se puede pedirle
+    // cinco escritorios ni un renombrado externo a voluntad— y por eso está aparte.
+
+    static HyprEspacios.Espacio E(int orden, string nombre, bool actual = false) =>
+        new(Guid.Parse($"00000000-0000-0000-0000-{orden + 100:000000000000}"), nombre, orden, actual);
+
+    static void D4NombresYOrden()
+    {
+        Grupo("D4: nombres vacíos, repetidos y renombrados de fuera");
+
+        // ---------- Un escritorio sin nombre no sale en blanco ----------
+        //
+        // Windows los crea sin nombre. "Escritorio 3" es lo que hace Windows y lo que el
+        // usuario espera; un hueco vacío en el indicador parece un fallo.
+        Igual("Escritorio 1", HyprEspacios.NombreVisible(null, 0), "sin nombre, se numera");
+        Igual("Escritorio 3", HyprEspacios.NombreVisible("", 2), "y con cadena vacía");
+        Igual("Escritorio 3", HyprEspacios.NombreVisible("   ", 2), "y con espacios");
+        Igual("Trabajo", HyprEspacios.NombreVisible("Trabajo", 0), "con nombre, el suyo");
+        Igual("Trabajo", HyprEspacios.NombreVisible("  Trabajo  ", 0), "recortado");
+
+        // ---------- Dos con el mismo nombre ----------
+        //
+        // Windows deja ponerlo. Dos espacios con el mismo rótulo son indistinguibles en el
+        // indicador, y entonces "lleva esta ventana a Trabajo" no tiene una respuesta.
+        Igual("Trabajo", HyprEspacios.NombreLibre(new[] { "Ocio" }, "Trabajo"), "si está libre, el suyo");
+        Igual("Trabajo (2)", HyprEspacios.NombreLibre(new[] { "Trabajo" }, "Trabajo"),
+              "si está cogido, se numera");
+        Igual("Trabajo (3)", HyprEspacios.NombreLibre(new[] { "Trabajo", "Trabajo (2)" }, "Trabajo"),
+              "y se sigue numerando");
+        // El choque se detecta SIN distinguir mayúsculas —dos rótulos que se leen igual son
+        // el mismo— pero la capitalización que escribió el usuario se conserva: cambiarle
+        // "trabajo" por "Trabajo" sería corregirle lo que tecleó.
+        Igual("trabajo (2)", HyprEspacios.NombreLibre(new[] { "TRABAJO" }, "trabajo"),
+              "el choque se detecta sin mayúsculas, y se respeta cómo lo escribiste");
+        Igual("Escritorio", HyprEspacios.NombreLibre(Array.Empty<string>(), null),
+              "sin nombre propuesto, el genérico");
+
+        // ---------- Presentar la lista entera ----------
+        var presentados = HyprEspacios.Presentar(new (Guid, string?, bool)[]
+        {
+            (Guid.NewGuid(), null, false),
+            (Guid.NewGuid(), "Trabajo", true),
+            (Guid.NewGuid(), "Trabajo", false),     // repetido, de verdad
+            (Guid.NewGuid(), "   ", false),
+        });
+        Igual(4, presentados.Count, "salen los cuatro");
+        Igual(4, presentados.Select(e => e.Nombre).Distinct().Count(),
+              "y los cuatro rótulos son distintos: ninguno se confunde con otro");
+        Igual("Escritorio 1", presentados[0].Nombre, "el primero sin nombre se numera por su sitio");
+        Igual("Trabajo", presentados[1].Nombre, "el segundo conserva el suyo");
+        Igual("Trabajo (2)", presentados[2].Nombre, "y el repetido se desambigua");
+        Vale(presentados[1].EsElActual, "y se conserva quién es el actual");
+
+        // El orden y la numeración
+        Vale(presentados.Select(e => e.Orden).SequenceEqual(new[] { 0, 1, 2, 3 }),
+             "el orden es el que vino de la API");
+        Vale(presentados.Select(e => e.Numero).SequenceEqual(new[] { 1, 2, 3, 4 }),
+             "y al usuario se le cuenta desde 1, que es como los cuenta él");
+
+        // Una lista vacía da una lista vacía, no revienta
+        Igual(0, HyprEspacios.Presentar(Array.Empty<(Guid, string?, bool)>()).Count,
+              "sin escritorios, lista vacía");
+
+        // ---------- Validar lo que escribe el usuario ----------
+        Vale(HyprEspacios.NombreValido("Trabajo", out var limpio, out _), "un nombre normal vale");
+        Igual("Trabajo", limpio, "y sale recortado");
+        Vale(HyprEspacios.NombreValido("  Ocio  ", out limpio, out _), "con espacios de más, vale");
+        Igual("Ocio", limpio, "recortado");
+        Vale(!HyprEspacios.NombreValido("", out _, out var p1), "vacío no vale");
+        Vale(p1.Length > 0, $"y se dice por qué ({p1})");
+        Vale(!HyprEspacios.NombreValido("   ", out _, out _), "ni solo espacios");
+        Vale(!HyprEspacios.NombreValido(new string('x', 200), out _, out var p2),
+             "ni doscientos caracteres");
+        Vale(p2.Contains("40"), $"diciendo el límite ({p2})");
+        Vale(!HyprEspacios.NombreValido("con\nsalto", out _, out _), "ni con saltos de línea");
+        Vale(!HyprEspacios.NombreValido(null, out _, out _), "ni null");
+    }
+
+    static void D4ElVecino()
+    {
+        Grupo("D4: el vecino, y por qué no da la vuelta");
+
+        var tres = new List<HyprEspacios.Espacio> { E(0, "Uno", true), E(1, "Dos"), E(2, "Tres") };
+
+        Igual("Dos", HyprEspacios.Vecino(tres, siguiente: true)!.Value.Nombre,
+              "desde el primero, el siguiente es el segundo");
+        Vale(HyprEspacios.Vecino(tres, siguiente: false) == null,
+             "y hacia atrás desde el primero no hay nada");
+
+        var enElUltimo = new List<HyprEspacios.Espacio> { E(0, "Uno"), E(1, "Dos"), E(2, "Tres", true) };
+        Vale(HyprEspacios.Vecino(enElUltimo, siguiente: true) == null,
+             "en el último no hay siguiente: es lo que hace Windows");
+        Igual("Dos", HyprEspacios.Vecino(enElUltimo, siguiente: false)!.Value.Nombre,
+              "y hacia atrás, el anterior");
+
+        // ---------- Dar la vuelta existe, pero no de serie ----------
+        //
+        // Mantener pulsado el atajo te llevaría del último al primero sin parar: la misma
+        // deriva que ya se evitó en `MoverEnElOrden`.
+        Igual("Uno", HyprEspacios.Vecino(enElUltimo, true, darLaVuelta: true)!.Value.Nombre,
+              "pidiéndolo, da la vuelta");
+        Igual("Tres", HyprEspacios.Vecino(tres, false, darLaVuelta: true)!.Value.Nombre,
+              "en los dos sentidos");
+
+        // ---------- Casos de borde ----------
+        Vale(HyprEspacios.Vecino(new List<HyprEspacios.Espacio>(), true) == null,
+             "sin espacios no hay vecino");
+        var uno = new List<HyprEspacios.Espacio> { E(0, "Solo", true) };
+        Vale(HyprEspacios.Vecino(uno, true) == null, "con uno solo tampoco");
+        Vale(HyprEspacios.Vecino(uno, true, darLaVuelta: true) == null,
+             "ni dando la vuelta: él mismo no es su vecino");
+
+        // Si nadie se declara actual —pasa justo durante un cambio— se empieza por el
+        // primero en vez de no hacer nada
+        var sinActual = new List<HyprEspacios.Espacio> { E(0, "Uno"), E(1, "Dos") };
+        Igual("Uno", HyprEspacios.Vecino(sinActual, true)!.Value.Nombre,
+              "sin actual conocido, el primero");
+        Igual(-1, HyprEspacios.IndiceDelActual(sinActual), "y se sabe que no se sabe");
+
+        // ---------- Por número, como lo cuenta el usuario ----------
+        Igual("Uno", HyprEspacios.PorNumero(tres, 1)!.Value.Nombre, "el número 1 es el primero");
+        Igual("Tres", HyprEspacios.PorNumero(tres, 3)!.Value.Nombre, "y el 3 el tercero");
+        Vale(HyprEspacios.PorNumero(tres, 0) == null, "no hay escritorio 0");
+        Vale(HyprEspacios.PorNumero(tres, 7) == null,
+             "y «ve al 7» cuando hay tres NO es «ve al 3»: no se hace nada");
+        Vale(HyprEspacios.PorNumero(tres, -1) == null, "ni con un número negativo");
+    }
+
+    static void D4ModoDeUnSoloEscritorio()
+    {
+        Grupo("D4: si la API falla, un solo escritorio");
+
+        // ---------- La forma de no llenar el código de «if (hayApi)» ----------
+        //
+        // La política devuelve UN espacio en vez de ninguno. Así el indicador enseña algo,
+        // los comandos de cambiar no encuentran vecino y no hacen nada, y las ventanas se
+        // cuentan todas en el único espacio que hay. Ningún camino muerto.
+        var uno = HyprEspacios.UnSoloEscritorio();
+        Igual(1, uno.Count, "el modo de uno da exactamente un espacio");
+        Vale(uno[0].EsElActual, "y es el actual: si no, nada tendría dónde estar");
+        Igual(1, uno[0].Numero, "se llama el número 1");
+        Vale(uno[0].Nombre.Length > 0, "con un nombre que se puede enseñar");
+        Vale(HyprEspacios.EsElModoDeUno(uno), "y se reconoce como el modo de uno");
+
+        // No se confunde con un equipo que de verdad tiene un escritorio
+        var deVerdad = new List<HyprEspacios.Espacio> { E(0, "Escritorio 1", true) };
+        Vale(!HyprEspacios.EsElModoDeUno(deVerdad),
+             "un escritorio real con su id no es el modo de uno");
+        Vale(!HyprEspacios.EsElModoDeUno(new List<HyprEspacios.Espacio>()),
+             "ni una lista vacía");
+
+        // En el modo de uno, los comandos de espacio no hacen nada y lo dicen
+        Vale(HyprEspacios.Resolver(uno, new Comando.AlVecino(true, false)) == null,
+             "en el modo de uno no hay siguiente");
+        Vale(HyprEspacios.Resolver(uno, new Comando.AlVecino(false, true)) == null,
+             "ni anterior, ni llevando la ventana");
+        Vale(HyprEspacios.Resolver(uno, new Comando.AlNumero(1, false)) == null,
+             "y «ve al 1» cuando ya estás en el 1 no hace nada");
+        Vale(HyprEspacios.Resolver(uno, new Comando.AlNumero(2, false)) == null,
+             "y el 2 no existe");
+    }
+
+    static void D4ResolverComandos()
+    {
+        Grupo("D4: de la intención al escritorio concreto");
+
+        // ---------- Por qué hace falta este paso ----------
+        //
+        // «Al siguiente» no se puede expresar con un número: el número depende de cuántos
+        // escritorios haya AHORA, y eso lo sabe la API, no el atajo.
+        var tres = new List<HyprEspacios.Espacio> { E(0, "Uno"), E(1, "Dos", true), E(2, "Tres") };
+
+        var sig = HyprEspacios.Resolver(tres, new Comando.AlVecino(true, false));
+        Vale(sig != null, "al siguiente se resuelve");
+        Igual("Tres", sig!.Value.Espacio.Nombre, "y es el tercero");
+        Vale(!sig.Value.LlevarLaVentana, "sin llevar la ventana");
+
+        var llevando = HyprEspacios.Resolver(tres, new Comando.AlVecino(true, true));
+        Vale(llevando!.Value.LlevarLaVentana, "y pidiéndolo, llevándola");
+        Vale(llevando.Value.Porque.Length > 0, "con su motivo para el log");
+
+        var ant = HyprEspacios.Resolver(tres, new Comando.AlVecino(false, false));
+        Igual("Uno", ant!.Value.Espacio.Nombre, "al anterior, el primero");
+
+        // Por número
+        Igual("Uno", HyprEspacios.Resolver(tres, new Comando.AlNumero(1, false))!.Value.Espacio.Nombre,
+              "por número funciona");
+        Vale(HyprEspacios.Resolver(tres, new Comando.AlNumero(2, false)) == null,
+             "ir al que ya es el actual no hace nada");
+        Vale(HyprEspacios.Resolver(tres, new Comando.AlNumero(9, false)) == null,
+             "y a uno que no existe tampoco");
+
+        // ---------- El comando de D1 cuenta desde 0 y el usuario desde 1 ----------
+        //
+        // La conversión va en un solo sitio. Repartida por cada sitio que lo llame es como
+        // se cuela un «fuera por uno» que manda la ventana al escritorio de al lado.
+        Igual("Uno", HyprEspacios.Resolver(tres, new Comando.CambiarEspacio(0, false))!.Value.Espacio.Nombre,
+              "el índice 0 de D1 es el escritorio número 1");
+        Igual("Tres", HyprEspacios.Resolver(tres, new Comando.CambiarEspacio(2, false))!.Value.Espacio.Nombre,
+              "y el índice 2, el número 3");
+        Vale(HyprEspacios.Resolver(tres, new Comando.CambiarEspacio(1, false)) == null,
+             "el índice 1 es el actual: no se hace nada");
+
+        // Un comando que no es de espacios devuelve null, no un destino inventado
+        Vale(HyprEspacios.Resolver(tres, new Comando.EnfocarSiguiente()) == null,
+             "un comando de foco no resuelve un espacio");
+        Vale(HyprEspacios.Resolver(tres, new Comando.AlternarFlotante()) == null,
+             "ni uno de flotante");
+
+        // Y los cuatro atajos de espacios dan comandos de espacio
+        foreach (var n in new[] { HyprAtajos.EspacioSiguiente, HyprAtajos.EspacioAnterior,
+                                  HyprAtajos.LlevarAlSiguiente, HyprAtajos.LlevarAlAnterior })
+        {
+            var c = HyprAtajos.Comando(n);
+            Vale(c is Comando.AlVecino, $"{n} da un comando de vecino");
+        }
+        Vale(HyprAtajos.Comando(HyprAtajos.LlevarAlSiguiente) is Comando.AlVecino { LlevarLaVentana: true },
+             "y «llevar» lleva la ventana");
+        Vale(HyprAtajos.Comando(HyprAtajos.EspacioSiguiente) is Comando.AlVecino { LlevarLaVentana: false },
+             "mientras «espacio.siguiente» solo cambia de espacio");
+    }
+
+    static void D4MapaTolerante()
+    {
+        Grupo("D4: el mapa de ventanas aguanta que la API no conteste");
+
+        var mapa = new HyprEspacios.Mapa();
+        var espacioA = Guid.NewGuid();
+        var espacioB = Guid.NewGuid();
+
+        // ---------- Si nunca ha contestado, se da por el actual ----------
+        //
+        // Más vale enseñar una ventana de más que esconder una que existe: es la misma
+        // regla que ya tenía `Escritorios.EstaEnElActual`.
+        var (donde, reciente, sabido) = mapa.Consultar((IntPtr)1, espacioA, HyprEspacios.Caducidad);
+        Igual(espacioA, donde, "de una ventana desconocida se supone el espacio actual");
+        Vale(!sabido, "y se dice que no se sabía");
+        Vale(!reciente, "ni que sea reciente");
+
+        // ---------- Cuando contesta, se apunta ----------
+        mapa.Apuntar((IntPtr)1, espacioB);
+        (donde, reciente, sabido) = mapa.Consultar((IntPtr)1, espacioA, HyprEspacios.Caducidad);
+        Igual(espacioB, donde, "apuntado, se devuelve lo apuntado y no el actual");
+        Vale(sabido && reciente, "y es reciente");
+        Igual(1, mapa.Cuantas, "con una ventana en el mapa");
+
+        // ---------- Y lo viejo se marca como viejo, no se descarta ----------
+        //
+        // Preguntar justo durante un cambio devuelve cosas raras. La respuesta correcta no
+        // es «no lo sé y la escondo»: es «lo último que me dijiste», con su marca.
+        (donde, reciente, sabido) = mapa.Consultar((IntPtr)1, espacioA, TimeSpan.Zero);
+        Igual(espacioB, donde, "con la caducidad a cero sigue devolviendo lo último");
+        Vale(sabido, "que se sabe");
+        Vale(!reciente, "pero marcado como NO reciente, para que quien lo use decida");
+
+        // Datos imposibles no entran en el mapa
+        mapa.Apuntar(IntPtr.Zero, espacioB);
+        mapa.Apuntar((IntPtr)2, Guid.Empty);
+        Igual(1, mapa.Cuantas, "una ventana nula o un espacio vacío no se apuntan");
+
+        // ---------- La memoria no crece sin fin ----------
+        mapa.Apuntar((IntPtr)2, espacioA);
+        mapa.Apuntar((IntPtr)3, espacioB);
+        Igual(3, mapa.Cuantas, "tres ventanas");
+        Igual(2, mapa.Limpiar(new[] { (IntPtr)1 }), "limpiar con una viva quita dos");
+        Igual(1, mapa.Cuantas, "y queda una");
+        mapa.Olvidar((IntPtr)1);
+        Igual(0, mapa.Cuantas, "olvidar la última la quita");
+        Igual(0, mapa.Limpiar(Array.Empty<IntPtr>()), "y limpiar un mapa vacío no quita nada");
+    }
+
+    static void D4CambiosDeFuera()
+    {
+        Grupo("D4: recuperarse de un cambio hecho fuera de NubeHypr");
+
+        // ---------- El caso que importa ----------
+        //
+        // El usuario pulsa Win+Ctrl+→, crea un escritorio desde la vista de tareas, o le
+        // cambia el nombre. Lo que hace falta saber es QUÉ cambió, no solo que algo
+        // cambió: con «algo cambió» la única reacción posible es rehacerlo todo, y
+        // rehacerlo todo es como se llega al parpadeo.
+        var antes = new List<HyprEspacios.Espacio> { E(0, "Uno", true), E(1, "Dos"), E(2, "Tres") };
+
+        // Nada cambió
+        var igual = HyprEspacios.Comparar(antes, antes);
+        Vale(igual.Nada, "la misma foto dos veces no da cambios");
+        Vale(!igual.TocaRepartir, "y no hay que rehacer el reparto");
+
+        // ---------- Cambió el escritorio actual ----------
+        var movido = new List<HyprEspacios.Espacio> { E(0, "Uno"), E(1, "Dos", true), E(2, "Tres") };
+        var c1 = HyprEspacios.Comparar(antes, movido);
+        Vale(c1.CambioElActual, "se detecta que cambió el actual");
+        Vale(c1.TocaRepartir, "y eso SÍ obliga a rehacer el reparto: son otras ventanas");
+        Igual(0, c1.Nuevos.Count, "sin escritorios nuevos");
+        Igual(0, c1.Quitados.Count, "ni quitados");
+
+        // ---------- Uno nuevo ----------
+        var conUnoMas = new List<HyprEspacios.Espacio>(antes) { E(3, "Cuatro") };
+        var c2 = HyprEspacios.Comparar(antes, conUnoMas);
+        Igual(1, c2.Nuevos.Count, "un escritorio nuevo se detecta");
+        Vale(!c2.TocaRepartir, "pero no obliga a repartir: el actual sigue siendo el mismo");
+
+        // ---------- Uno menos ----------
+        var sinElTercero = antes.Take(2).ToList();
+        var c3 = HyprEspacios.Comparar(antes, sinElTercero);
+        Igual(1, c3.Quitados.Count, "un escritorio que desaparece se detecta");
+        Vale(c3.TocaRepartir, "y eso sí obliga: sus ventanas han ido a alguna parte");
+
+        // ---------- Renombrado desde fuera ----------
+        var renombrado = new List<HyprEspacios.Espacio>
+            { E(0, "Trabajo", true), E(1, "Dos"), E(2, "Tres") };
+        var c4 = HyprEspacios.Comparar(antes, renombrado);
+        Igual(1, c4.Renombrados.Count, "un renombrado se detecta");
+        Vale(!c4.Nada, "y cuenta como cambio");
+        Vale(!c4.TocaRepartir,
+             "pero NO obliga a repartir: un nombre nuevo no mueve ninguna ventana");
+
+        // ---------- Reordenados ----------
+        var reordenado = new List<HyprEspacios.Espacio>
+            { E(2, "Tres"), E(1, "Dos"), E(0, "Uno", true) };
+        var c5 = HyprEspacios.Comparar(antes, reordenado);
+        Vale(c5.CambioElOrden, "reordenar se detecta");
+
+        // Y el orden solo se mira cuando el conjunto es el mismo: si entró o salió alguno,
+        // que "cambie el orden" es obvio y no es información
+        Vale(!c2.CambioElOrden, "con uno nuevo no se dice además que cambió el orden");
+        Vale(!c3.CambioElOrden, "ni con uno menos");
+
+        // ---------- Todo a la vez, y desde cero ----------
+        var deCero = HyprEspacios.Comparar(new List<HyprEspacios.Espacio>(), antes);
+        Igual(3, deCero.Nuevos.Count, "de ninguno a tres, tres nuevos");
+        var aCero = HyprEspacios.Comparar(antes, new List<HyprEspacios.Espacio>());
+        Igual(3, aCero.Quitados.Count, "y de tres a ninguno, tres quitados");
+        Vale(aCero.TocaRepartir, "que obliga a repartir, claro");
+
+        // Pasar al modo de un solo escritorio —la API se cayó a mitad de sesión— se
+        // detecta como lo que es: desaparecieron los tres y apareció uno
+        var alModoDeUno = HyprEspacios.Comparar(antes, HyprEspacios.UnSoloEscritorio());
+        Igual(3, alModoDeUno.Quitados.Count, "si la API se cae, se ve que se fueron los tres");
+        Igual(1, alModoDeUno.Nuevos.Count, "y que apareció el único");
+        Vale(alModoDeUno.TocaRepartir, "y hay que rehacer el reparto");
+    }
+    // ================= D3 cerrada: los atajos registrados =================
+    //
+    // Registrar de verdad en una prueba cogería atajos globales del equipo de quien la
+    // ejecuta, y dos tandas en paralelo se pisarían. Así que aquí se comprueba todo lo que
+    // DECIDE: el rango de ids, la clasificación de los códigos de Windows, el mapa de tres
+    // fuentes y el ciclo de limpieza. Registrar y pulsar de verdad es `--diagatajos`.
+
+    static void D3RangoDeIdsYConflictos()
+    {
+        Grupo("D3: los ids no se cruzan con el atajo de la vista general");
+
+        // ---------- El rango propio ----------
+        //
+        // `IdAtajoVista` es 0xB0CA. Un rango propio es lo que permite que el hook pregunte
+        // "¿este id es mío?" sin una lista de excepciones que se olvide de actualizar.
+        Vale(HyprTeclas.EsNuestro(HyprTeclas.IdBase), "el primero del rango es nuestro");
+        Vale(HyprTeclas.EsNuestro(HyprTeclas.IdTope), "y el último");
+        Vale(!HyprTeclas.EsNuestro(HyprTeclas.IdBase - 1), "lo de antes no");
+        Vale(!HyprTeclas.EsNuestro(HyprTeclas.IdTope + 1), "ni lo de después");
+        Vale(!HyprTeclas.EsNuestro(0xB0CA),
+             "y el id del atajo de la vista general NO cae en nuestro rango");
+        Vale(HyprTeclas.IdTope - HyprTeclas.IdBase + 1 >= HyprAtajos.Nombres.Length,
+             $"el rango da para los {HyprAtajos.Nombres.Length} comandos");
+
+        // ---------- La clasificación de lo que dice Windows ----------
+        //
+        // 1409 es ERROR_HOTKEY_ALREADY_REGISTERED y es EL caso interesante: el atajo es
+        // bueno pero alguien se le adelantó. Confundirlo con un error genérico haría que el
+        // log no distinguiera "mal escrito" de "ocupado", que tienen soluciones distintas.
+        Igual(HyprTeclas.Como.Registrado, HyprTeclas.Clasificar(true, 0), "si fue bien, registrado");
+        Igual(HyprTeclas.Como.YaLoTieneOtro, HyprTeclas.Clasificar(false, 1409),
+              "1409 es «ya lo tiene otra aplicacion»");
+        Igual(HyprTeclas.Como.NoSeEntiende, HyprTeclas.Clasificar(false, -1),
+              "-1 es «no entiendo la combinacion»");
+        Igual(HyprTeclas.Como.Error, HyprTeclas.Clasificar(false, 5),
+              "y cualquier otro es un error, sin disfrazarlo de conflicto");
+
+        // Cada caso se explica con palabras, que es lo que acaba en el log
+        foreach (var como in Enum.GetValues<HyprTeclas.Como>())
+        {
+            var r = new HyprTeclas.Resultado(0xB100, "Win+Alt+Right", "foco.derecha", como, 0);
+            Vale(r.Explicado.Length > 0, $"{como} se explica ({r.Explicado})");
+            Vale(r.ToString().Contains("Win+Alt+Right"), "y la línea dice de qué atajo habla");
+        }
+        Vale(new HyprTeclas.Resultado(1, "x", "y", HyprTeclas.Como.Registrado, 0).Ok,
+             "solo «registrado» cuenta como Ok");
+        Vale(!new HyprTeclas.Resultado(1, "x", "y", HyprTeclas.Como.YaLoTieneOtro, 1409).Ok,
+             "un conflicto NO es Ok, aunque el atajo sea válido");
+    }
+
+    static void D3MapaDeTresFuentes()
+    {
+        Grupo("D3: el mapa junta lo del usuario, lo de serie y lo reservado");
+
+        // ---------- Sin atajos puestos, los de serie ----------
+        var opc = new OpcionesHypr();
+        Igual(0, opc.Atajos.Count, "de serie la configuración no trae atajos propios");
+        var conSerie = HyprTeclas.MapaDe(opc, "Ctrl+Alt+W");
+        Vale(conSerie.Atajos.Count > 0, $"y el mapa cae en los de serie ({conSerie.Atajos.Count})");
+        Vale(conSerie.Bien, "sin problemas: " + string.Join(" | ", conSerie.Problemas));
+        Vale(conSerie.Resolver($"{HyprAtajos.Prefijo}+Right")
+                 is Comando.EnfocarHacia { Hacia: Direccion.Derecha },
+             $"y {HyprAtajos.Prefijo}+Right enfoca a la derecha");
+
+        // ---------- Con atajos puestos, los suyos y SOLO los suyos ----------
+        //
+        // No se mezclan: si el usuario puso tres atajos, tiene tres. Añadirle los de serie
+        // por debajo le daría atajos que no pidió y que no sabría de dónde salen.
+        var mios = new OpcionesHypr();
+        mios.Atajos["Win+Shift+Right"] = HyprAtajos.FocoDerecha;
+        mios.Atajos["Win+Shift+Left"] = HyprAtajos.FocoIzquierda;
+        var conMios = HyprTeclas.MapaDe(mios, "Ctrl+Alt+W");
+        Igual(2, conMios.Atajos.Count, "con dos puestos, el mapa tiene dos");
+        Vale(conMios.Resolver("Win+Alt+Right") == null, "y los de serie NO se cuelan por debajo");
+
+        // ---------- Ctrl+Alt+W se conserva ----------
+        //
+        // Entra como reservado, así que se rechaza al construir el mapa —con su problema
+        // explicado— y no en RegisterHotKey con un 1409 que parecería culpa de otro.
+        var choca = new OpcionesHypr();
+        choca.Atajos["Ctrl+Alt+W"] = HyprAtajos.FocoSiguiente;
+        var conChoque = HyprTeclas.MapaDe(choca, "Ctrl+Alt+W");
+        Igual(0, conChoque.Atajos.Count, "un atajo que pisa el de la vista general no entra");
+        Vale(conChoque.Problemas.Any(p => p.Contains("ya está cogido")),
+             $"y se dice ({string.Join(" | ", conChoque.Problemas)})");
+
+        // Escrito de otra forma, choca igual: para eso se normaliza
+        var choca2 = new OpcionesHypr();
+        choca2.Atajos["alt+ctrl+w"] = HyprAtajos.FocoSiguiente;
+        Igual(0, HyprTeclas.MapaDe(choca2, "Ctrl+Alt+W").Atajos.Count,
+              "escrito al revés y en minúsculas, choca igual");
+
+        // Y si el usuario cambió el atajo de la vista general, se reserva EL SUYO
+        var otro = new OpcionesHypr();
+        otro.Atajos["Ctrl+Alt+W"] = HyprAtajos.FocoSiguiente;
+        Igual(1, HyprTeclas.MapaDe(otro, "Ctrl+Shift+Q").Atajos.Count,
+              "con otro atajo de vista, Ctrl+Alt+W queda libre para NubeHypr");
+
+        // Sin atajo de vista configurado no se reserva nada y no revienta
+        Vale(HyprTeclas.MapaDe(new OpcionesHypr(), null).Atajos.Count > 0,
+             "sin atajo de vista, el mapa se construye igual");
+        Vale(HyprTeclas.MapaDe(new OpcionesHypr(), "").Atajos.Count > 0, "y con la cadena vacía");
+    }
+
+    static void D3LimpiezaDeAtajos()
+    {
+        Grupo("D3: registrar, soltar, volver a registrar y no dejar nada");
+
+        // Sin ventana no se registra nada, y se dice en vez de reventar
+        HyprTeclas.OlvidarTodo();
+        var mapa = HyprTeclas.MapaDe(new OpcionesHypr(), "Ctrl+Alt+W");
+        Igual(0, HyprTeclas.Registrar(IntPtr.Zero, mapa).Count,
+              "sin ventana donde registrarlos, no se registra ninguno");
+        Igual(0, HyprTeclas.Cuantos, "y no queda nada apuntado");
+
+        // ---------- Soltar es idempotente ----------
+        //
+        // Es lo que permite ponerlo en el cierre sin preguntar si hacía falta. Un atajo
+        // global que sobrevive al proceso se queda cogido hasta reiniciar la sesión, y el
+        // usuario se encuentra una tecla que no hace nada y no sabe por qué.
+        Igual(0, HyprTeclas.Quitar(IntPtr.Zero), "soltar sin nada registrado devuelve cero");
+        Igual(0, HyprTeclas.Quitar(IntPtr.Zero), "y otra vez cero: no falla ni cuenta de más");
+        Igual(0, HyprTeclas.Cuantos, "y sigue sin quedar nada");
+
+        // El registro vacío no sabe de nadie
+        Vale(HyprTeclas.NombreDe(HyprTeclas.IdBase) == null,
+             "sin nada registrado, ningún id tiene nombre");
+        Igual(0, HyprTeclas.Vivos.Count(), "y la lista de vivos está vacía");
+
+        // ---------- El estado queda limpio ----------
+        //
+        // El ciclo entero con el registro real es `--diagatajos`: una prueba que registrara
+        // de verdad cogería atajos globales del equipo de quien la ejecuta.
+        Vale(HyprTeclas.Cuantos == 0, "la tanda acaba sin atajos apuntados");
+    }
+    // ================= D5: reglas, prioridades y persistencia =================
+
+    static HyprReglas.Regla R(string id, int prio = 0, string? proc = null, string? clase = null,
+                              string? titulo = null, string? ruta = null, int? espacio = null,
+                              int? monitor = null, NubeHypr.Layout? layout = null,
+                              bool? flotante = null, double? ancho = null, double? alto = null,
+                              bool? foco = null, bool activa = true) =>
+        new(id, prio, proc, clase, titulo, ruta, espacio, monitor, layout, flotante,
+            ancho, alto, foco, activa);
+
+    static void D5UnaReglaVaciaNoCoincideConNada()
+    {
+        Grupo("D5: una regla sin criterios no coincide con nada");
+
+        // ---------- La decisión que lo gobierna todo ----------
+        //
+        // Lo contrario —que coincida con todo— es el valor por defecto que parece cómodo y
+        // es el que convierte un error de tecleo en «todas mis ventanas se han ido al
+        // escritorio 3».
+        var vacia = R("vacia", espacio: 1);
+        Vale(vacia.SinCriterios, "una regla sin criterios se reconoce como tal");
+        Vale(!HyprReglas.Coincide(vacia, V(1), "Clase", @"C:\x.exe", out var p),
+             "y NO coincide con una ventana cualquiera");
+        Vale(p.Contains("no coincide con nada"), $"diciendo por qué ({p})");
+
+        // Ni es válida para guardar: es una regla a medio escribir
+        Vale(!HyprReglas.Valida(vacia, out var pv), "no se puede guardar");
+        Vale(pv.Contains("medio escribir"), $"y se dice ({pv})");
+
+        // Una sin ACCIONES tampoco: no haría nada
+        Vale(!HyprReglas.Valida(R("muda", proc: "firefox"), out var pm), "una regla sin acciones tampoco");
+        Vale(pm.Contains("no haría nada"), $"y se dice ({pm})");
+
+        // Una completa sí
+        Vale(HyprReglas.Valida(R("buena", proc: "firefox", espacio: 1), out _), "una completa vale");
+
+        // Y los valores imposibles se rechazan antes de guardar, no después
+        Vale(!HyprReglas.Valida(R("x", proc: "a", espacio: -1), out _), "un espacio negativo no vale");
+        Vale(!HyprReglas.Valida(R("x", proc: "a", monitor: -2), out _), "ni un monitor negativo");
+        Vale(!HyprReglas.Valida(R("x", proc: "a", ancho: 0, alto: 100), out _), "ni un ancho de cero");
+        Vale(!HyprReglas.Valida(R("x", proc: "a", ancho: 99999, alto: 100), out _),
+             "ni un tamaño que no cabe en ninguna pantalla");
+        Vale(!HyprReglas.Valida(R("", proc: "a", espacio: 1), out var pid), "ni una sin id");
+        Vale(pid.Contains("deshacer"), $"porque sin id no se puede deshacer por separado ({pid})");
+    }
+
+    static void D5CriteriosYCoincidencia()
+    {
+        Grupo("D5: proceso, clase, título y ruta");
+
+        var v = new VentanaModelo((IntPtr)1, "firefox", "Configuración — Mozilla Firefox",
+                                  new NubeHypr.Rect(0, 0, 800, 600));
+        const string clase = "MozillaWindowClass";
+        const string ruta = @"C:\Program Files\Mozilla Firefox\firefox.exe";
+
+        // ---------- Proceso y clase: exactos, sin distinguir mayúsculas ----------
+        Vale(HyprReglas.Coincide(R("a", proc: "firefox", espacio: 1), v, clase, ruta, out _),
+             "el proceso coincide");
+        Vale(HyprReglas.Coincide(R("a", proc: "FIREFOX", espacio: 1), v, clase, ruta, out _),
+             "sin distinguir mayúsculas");
+        Vale(!HyprReglas.Coincide(R("a", proc: "fire", espacio: 1), v, clase, ruta, out var p1),
+             "pero NO por un trozo: el proceso es exacto");
+        Vale(p1.Contains("firefox"), $"y se dice cuál es el de verdad ({p1})");
+
+        Vale(HyprReglas.Coincide(R("a", clase: "mozillawindowclass", espacio: 1), v, clase, ruta, out _),
+             "la clase coincide sin mayúsculas");
+        Vale(!HyprReglas.Coincide(R("a", clase: "Chrome_WidgetWin_1", espacio: 1), v, clase, ruta, out _),
+             "y otra clase no");
+
+        // ---------- Título y ruta: contiene, y sin acentos ----------
+        //
+        // Quien escribe una regla para "Configuración" no tiene por qué acordarse de la
+        // tilde. Es la misma norma que ya usa el buscador.
+        Vale(HyprReglas.Coincide(R("a", titulo: "Firefox", espacio: 1), v, clase, ruta, out _),
+             "el título por un trozo");
+        Vale(HyprReglas.Coincide(R("a", titulo: "configuracion", espacio: 1), v, clase, ruta, out _),
+             "sin tilde y en minúsculas");
+        Vale(HyprReglas.Coincide(R("a", titulo: "CONFIGURACIÓN", espacio: 1), v, clase, ruta, out _),
+             "y con tilde y en mayúsculas");
+        Vale(!HyprReglas.Coincide(R("a", titulo: "Chrome", espacio: 1), v, clase, ruta, out _),
+             "y lo que no está, no coincide");
+
+        Vale(HyprReglas.Coincide(R("a", ruta: "Mozilla Firefox", espacio: 1), v, clase, ruta, out _),
+             "la ruta por un trozo");
+        Vale(HyprReglas.Coincide(R("a", ruta: "program files", espacio: 1), v, clase, ruta, out _),
+             "sin mayúsculas");
+        Vale(!HyprReglas.Coincide(R("a", ruta: @"C:\Windows", espacio: 1), v, clase, ruta, out _),
+             "y otra ruta no");
+
+        // ---------- Varios criterios se combinan con Y ----------
+        Vale(HyprReglas.Coincide(R("a", proc: "firefox", titulo: "Firefox", espacio: 1), v, clase, ruta, out _),
+             "dos criterios que se cumplen, coincide");
+        Vale(!HyprReglas.Coincide(R("a", proc: "firefox", titulo: "Chrome", espacio: 1), v, clase, ruta, out _),
+             "si uno falla, no coincide: es Y, no O");
+
+        // ---------- Desactivada no coincide, aunque encaje ----------
+        //
+        // Desactivar en vez de borrar: el usuario puede querer apagar una regla un rato
+        // sin perder lo que escribió.
+        Vale(!HyprReglas.Coincide(R("a", proc: "firefox", espacio: 1, activa: false), v, clase, ruta, out var pd),
+             "una regla desactivada no coincide");
+        Vale(pd.Contains("desactivada"), $"y se dice ({pd})");
+
+        // Sin datos de clase o ruta —pasa: muchas ventanas no los dan— una regla que los
+        // pide no coincide, en vez de coincidir por omisión
+        Vale(!HyprReglas.Coincide(R("a", clase: "X", espacio: 1), v, "", "", out _),
+             "si no se sabe la clase, una regla que la pide no coincide");
+    }
+
+    static void D5PrioridadesYEmpates()
+    {
+        Grupo("D5: prioridad, especificidad y posición");
+
+        // ---------- Tres niveles de desempate, en este orden ----------
+        //
+        // La prioridad explícita manda. Si empatan, gana la más específica, porque se
+        // escribió pensando en un caso concreto. Y si siguen empatadas, la que está antes
+        // en la lista: estable y predecible.
+        var baja = R("baja", prio: 0, proc: "firefox", espacio: 1);
+        var alta = R("alta", prio: 10, proc: "firefox", espacio: 2);
+        var ordenadas = HyprReglas.Ordenar(new[] { baja, alta });
+        Igual("alta", ordenadas[0].Id, "la de más prioridad va primera");
+
+        var general = R("general", proc: "firefox", espacio: 1);
+        var concreta = R("concreta", proc: "firefox", titulo: "GitHub", espacio: 2);
+        var porEspecificidad = HyprReglas.Ordenar(new[] { general, concreta });
+        Igual("concreta", porEspecificidad[0].Id,
+              "con la misma prioridad, la más específica va primera");
+        Igual(2, concreta.Especificidad, "y la especificidad se cuenta por criterios");
+        Igual(1, general.Especificidad, "la general tiene uno");
+
+        var primera = R("primera", proc: "a", espacio: 1);
+        var segunda = R("segunda", proc: "b", espacio: 2);
+        var porPosicion = HyprReglas.Ordenar(new[] { primera, segunda });
+        Igual("primera", porPosicion[0].Id, "empatadas del todo, manda el orden del fichero");
+
+        // Ordenar es estable: hacerlo dos veces da lo mismo
+        var otraVez = HyprReglas.Ordenar(porPosicion);
+        Vale(otraVez.Select(r => r.Id).SequenceEqual(porPosicion.Select(r => r.Id)),
+             "ordenar dos veces da el mismo orden");
+
+        // ---------- La de más peso pone el campo, y la otra NO lo pisa ----------
+        var v = new VentanaModelo((IntPtr)1, "firefox", "GitHub — Firefox",
+                                  new NubeHypr.Rect(0, 0, 800, 600));
+        var r = HyprReglas.Resolver(v, new[] { baja, alta });
+        Igual(2, r.Decision.Espacio, "el espacio lo pone la de más prioridad");
+        Igual("alta", r.Decision.Quien["Espacio"], "y se sabe quién lo puso");
+        Igual(2, r.Coincidencias, "las dos coincidieron");
+
+        // La que coincide pero no aporta se dice: explica por qué «una regla que coincide»
+        // no se nota
+        var laQueNoAporta = r.Explicaciones.First(e => e.Id == "baja");
+        Vale(laQueNoAporta.Coincidio, "la de menos prioridad coincidió");
+        Vale(laQueNoAporta.ToString().Contains("no aportó nada"),
+             $"y se dice que no aportó nada ({laQueNoAporta})");
+
+        // ---------- Dos reglas se SUMAN si hablan de campos distintos ----------
+        //
+        // `null` significa «esta regla no opina de eso», no «ponlo a cero». Es lo que
+        // permite que una diga el espacio y otra diga que sea flotante.
+        var dondeVa = R("donde", proc: "firefox", espacio: 3);
+        var comoVa = R("como", proc: "firefox", flotante: true);
+        var suma = HyprReglas.Resolver(v, new[] { dondeVa, comoVa });
+        Igual(3, suma.Decision.Espacio, "una pone el espacio");
+        Igual(true, suma.Decision.Flotante, "y la otra lo flotante");
+        Igual("donde", suma.Decision.Quien["Espacio"], "cada campo con su dueño");
+        Igual("como", suma.Decision.Quien["Flotante"], "los dos");
+    }
+
+    static void D5LaExplicacion()
+    {
+        Grupo("D5: por qué coincidió o por qué no");
+
+        // ---------- Lo que convierte una sorpresa en un dato ----------
+        //
+        // «Mi navegador aparece en un sitio raro» no se investiga leyendo el código: se
+        // investiga sabiendo qué regla coincidió y por qué las demás no.
+        var v = new VentanaModelo((IntPtr)1, "code", "NubeBar — Visual Studio Code",
+                                  new NubeHypr.Rect(0, 0, 800, 600));
+
+        var reglas = new[]
+        {
+            R("navegador", proc: "firefox", espacio: 1),
+            R("editor", proc: "code", espacio: 2, layout: NubeHypr.Layout.Principal),
+            R("por-titulo", titulo: "NubeBar", flotante: false),
+            R("apagada", proc: "code", espacio: 9, activa: false),
+        };
+
+        var r = HyprReglas.Resolver(v, reglas, "Chrome_WidgetWin_1", @"C:\code\Code.exe");
+
+        Igual(4, r.Explicaciones.Count, "hay una línea por regla, coincidan o no");
+        Igual(2, r.Coincidencias, "coinciden dos");
+
+        var noVa = r.Explicaciones.First(e => e.Id == "navegador");
+        Vale(!noVa.Coincidio, "la del navegador no coincide");
+        Vale(noVa.Porque.Contains("code") && noVa.Porque.Contains("firefox"),
+             $"y dice qué proceso es y qué pedía ({noVa.Porque})");
+
+        var apagada = r.Explicaciones.First(e => e.Id == "apagada");
+        Vale(!apagada.Coincidio && apagada.Porque.Contains("desactivada"),
+             "la desactivada se descarta por estarlo, no por los criterios");
+
+        var siVa = r.Explicaciones.First(e => e.Id == "editor");
+        Vale(siVa.Coincidio && siVa.Aplico.Contains("espacio=2"),
+             $"y la que coincide dice qué aplicó ({siVa})");
+
+        // La decisión se lee de un vistazo, con el dueño de cada campo
+        var texto = r.Decision.ToString();
+        Vale(texto.Contains("espacio=2") && texto.Contains("editor"),
+             $"la decisión dice qué y quién ({texto})");
+
+        // Sin reglas, nadie opina, y eso NO es un error
+        var sinNada = HyprReglas.Resolver(v, Array.Empty<HyprReglas.Regla>());
+        Vale(!sinNada.Decision.DiceAlgo, "sin reglas, ninguna decisión");
+        Igual("ninguna regla opina", sinNada.Decision.ToString(), "y se lee así");
+        Igual(0, sinNada.Explicaciones.Count, "sin explicaciones que dar");
+
+        // Todas las acciones se pueden expresar
+        var completa = R("todo", proc: "code", espacio: 1, monitor: 2,
+                         layout: NubeHypr.Layout.Vertical, flotante: true,
+                         ancho: 800, alto: 600, foco: true);
+        var rc = HyprReglas.Resolver(v, new[] { completa });
+        Igual(1, rc.Decision.Espacio, "espacio");
+        Igual(2, rc.Decision.Monitor, "monitor");
+        Igual(NubeHypr.Layout.Vertical, rc.Decision.Layout, "layout");
+        Igual(true, rc.Decision.Flotante, "flotante");
+        Igual(800.0, rc.Decision.Ancho, "ancho");
+        Igual(600.0, rc.Decision.Alto, "alto");
+        Igual(true, rc.Decision.Foco, "y foco");
+    }
+
+    static void D5GuardarDeshacerYRollback()
+    {
+        Grupo("D5: quitar una regla sin tocar las demás");
+
+        var lista = new List<HyprReglas.Regla>
+        {
+            R("a", proc: "firefox", espacio: 1),
+            R("b", proc: "code", espacio: 2),
+            R("c", proc: "discord", espacio: 3),
+        };
+
+        // ---------- Quitar por id, no por posición ----------
+        //
+        // Quitar «la tercera» se rompe en cuanto el usuario reordena.
+        var sinB = HyprReglas.Quitar(lista, "b");
+        Igual(2, sinB.Count, "quitar una deja dos");
+        Vale(sinB.Select(r => r.Id).SequenceEqual(new[] { "a", "c" }),
+             "y las demás conservan su orden");
+        Vale(HyprReglas.Quitar(lista, "B").Count == 2, "el id no distingue mayúsculas");
+        Igual(3, HyprReglas.Quitar(lista, "noexiste").Count, "quitar una que no está no quita nada");
+
+        // ---------- Desactivar es reversible; borrar no ----------
+        var apagada = HyprReglas.Alternar(lista, "b");
+        Vale(!apagada.First(r => r.Id == "b").Activa, "alternar la desactiva");
+        Igual(3, apagada.Count, "sin perderla");
+        Vale(HyprReglas.Alternar(apagada, "b").First(r => r.Id == "b").Activa,
+             "y alternar otra vez la vuelve a encender");
+
+        // ---------- Poner actualiza en su sitio ----------
+        var cambiada = HyprReglas.Poner(lista, R("b", proc: "code", espacio: 7));
+        Igual(3, cambiada.Count, "actualizar no duplica");
+        Igual(7, cambiada.First(r => r.Id == "b").Espacio, "y el valor es el nuevo");
+        Vale(cambiada.Select(r => r.Id).SequenceEqual(new[] { "a", "b", "c" }),
+             "y NO se mueve en el orden: por eso no da saltos");
+
+        var anadida = HyprReglas.Poner(lista, R("d", proc: "steam", espacio: 4));
+        Igual(4, anadida.Count, "una nueva se añade");
+        Igual("d", anadida[^1].Id, "al final");
+
+        // ---------- El rollback ----------
+        //
+        // Guardar la lista entera antes de tocarla y poder volver. Es lo mismo que hacen
+        // los perfiles de C5 con las claves del config, y por el mismo motivo.
+        var antes = HyprReglas.Instantanea(lista);
+        var tocada = HyprReglas.Quitar(HyprReglas.Poner(lista, R("e", proc: "x", espacio: 5)), "a");
+        var (puestas, quitadas, cambiadas) = HyprReglas.Comparar(antes, tocada);
+        Igual(1, puestas.Count, "se ve la que entró");
+        Igual("e", puestas[0], "y cuál");
+        Igual(1, quitadas.Count, "la que salió");
+        Igual("a", quitadas[0], "y cuál");
+        Igual(0, cambiadas.Count, "y ninguna cambiada");
+
+        // Volver atrás devuelve exactamente lo de antes
+        var vuelta = HyprReglas.Instantanea(antes);
+        Vale(vuelta.Select(r => r.Id).SequenceEqual(antes.Select(r => r.Id)),
+             "la instantánea devuelve la lista de antes");
+        Vale(HyprReglas.Comparar(antes, vuelta) is { Puestas.Count: 0, Quitadas.Count: 0, Cambiadas.Count: 0 },
+             "y comparada con el original no hay diferencias");
+
+        // Un cambio de valor se detecta como cambio, no como quitar y poner
+        var otroValor = HyprReglas.Poner(antes, R("a", proc: "firefox", espacio: 99));
+        var (_, _, cam2) = HyprReglas.Comparar(antes, otroValor);
+        Igual(1, cam2.Count, "cambiar el valor de una regla se ve como cambio");
+        Igual("a", cam2[0], "y de cuál");
+
+        // ---------- Ids libres ----------
+        Igual("firefox", HyprReglas.IdLibre(lista, "Firefox"), "un id libre se usa tal cual, sin acentos");
+        Igual("a-2", HyprReglas.IdLibre(lista, "a"), "uno cogido se numera");
+        Vale(HyprReglas.IdLibre(lista, null).Length > 0, "y sin propuesta se inventa uno");
+        Vale(!HyprReglas.IdLibre(lista, "Configuración").Contains('ó'),
+             "los acentos se quitan: un id es para el fichero, no para leerlo");
+    }
+
+    static void D5ReglasEnLaConfiguracion()
+    {
+        Grupo("D5: las reglas en el config, y lo desconocido se conserva");
+
+        // ---------- De serie, ninguna ----------
+        var opc = new OpcionesHypr();
+        Igual(0, opc.Reglas.Count, "de serie no hay ninguna regla");
+        Vale(!opc.Activo, "y la capa sigue apagada");
+
+        // ---------- Un config antiguo no trae reglas y no se rompe ----------
+        var v3 = new JsonObject { ["Version"] = 3, ["Tema"] = new JsonObject() };
+        Esquema.Migrar(v3);
+        Vale(v3["NubeHypr"]!["Reglas"] is JsonArray a && a.Count == 0,
+             "al migrar, las reglas quedan como una lista vacía");
+
+        // ---------- Lo que esta versión no conoce se conserva ----------
+        //
+        // Es el requisito del documento, y la forma de cumplirlo es que las migraciones
+        // trabajen sobre el ÁRBOL: lo que no se toca sigue ahí.
+        var conExtras = new JsonObject
+        {
+            ["Version"] = 3,
+            ["NubeHypr"] = new JsonObject
+            {
+                ["Activo"] = false,
+                ["UnaClaveDelFuturo"] = "no la conozco",
+                ["OtraMas"] = 42,
+            },
+            ["SeccionQueNoExiste"] = new JsonObject { ["x"] = 1 },
+        };
+        Esquema.Migrar(conExtras);
+        Igual("no la conozco", conExtras["NubeHypr"]!["UnaClaveDelFuturo"]!.GetValue<string>(),
+              "una clave desconocida dentro de NubeHypr sobrevive a la migración");
+        Igual(42, conExtras["NubeHypr"]!["OtraMas"]!.GetValue<int>(), "y otra más");
+        Vale(conExtras["SeccionQueNoExiste"] is JsonObject,
+             "y una sección entera desconocida también");
+        Igual(false, conExtras["NubeHypr"]!["Activo"]!.GetValue<bool>(),
+              "sin encender la capa, que es lo importante");
+
+        // Y el validador no se queja de lo que no conoce
+        Vale(Esquema.Mal(conExtras, 0) == null,
+             "el validador no rechaza un árbol por llevar claves que no entiende");
+
+        // ---------- Una regla da la vuelta por JSON sin perder nada ----------
+        var regla = R("prueba", prio: 5, proc: "firefox", titulo: "GitHub",
+                      espacio: 2, layout: NubeHypr.Layout.Vertical, flotante: true,
+                      ancho: 900, alto: 700, foco: true);
+        var json = System.Text.Json.JsonSerializer.Serialize(regla);
+        var vuelta = System.Text.Json.JsonSerializer.Deserialize<HyprReglas.Regla>(json);
+        Vale(vuelta != null, "la regla se deserializa");
+        Igual(regla, vuelta, "y es exactamente la misma: nada se pierde por el camino");
+
+        // Los nulos siguen siendo nulos: «no opino» no puede convertirse en un cero
+        var media = R("media", proc: "x", espacio: 1);
+        var vueltaMedia = System.Text.Json.JsonSerializer.Deserialize<HyprReglas.Regla>(
+            System.Text.Json.JsonSerializer.Serialize(media));
+        Vale(vueltaMedia!.Flotante == null, "lo que no opinaba sigue sin opinar");
+        Vale(vueltaMedia.Ancho == null, "y no se convierte en cero");
+    }
+
+    // ================= D5.1: las reglas conectadas a que aparezca una ventana =================
+    //
+    // Siete grupos, que son los siete casos que pide el documento, más dos de integración.
+    // Todos PUROS: no se abre ni una ventana, no se mueve ni una, y `HyprVigilante` no
+    // llama a Win32 en ninguno.
+
+    // La ventana con título y proceso a medida: el helper `V` pone el título "t<hwnd>", y
+    // para probar el criterio de título hace falta decidirlo.
+    static VentanaModelo Vt(long h, string proc, string titulo) =>
+        new((IntPtr)h, proc, titulo, new NubeHypr.Rect(0, 0, 400, 300));
+
+    static void D51ReglaAplicable()
+    {
+        Grupo("D5.1: una regla aplicable se aporta, y se ve qué aportó");
+
+        var reglas = new List<HyprReglas.Regla> { R("nav", proc: "firefox", espacio: 3) };
+        var a = HyprVigilante.Examinar(Vt(1, "firefox", "GitHub"), reglas);
+
+        Vale(a.AlgunaCoincidio, "la regla coincide");
+        Igual(3, a.Decision.Espacio, "y pone el espacio");
+        Vale(a.CamposPuestos.Contains("Espacio"), "el espacio sale en los campos puestos");
+
+        // ---------- Y esto es la mitad del valor del diagnóstico ----------
+        //
+        // Los campos de los que NADIE opinó, listados. Sin ellos, "mi ventana no se va al
+        // monitor 2" no se distingue de "se intentó y no funcionó".
+        Vale(a.CamposSinOpinion.Contains("Monitor"), "del monitor no opinó nadie, y se dice");
+        Vale(a.CamposSinOpinion.Contains("Layout"), "ni del layout");
+        Igual(5, a.CamposSinOpinion.Count, "cinco campos sin opinión de los seis");
+
+        // ---------- La línea del log dice la verdad sobre si se movió algo ----------
+        //
+        // Esta prueba exigía `modo=simulacion` y «NO se ha movido nada» **siempre**, porque
+        // así estaba escrito: un literal fijo de cuando el vigilante solo resolvía. Desde
+        // D9.5 mueve y desde D9.6 reparte escritorios, así que la prueba estaba blindando
+        // una mentira — un registro que dice «simulacion» mientras las ventanas se mueven.
+        //
+        // Ahora se exige lo contrario: que la línea diga **el modo de verdad**, y que diga
+        // lo que va a pasar con ese modo.
+        var enSimulacion = HyprVigilante.Lineas(a, NubeHypr.Modo.Simulacion);
+        Vale(enSimulacion.Any(l => l.Contains("modo=simulacion")),
+             "en simulación la primera línea dice «simulacion»");
+        Vale(enSimulacion.Any(l => l.Contains("NO se mueve nada")),
+             "y se apunta explícitamente que no se mueve nada");
+        Vale(enSimulacion.Any(l => l.Contains("firefox")), "y de qué ventana se habla");
+
+        // Y con la capa aplicando, la misma línea NO puede decir que no se mueve nada.
+        var aplicando = HyprVigilante.Lineas(a, NubeHypr.Modo.Aplicar);
+        Vale(aplicando.Any(l => l.Contains("modo=aplicar")),
+             "aplicando la primera línea dice «aplicar», no «simulacion»");
+        Vale(!aplicando.Any(l => l.Contains("NO se mueve nada")),
+             "y NO promete que no se mueve nada, porque sí se mueve");
+        Vale(aplicando.Any(l => l.Contains("SÍ se ejecuta")),
+             "lo dice en claro, y remite a las líneas de D9.5 y D9.6");
+
+        // Apagada, lo mismo por el otro lado.
+        Vale(HyprVigilante.Lineas(a, NubeHypr.Modo.Apagado).Any(l => l.Contains("apagada")),
+             "y con la capa apagada se dice que está apagada");
+
+        // Y quien solo quiere ver la decisión —el editor de reglas, la guía— no recibe un
+        // modo inventado: recibe que aquí solo se resuelve.
+        var sinModo = HyprVigilante.Lineas(a);
+        Vale(sinModo.Any(l => l.Contains("solo se resuelve")),
+             "sin modo no se inventa uno: se dice que aquí solo se resuelve");
+    }
+
+    static void D51ReglaAmbigua()
+    {
+        Grupo("D5.1: dos reglas que valen para la misma ventana y el mismo campo");
+
+        // Ambas coinciden y ambas opinan del espacio. No es un error: gana la de más peso
+        // y la otra queda apuntada como "coincide pero no aportó nada nuevo". Que una
+        // regla coincida y no cambie nada es información, no silencio.
+        var reglas = new List<HyprReglas.Regla>
+        {
+            R("general", proc: "code", espacio: 1),
+            R("concreta", proc: "code", titulo: "nubebar", espacio: 9),
+        };
+        var a = HyprVigilante.Examinar(Vt(1, "code", "NubeBar - Visual Studio Code"), reglas);
+
+        Igual(2, a.Explicaciones.Count(e => e.Coincidio), "las dos coinciden");
+        Igual(9, a.Decision.Espacio, "y gana la más específica: dos criterios pesan más que uno");
+        Igual("concreta", a.Decision.Quien["Espacio"], "y queda escrito quién lo decidió");
+
+        var perdedora = a.Explicaciones.First(e => e.Id == "general");
+        Vale(perdedora.ToString().Contains("no aportó nada nuevo"),
+             "la que coincidió y no pudo poner nada lo dice, en vez de desaparecer del log");
+    }
+
+    static void D51Prioridad()
+    {
+        Grupo("D5.1: la prioridad manda sobre la especificidad");
+
+        // La general tiene prioridad 10 y un solo criterio; la concreta tiene prioridad 0
+        // y dos. Gana la prioridad: si no ganara, poner una prioridad no serviría para
+        // nada y habría que adivinar el orden interno de evaluación.
+        var reglas = new List<HyprReglas.Regla>
+        {
+            R("concreta", prio: 0, proc: "code", titulo: "nubebar", espacio: 9),
+            R("mandona", prio: 10, proc: "code", espacio: 1),
+        };
+        var a = HyprVigilante.Examinar(Vt(1, "code", "NubeBar - Visual Studio Code"), reglas);
+
+        Igual(1, a.Decision.Espacio, "gana la de prioridad 10 aunque sea menos específica");
+        Igual("mandona", a.Decision.Quien["Espacio"], "y se sabe cuál fue");
+
+        // Y una prioridad negativa es "la última de todas": sirve para una regla de
+        // respaldo que solo actúe si nadie más ha opinado.
+        var conRespaldo = new List<HyprReglas.Regla>
+        {
+            R("respaldo", prio: -5, proc: "code", monitor: 0),
+            R("normal", proc: "code", espacio: 4),
+        };
+        var b = HyprVigilante.Examinar(Vt(1, "code", "x"), conRespaldo);
+        Igual(4, b.Decision.Espacio, "la normal pone el espacio");
+        Igual(0, b.Decision.Monitor, "y la de respaldo llega a poner lo que nadie puso");
+        Igual("respaldo", b.Decision.Quien["Monitor"], "aunque vaya la última");
+    }
+
+    static void D51Empate()
+    {
+        Grupo("D5.1: el empate se rompe por el orden, no por el azar");
+
+        // Misma prioridad, misma especificidad, mismo campo. El desempate es la POSICIÓN
+        // en la lista, y eso importa: sin un desempate estable, la misma configuración
+        // daría decisiones distintas entre arranques, y eso es exactamente lo que haría
+        // imposible aplicarlas de verdad después.
+        var reglas = new List<HyprReglas.Regla>
+        {
+            R("primera", proc: "code", espacio: 1),
+            R("segunda", proc: "code", espacio: 2),
+        };
+        var a = HyprVigilante.Examinar(Vt(1, "code", "x"), reglas);
+        Igual(1, a.Decision.Espacio, "gana la que está antes en la lista");
+
+        // Y con la lista al revés gana la otra: se confirma que el criterio es el orden
+        // y no algo del contenido que diera siempre el mismo resultado por casualidad.
+        var alReves = new List<HyprReglas.Regla> { reglas[1], reglas[0] };
+        Igual(2, HyprVigilante.Examinar(Vt(1, "code", "x"), alReves).Decision.Espacio,
+              "y al darle la vuelta a la lista, gana la otra");
+
+        // La perdedora sigue saliendo en el log, marcada como coincidente
+        Igual(2, a.Explicaciones.Count(e => e.Coincidio), "las dos aparecen como coincidentes");
+    }
+
+    static void D51VentanaDesconocida()
+    {
+        Grupo("D5.1: una ventana que no encaja en ninguna regla se deja en paz");
+
+        var reglas = new List<HyprReglas.Regla>
+        {
+            R("nav", proc: "firefox", espacio: 2),
+            R("ed", proc: "code", espacio: 3),
+        };
+        var a = HyprVigilante.Examinar(Vt(1, "calculadora", "Calculadora"), reglas);
+
+        Vale(!a.AlgunaCoincidio, "ninguna regla coincide");
+        Vale(!a.Decision.DiceAlgo, "y la decisión no dice nada");
+        Igual(0, a.CamposPuestos.Count, "ningún campo puesto");
+        Igual(6, a.CamposSinOpinion.Count, "los seis campos sin opinión");
+
+        // El log de este caso tiene que ser corto y claro. Un "ninguna regla coincide" de
+        // una línea por ventana es legible; seis líneas de "no opinó nadie" por cada
+        // ventana que abres, no.
+        var lineas = HyprVigilante.Lineas(a);
+        Igual(2, lineas.Count, "dos líneas y se acabó: la ventana y el «ninguna coincide»");
+        Vale(lineas[1].Contains("ninguna regla coincide"), "y lo dice con esas palabras");
+
+        // Y se explica POR QUÉ cada una no coincidió: sin eso, una regla que no dispara
+        // se depura cambiándola al azar.
+        Igual(2, a.Explicaciones.Count, "las dos reglas se explican");
+        Vale(a.Explicaciones.All(e => !e.Coincidio && e.Porque.Length > 0),
+             "cada una dice por qué no");
+    }
+
+    static void D51VariasReglasAportanCamposDistintos()
+    {
+        Grupo("D5.1: varias reglas aportando campos distintos a la misma ventana");
+
+        // Tres reglas coinciden y cada una pone lo suyo. Es el caso que el documento pide
+        // explícitamente, y el que de verdad se usa: una regla dice el espacio, otra el
+        // tamaño, otra que flote.
+        var reglas = new List<HyprReglas.Regla>
+        {
+            R("espacio", prio: 3, proc: "firefox", espacio: 2),
+            R("tamano", prio: 2, proc: "firefox", ancho: 0.8, alto: 0.9),
+            R("flota", prio: 1, proc: "firefox", flotante: true),
+            R("otra-app", proc: "code", monitor: 1),
+        };
+        var a = HyprVigilante.Examinar(Vt(1, "firefox", "GitHub"), reglas);
+
+        Igual(3, a.Explicaciones.Count(e => e.Coincidio), "coinciden tres de las cuatro");
+        Igual(2, a.Decision.Espacio, "el espacio lo pone una");
+        Igual(0.8, a.Decision.Ancho, "el tamaño otra");
+        Igual(true, a.Decision.Flotante, "y que flote, otra");
+        Vale(a.Decision.Monitor == null, "y del monitor no opina nadie: esa regla era de otra app");
+
+        // El mapa de quién: tres campos, tres dueños distintos. Es lo que contesta "¿por
+        // qué esta ventana sale flotando?" sin tener que releer la configuración entera.
+        Igual("espacio", a.Decision.Quien["Espacio"], "cada campo recuerda su dueño");
+        Igual("tamano", a.Decision.Quien["Tamano"], "el del tamaño");
+        Igual("flota", a.Decision.Quien["Flotante"], "y el de flotante");
+
+        Igual(3, a.CamposPuestos.Count, "tres campos puestos");
+        Vale(a.CamposSinOpinion.SequenceEqual(new[] { "Monitor", "Layout", "Foco" }),
+             "y los tres que quedan, listados como sin opinión");
+    }
+
+    static void D51Idempotencia()
+    {
+        Grupo("D5.1: resolver dos veces da lo mismo, y una ventana se resuelve una sola vez");
+
+        var reglas = new List<HyprReglas.Regla>
+        {
+            R("a", prio: 2, proc: "firefox", espacio: 2, ancho: 0.5),
+            R("b", prio: 1, proc: "firefox", espacio: 9, flotante: true),
+        };
+        var v = Vt(1, "firefox", "GitHub");
+
+        // ---------- Mismo resultado al repetir ----------
+        var uno = HyprVigilante.Examinar(v, reglas);
+        var dos = HyprVigilante.Examinar(v, reglas);
+        Igual(uno.Decision.ToString(), dos.Decision.ToString(), "la misma decisión, al detalle");
+        Vale(uno.CamposPuestos.SequenceEqual(dos.CamposPuestos), "los mismos campos puestos");
+        Vale(uno.Explicaciones.SequenceEqual(dos.Explicaciones), "y las mismas explicaciones");
+
+        // ---------- Y la conexión: una ventana se examina UNA vez ----------
+        //
+        // Esto es lo que evita que una ventana que cambia de título vuelva a "aparecer"
+        // para las reglas cuarenta veces por minuto.
+        HyprVigilante.Olvidar();
+        var lista = new List<VentanaModelo> { v };
+
+        var primera = HyprVigilante.AlCambiarLaLista(NubeHypr.Modo.Simulacion, lista, reglas);
+        Igual(1, primera.Count, "la primera vez se resuelve");
+        var segunda = HyprVigilante.AlCambiarLaLista(NubeHypr.Modo.Simulacion, lista, reglas);
+        Igual(0, segunda.Count, "la segunda no: ya se vio");
+        Igual(1, (int)HyprVigilante.Resueltas, "y el contador no sube de uno");
+
+        // Una ventana NUEVA sí se resuelve, y la vieja no otra vez
+        var conOtra = new List<VentanaModelo> { v, Vt(2, "firefox", "Otra") };
+        var tercera = HyprVigilante.AlCambiarLaLista(NubeHypr.Modo.Simulacion, conOtra, reglas);
+        Igual(1, tercera.Count, "solo la nueva");
+        Igual((IntPtr)2, tercera[0].Hwnd, "y es la que acaba de aparecer");
+
+        // ---------- La que se va, se olvida ----------
+        //
+        // Si no se olvidara, una sesión larga acumularía handles muertos y un hwnd que
+        // Windows reutilizara se daría por ya visto: la ventana nueva no se resolvería.
+        HyprVigilante.AlCambiarLaLista(NubeHypr.Modo.Simulacion, new List<VentanaModelo>(), reglas);
+        Igual(0, HyprVigilante.Vistas, "al cerrarse todas, no queda ningún handle recordado");
+        var otraVez = HyprVigilante.AlCambiarLaLista(NubeHypr.Modo.Simulacion, lista, reglas);
+        Igual(1, otraVez.Count, "y un hwnd reutilizado se vuelve a resolver");
+
+        // ---------- Apagada: no se resuelve ni se recuerda ----------
+        HyprVigilante.Olvidar();
+        Igual(0, HyprVigilante.AlCambiarLaLista(NubeHypr.Modo.Apagado, lista, reglas).Count,
+              "con la capa apagada no se resuelve nada");
+        Igual(0, HyprVigilante.Vistas, "y no se recuerda nada: apagada es apagada");
+
+        // ---------- Sin reglas: se marca la ventana pero no se apunta nada ----------
+        //
+        // Es el caso de serie (la lista nace vacía) y tiene que ser barato: sin reglas no
+        // hay nada que resolver, pero la ventana se da por vista para no volver a mirarla.
+        HyprVigilante.Olvidar();
+        var sinReglas = HyprVigilante.AlCambiarLaLista(
+            NubeHypr.Modo.Simulacion, lista, new List<HyprReglas.Regla>());
+        Igual(0, sinReglas.Count, "sin reglas no sale ningún apunte");
+        Igual(1, HyprVigilante.Vistas, "pero la ventana queda vista");
+        Igual(1, (int)HyprVigilante.SinReglas, "y se cuenta aparte, para poder decirlo en el log");
+        HyprVigilante.Olvidar();
+    }
+
+    static void D51ConfiguracionAntiguaConCadenas()
+    {
+        Grupo("D5.1: Reglas con cadenas de un config viejo no tumba la configuración");
+
+        // ---------- El riesgo real ----------
+        //
+        // `Reglas` nació como `List<string>` en un borrador. Si alguien tuviera cadenas
+        // ahí, `JsonSerializer` lanzaría, `Config.Cargar` devolvería null y NubeBar
+        // arrancaría con la configuración de serie: el usuario perdería su configuración
+        // entera por una clave. Por eso el lector es tolerante.
+        var opc = new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            Converters = { new HyprReglas.LectorTolerante() },
+        };
+
+        var cadenas = System.Text.Json.JsonSerializer.Deserialize<OpcionesHypr>(
+            "{\"Activo\":false,\"Reglas\":[\"firefox\",\"code\"]}", opc);
+        Vale(cadenas != null, "un config con cadenas en Reglas se lee en vez de reventar");
+        Igual(2, cadenas!.Reglas.Count, "las dos entradas llegan");
+        Igual("firefox", cadenas.Reglas[0].Id, "y el texto original se conserva como id");
+
+        // Y son INERTES: sin criterios no coinciden con nada, así que una configuración
+        // vieja no empieza a decidir sobre las ventanas de nadie.
+        Vale(cadenas.Reglas.All(r => r.SinCriterios), "sin criterios: no coinciden con nada");
+        var a = HyprVigilante.Examinar(Vt(1, "firefox", "GitHub"), cadenas.Reglas);
+        Vale(!a.AlgunaCoincidio, "una regla heredada de una cadena no coincide ni con su propio nombre");
+
+        // ---------- Y lo demás de la sección se lee bien ----------
+        Vale(!cadenas.Activo, "la capa sigue apagada");
+
+        // ---------- Números, booleanos y nulos tampoco rompen ----------
+        var basura = System.Text.Json.JsonSerializer.Deserialize<OpcionesHypr>(
+            "{\"Reglas\":[1,true,null,\"x\"]}", opc);
+        Igual(4, basura!.Reglas.Count, "cuatro entradas de basura se leen como cuatro reglas inertes");
+        Vale(basura.Reglas.All(r => r.SinCriterios), "y ninguna coincide con nada");
+
+        // ---------- Un objeto mal formado tampoco ----------
+        var roto = System.Text.Json.JsonSerializer.Deserialize<OpcionesHypr>(
+            "{\"Reglas\":[{\"Id\":\"ok\",\"Proceso\":\"code\"},{\"Id\":5,\"Espacio\":\"dos\"}]}", opc);
+        Igual(2, roto!.Reglas.Count, "las dos entradas llegan");
+        Igual("ok", roto.Reglas[0].Id, "la buena se lee entera");
+        Igual("code", roto.Reglas[0].Proceso, "con su criterio");
+        Vale(roto.Reglas[1].SinCriterios, "y la rota queda inerte en vez de tumbar la carga");
+
+        // ---------- Una regla normal sigue dando la vuelta sin perder nada ----------
+        var buena = R("prueba", prio: 5, proc: "firefox", espacio: 2, flotante: true);
+        var vuelta = System.Text.Json.JsonSerializer.Deserialize<HyprReglas.Regla>(
+            System.Text.Json.JsonSerializer.Serialize(buena, opc), opc);
+        Igual(buena, vuelta, "con el lector tolerante puesto, una regla buena no cambia");
+    }
+
+    static void D51ReglasYAtajosEnLosPerfiles()
+    {
+        Grupo("D5.1: los perfiles pueden llevar reglas y atajos, pero no encender la capa");
+
+        // ---------- Lo que un perfil SÍ puede ----------
+        Vale(Perfiles.Permitida("NubeHypr", "Reglas"), "un perfil puede traer reglas");
+        Vale(Perfiles.Permitida("NubeHypr", "Atajos"), "y atajos");
+
+        // ---------- Y lo que NO ----------
+        //
+        // Esto importa más que lo anterior. Un perfil cambia la configuración; si pudiera
+        // encender la capa —o ponerla en "aplicar"— aplicar un perfil te empezaría a mover
+        // ventanas sin haberlo pedido.
+        Vale(!Perfiles.Permitida("NubeHypr", "Activo"), "un perfil NO puede encender la capa");
+        Vale(!Perfiles.Permitida("NubeHypr", "Modo"), "ni cambiar el modo");
+        Vale(!Perfiles.Permitida("NubeHypr", "RestaurarAlOrganizar"),
+             "ni decidir que se desmaximicen tus ventanas");
+
+        // ---------- Un perfil con reglas se traduce a escrituras, no a movimientos ----------
+        //
+        // Lo que un perfil produce son escrituras de configuración. Que una de ellas sea
+        // una lista de reglas no cambia nada: nadie mueve ventanas al aplicar un perfil.
+        var p = new Perfil
+        {
+            Id = "conreglas", Nombre = "Con reglas",
+            Ajustes = new JsonObject
+            {
+                ["NubeHypr"] = new JsonObject
+                {
+                    ["Reglas"] = new JsonArray
+                    {
+                        new JsonObject { ["Id"] = "del-perfil", ["Proceso"] = "code", ["Espacio"] = 2 },
+                    },
+                    ["Atajos"] = new JsonObject { ["ciclo.siguiente"] = "Win+Alt+J" },
+                    ["Activo"] = true,        // esta tiene que caerse
+                    ["Modo"] = "aplicar",     // y esta también
+                },
+                ["Tema"] = new JsonObject { ["Acento"] = "#112233" },
+            },
+        };
+
+        var escrituras = Perfiles.Escrituras(p);
+        Vale(escrituras.Any(e => e.Seccion == "NubeHypr" && e.Clave == "Reglas"),
+             "las reglas del perfil se escriben");
+        Vale(escrituras.Any(e => e.Seccion == "NubeHypr" && e.Clave == "Atajos"),
+             "y los atajos también");
+        Vale(!escrituras.Any(e => e.Clave == "Activo"),
+             "encender la capa se descarta, aunque venga en el fichero del perfil");
+        Vale(!escrituras.Any(e => e.Clave == "Modo"),
+             "y poner el modo en «aplicar», igual: se descarta");
+        Vale(escrituras.Any(e => e.Seccion == "Tema" && e.Clave == "Acento"),
+             "y lo demás del perfil sigue funcionando");
+
+        // Las reglas llegan como el nodo entero, no aplanadas: una lista es un valor.
+        var deReglas = escrituras.First(e => e.Clave == "Reglas");
+        Vale(deReglas.Valor is JsonArray arr && arr.Count == 1,
+             "la lista de reglas viaja entera como un solo valor");
+
+        // Y el contador de movimientos reales sigue a cero: aplicar reglas no es mover.
+        Igual(0L, HyprAdaptador.VecesMovida,
+              "en toda la batería de pruebas no se ha movido ni una ventana de verdad");
     }
 }

@@ -6,6 +6,190 @@ construidos por el workflow de Release a partir de la etiqueta.
 
 ---
 
+## v1.3.0 — sin publicar
+
+**Esta versión NO está publicada.** Está preparada: compilada, probada y empaquetada en
+carpetas de fase, con los hashes en `NUBEHYPR.md`. Lo que falta es la tanda de pruebas que
+necesitan ojos, ratón y teclado, enumerada en `NUBEHYPR.md`.
+
+NubeHypr: una capa de organización de ventanas dentro de NubeBar. **Nace apagada, y
+encendida nace en simulación**: calcula, explica en el registro lo que haría y no mueve
+ninguna ventana. Pasar a mover de verdad es una decisión explícita del usuario.
+
+### Nuevo
+
+**NubeHypr — el motor (fases D0 a D5.1)**
+
+- Modelo puro de layouts (flotante, horizontal, vertical, principal) y 19 comandos
+  semánticos, con el reparto calculado sobre bordes en vez de tamaños: sin costuras de 1 px
+  ni desbordes.
+- Motor real de posicionamiento con el orden seguro: destino válido → simular y volver →
+  comprobar que la ventana existe → mover → **confirmar** comparando lo que se pidió con lo
+  que Windows hizo.
+- Lista protegida: el shell, los diálogos del sistema y nuestras propias ventanas quedan
+  fuera. Las maximizadas y minimizadas también, salvo que se pida restaurarlas.
+- Escritorios virtuales: leer, renombrar, reordenar y enviar ventanas, con un modo de un
+  solo escritorio si la API no responde.
+- Reglas por proceso, clase, título y ruta, con prioridad, especificidad y desempate por
+  orden; y una **explicación por regla** de por qué coincide o se descarta.
+- Las reglas conectadas al momento en que aparece una ventana, en simulación.
+- Editor de atajos en Ajustes: ver los ocupados, reasignar, detectar conflictos antes de
+  guardar y restaurar los de serie.
+
+**NubeHypr — la integración visual (D6)**
+
+- **Indicador de escritorio** con nombre, número y estado de ventanas ("2/4 · Trabajo"),
+  con cuatro tallas según el sitio disponible y el estado por tamaño de punto, no por color.
+- **Vista general rediseñada**: la ventana activa del sistema y la elegida con el teclado
+  son dos cosas distintas y se ven a la vez (filo de acento y halo de foco). Teclado
+  completo: flechas, Inicio, Fin, Entrar, Supr y la tecla de menú.
+- El **menú de una tarjeta ya no la tapa**: se coloca en el lado con hueco.
+- **Página de NubeHypr en Ajustes**: búsqueda, grupos, estado activo y la explicación de
+  qué decidiría cada ventana abierta, con el aviso de simulación siempre a la vista.
+- **Previsualización del ajuste con filo doble**: una línea oscura y una de color, para que
+  se vea sobre un fondo claro, uno oscuro o un vídeo de Wallpaper Engine. Sigue sin recibir
+  clics ni foco.
+- Azul para foco y acciones principales, coral para avisos y acciones destructivas, en los
+  siete temas y con contraste medido.
+- La nube de la escena de inicio como identidad, con topes de tamaño para que no se coma la
+  pantalla.
+
+**NubeHypr — fiabilidad (D7)**
+
+- **Modo seguro**: deja de organizar ventanas y **conserva la isla, los paneles, el
+  carrusel y la bandeja**. Es estado de ejecución, no configuración: reiniciando se sale.
+- **Supervisor interno** que vigila la edad de la instantánea, los atajos vivos y las rachas
+  de fallos. Su acción más fuerte es apagar la capa: no existe ninguna que reorganice.
+- **Restauración de posiciones** cuando una aplicación se reinicia, descartando las que
+  caerían en un monitor que ya no está.
+- **Rescate de la configuración**: si `config.json` no se puede leer, se usa la copia más
+  reciente que sirva (el `.tmp` a medias, el `.bak` o un respaldo de migración) en vez de
+  arrancar con la configuración de fábrica. El fichero roto no se borra ni se sobrescribe.
+- Inventario de cierre que se **mide**: atajos, suscripciones, previsualización y memorias.
+
+**NubeHypr — preguntar antes de mover**
+
+- **`ConfirmarMovimientos` por fin hace algo.** La clave estaba en la configuración desde la
+  primera versión de NubeHypr, puesta a `true`, escrita en el `config.json` de cada usuario…
+  y no la leía nadie. Era una promesa de seguridad sin cumplir: el fichero decía que NubeHypr
+  pregunta antes de tocar ventanas, y no preguntaba.
+- La pregunta sale en la isla, con «Mover» y «Cancelar», y **no contestar es no mover**: no
+  hay plazo que venza aplicando ni confirmación por omisión.
+- **Solo para lo automático**: la regla que salta al abrir una ventana y el reparto por
+  layout. Un atajo que el usuario acaba de pulsar no pregunta, porque pulsarlo ya es la
+  respuesta.
+- La propuesta **caduca a los 30 segundos** —los destinos se calcularon con las ventanas de
+  entonces— y al contestar se vuelve a comprobar que la pregunta siga en pie, que no haya
+  caducado y que la capa siga en «aplicar».
+- Interruptor en Ajustes → NubeHypr. Apagarlo es legítimo: es decir «muévelas sin preguntar».
+
+**D9.6 probado contra Windows — y arreglado, porque no funcionaba**
+
+- **`--arneslayout`**: crea un escritorio virtual, lanza tres ventanas propias dentro, aplica
+  una regla con layout y mide dónde acaban. La prueba que «no se podía hacer sin recolocar
+  las ventanas del usuario» sí se podía: en un escritorio recién creado no hay ninguna.
+- **Y prueba las dos mitades sobre las mismas ventanas**: en simulación las tres se quedan
+  donde Windows las puso, con los contadores de reparto y de movimientos reales sin tocar
+  —«en simulación no se mueve nada» estaba comprobado solo en lógica—; después, en «aplicar»,
+  una ventana nueva dispara el reparto y las cuatro acaban enlosadas, incluidas las tres que
+  ninguna regla nombró.
+- **Y encontró que D9.6 no llegaba a ejecutarse.** Una regla que pedía **solo** un layout
+  —la forma natural de escribirla— volvía antes de repartir, porque la condición de salida
+  miraba si la regla decía algo de *esa* ventana. Son dos decisiones distintas: una sobre la
+  ventana y otra sobre el escritorio. Ahora se comprueban por separado.
+- Contador propio para el reparto (`RepartidasPorRegla`): el de colocar cuenta ventanas una a
+  una, y un layout no coloca una a una.
+- **Y una mentira en el registro:** la línea de cada ventana decía `modo=simulacion` fijo
+  desde antes de que NubeHypr moviera nada, así que llevaba desde D9.5 diciéndolo mientras las
+  ventanas se movían. Ahora dice el modo de verdad.
+
+**Paneles: superficie propia para cuatro que no la tenían**
+
+- Bandeja, batería, notificaciones y el menú contextual usan ya la misma concha que audio, red
+  y el centro de control. No es estética: da superficie **opaca**, y antes se apoyaban en el
+  fondo translúcido de la isla, con el escritorio transparentándose detrás del texto.
+- **Y destapó que tres paneles se dibujaban de punta a punta de la isla** con su contenido
+  centrado dentro, porque no pasaban el ancla a la que debían colgarse. Ya cuelgan de su
+  icono. No se veía porque sin filo, un contenedor de ancho completo y uno que abraza su
+  contenido se dibujan igual.
+- El menú contextual se cierra al salir el ratón, y ese gesto se movió a la superficie nueva:
+  si no, moverse hacia el filo del propio menú lo habría cerrado en la cara.
+- Una notificación con dos acciones del mismo texto —Defender manda dos «Ver menos
+  notificaciones»— ya no pinta dos botones idénticos.
+
+**Pruebas que antes eran manuales y ahora se miden**
+
+- `--diagrejilla`: «Ver todas las ventanas» con ventanas de verdad, midiendo las tarjetas
+  **dibujadas** y no las pedidas.
+- El panel de red abierto y cerrado diez veces, comprobando que las cinco acciones están las
+  diez. El fallo que eso busca sale una vez de cada tantas.
+- Ajustes encogida a su tamaño mínimo: las trece páginas caben a 720x460.
+- **Y el fallo original, probado por el botón de verdad**: `--diagmodulos` abre Ajustes,
+  pulsa «Añadir Escritorios a Centro», comprueba que aparece en la barra, pulsa **Guardar**,
+  **cierra la ventana** y comprueba que sigue ahí. Ese último paso es el que importa: Ajustes
+  guarda en vivo para que veas el resultado, pero cerrar sin Guardar revierte.
+  No es inyección de entrada: se levanta el `Click` de WPF, que llama al manejador del botón.
+- Elegir una ventana en «Ver todas las ventanas» y comprobar que viene al frente, sobre una
+  ventana propia.
+
+**Ajustes que existían y no se podían tocar**
+
+- **«Mover ventanas de verdad»**, el interruptor que faltaba. `NubeHypr.Modo` decide si la
+  capa mueve ventanas o solo apunta lo que haría, tiene 175 usos en el producto y **no tenía
+  ningún control en Ajustes**: el modo «aplicar» solo se alcanzaba editando el `config.json`
+  a mano. Con él, todo lo que mueve ventanas era inalcanzable desde la interfaz.
+- Ese interruptor y el de la confirmación salen **atenuados** mientras NubeHypr está apagado,
+  con el motivo en la ayuda emergente y en el nombre para el lector de pantalla: apagada la
+  capa no significan nada, y un control que parece disponible y no responde engaña más que
+  uno que se ofrece de más.
+- **Hueco entre ventanas** (`NubeHypr.Gap`): lo usan el reparto, la vista general y las
+  reglas, y la única forma de cambiarlo era editar el `config.json` a mano. Ahora es un
+  deslizador en Ajustes → NubeHypr.
+- Los dos salieron del mismo barrido mecánico —qué claves de la configuración no escribe
+  nadie desde la interfaz—, que es el que habría encontrado el dock sin interruptor mucho
+  antes de que lo encontrara un usuario.
+- **Y tres que no leía nadie dejan de escribirse** (`EspacioInicial`,
+  `MostrarPrevisualizacion`, `Espacios`): escribir en el fichero de alguien una clave que el
+  programa ignora no es inofensivo, porque quien lo abre entiende que significa algo. Lo que
+  ya esté escrito no se toca; solo se deja de añadirlas donde no estén.
+
+### Cambiado
+
+- `Contraste` sabe de tonos (`Tono`), y el extractor del fondo guarda también el color medio
+  sin oscurecer, que es lo que de verdad hay detrás de una ventana.
+- La previsualización del ajuste a bordes y la de NubeHypr comparten cuerpo: eran dos copias
+  del mismo rectángulo.
+- El módulo de escritorios repinta comparando una huella, así que renombrar un escritorio o
+  mover una ventana se nota — antes solo se notaba al cambiar el número de escritorios.
+- `Config.MiraYNoToca` decide qué banderas no pueden escribir la configuración, y es una
+  función pura: antes era un `is ... or ...` dentro del arranque que no se podía comprobar.
+
+### Corregido
+
+- Un valor no esperado en `NubeHypr.Reglas` (por ejemplo cadenas de un borrador antiguo)
+  tumbaba la carga entera de `config.json` y arrancaba con la configuración de fábrica.
+  Ahora cada entrada ilegible queda inerte y el resto de la configuración se conserva.
+- El registro decía `adapter=stopped` incluso con el motor montado, y daba dos versiones de
+  configuración distintas para el mismo fichero en líneas seguidas.
+- **El prefijo de los atajos de NubeHypr pasa de `Win+Alt` a `Win+Ctrl+Alt`.** Con el
+  anterior solo entraban 10 de los 19: el Game Bar de Xbox y Teams se quedan con varios
+  `Win+Alt`. Con el nuevo entran **los 19**, medido con `--diagprefijos`. El prefijo es
+  ahora una constante, así que cambiarlo es una edición y no reescribir veinte cadenas.
+- **`--salir` migraba la configuración** al esquema del binario que lo lanzaba. Su proceso
+  solo manda la señal de salida, pero al irse cargaba la configuración, y cargarla ejecuta
+  las migraciones.
+- **Una opción desconocida arrancaba la barra entera.** Un `--loquesea` se caía por todas
+  las ramas del arranque y terminaba montando NubeBar, con lo que eso implica para la
+  configuración. Ahora se dice en el registro y se sale con código 2.
+
+### Diagnósticos nuevos
+
+`--diagreglas`, `--diagd6`, `--diagd7` y `--diagprefijos`, todos de solo lectura. Ninguno
+mueve ventanas ni escribe la configuración.
+
+---
+
+
 ## v1.2.0
 
 Primera versión de la serie 1.2. La 1.1.x cerró con una barra que funcionaba; esta

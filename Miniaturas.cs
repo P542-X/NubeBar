@@ -62,7 +62,10 @@ public static class Miniaturas
         Task.Run(() =>
         {
             ImageSource? foto = null;
-            try { foto = Nativo.Foto(h, anchoMax); }
+            // `rechazarLisa: true` solo aquí: esta foto va a una tarjeta de la vista
+            // general, y ahí un rectángulo de un solo color es un fallo que se ve —las
+            // aplicaciones Electron devuelven eso— y no el fondo de nada.
+            try { foto = Nativo.Foto(h, anchoMax, rechazarLisa: true); }
             catch (Exception ex) { Log.Error("sacar la foto de una ventana", ex); }
 
             interfaz.BeginInvoke(new Action(() =>
@@ -84,6 +87,24 @@ public static class Miniaturas
         if (_cache.Count < 60) return;
         foreach (var muerta in new List<IntPtr>(_cache.Keys))
             if (!vivas.Contains(muerta)) _cache.Remove(muerta);
+    }
+
+    // ---------- El criterio de «aquí no hay nada dibujado» ----------
+    //
+    // Separado del muestreo para poder comprobarlo: lo que necesita una ventana de verdad
+    // es sacar los píxeles, no decidir qué significan.
+    //
+    // Exacto y no por parecido, a propósito. Una ventana legítimamente casi lisa —un editor
+    // en blanco, una terminal negra— tiene marco, borde o cursor, y veinticinco puntos
+    // repartidos por toda la imagen no salen EXACTAMENTE iguales. Con tolerancia se
+    // empezarían a tirar miniaturas buenas, y eso es peor: una tarjeta gris se ve y se
+    // entiende, pero una ventana que pierde su miniatura sin motivo, no.
+    internal static bool TodasIguales(IReadOnlyList<uint> muestras)
+    {
+        if (muestras.Count < 4) return false;        // con tan pocas no se puede juzgar
+        uint primera = muestras[0];
+        for (int i = 1; i < muestras.Count; i++) if (muestras[i] != primera) return false;
+        return true;
     }
 
     public static void Olvidar(IntPtr h) => _cache.Remove(h);

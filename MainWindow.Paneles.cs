@@ -1,6 +1,8 @@
 using System;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 
@@ -14,6 +16,44 @@ public partial class MainWindow
     string? _panelAbierto;          // nombre del panel que hay ahora mismo, o null
     bool _panelConTeclado;          // le quitamos WS_EX_NOACTIVATE mientras está abierto
     double _panelAlto, _panelAncho; // medidas del panel actual
+
+    // ---------- E0: el tablero de superficies ----------
+    //
+    // Uno por isla, porque cada pantalla tiene las suyas y cerrar el panel de una no puede
+    // cerrar el de la otra.
+    //
+    // De momento va **en paralelo** a `_panelAbierto` y en modo clásico: no manda sobre nada,
+    // se le cuenta lo que pasa. Es a propósito y no es código muerto — es la forma de que el
+    // tablero esté vivo, con datos de verdad y mirable desde un diagnóstico, antes de que
+    // nada dependa de él. Cuando la composición E se encienda, el tablero pasa a mandar y
+    // `_panelAbierto` se queda siendo lo que siempre fue: el panel clásico de la isla.
+    //
+    // Y mientras tanto, si los dos dijeran cosas distintas sería un fallo. `--diage0` lo
+    // comprueba en vez de confiar en que no pase.
+    internal readonly Superficies.Tablero _mesa = new() { ModoClasico = true };
+
+    internal string DuenoDeLaMesa => _esJefa ? "principal" : $"monitor-{_monitor.Handle}";
+
+    // Un solo sitio donde contárselo, para no tener que acordarse en los veinte que abren.
+    void ApuntarPanelEnLaMesa(string nombre, double ancho, double alto, bool teclado)
+    {
+        try
+        {
+            _mesa.Abrir(Superficies.Nueva(nombre, Superficies.Clase.Panel, DuenoDeLaMesa) with
+            {
+                Ancho = ancho,
+                Alto = alto,
+                PideTeclado = teclado,
+            });
+        }
+        catch (Exception ex) { Log.Error("apuntar el panel en el tablero de superficies", ex); }
+    }
+
+    void OlvidarPanelEnLaMesa(string? nombre)
+    {
+        try { if (nombre is { Length: > 0 }) _mesa.Cerrar(nombre); }
+        catch (Exception ex) { Log.Error("olvidar el panel en el tablero", ex); }
+    }
 
     public bool HayPanel => _panelAbierto != null;
 
@@ -263,8 +303,169 @@ public partial class MainWindow
                 Log.Info($"alto real: {raiz.ActualHeight:0}");
                 Log.Info($"isla real: {Isla.ActualWidth:0}x{Isla.ActualHeight:0}");
             }));
+
+            // ---------- Y el recorte, cuando el panel ya está QUIETO ----------
+            //
+            // Esto estuvo mal medido y conviene que quede escrito, porque la medida decía
+            // justo lo contrario de la verdad. Puesto en el mismo `Loaded` de arriba, el
+            // contenido ya está colocado pero la isla todavía no ha crecido: se la ve de
+            // 46 px de alto con un panel de 490 dentro, y el diagnóstico gritaba «SE SALE
+            // 427 px» en paneles que acababan perfectamente.
+            //
+            // La isla crece animada hasta 460 ms (ver `AnimarAlto`), así que se mira
+            // después. Un diagnóstico que mide a destiempo no es medio diagnóstico: es uno
+            // que manda a investigar donde no hay nada.
+            var cuando = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(700),
+            };
+            cuando.Tick += (s, _) =>
+            {
+                cuando.Stop();
+                if (_panelAbierto == nombre) ApuntarSiAlgoSeSale(nombre, raiz);
+            };
+            cuando.Start();
         }
         catch (Exception ex) { Log.Error("apuntar el flujo del panel", ex); }
+    }
+
+    // ---------- ¿Se sale algo por abajo? ----------
+    //
+    // La pregunta que no se podía contestar. El registro decía el alto del panel y el de
+    // la isla, y de ahí no se deduce si el ÚLTIMO BOTÓN está dentro: puede estar fuera por
+    // veinte píxeles y los dos números parecer razonables.
+    //
+    // Esto mide el borde inferior del último elemento que de verdad se dibuja, en
+    // coordenadas de la isla, y lo compara con el borde de la isla. Si sobresale, lo dice
+    // con el número. Y dice también si hay un scroll que lo rescate: un panel cuyo
+    // contenido se sale PERO se puede desplazar es correcto; uno que se sale sin scroll
+    // tiene un botón que nadie puede pulsar.
+    // Lo que sale de mirar un panel. `Bien` es la regla entera: o cabe, o hay rueda.
+    internal readonly record struct Recorte(bool Bien, double Sobra, string Quien, bool HayRueda)
+    {
+        public override string ToString() =>
+            Bien ? (Sobra > 1 ? $"se sale {Sobra:0} px pero hay rueda" : "todo dentro")
+                 : $"SE SALE {Sobra:0} px sin rueda ({Quien})";
+    }
+
+    // ---------- Y lo que un lector de pantalla oye de un panel ----------
+    //
+    // La misma medida que se hizo con Ajustes, donde encontró cincuenta y un botones mudos
+    // —los trece de la navegación, los cuarenta y cuatro de la biblioteca, los siete temas—
+    // que ninguna captura podía enseñar: un botón con nombre y uno sin él se dibujan igual.
+    //
+    // Los de dentro de una plantilla de WPF no cuentan: las flechas de un `ScrollViewer`
+    // son suyas, y un lector entiende la barra entera por su patrón, no botón a botón.
+    internal static (int Botones, int SinNombre, string Ejemplo) MirarElTecladoDe(FrameworkElement raiz)
+    {
+        int botones = 0, sinNombre = 0;
+        string ejemplo = "";
+        try
+        {
+            foreach (var d in Descendientes(raiz))
+            {
+                if (d is not ButtonBase b || !b.IsVisible) continue;
+                if (b.TemplatedParent != null) continue;
+                botones++;
+                var n = System.Windows.Automation.AutomationProperties.GetName(b);
+                if (!string.IsNullOrWhiteSpace(n) || b.Content is string) continue;
+                sinNombre++;
+                // Todos, no uno de ejemplo: con un solo nombre se arregla ese y vuelven a
+                // salir cinco iguales en la siguiente pasada. Con la lista se ven de golpe
+                // y se sabe de qué trozo de interfaz son.
+                if (sinNombre <= 6)
+                    ejemplo += (ejemplo.Length > 0 ? " | " : "") +
+                               (b.ToolTip?.ToString() ?? b.Content?.GetType().Name ?? "(sin pista)");
+            }
+        }
+        catch { }
+        return (botones, sinNombre, ejemplo);
+    }
+
+    Recorte ApuntarSiAlgoSeSale(string nombre, FrameworkElement raiz)
+    {
+        try
+        {
+            double bordeIsla = Isla.ActualHeight - Isla.BorderThickness.Bottom;
+            double masAbajo = double.NegativeInfinity;
+            string quien = "(nada)";
+
+            foreach (var d in Descendientes(raiz))
+            {
+                if (d is not FrameworkElement fe || !fe.IsVisible) continue;
+                if (fe.ActualHeight <= 0 || fe.ActualWidth <= 0) continue;
+                // Solo lo que se PULSA o se lee: medir contenedores da el mismo número y
+                // no dice qué control se queda fuera.
+                if (fe is not (ButtonBase or TextBlock)) continue;
+                try
+                {
+                    double y = fe.TransformToAncestor(Isla)
+                                 .Transform(new Point(0, fe.ActualHeight)).Y;
+                    if (y > masAbajo)
+                    {
+                        masAbajo = y;
+                        quien = fe is ButtonBase b
+                              ? $"botón «{System.Windows.Automation.AutomationProperties.GetName(b)}{b.ToolTip}»"
+                              : $"texto «{((TextBlock)fe).Text}»";
+                    }
+                }
+                catch { }
+            }
+
+            // Ni un botón ni un texto: no hay nada que pueda quedarse fuera.
+            if (double.IsNegativeInfinity(masAbajo))
+                return new Recorte(true, 0, "(sin controles que medir)", false);
+
+            var scroll = Descendientes(raiz).OfType<ScrollViewer>()
+                                            .FirstOrDefault(s => s.ScrollableHeight > 0);
+            double sobra = masAbajo - bordeIsla;
+            bool bien = sobra <= 1 || scroll != null;
+
+            Log.Info($"panel {nombre}: lo más abajo es {quien} en y={masAbajo:0}; " +
+                     $"la isla acaba en {bordeIsla:0} · " +
+                     (sobra > 1
+                        ? (scroll != null
+                            ? $"se sale {sobra:0} px PERO hay desplazamiento ({scroll.ScrollableHeight:0} px)"
+                            : $"SE SALE {sobra:0} px Y NO HAY DESPLAZAMIENTO: ese control no se puede pulsar")
+                        : "todo dentro"));
+
+            // ---------- Y el detalle, SOLO cuando algo va mal ----------
+            //
+            // Esto se escribía siempre, y esta función corre cada vez que abres un panel —
+            // también en uso normal, no solo en un diagnóstico—. Son tres o cuatro líneas
+            // de aritmética por cada apertura, en el registro que uno abre cuando algo
+            // falla. Un registro que lo cuenta todo tapa lo que importa igual de bien que
+            // uno que no cuenta nada.
+            //
+            // Callado cuando está bien; con todos los números cuando no, que es cuando
+            // sirven: la cadena de alturas dice QUIÉN impone el recorte —la ventana, la
+            // fila del cajón o la medida— y las tarjetas dicen en cuál está la diferencia.
+            if (!bien)
+            {
+                Log.Info($"   alturas de {nombre}: ventana {ActualHeight:0} · isla {Isla.ActualHeight:0} " +
+                         $"· barra {_cfg.Barra.Alto:0} · cajón {Cajon.ActualHeight:0} " +
+                         $"· raíz [pide {raiz.DesiredSize.Height:0}, ocupa {raiz.ActualHeight:0}] " +
+                         $"· _panelAlto {_panelAlto:0} · tope {AltoMaximoPanel():0}");
+                try
+                {
+                    var pila = Descendientes(raiz).OfType<StackPanel>().FirstOrDefault();
+                    if (pila != null)
+                        Log.Info($"   tarjetas de {nombre}: " + string.Join("  ", pila.Children
+                            .OfType<FrameworkElement>()
+                            .Select(c => $"[pide {c.DesiredSize.Height:0}, ocupa {c.ActualHeight:0}]")));
+                }
+                catch { }
+            }
+
+            // La regla, en una sola frase: o cabe, o hay rueda que lo alcance.
+            return new Recorte(bien, Math.Max(0, sobra), quien, scroll != null);
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"medir si algo se sale del panel {nombre}", ex);
+            // Si no se pudo mirar, no se inventa un veredicto: se da por bueno y se dice.
+            return new Recorte(true, 0, "(no se pudo medir)", false);
+        }
     }
 
     void AbrirPanel(string nombre, FrameworkElement contenido, double ancho, double alto,
@@ -284,9 +485,11 @@ public partial class MainWindow
         }
 
         bool habiaOtro = _panelAbierto != null;
+        if (habiaOtro) OlvidarPanelEnLaMesa(_panelAbierto);
         _panelAbierto = nombre;
         _panelAlto = alto;
         _panelAncho = ancho;
+        ApuntarPanelEnLaMesa(nombre, ancho, alto, teclado);
 
         if (ancla != null) RecortarCajon(ancla, ancho); else SinRecorteDelCajon();
 
@@ -330,8 +533,12 @@ public partial class MainWindow
         double bordes = Isla.BorderThickness.Top + Isla.BorderThickness.Bottom;
         try
         {
-            contenido.Measure(new Size(ancho, double.PositiveInfinity));
-            double pide = contenido.DesiredSize.Height + bordes;
+            // Por `AltoQueDeVerdadPide` y no por `Measure` a secas: al abrir, el cajón
+            // todavía no se ha medido y la raíz contesta bien, pero eso es suerte de
+            // cronometraje. Un panel que naciera ya lleno —la lista de wifis en caché, el
+            // centro de notificaciones con cosas sin leer— se encontraría la misma fila
+            // `Star` contestando por él. Una sola forma de medir en los dos sitios.
+            double pide = AltoQueDeVerdadPide(contenido, ancho) + bordes;
 
             // Y por mucho que necesite, la isla no puede crecer más de lo que cabe en
             // la pantalla: lo que sobre se recorre por dentro con la rueda
@@ -487,6 +694,7 @@ public partial class MainWindow
 
         var nombre = _panelAbierto;
         bool pequeno = _panelAlto < 220;
+        OlvidarPanelEnLaMesa(nombre);
         _panelAbierto = null;
         _panelAlto = _panelAncho = 0;
         _panelEncogido = false;
@@ -565,11 +773,96 @@ public partial class MainWindow
         catch { }
     }
 
+    // ---------- Cuánto pide un panel DE VERDAD ----------
+    //
+    // Aquí estaba el recorte del panel de red, y es una trampa que merece quedar escrita
+    // porque no se ve leyendo el código.
+    //
+    // El cajón vive en una fila `Star` (`FilaCajon.Height = Star`), así que el Grid le
+    // concede la altura que sobra en la isla y mide a su contenido CON ESA altura. El
+    // `DesiredSize` de la raíz del panel no puede entonces pasar de lo que ya se le ha
+    // dado: si la isla mide 530 y la barra 38, la raíz dirá 492 tenga dentro lo que tenga.
+    //
+    // Y `ReajustarPanel` preguntaba justo a esa raíz. La conversación era circular:
+    //
+    //     — ¿Cuánto necesitas?   — 492.
+    //     — ¿Y por qué 492?      — Porque es lo que me has dado.
+    //
+    // Medido: la raíz decía 492 mientras su contenido pedía 638. Las cuatro tarjetas del
+    // panel de red suman 626, el último botón acababa en y=642 y la isla terminaba en 530:
+    // 111 píxeles de «Ajustes de Windows», «Medir velocidad» y compañía por debajo del
+    // borde, sin desplazamiento que los rescatara. No era una altura fija, ni el recorte en
+    // tarjeta, ni el DPI, ni el área de trabajo: era la medida, que se contestaba a sí misma.
+    //
+    // La salida es no preguntarle al contenedor sino a lo que lleva dentro, que sí puede
+    // medirse suelto. Se le descuenta el filo y el relleno del contenedor para medirlo con
+    // el ancho que le toca, y se le vuelven a sumar después.
+    //
+    // Se devuelve el MÁXIMO de las dos medidas a propósito: así esto solo puede hacer que
+    // un panel crezca cuando hacía falta, nunca encogerlo por debajo de lo que el código de
+    // antes le daba. Un arreglo de recortes no puede introducir otro.
+    internal static double AltoQueDeVerdadPide(FrameworkElement raiz, double ancho)
+    {
+        double deLaRaiz = 0;
+        try
+        {
+            raiz.InvalidateMeasure();
+            raiz.Measure(new Size(ancho, double.PositiveInfinity));
+            deLaRaiz = raiz.DesiredSize.Height;
+        }
+        catch { }
+
+        try
+        {
+            // El envoltorio puede ser el `PanelShell` (un Border con filo y relleno) o el
+            // `ScrollViewer` que `EnvolverConScroll` pone cuando el panel ya no cabía. En
+            // el segundo caso no hay nada que arreglar: su contenido SÍ se desplaza.
+            if (raiz is ScrollViewer) return deLaRaiz;
+
+            if (raiz is not Border marco || marco.Child is not FrameworkElement dentro)
+                return deLaRaiz;
+
+            double aLosLados = marco.Padding.Left + marco.Padding.Right
+                             + marco.BorderThickness.Left + marco.BorderThickness.Right;
+            double arribaYAbajo = marco.Padding.Top + marco.Padding.Bottom
+                                + marco.BorderThickness.Top + marco.BorderThickness.Bottom;
+
+            dentro.InvalidateMeasure();
+            dentro.Measure(new Size(Math.Max(1, ancho - aLosLados), double.PositiveInfinity));
+            return Math.Max(deLaRaiz, dentro.DesiredSize.Height + arribaYAbajo);
+        }
+        catch { return deLaRaiz; }
+    }
+
     // Para los paneles que se rellenan por detrás (la lista de wifis, el test de
     // velocidad, la caja de la contraseña): AbrirPanel midió el contenido cuando aún
     // estaba a medias, así que se vuelve a medir y la isla crece o encoge a lo que
     // ahora necesita. Sin esto lo que llegaba tarde salía recortado por abajo.
+    // ---------- Y se mide cuando el layout ya ha pasado ----------
+    //
+    // Medir en el mismo instante en que se añade el contenido es medir a medias, y eso
+    // costó la mitad del recorte del panel de red: el único reajuste que llegaba a correr
+    // lo hacía 90 ms después de abrir, con las wifis todavía entrando, y se quedaba con
+    // aquel alto para siempre.
+    //
+    // `DispatcherPriority.Loaded` corre después de que WPF haya medido y colocado, así que
+    // lo que se mide es lo que hay. El contador evita que una ráfaga de cambios —tres
+    // repasos de red seguidos— encole tres reajustes: solo cuenta el último.
+    int _reajustesPendientes;
+
     void ReajustarPanel(string nombre)
+    {
+        if (_panelAbierto != nombre) return;
+        _reajustesPendientes++;
+        Dispatcher.InvokeAsync(() =>
+        {
+            _reajustesPendientes--;
+            if (_reajustesPendientes > 0) return;      // ya viene otro detrás
+            ReajustarPanelYa(nombre);
+        }, System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    void ReajustarPanelYa(string nombre)
     {
         if (_panelAbierto != nombre) return;
         if (PanelSuperpuestoAbierto) { ReajustarPanelFlotante(nombre); return; }
@@ -577,13 +870,27 @@ public partial class MainWindow
         try
         {
             double bordes = Isla.BorderThickness.Top + Isla.BorderThickness.Bottom;
-            contenido.Measure(new Size(_panelAncho, double.PositiveInfinity));
-            double alto = contenido.DesiredSize.Height + bordes;
+
+            // ---------- Hay que INVALIDAR antes de medir ----------
+            //
+            // `Measure` no vuelve a medir por pedírselo: si el elemento no está marcado
+            // como sucio, devuelve el `DesiredSize` que ya tenía guardado. Y aquí no
+            // siempre está sucio: el contenido que acaba de cambiar está varios niveles más
+            // abajo —dentro del ScrollViewer de las wifis, dentro de su tarjeta— y ese
+            // ScrollViewer tiene `MaxHeight`, así que absorbe el cambio y no propaga
+            // ninguna invalidación hacia arriba.
+            //
+            // Resultado: se medía el alto de antes, salía igual que `_panelAlto`, y la
+            // comparación de abajo decidía que no había nada que hacer. La isla se quedaba
+            // con el alto de cuando el panel estaba vacío y lo que llegó después quedaba
+            // por debajo del borde.
+            double alto = AltoQueDeVerdadPide(contenido, _panelAncho) + bordes;
 
             // Lo que llega tarde (las wifis, el test de velocidad) puede pasarse del
             // alto de la pantalla: mismo trato que al abrir, se desplaza por dentro
             double tope = AltoMaximoPanel();
-            if (alto > tope)
+            var (cabe, conScroll) = ComoCabeElPanel(alto, tope);
+            if (conScroll)
             {
                 if (contenido is ScrollViewer { Tag: TopeDePanel } ya) ya.MaxHeight = tope - bordes;
                 else
@@ -592,10 +899,14 @@ public partial class MainWindow
                     Cajon.Content = null;
                     Cajon.Content = EnvolverConScroll(contenido, tope - bordes);
                 }
-                alto = tope;
             }
+            alto = cabe;
 
             if (Math.Abs(alto - _panelAlto) < 1) return;
+
+            Log.Info($"reajuste {nombre}: {_panelAlto:0} → {alto:0} " +
+                     $"(pide {AltoQueDeVerdadPide(contenido, _panelAncho) + bordes:0}, tope {tope:0}, " +
+                     $"desplazamiento {(conScroll ? "sí" : "no")})");
 
             bool crece = alto > _panelAlto;
             _panelAlto = alto;
@@ -615,10 +926,37 @@ public partial class MainWindow
     // Lo máximo que puede medir un panel sin que la isla se salga del monitor. Sin
     // esto, un panel largo (quince wifis, un menú Inicio en un portátil de 768 px)
     // estiraba la isla hasta fuera de la pantalla y lo de abajo era inalcanzable.
-    double AltoMaximoPanel()
+    double AltoMaximoPanel() =>
+        AltoMaximoDePanel(_monitor.Alto / Math.Max(0.1, _monitor.Escala),
+                          _cfg.Barra.Alto, _cfg.Barra.Margen);
+
+    // ---------- La misma cuenta, pura ----------
+    //
+    // Fuera de la ventana para poder comprobarla en pantallas que no tengo: un portátil de
+    // 1366x768, un 4K al 150 %, un monitor vertical. La altura va siempre en píxeles de
+    // DISEÑO —la pantalla física dividida por la escala—, que es en lo que mide WPF; pasarle
+    // píxeles físicos daría el doble de sitio del que hay en un monitor al 200 %.
+    //
+    // El 24 son los dos márgenes de aire que la isla deja contra el borde de la pantalla, y
+    // el mínimo de 200 es la red de seguridad: en una pantalla ridícula vale más un panel
+    // que se desplaza por dentro que uno de altura negativa.
+    internal static double AltoMaximoDePanel(double altoPantallaDip, double altoBarra, double margen) =>
+        Math.Max(200, altoPantallaDip - altoBarra - margen * 2 - 24);
+
+    // ---------- Y la decisión: ¿cabe o se desplaza? ----------
+    //
+    // Lo que hacen `AbrirPanel` y `ReajustarPanel` con esos dos números, en una función que
+    // se puede comprobar sin abrir una ventana. Devuelve el alto que se le da al panel y si
+    // hace falta desplazamiento por dentro.
+    //
+    // La regla que importa y que se comprueba: **el alto que se da nunca pasa del tope**, y
+    // cuando lo que se pide no cabe, el desplazamiento se enciende. Las dos cosas juntas son
+    // lo que garantiza que no queda un botón por debajo del borde: o cabe, o se llega a él
+    // con la rueda.
+    internal static (double Alto, bool ConScroll) ComoCabeElPanel(double pide, double tope)
     {
-        double pantalla = _monitor.Alto / _monitor.Escala;
-        return Math.Max(200, pantalla - _cfg.Barra.Alto - _cfg.Barra.Margen * 2 - 24);
+        if (pide <= tope) return (Math.Max(0, pide), false);
+        return (tope, true);
     }
 
     const string TopeDePanel = "tope";
@@ -653,6 +991,7 @@ public partial class MainWindow
         if (_panelAbierto == null) return;
         Log.Info($"panel {_panelAbierto} cerrado por recarga del config");
         if (_panelConTeclado) ActivarTeclado(false);
+        OlvidarPanelEnLaMesa(_panelAbierto);
         _panelAbierto = null;
         _panelEncogido = false;
         _panelAlto = _panelAncho = 0;

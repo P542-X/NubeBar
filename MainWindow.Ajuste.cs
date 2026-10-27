@@ -144,7 +144,7 @@ public partial class MainWindow
         // `Nativo.Activar` haría el truco del Alt para nada.
         Log.Info($"arrastre ventana TERMINADO hwnd=0x{ventana.ToInt64():X} " +
                  $"destino={ZonasAjuste.Nombre(zona)} pantalla={NombreDeMonitor(monitor)}");
-        ZonasAjuste.Ajustar(ventana, zona, monitor);
+        ZonasAjuste.Ajustar(ventana, zona, monitor, estorbos: EstorbosDeAhora());
         GestorVentanas.HayQueMirar(GestorVentanas.Motivo.AMano);
     }
 

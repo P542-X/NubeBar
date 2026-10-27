@@ -182,11 +182,25 @@ public static class GestorVentanas
     public static readonly Dictionary<string, long> EventosPorTipo = new();
     public static long EventosNuestros, EventosDeSitio;
 
+    // ---------- D7: cuándo se refrescó por última vez ----------
+    //
+    // La instantánea se mantiene con eventos de Windows, sin sondeo. Eso es bueno hasta que
+    // el gancho se cae: entonces la lista se queda congelada y **nada avisa**, porque no
+    // llegar un evento es exactamente lo que se espera cuando no pasa nada.
+    //
+    // La única forma de notar la diferencia entre "no pasa nada" y "no me estoy enterando"
+    // es la edad de la última lectura. No se interpreta aquí —el gestor no sabe qué es
+    // demasiado— sino en `HyprSalud`, que es quien decide.
+    public static DateTime UltimoRefresco { get; private set; } = DateTime.Now;
+
+    public static TimeSpan EdadDeLaInstantanea => DateTime.Now - UltimoRefresco;
+
     public static void OlvidarContadores()
     {
         VecesRefrescado = VecesAvisado = VecesSinCambio = 0;
         EventosNuestros = EventosDeSitio = 0;
         EventosPorTipo.Clear();
+        UltimoRefresco = DateTime.Now;
     }
 
     public static string Contadores() =>
@@ -207,6 +221,7 @@ public static class GestorVentanas
         try
         {
             VecesRefrescado++;
+            UltimoRefresco = DateTime.Now;      // D7: para poder medir si el gancho sigue vivo
             UltimoMotivo = motivo;
             var antes = _ventanas.Count;
             var activa = Nativo.Activa();
@@ -488,4 +503,5 @@ public static class GestorVentanas
     }
 
     static Motivo _motivoPendiente = Motivo.AMano;
+
 }

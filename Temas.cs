@@ -47,9 +47,34 @@ public static class Temas
         Secundario:     "#F29C65",   // naranja secundario: detalles cálidos
         Sistema:        "#65B8D6");  // azul nube: red, volumen, batería, reloj
 
+    // ---------- El claro ----------
+    //
+    // Los siete temas de serie eran oscuros, así que la acción rápida «Tema claro» no tenía
+    // nada que aplicar y abría Ajustes. El usuario lo dijo mirándola: «si pongo tema oscuro
+    // se abre ajustes en vez de aplicarlo». Una pastilla con aspecto de interruptor cuya
+    // única función es abrir una ventana miente, por muy honesto que fuera el motivo.
+    //
+    // Los colores van elegidos por CONTRASTE y no por gusto: el texto da ~14:1 sobre el fondo
+    // y el acento ~5:1, que pasa AA de sobra. Y las superficies se escriben con alfa sobre
+    // NEGRO: en un tema claro, «un paso levantado» es un velo oscuro, no uno blanco — con los
+    // velos blancos de los temas oscuros, una tarjeta clara sobre fondo claro desaparecería.
+    public static readonly TemaGuardado Claro = new(
+        Nombre: "Claro",
+        Fondo:  "#F2F7F9FC",
+        Texto:  "#1B2231",
+        Acento: "#2F6BD8",
+        Radio:  18,
+        Superficie:     "#14000000",
+        SuperficieAlta: "#22000000",
+        Borde:          "#2E000000",
+        TextoAtenuado:  "#5A6476",
+        Secundario:     "#B4531C",
+        Sistema:        "#1F6FB8");
+
     public static readonly TemaGuardado[] Predefinidos =
     {
         Nube,
+        Claro,
         new("Negro iPhone",      "#E6000000", "#FFFFFF", "#7AA2F7", 20),
         new("Tokyo Night",       "#E61A1B26", "#C0CAF5", "#7AA2F7", 18),
         new("Catppuccin Mocha",  "#E61E1E2E", "#CDD6F4", "#CBA6F7", 20),

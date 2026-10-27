@@ -44,7 +44,7 @@ public static class Esquema
     //  1  Fase A .. B4   — manda `Barra`; no existe `Paneles`
     //  2  B5 / B6        — manda `Paneles`; `Barra` es una vista derivada en memoria
     //  3  C5             — hay sección `Fondo`, y `Wallpaper` lleva la integración
-    public const int Actual = 3;
+    public const int Actual = 4;
 
     public const string Clave = "Version";
 
@@ -52,6 +52,30 @@ public static class Esquema
     // nombre: así migrar de 1 a 3 deja rastro de las dos y ninguna pisa a la otra.
     public static string RutaRespaldo(string config, int desde) =>
         config + ".antes-de-v" + desde + ".json";
+
+    // ---------- Y si ese nombre ya está cogido ----------
+    //
+    // Pasa más de lo que parece: basta con restaurar una copia vieja y volver a migrar. En
+    // esta sesión pasó tres veces con la misma v3.
+    //
+    // Lo que hacía era NO escribir —«ya había copia de v3, no se sobrescribe»— con un
+    // razonamiento bueno a medias: conservar la más antigua está bien, pero deja la
+    // migración de HOY sin respaldo propio. Y lo peor es que el usuario cree que lo tiene:
+    // el mecanismo existe, el registro dice que había copia, y esa copia es de otro día y
+    // de otro contenido.
+    //
+    // Ahora no se pierde ninguna. La primera conserva su nombre limpio y las siguientes
+    // llevan la fecha. Un fichero de más en una carpeta frente a quedarse sin la red el día
+    // que haga falta no es una decisión difícil.
+    //
+    // Pura y con `existe` inyectado para poder comprobarla sin tocar el disco.
+    public static string RutaRespaldoQueNoPisa(string config, int desde,
+                                               Func<string, bool> existe, DateTime ahora)
+    {
+        string limpia = RutaRespaldo(config, desde);
+        if (!existe(limpia)) return limpia;
+        return config + ".antes-de-v" + desde + "-" + ahora.ToString("yyyyMMdd-HHmmss") + ".json";
+    }
 
     // ================= Deducir la versión de un fichero sin ella =================
     //
@@ -153,6 +177,7 @@ public static class Esquema
     {
         1 => new Migracion("v1→v2: sellar la derivación de Paneles", De1A2),
         2 => new Migracion("v2→v3: declarar la sección Fondo", De2A3),
+        3 => new Migracion("v3→v4: declarar la sección NubeHypr, apagada", De3A4),
         _ => null,
     };
 
@@ -204,6 +229,71 @@ public static class Esquema
         if (wp["Integrar"] == null) wp["Integrar"] = false;
     }
 
+
+    // ---------- v3 → v4 ----------
+    //
+    // Deja la sección `NubeHypr` escrita y APAGADA.
+    //
+    // Importa que sea explícito y no una ausencia, por el mismo motivo que `Fondo` en la
+    // migración anterior: "Activo: false" significa **NubeBar no organiza tus ventanas**,
+    // y es lo que tiene que pasar al actualizar. Sin la clave escrita, el día que el
+    // motor empiece a leer esa sección se encontraría un hueco y tendría que decidir qué
+    // hacer con él; con la clave puesta, el fichero dice la verdad y a nadie le mueven
+    // las ventanas por omisión.
+    //
+    // El modo se escribe en "simulacion" aunque esté apagado, a propósito: el día que
+    // alguien ponga `Activo: true` a mano —sin pasar por Ajustes— lo que se encuentra es
+    // la capa calculando y apuntando, no moviéndole las ventanas.
+    //
+    // Y si ya había una sección `NubeHypr` —de una prueba, de haber editado el fichero—
+    // no se toca: solo se rellena lo que falte. Nunca se pone `Activo` a true aquí.
+    static void De3A4(JsonObject raiz)
+    {
+        if (raiz["NubeHypr"] is not JsonObject h)
+        {
+            h = new JsonObject();
+            raiz["NubeHypr"] = h;
+        }
+        if (h["Activo"] == null) h["Activo"] = false;
+        if (h["Modo"] == null) h["Modo"] = "simulacion";
+        if (h["Gap"] == null) h["Gap"] = 8;
+        if (h["Margen"] == null) h["Margen"] = 12;
+        if (h["Layout"] == null) h["Layout"] = "principal";
+        if (h["ConfirmarMovimientos"] == null) h["ConfirmarMovimientos"] = true;
+        // Aditiva y apagada: un fichero que ya esté en v4 sin esta clave la lee como
+        // false por el valor por defecto del modelo, así que no hace falta una v5. Lo que
+        // NO puede pasar es que aparezca encendida, y por eso se escribe explícita.
+        if (h["RestaurarAlOrganizar"] == null) h["RestaurarAlOrganizar"] = false;
+        if (h["Atajos"] == null) h["Atajos"] = new JsonObject();
+        if (h["Reglas"] == null) h["Reglas"] = new JsonArray();
+
+        // ---------- Tres que ya NO se escriben ----------
+        //
+        // `EspacioInicial`, `MostrarPrevisualizacion` y `Espacios` salieron de la
+        // especificación de D0 y se escribían aquí desde entonces… y **no las lee nadie**:
+        // cero referencias en todo el producto. Las sacó a la luz un barrido de claves sin
+        // puerta, el mismo que encontró `Modo` y `Gap` sin interruptor.
+        //
+        // Escribir en el fichero de alguien una clave que el programa ignora no es
+        // inofensivo: quien lo abre entiende que significa algo. `ConfirmarMovimientos` era
+        // exactamente eso —prometía que NubeHypr pregunta antes de tocar ventanas— y no
+        // preguntaba. Esas tres siguen en ese estado, y la salida honesta es dejar de
+        // prometerlas, no implementarlas inventándose qué deberían hacer.
+        //
+        // El día que alguien sepa qué tienen que significar, se añaden con su código y su
+        // interruptor, igual que se ha hecho con las otras tres.
+        //
+        // ---------- Y lo que ya esté escrito NO se toca ----------
+        //
+        // Esto solo deja de AÑADIRLAS donde no estén. Borrar claves del config de alguien es
+        // justo lo que este proyecto lleva cuatro accidentes aprendiendo a no hacer, y
+        // `ConfigArbol` conserva las que no conoce. Si tu fichero las tiene, ahí siguen, no
+        // molestan y no se pierden.
+        //
+        //   if (h["EspacioInicial"] == null) h["EspacioInicial"] = "actual";
+        //   if (h["MostrarPrevisualizacion"] == null) h["MostrarPrevisualizacion"] = true;
+        //   if (h["Espacios"] == null) h["Espacios"] = new JsonArray();
+    }
     // ================= Validar antes de escribir =================
     //
     // Lo mínimo que tiene que ser verdad de un árbol migrado para que merezca tocar el
@@ -225,7 +315,46 @@ public static class Esquema
         if (clavesAntes > 0 && raiz.Count < clavesAntes)
             return $"la migración dejó {raiz.Count} secciones y antes había {clavesAntes}: " +
                    "algo se ha perdido";
+
+        // ---------- Y la capa de ventanas ----------
+        //
+        // Se valida a partir de la v4, que es cuando la sección existe. Lo que se mira es
+        // que el modo sea uno de los tres y que los huecos sean números razonables: un
+        // `Gap` de 4000 no es una preferencia, es un fichero roto, y con el motor en
+        // marcha dejaría las ventanas fuera de la pantalla.
+        if (v >= 4 && raiz["NubeHypr"] is JsonObject h)
+        {
+            try
+            {
+                if (h["Modo"] is { } m && !NubeHypr.ModoConocido(m.GetValue<string>()))
+                    return $"NubeHypr.Modo: «{m.GetValue<string>()}» no es un modo conocido";
+            }
+            catch { return "NubeHypr.Modo: no es una cadena"; }
+
+            foreach (var clave in new[] { "Gap", "Margen" })
+            {
+                if (h[clave] == null) continue;
+                try
+                {
+                    int n = h[clave]!.GetValue<int>();
+                    if (n is < 0 or > 200) return $"NubeHypr.{clave}: {n} no es un hueco razonable";
+                }
+                catch { return $"NubeHypr.{clave}: no es un entero"; }
+            }
+        }
         return null;
+    }
+
+    // ¿Venía la capa de ventanas encendida en el fichero de ENTRADA?
+    //
+    // Lo pregunta `MigrarFichero` para poder AFIRMAR, y no suponer, que la migración no
+    // la ha encendido ella. Encender esa capa es una decisión del usuario; un fichero que
+    // sale de migrar con las ventanas organizándose solas sería la peor sorpresa posible
+    // al actualizar, y la forma de que no pase es comprobarlo, no prometerlo.
+    public static bool ActivoAntes(JsonObject? raiz)
+    {
+        try { return raiz?["NubeHypr"]?["Activo"]?.GetValue<bool>() == true; }
+        catch { return false; }
     }
 
     // ================= Todo junto, sobre el disco =================
@@ -297,15 +426,18 @@ public static class Esquema
         string? respaldo = null;
         try
         {
-            respaldo = RutaRespaldo(ruta, desde);
-            if (!File.Exists(respaldo) && texto.Length > 0)
+            // Un nombre que no pise ninguno: ver `RutaRespaldoQueNoPisa`. Antes, si ya
+            // había copia de esa versión, esta migración se quedaba sin respaldo propio y
+            // el registro decía «ya había copia», que suena a que estás cubierto.
+            respaldo = RutaRespaldoQueNoPisa(ruta, desde, File.Exists, DateTime.Now);
+            if (texto.Length > 0)
             {
                 File.WriteAllText(respaldo, texto);
                 Log.Info("esquema: copia de antes de migrar en " + Path.GetFileName(respaldo));
             }
-            else if (File.Exists(respaldo))
+            else
             {
-                Log.Info("esquema: ya había copia de v" + desde + ", no se sobrescribe");
+                Log.Info("esquema: el fichero de origen estaba vacío: no hay nada que respaldar");
             }
         }
         catch (Exception ex)

@@ -390,7 +390,7 @@ public partial class MainWindow : Window
             Musica.Caratula,
             e?.Titulo ?? "",
             e?.Artista,
-            e?.AppId,
+            Notificaciones.NombreBonito(e?.AppId ?? ""),
             e?.Avance ?? 0,
             () => { Musica.Anterior(); RefrescarMultimedia(); },
             () => { Musica.PlayPausa(); RefrescarMultimedia(); },
@@ -539,7 +539,7 @@ public partial class MainWindow : Window
         _ccVolumen = Slider(v, 0, 100,
             nv => { Audio.PonerVolumen((int)Math.Round(nv)); PintarCifraVolumen((int)Math.Round(nv)); },
             nv => { if (nv > 0 && Audio.Silenciado) { Audio.Silenciar(false); RefrescarVolumen(); PintarAccionesRapidas(); } },
-            apagado: mudo);
+            apagado: mudo, nombre: "Volumen general");
         _ccVolumen.Visual.Margin = new Thickness(2, 0, 2, 0);
         Grid.SetColumn(_ccVolumen.Visual, 1);
         filaCifra.Children.Add(_ccVolumen.Visual);
@@ -693,7 +693,7 @@ public partial class MainWindow : Window
 
         var mando = Slider(s.Volumen, 0, 100,
             nv => { Audio.PonerVolumenSesion(s, (int)Math.Round(nv)); cifra.Text = $"{(int)Math.Round(nv)}%"; },
-            apagado: s.Silenciada);
+            apagado: s.Silenciada, nombre: $"Volumen de {s.Nombre}");
         col.Children.Add(mando.Visual);
         Grid.SetColumn(col, 1);
         g.Children.Add(col);
@@ -762,10 +762,70 @@ public partial class MainWindow : Window
                 ToolTip = s.EsLaActual ? "Ya es la salida actual" : "Usar " + s.Nombre,
                 IsEnabled = !s.EsLaActual,
             };
-            boton.Click += (_, _) => { Audio.CambiarSalida(elegida.Id); RefrescarControlEntero("cambió la salida de audio"); };
+            // El contenido es un `Grid` con el icono y el nombre, así que para UIA no tiene
+            // nombre. El del dispositivo es lo único que distingue una fila de otra.
+            System.Windows.Automation.AutomationProperties.SetName(
+                boton, s.EsLaActual ? $"{s.Nombre} (salida actual)" : $"Usar {s.Nombre}");
+            boton.Click += (_, _) => CambiarLaSalidaYEsperarla(elegida.Id);
             col.Children.Add(boton);
         }
         columna.Children.Add(Card(col));
+    }
+
+    // ---------- Cambiar de salida y ESPERAR a que sea verdad ----------
+    //
+    // Esto hacía `CambiarSalida(...)` y repintaba en la línea siguiente. El sonido cambiaba
+    // de altavoz, pero el panel seguía marcando «Activa» en el de antes hasta que lo cerrabas
+    // y lo abrías. Lo contó el usuario: «cuando cambio el audio y pongo otro se aplica, pero
+    // en el panel no pone activo el nuevo, tengo que recargar».
+    //
+    // El motivo no es que falte repintar — repintaba. Es que `SetDefaultEndpoint` vuelve
+    // antes de que Windows haya terminado de mover el dispositivo predeterminado: al
+    // preguntar inmediatamente después, el sistema todavía contesta el viejo. Se repintaba
+    // bien un dato que aún era el anterior.
+    //
+    // Así que se pregunta hasta que la respuesta cambie, con tope. Y si no llega a cambiar,
+    // se repinta igual: entonces lo que el panel enseña es la verdad —no se movió—, que es
+    // mejor que dejarlo marcando una salida que tampoco es.
+    //
+    // Nada de bloquear esperando: esto cuelga de un clic y el hilo que lo atiende es el que
+    // pinta. Un `Sleep` aquí congela la barra entera.
+    void CambiarLaSalidaYEsperarla(string id)
+    {
+        try
+        {
+            if (!Audio.CambiarSalida(id))
+            {
+                // No se pudo ni intentar (Windows que no lo permite, o modo de solo lectura).
+                // Se repinta para que el panel diga lo que de verdad hay.
+                RefrescarControlEntero("no se pudo cambiar la salida de audio");
+                return;
+            }
+
+            int intentos = 0;
+            var reloj = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(60) };
+            reloj.Tick += (_, _) =>
+            {
+                // Si has cerrado el panel mientras tanto, se deja de preguntar. Seguir sería
+                // enumerar los dispositivos de audio dieciséis veces para repintar algo que
+                // ya no está en pantalla.
+                if (_panelAbierto != PanelDelCentro) { reloj.Stop(); return; }
+
+                bool yaEs;
+                try { yaEs = Audio.Salidas().Any(s => s.EsLaActual && s.Id == id); }
+                catch { yaEs = false; }
+
+                // Hasta ~1 segundo. Pasado eso no es que tarde: es que no va a cambiar.
+                if (!yaEs && ++intentos < 16) return;
+
+                reloj.Stop();
+                RefrescarControlEntero(yaEs
+                    ? "cambió la salida de audio"
+                    : "la salida de audio no llegó a cambiar");
+            };
+            reloj.Start();
+        }
+        catch (Exception ex) { Log.Error("cambiar la salida de audio", ex); }
     }
 
     // ---------- Brillo ----------
@@ -795,7 +855,8 @@ public partial class MainWindow : Window
             var pant = p;
             var mando = Slider(p.PorCiento, 0, 100,
                 nv => cifra.Text = $"{(int)Math.Round(nv)}%",
-                nv => { Brillo.Poner(pant, (int)Math.Round(nv)); AvisoDeBrillo((int)Math.Round(nv)); });
+                nv => { Brillo.Poner(pant, (int)Math.Round(nv)); AvisoDeBrillo((int)Math.Round(nv)); },
+                nombre: $"Brillo de {pant.Nombre}");
             fila.Children.Add(mando.Visual);
             Grid.SetColumn(cifra, 1);
             fila.Children.Add(cifra);
@@ -881,6 +942,7 @@ public partial class MainWindow : Window
             Cursor = Cursors.Hand,
             ToolTip = "Ver las redes wifi, conectarse y medir la velocidad",
         };
+        System.Windows.Automation.AutomationProperties.SetName(irRed, "Redes y velocidad");
         irRed.Click += (_, _) => { CerrarPanel(); AbrirRed(); };
         col.Children.Add(irRed);
 

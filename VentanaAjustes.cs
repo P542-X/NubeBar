@@ -18,7 +18,7 @@ namespace NubeBar;
 // Ventana de ajustes. Es una ventana normal (se activa y se escribe en ella) pero
 // con el aire de la nube. Cada cambio se escribe en el config y la isla lo recoge
 // con su recarga en caliente: por eso la vista previa es en vivo y gratis.
-public sealed class VentanaAjustes : Window
+public sealed partial class VentanaAjustes : Window
 {
     readonly ConfigArbol _arbol;
     readonly DispatcherTimer _escritura = new() { Interval = TimeSpan.FromMilliseconds(120) };
@@ -212,7 +212,11 @@ public sealed class VentanaAjustes : Window
         ["modulos"] = 0xE8A9,      // GridView
         ["biblioteca"] = 0xE8F1,   // Library
         ["apps"] = 0xECAA,         // AppIconDefault
+        // El mismo glifo de «Ventanas» que ya usa el centro de control: el dock y los
+        // paneles laterales son superficies del escritorio, no de la barra.
+        ["escritorio"] = 0xE7F4,
         ["atajos"] = 0xE765,       // KeyboardClassic
+        ["nubehypr"] = 0xE753,     // Cloud: organizar ventanas es cosa de la nube
         ["inicio"] = 0xE80F,       // Home
         ["sistema"] = 0xE713,      // Settings
     };
@@ -226,6 +230,26 @@ public sealed class VentanaAjustes : Window
 
     internal static string GlifoDeSeccion(string id) =>
         Glifo(Iconos.TryGetValue(id, out int c) ? c : 0xE713);
+
+    // ---------- Las secciones, en una sola lista ----------
+    //
+    // Existe porque la prueba de los glifos llevaba los doce ids ESCRITOS A MANO, y al
+    // añadir la decimotercera —«escritorio»— no se enteró: la sección se quedó sin icono
+    // propio, cayó en el valor por defecto (la rueda dentada) y pasó a compartir icono con
+    // «Sistema» en la misma barra lateral. Dos entradas con el mismo icono y la prueba en
+    // verde.
+    //
+    // Con una lista y dos comprobaciones contra ella, añadir una sección y olvidarse de su
+    // icono o de su subtítulo deja de ser silencioso.
+    internal static readonly string[] Secciones =
+    {
+        "apariencia", "colores", "fondo", "wallpaper", "perfiles",
+        "modulos", "biblioteca", "apps", "escritorio",
+        "atajos", "nubehypr", "inicio", "sistema",
+    };
+
+    internal static bool TieneIconoPropio(string id) => Iconos.ContainsKey(id);
+    internal static bool TieneSubtituloPropio(string id) => Subtitulos.ContainsKey(id);
 
     // ---------- Las categorías ----------
     //
@@ -249,7 +273,9 @@ public sealed class VentanaAjustes : Window
         ["modulos"] = "Qué widgets hay en cada zona de la nube",
         ["biblioteca"] = "Añade, oculta o quita widgets",
         ["apps"] = "El carrusel de aplicaciones y las fijadas",
+        ["escritorio"] = "El dock y los paneles laterales",
         ["atajos"] = "Las combinaciones de teclado",
+        ["nubehypr"] = "Organizar ventanas: reglas, atajos y estado",
         ["inicio"] = "El menú Inicio propio y su buscador",
         ["sistema"] = "Arranque, notificaciones y diagnóstico",
     };
@@ -358,8 +384,15 @@ public sealed class VentanaAjustes : Window
                            "widgets", "añadir", "ocultar", "quitar", "catálogo", "buscar");
         _modulos.Registrar("apps", "Apps", "Panel", SeccionApps,
                            "carrusel", "fijadas", "agrupar", "orden", "ventanas");
+        // La macrofase E: el dock y los paneles laterales. Ver VentanaAjustes.Escritorio.cs
+        // para por qué esta página hacía falta — el dock existía sin interruptor.
+        _modulos.Registrar("escritorio", "Escritorio", "Panel", SeccionEscritorio,
+                           "dock", "lateral", "laterales", "paneles", "escritorio", "borde");
         _modulos.Registrar("atajos", "Atajos", "Sistema", SeccionAtajos,
                            "teclado", "combinación", "vista general", "teclas");
+        _modulos.Registrar("nubehypr", "NubeHypr", "Sistema", SeccionNubeHypr,
+                           "ventanas", "reglas", "organizar", "espacios", "simulación",
+                           "layout", "flotante", "mosaico");
         _modulos.Registrar("inicio", "Inicio", "Sistema", SeccionInicio,
                            "menú", "buscador", "archivos", "web", "saludo", "tecla windows");
         _modulos.Registrar("sistema", "Sistema", "Sistema", SeccionSistema,
@@ -607,6 +640,20 @@ public sealed class VentanaAjustes : Window
             Tag = d.Id,
             ToolTip = Subtitulos.TryGetValue(d.Id, out var s) ? s : d.Nombre,
         };
+
+        // ---------- Y su nombre para quien no lo ve ----------
+        //
+        // El contenido de este botón es un `StackPanel` con un glifo y un texto. Un lector
+        // de pantalla que se encuentra eso lee lo que puede: el carácter del área privada,
+        // o nada. La ayuda emergente NO vale como nombre —no es lo que UIA expone—, y eso
+        // es exactamente lo que pasaba: trece entradas de navegación, las que llevan a
+        // todas las páginas de Ajustes, sin nombre ninguno.
+        //
+        // Lo encontró una medida, no una captura: un botón con nombre y uno sin él se
+        // dibujan igual. La cuenta salió «124 botones, 25 sin nombre».
+        System.Windows.Automation.AutomationProperties.SetName(b, d.Nombre);
+        System.Windows.Automation.AutomationProperties.SetHelpText(b, (string)b.ToolTip);
+
         b.Click += (_, _) => Ir(d.Id);
         b.KeyDown += (_, e) =>
         {
@@ -670,6 +717,134 @@ public sealed class VentanaAjustes : Window
     }
 
     // ---------- Ir a una sección ----------
+    // ---------- Lo que un lector de pantalla y el tabulador ven de esta ventana ----------
+    //
+    // «Teclado-accesible» se pidió y se escribió: los botones del editor de módulos llevan
+    // su `AutomationProperties.Name`, y lo que no se puede pulsar lo dice ahí además de en
+    // la ayuda emergente. Lo que faltaba era COMPROBARLO, y una captura no sirve: un botón
+    // sin nombre y uno con nombre se dibujan exactamente igual.
+    //
+    // Esto cuenta lo que de verdad hay en la página abierta. Lo usa el diagnóstico de
+    // capturas; aquí vive porque es quien tiene el árbol delante.
+    // ================= Pulsar un botón de verdad, desde un diagnóstico =================
+    //
+    // ---------- Esto NO es inyección de entrada ----------
+    //
+    // La regla de este proyecto no se toca: nada de `SendInput`, `SendKeys`, `keybd_event`
+    // ni clics sintéticos. Un programa que mueve el ratón del usuario para probarse a sí
+    // mismo es un programa en el que no se puede confiar, y además deja la máquina
+    // inservible mientras corre.
+    //
+    // Levantar el `Click` de un botón de WPF es otra cosa: no toca el ratón, no toca el
+    // teclado y no sale de nuestro proceso. Es **llamar al manejador del botón**, que es
+    // exactamente el mismo camino de código que recorre una pulsación de verdad.
+    //
+    // Y cierra una pregunta que ningún diagnóstico contestaba: `--diagmodulos` recorría el
+    // camino del modelo, pero nadie comprobaba que **el botón de Ajustes llame a ese
+    // camino**. Justo el hueco donde vivía el fallo de los módulos que no aparecían.
+    //
+    // Se busca por el nombre de accesibilidad, que aprovecha el trabajo ya hecho: un botón
+    // sin nombre no se encuentra desde aquí — y eso también es una señal.
+    // ---------- Cómo se llama un botón ----------
+    //
+    // La misma regla que usa `MirarElTeclado` para contar los que se quedan sin nombre, y por
+    // el mismo motivo: un botón con `Content` de **texto** sí tiene nombre para UIA, porque
+    // WPF lo deriva del contenido. `AutomationProperties.Name` solo hace falta cuando el
+    // contenido no es texto — un glifo, un `Grid`, una caja con icono.
+    //
+    // Esto salió a la primera ejecución: busqué «Guardar» y no apareció, porque `BotonPlano`
+    // pone `Content = "Guardar"` y no la propiedad adjunta. El botón está bien y es
+    // accesible; la que miraba mal era la búsqueda.
+    static string NombreDe(System.Windows.Controls.Primitives.ButtonBase b)
+    {
+        var n = System.Windows.Automation.AutomationProperties.GetName(b);
+        return string.IsNullOrWhiteSpace(n) ? b.Content as string ?? "" : n;
+    }
+
+    internal System.Windows.Controls.Primitives.ButtonBase? BotonLlamado(string nombreUia)
+    {
+        foreach (var d in Descendientes(this))
+        {
+            if (d is not System.Windows.Controls.Primitives.ButtonBase b) continue;
+            if (!b.IsVisible || !b.IsEnabled) continue;
+            if (NombreDe(b) == nombreUia) return b;
+        }
+        return null;
+    }
+
+    // Los nombres visibles, para poder decir en el registro qué había cuando no aparece el
+    // que se buscaba. Un «no lo encontré» sin la lista al lado es media hora adivinando si
+    // el nombre cambió o si el botón no estaba.
+    internal List<string> NombresDeBotones()
+    {
+        var l = new List<string>();
+        foreach (var d in Descendientes(this))
+            if (d is System.Windows.Controls.Primitives.ButtonBase b && b.IsVisible)
+            {
+                var n = NombreDe(b);
+                l.Add(n.Length > 0 ? n : "(sin nombre)");
+            }
+        return l;
+    }
+
+    internal static void Pulsar(System.Windows.Controls.Primitives.ButtonBase b) =>
+        b.RaiseEvent(new RoutedEventArgs(
+            System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+
+    internal (int Botones, int ConFoco, int SinNombre, string Ejemplo) MirarElTeclado()
+    {
+        int botones = 0, conFoco = 0, sinNombre = 0;
+        string ejemplo = "";
+        try
+        {
+            foreach (var d in Descendientes(this))
+            {
+                if (d is not System.Windows.Controls.Primitives.ButtonBase b) continue;
+                if (!b.IsVisible) continue;
+
+                // ---------- Lo que no es nuestro no se cuenta ----------
+                //
+                // Un `ScrollViewer` trae dentro sus flechas y su carrito, que son
+                // `RepeatButton` con un `Path` de contenido. Son de la plantilla de WPF, no
+                // nuestros, y un lector de pantalla no los recorre uno a uno: entiende la
+                // barra entera por su patrón de UIA.
+                //
+                // Contarlos daba doce «botones sin nombre» que no se pueden arreglar y que
+                // tapaban los que sí: los trece de la navegación, que eran de verdad.
+                if (b.TemplatedParent != null) continue;
+
+                botones++;
+
+                // Alcanzable con el tabulador. Un botón que solo responde al ratón no
+                // existe para quien no usa el ratón.
+                if (b.Focusable && b.IsTabStop && b.IsEnabled) conFoco++;
+
+                // Y con nombre. Sin él, un lector de pantalla lee el contenido —que en
+                // media interfaz es un glifo del área privada— o no lee nada.
+                var n = System.Windows.Automation.AutomationProperties.GetName(b);
+                if (string.IsNullOrWhiteSpace(n) && b.Content is not string)
+                {
+                    sinNombre++;
+                    if (ejemplo.Length == 0)
+                        ejemplo = b.ToolTip?.ToString() ?? b.Content?.GetType().Name ?? "(sin pista)";
+                }
+            }
+        }
+        catch { }
+        return (botones, conFoco, sinNombre, ejemplo);
+    }
+
+    static IEnumerable<DependencyObject> Descendientes(DependencyObject raiz)
+    {
+        int n = System.Windows.Media.VisualTreeHelper.GetChildrenCount(raiz);
+        for (int i = 0; i < n; i++)
+        {
+            var h = System.Windows.Media.VisualTreeHelper.GetChild(raiz, i);
+            yield return h;
+            foreach (var nieto in Descendientes(h)) yield return nieto;
+        }
+    }
+
     internal void Ir(string id)
     {
         int donde = _modulos.Indice(id);
@@ -1095,6 +1270,16 @@ public sealed class VentanaAjustes : Window
         if (Hay("restaur", "volver", "deshacer")) return Ico.Restaurar;
         if (Hay("export", "import", "guardar", "probar", "aplicar")) return Ico.Guardar;
 
+        // El dock y los laterales son superficies del escritorio. Van antes que "forma"
+        // y "posición" porque sus tarjetas hablan de dónde se ven y cuándo, y con el orden
+        // al revés «Dock» se llevaría el icono de la forma de la barra, que es otra cosa.
+        if (Hay("dock")) return Ico.Apps;
+        if (Hay("lateral", "panel")) return Ico.Pantallas;
+
+        // Antes que "modo" y que "pantalla": hoy «Clima» no choca con ninguno, pero el grupo
+        // del tiempo tiene que llevar la nube de la casa y no el icono por defecto.
+        if (Hay("clima", "tiempo")) return Ico.Nube;
+
         if (Hay("forma", "posición", "posicion", "modo")) return Ico.Forma;
         if (Hay("color", "tema", "contraste", "paleta")) return Ico.Color;
         if (Hay("fondo", "imagen", "degradado")) return Ico.Imagen;
@@ -1253,11 +1438,338 @@ public sealed class VentanaAjustes : Window
             Content = etiqueta,
             IsChecked = valor,
             Foreground = _texto,
-            Margin = new Thickness(0, 6, 0, 6)
+            Margin = new Thickness(0, 6, 0, 6),
+            Template = PlantillaDeInterruptor(),
         };
         c.Checked += (_, _) => { alCambiar(true); Cambio(); };
         c.Unchecked += (_, _) => { alCambiar(false); Cambio(); };
         return c;
+    }
+
+    // ================= El interruptor, vestido =================
+    //
+    // ---------- Esto ya estaba inventado ----------
+    //
+    // `MainWindow.Toggle` existe desde E3, y su comentario dice literalmente que «sustituye al
+    // `CheckBox` del sistema, que en un panel oscuro sale como una caja blanca y no se parece
+    // a nada de NubeBar». Lo usan los paneles laterales.
+    //
+    // Ajustes no lo usó nunca. Y Ajustes es donde están casi todos los interruptores de
+    // NubeBar: cada página de la ventana enseñaba la cajita gris de Windows mientras el panel
+    // de al lado tenía un interruptor de verdad. El mismo fallo de siempre en este proyecto —
+    // la pieza buena escrita, y nadie llamándola.
+    //
+    // ---------- Por qué una plantilla y no reutilizar `Toggle` ----------
+    //
+    // `Toggle` es un método de `MainWindow` y vive de sus pinceles; desde aquí no se alcanza.
+    // Copiarlo entero habría dado dos interruptores que algún día se parecerían menos.
+    //
+    // Vestir el `CheckBox` con la misma FORMA conserva además lo que importa y no se ve: sigue
+    // siendo un `CheckBox`, así que el tabulador, la barra espaciadora, los lectores de
+    // pantalla y el `(CheckBox)` que castea `VentanaAjustes.NubeHypr.cs` para atenuarlo siguen
+    // funcionando exactamente igual. Cambia el aspecto, no el control.
+    ControlTemplate PlantillaDeInterruptor()
+    {
+        var plantilla = new ControlTemplate(typeof(CheckBox));
+
+        var fila = new FrameworkElementFactory(typeof(Grid));
+        fila.SetValue(FrameworkElement.MinHeightProperty, 26.0);
+
+        var colTexto = new FrameworkElementFactory(typeof(ColumnDefinition));
+        colTexto.SetValue(ColumnDefinition.WidthProperty, new GridLength(1, GridUnitType.Star));
+        var colPista = new FrameworkElementFactory(typeof(ColumnDefinition));
+        colPista.SetValue(ColumnDefinition.WidthProperty, GridLength.Auto);
+        fila.AppendChild(colTexto);
+        fila.AppendChild(colPista);
+
+        // El rótulo a la izquierda y el interruptor a la derecha, como en los paneles. Y el
+        // texto se PARTE: varias etiquetas de esta ventana son frases largas («Traer los
+        // iconos de la bandeja a la isla»), y cortarlas sería el mismo fallo que ya hubo en
+        // el panel izquierdo.
+        var pres = new FrameworkElementFactory(typeof(ContentPresenter));
+        pres.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+        pres.SetValue(ContentPresenter.MarginProperty, new Thickness(0, 0, 12, 0));
+        pres.SetValue(TextBlock.TextWrappingProperty, TextWrapping.Wrap);
+        pres.SetValue(Grid.ColumnProperty, 0);
+        fila.AppendChild(pres);
+
+        var pista = new FrameworkElementFactory(typeof(Border), "pista");
+        pista.SetValue(FrameworkElement.WidthProperty, 38.0);
+        pista.SetValue(FrameworkElement.HeightProperty, 20.0);
+        pista.SetValue(Border.CornerRadiusProperty, new CornerRadius(10));
+        pista.SetValue(Border.BackgroundProperty, new SolidColorBrush(_roles.SuperficieAltaSolida));
+        pista.SetValue(Border.BorderBrushProperty, new SolidColorBrush(_roles.Borde));
+        pista.SetValue(Border.BorderThicknessProperty, new Thickness(1));
+        pista.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        pista.SetValue(Grid.ColumnProperty, 1);
+
+        var bolita = new FrameworkElementFactory(typeof(System.Windows.Shapes.Ellipse), "bolita");
+        bolita.SetValue(FrameworkElement.WidthProperty, 14.0);
+        bolita.SetValue(FrameworkElement.HeightProperty, 14.0);
+        bolita.SetValue(System.Windows.Shapes.Shape.FillProperty, new SolidColorBrush(_roles.Texto));
+        bolita.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Left);
+        bolita.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        bolita.SetValue(FrameworkElement.MarginProperty, new Thickness(2, 0, 2, 0));
+        pista.AppendChild(bolita);
+        fila.AppendChild(pista);
+
+        plantilla.VisualTree = fila;
+
+        // ---------- Encendido ----------
+        //
+        // La bolita se va a la derecha y la pista se pinta del acento. El relleno de la bolita
+        // pasa al color del FONDO, no al del texto: sobre el acento, blanco sobre azul claro
+        // casi no se ve, y el fondo siempre contrasta con el acento porque es de donde sale.
+        var puesto = new Trigger
+        {
+            Property = System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
+            Value = true,
+        };
+        puesto.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(_roles.Acento), "pista"));
+        puesto.Setters.Add(new Setter(System.Windows.Shapes.Shape.FillProperty,
+                                      new SolidColorBrush(_roles.FondoOpaco), "bolita"));
+        puesto.Setters.Add(new Setter(FrameworkElement.HorizontalAlignmentProperty,
+                                      HorizontalAlignment.Right, "bolita"));
+        plantilla.Triggers.Add(puesto);
+
+        var encima = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+        encima.Setters.Add(new Setter(Border.BorderBrushProperty,
+                                      new SolidColorBrush(_roles.AcentoTinta), "pista"));
+        plantilla.Triggers.Add(encima);
+
+        // El foco de teclado tiene que VERSE, o la ventana no se puede recorrer con el
+        // tabulador — y al quitar la plantilla de serie se perdería el recuadro punteado que
+        // Windows pone solo.
+        var foco = new Trigger { Property = UIElement.IsKeyboardFocusedProperty, Value = true };
+        foco.Setters.Add(new Setter(Border.BorderThicknessProperty, new Thickness(2), "pista"));
+        foco.Setters.Add(new Setter(Border.BorderBrushProperty,
+                                    new SolidColorBrush(_roles.AcentoTinta), "pista"));
+        plantilla.Triggers.Add(foco);
+
+        return plantilla;
+    }
+
+    // ================= El desplegable, vestido =================
+    //
+    // ---------- Qué estaba mal ----------
+    //
+    // Los tres sitios que hacían un `ComboBox` lo creaban con `Foreground = Brushes.Black`.
+    // Eso no era una decisión de color: era un apaño. La plantilla de serie de WPF pinta el
+    // desplegable con su propio cromo CLARO y no mira el `Background` que se le ponga, así
+    // que en una ventana oscura salía una caja blanca — y alguien puso el texto en negro para
+    // que al menos se leyera.
+    //
+    // El resultado se ve en cuanto uno mira una captura de Ajustes: cuatro rectángulos
+    // blancos entre tarjetas oscuras. No se lee como «un control del sistema», se lee como
+    // algo a medio hacer, que es justo lo que esta fase tenía que quitar.
+    //
+    // ---------- Por qué una plantilla y no más propiedades ----------
+    //
+    // Porque no hay propiedad que valga: el cromo claro está dentro de la plantilla de serie.
+    // Hay que sustituirla. Es lo que ya hacen `PlantillaDeNavegacion` y las de la barra, así
+    // que esto no inventa una técnica nueva — usa la de la casa.
+    //
+    // Y está en UN sitio para los tres: el día que el tema cambie, cambian los tres.
+    ComboBox Desplegable(System.Collections.IEnumerable valores)
+    {
+        var c = new ComboBox
+        {
+            ItemsSource = valores,
+            Foreground = _texto,
+            Background = _superficieAlta,
+            BorderBrush = new SolidColorBrush(_roles.Borde),
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(8, 4, 8, 4),
+            Template = PlantillaDeDesplegable(),
+        };
+        // Las filas del desplegable desplegado. Sin esto, la lista sigue siendo blanca aunque
+        // la caja ya no lo sea — y el salto se ve justo al abrirla.
+        c.Resources[typeof(ComboBoxItem)] = EstiloDeOpcion();
+        return c;
+    }
+
+    Style EstiloDeOpcion()
+    {
+        var plantilla = new ControlTemplate(typeof(ComboBoxItem));
+        var marco = new FrameworkElementFactory(typeof(Border), "marco");
+        marco.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+        marco.SetValue(Border.PaddingProperty, new Thickness(9, 6, 9, 6));
+        var pres = new FrameworkElementFactory(typeof(ContentPresenter));
+        marco.AppendChild(pres);
+        plantilla.VisualTree = marco;
+
+        var encima = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+        encima.Setters.Add(new Setter(Border.BackgroundProperty, _superficieAlta, "marco"));
+        plantilla.Triggers.Add(encima);
+
+        // La elegida, del color de acento. Es lo que contesta «¿cuál está puesta?» sin leer.
+        var elegida = new Trigger { Property = ComboBoxItem.IsSelectedProperty, Value = true };
+        elegida.Setters.Add(new Setter(Border.BackgroundProperty,
+            new SolidColorBrush(HyprPinta.Azul(_roles) with { A = 0x44 }), "marco"));
+        plantilla.Triggers.Add(elegida);
+
+        var e = new Style(typeof(ComboBoxItem));
+        e.Setters.Add(new Setter(Control.TemplateProperty, plantilla));
+        e.Setters.Add(new Setter(Control.ForegroundProperty, _texto));
+        return e;
+    }
+
+    ControlTemplate PlantillaDeDesplegable()
+    {
+        var plantilla = new ControlTemplate(typeof(ComboBox));
+        var raiz = new FrameworkElementFactory(typeof(Grid));
+
+        // ---------- La caja ----------
+        var marco = new FrameworkElementFactory(typeof(Border), "marco");
+        marco.SetBinding(Border.BackgroundProperty, Lazo("Background"));
+        marco.SetBinding(Border.BorderBrushProperty, Lazo("BorderBrush"));
+        marco.SetBinding(Border.BorderThicknessProperty, Lazo("BorderThickness"));
+        marco.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
+
+        var dentro = new FrameworkElementFactory(typeof(Grid));
+        var colTexto = new FrameworkElementFactory(typeof(ColumnDefinition));
+        colTexto.SetValue(ColumnDefinition.WidthProperty, new GridLength(1, GridUnitType.Star));
+        var colFlecha = new FrameworkElementFactory(typeof(ColumnDefinition));
+        colFlecha.SetValue(ColumnDefinition.WidthProperty, GridLength.Auto);
+        dentro.AppendChild(colTexto);
+        dentro.AppendChild(colFlecha);
+
+        // Lo elegido. `SelectionBoxItem` y no `SelectedItem`: es lo que el ComboBox prepara
+        // para enseñar, y respeta la plantilla de los elementos si la hubiera.
+        var pres = new FrameworkElementFactory(typeof(ContentPresenter));
+        pres.SetBinding(ContentPresenter.ContentProperty, Lazo("SelectionBoxItem"));
+        pres.SetBinding(ContentPresenter.ContentTemplateProperty, Lazo("SelectionBoxItemTemplate"));
+        pres.SetValue(ContentPresenter.MarginProperty, new Thickness(9, 5, 4, 5));
+        pres.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+        pres.SetValue(Grid.ColumnProperty, 0);
+        dentro.AppendChild(pres);
+
+        var flecha = new FrameworkElementFactory(typeof(TextBlock));
+        flecha.SetValue(TextBlock.TextProperty, char.ConvertFromUtf32(0xE70D));   // ChevronDown
+        flecha.SetValue(TextBlock.FontFamilyProperty, new FontFamily(MainWindow.FuenteIconos));
+        flecha.SetValue(TextBlock.FontSizeProperty, 10.0);
+        flecha.SetValue(TextBlock.ForegroundProperty, _texto);
+        flecha.SetValue(UIElement.OpacityProperty, 0.6);
+        flecha.SetValue(TextBlock.MarginProperty, new Thickness(0, 0, 10, 0));
+        flecha.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
+        flecha.SetValue(Grid.ColumnProperty, 1);
+        dentro.AppendChild(flecha);
+
+        marco.AppendChild(dentro);
+        raiz.AppendChild(marco);
+
+        // ---------- Lo que se pulsa ----------
+        //
+        // Encima de la caja y transparente, ocupándola entera. Con su propia plantilla, o
+        // traería el cromo claro del botón de serie — que es el mismo problema otra vez.
+        var toggle = new FrameworkElementFactory(typeof(System.Windows.Controls.Primitives.ToggleButton));
+        toggle.SetValue(Control.TemplateProperty, PlantillaTransparente());
+        toggle.SetValue(Control.BackgroundProperty, Brushes.Transparent);
+        toggle.SetValue(System.Windows.Controls.Primitives.ToggleButton.ClickModeProperty, ClickMode.Press);
+        toggle.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
+            new System.Windows.Data.Binding("IsDropDownOpen")
+            {
+                RelativeSource = System.Windows.Data.RelativeSource.TemplatedParent,
+                Mode = System.Windows.Data.BindingMode.TwoWay,
+            });
+        raiz.AppendChild(toggle);
+
+        // ---------- La lista ----------
+        //
+        // El nombre «PART_Popup» no es decorativo: el ComboBox lo busca por ese nombre para
+        // cerrarlo al elegir. Con otro nombre, la lista se queda abierta.
+        var popup = new FrameworkElementFactory(typeof(System.Windows.Controls.Primitives.Popup), "PART_Popup");
+        popup.SetBinding(System.Windows.Controls.Primitives.Popup.IsOpenProperty, Lazo("IsDropDownOpen"));
+        popup.SetValue(System.Windows.Controls.Primitives.Popup.PlacementProperty,
+                       System.Windows.Controls.Primitives.PlacementMode.Bottom);
+        popup.SetValue(System.Windows.Controls.Primitives.Popup.AllowsTransparencyProperty, true);
+        popup.SetValue(System.Windows.Controls.Primitives.Popup.PopupAnimationProperty,
+                       System.Windows.Controls.Primitives.PopupAnimation.Fade);
+        popup.SetBinding(FrameworkElement.MinWidthProperty, Lazo("ActualWidth"));
+
+        var marcoLista = new FrameworkElementFactory(typeof(Border));
+        // Opaca a propósito: una lista translúcida deja ver el texto de debajo y se vuelve
+        // ilegible justo cuando hay que leerla.
+        marcoLista.SetValue(Border.BackgroundProperty, new SolidColorBrush(_roles.FondoOpaco));
+        marcoLista.SetValue(Border.BorderBrushProperty, new SolidColorBrush(_roles.Borde));
+        marcoLista.SetValue(Border.BorderThicknessProperty, new Thickness(1));
+        marcoLista.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
+        marcoLista.SetValue(Border.MarginProperty, new Thickness(0, 3, 0, 0));
+        marcoLista.SetValue(Border.PaddingProperty, new Thickness(0, 4, 0, 4));
+
+        var scroll = new FrameworkElementFactory(typeof(ScrollViewer));
+        scroll.SetValue(ScrollViewer.MaxHeightProperty, 260.0);
+        scroll.SetValue(ScrollViewer.VerticalScrollBarVisibilityProperty, ScrollBarVisibility.Auto);
+        scroll.AppendChild(new FrameworkElementFactory(typeof(ItemsPresenter)));
+        marcoLista.AppendChild(scroll);
+        popup.AppendChild(marcoLista);
+        raiz.AppendChild(popup);
+
+        plantilla.VisualTree = raiz;
+
+        // El foco de teclado se ve: es lo que hace la ventana usable con Tab, igual que en
+        // la navegación lateral.
+        var foco = new Trigger { Property = UIElement.IsKeyboardFocusWithinProperty, Value = true };
+        foco.Setters.Add(new Setter(Border.BorderBrushProperty, new SolidColorBrush(_roles.AcentoTinta), "marco"));
+        plantilla.Triggers.Add(foco);
+
+        return plantilla;
+    }
+
+    // Un botón sin nada: solo su contenido y la superficie que pulsa.
+    ControlTemplate PlantillaTransparente()
+    {
+        var p = new ControlTemplate(typeof(System.Windows.Controls.Primitives.ToggleButton));
+        var b = new FrameworkElementFactory(typeof(Border));
+        b.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+        b.AppendChild(new FrameworkElementFactory(typeof(ContentPresenter)));
+        p.VisualTree = b;
+        return p;
+    }
+
+    static System.Windows.Data.Binding Lazo(string propiedad) =>
+        new(propiedad) { RelativeSource = System.Windows.Data.RelativeSource.TemplatedParent };
+
+    // Lo que hay puesto ahora mismo, pasado por los topes. Se lee del árbol y no del modelo
+    // tipado porque en esta ventana el árbol es lo que está al día: el modelo se recarga al
+    // guardar, y aquí hay que enseñar lo que acabas de mover.
+    Neon.Ajuste LeerNeon() => Neon.Limpia(new OpcionesNeon
+    {
+        Intensidad = _arbol.Numero("Neon", "Intensidad", 1.0),
+        Radio = _arbol.Numero("Neon", "Radio", 26),
+        Velocidad = (int)_arbol.Numero("Neon", "Velocidad", 2600),
+        Respira = _arbol.Bandera("Neon", "Respira", true),
+        Color = _arbol.Texto("Neon", "Color", ""),
+    });
+
+    // El color del halo: vacío = el acento del tema; uno = ese; dos separados por coma =
+    // degradado (filo y luz). Se explica en el propio campo, porque «#RRGGBB,#RRGGBB» no se
+    // adivina.
+    UIElement CampoDeColorDelNeon()
+    {
+        var caja = new TextBox
+        {
+            Text = _arbol.Texto("Neon", "Color", ""),
+            Background = _superficieAlta,
+            Foreground = _texto, BorderBrush = _acento, BorderThickness = new Thickness(1),
+            Padding = new Thickness(6), Margin = new Thickness(0, 6, 0, 0),
+        };
+        caja.TextChanged += (_, _) => _arbol.Poner("Neon", "Color", caja.Text.Trim());
+
+        var fila = new StackPanel();
+        fila.Children.Add(new TextBlock
+        {
+            Text = "Color del halo", Foreground = _texto, Margin = new Thickness(0, 8, 0, 0),
+        });
+        fila.Children.Add(caja);
+        var pista = Rotulo(
+            "Vacío usa el color de acento del tema. Un color (#7AA2F7) manda sobre él. Dos " +
+            "separados por coma (#7AA2F7,#C77DFF) dan degradado: el primero es el filo y el " +
+            "segundo la luz. Lo que no se entienda se ignora y vuelve al color del tema.");
+        pista.TextWrapping = TextWrapping.Wrap;
+        pista.Opacity = 0.55;
+        fila.Children.Add(pista);
+        return fila;
     }
 
     UIElement Opciones(string etiqueta, string[] valores, string actual, Action<string> alCambiar)
@@ -1267,7 +1779,8 @@ public sealed class VentanaAjustes : Window
         fila.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
         var rot = new TextBlock { Text = etiqueta, Foreground = _texto, VerticalAlignment = VerticalAlignment.Center };
-        var combo = new ComboBox { ItemsSource = valores, SelectedItem = actual, Foreground = Brushes.Black };
+        var combo = Desplegable(valores);
+        combo.SelectedItem = actual;
         combo.SelectionChanged += (_, _) =>
         {
             if (combo.SelectedItem is string s) { alCambiar(s); Cambio(); }
@@ -1281,6 +1794,92 @@ public sealed class VentanaAjustes : Window
     UIElement SeccionApariencia()
     {
         var p = NuevaPagina("apariencia");
+
+        // ================= El estilo visual =================
+        //
+        // Lo primero de la página porque es lo que más cambia de golpe, y porque es la
+        // decisión que el usuario pidió poder tomar: «lo que buscamos ahora es decoración».
+        //
+        // El tema decide los colores y ya tenía siete variantes; esto decide la FORMA —cuánto
+        // se redondea una tarjeta, cuánto filo lleva, cuánto aire y si brilla—, que estaba
+        // escrita en cuatro constantes dentro del código.
+        p.Grupo("Estilo", IconoDeGrupo("Forma"),
+                "La forma de las tarjetas y los paneles. Los colores los decide el tema.");
+
+        p.Mas(Opciones("Estilo",
+                       Estilos.Todos.Select(e => e.Nombre).ToArray(),
+                       Estilos.Leer(_arbol.Texto("Tema", "Estilo", "normal")).Nombre,
+                       nombre =>
+                       {
+                           var e = Estilos.Todos.FirstOrDefault(x => x.Nombre == nombre)
+                                   ?? Estilos.Normal;
+                           _arbol.Poner("Tema", "Estilo", Estilos.Clave(e.Que));
+                       }));
+
+        // Qué hace cada uno, para poder elegir sin ir probando los tres.
+        //
+        // Sin asteriscos: `Pista` pinta texto plano, no markdown, y los `**` salían literales
+        // en pantalla. Lo vi en la captura — que es para lo que están.
+        foreach (var e in Estilos.Todos)
+            p.Pista($"{e.Nombre} — {e.Que_Hace}");
+
+        p.Pista("Ninguno de los tres quita funciones ni esconde controles: lo único que " +
+                "cambia es la decoración.");
+
+        // ================= El halo del neón =================
+        //
+        // ---------- Por qué estos mandos y no otros ----------
+        //
+        // «Cuánto tiene que brillar» no tiene respuesta correcta: depende del monitor, del
+        // fondo de pantalla y de a quién le canse antes. Lo que para uno es un halo bonito,
+        // para otro es una luz de discoteca.
+        //
+        // Primero los presets, porque nadie debería tener que entender «radio del difuminado»
+        // para tener su escritorio bonito; y debajo los tres números, para quien sí quiera
+        // afinar. El que está puesto se enseña por su nombre — ver `Neon.NombreDe`— para que
+        // no haya que deducirlo de tres cifras.
+        p.Grupo("Halo del neón", IconoDeGrupo("Color"));
+
+        p.Mas(Opciones("Preajuste",
+                       Neon.Presets.Select(x => x.Nombre).Append("Personalizado").ToArray(),
+                       Neon.NombreDe(LeerNeon()),
+                       nombre =>
+                       {
+                           // «Personalizado» no es un preajuste: es lo que sale cuando has
+                           // tocado los números. Elegirlo no puede cambiar nada, o perderías
+                           // justo lo que habías afinado.
+                           if (Neon.Preset(nombre) is not { } a) return;
+                           _arbol.Poner("Neon", "Intensidad", a.Intensidad);
+                           _arbol.Poner("Neon", "Radio", a.Radio);
+                           _arbol.Poner("Neon", "Velocidad", a.Velocidad);
+                           _arbol.Poner("Neon", "Respira", a.Respira);
+                       }));
+
+        p.Mas(Deslizador("Intensidad del halo", Neon.IntensidadMin, Neon.IntensidadMax,
+                         LeerNeon().Intensidad,
+                         v => _arbol.Poner("Neon", "Intensidad", Math.Round(v, 2))));
+
+        p.Mas(Deslizador("Radio del halo (px)", Neon.RadioMin, Neon.RadioMax,
+                         LeerNeon().Radio,
+                         v => _arbol.Poner("Neon", "Radio", Math.Round(v))));
+
+        p.Mas(Deslizador("Lo que tarda en respirar (ms)", Neon.VelocidadMin, Neon.VelocidadMax,
+                         LeerNeon().Velocidad,
+                         v => _arbol.Poner("Neon", "Velocidad", Math.Round(v))));
+
+        p.Mas(Interruptor("Que el halo respire",
+                          _arbol.Bandera("Neon", "Respira", true),
+                          v => _arbol.Poner("Neon", "Respira", v)));
+
+        p.Mas(CampoDeColorDelNeon());
+
+        p.Pista("El halo solo se ve con el estilo «Neón» puesto. Apagar la respiración lo " +
+                "deja fijo y visible, no lo quita — para no tener halo se elige otro estilo.");
+        p.Pista("Con las animaciones reducidas o desactivadas el halo se queda quieto por su " +
+                "cuenta, aunque la respiración esté encendida.");
+        p.Pista("Los cambios se ven en cuanto sueltas: los paneles se vuelven a montar con lo " +
+                "que acabas de poner.");
+
         p.Grupo("Forma", IconoDeGrupo("Forma"));
         // La geometría se escribe en Paneles[principal], que es la autoridad desde B5.
         // Las claves equivalentes de "Barra" ya no se leen: se derivan al cargar.
@@ -1441,6 +2040,13 @@ public sealed class VentanaAjustes : Window
             Foreground = _texto,
             Cursor = Cursors.Hand
         };
+
+        // El contenido es una pila con el nombre y tres rectángulos de color. Para UIA eso
+        // es un objeto sin nombre, así que los siete temas se anunciaban como siete botones
+        // iguales y mudos. Y el color NO puede ser el único portador: quien no lo ve
+        // necesita el nombre del tema, que es lo que de verdad distingue uno de otro.
+        System.Windows.Automation.AutomationProperties.SetName(b, $"Tema {t.Nombre}");
+
         b.Click += (_, _) => AplicarTema(t);
         return b;
     }
@@ -1570,133 +2176,17 @@ public sealed class VentanaAjustes : Window
         return p.Fin();
     }
 
-    UIElement SeccionModulos()
-    {
-        var p = NuevaPagina("modulos");
-        p.Grupo("Arrastra los módulos entre columnas para colocarlos", IconoDeGrupo("Arrastra los módulos entre columnas para colocarlos"));
-
-        var rejilla = new Grid();
-        for (int i = 0; i < 3; i++) rejilla.ColumnDefinitions.Add(new ColumnDefinition());
-
-        var izq = ListaModulos("Izquierda", _arbol.Lista("Modulos", "Izquierda", "inicio"));
-        var cen = ListaModulos("Centro", _arbol.Lista("Modulos", "Centro", "fijadas", "apps", "reloj"));
-        var der = ListaModulos("Derecha", _arbol.Lista("Modulos", "Derecha", "cpu", "ram", "bateria", "bandeja", "control", "fecha"));
-
-        Grid.SetColumn(izq.Caja, 0); Grid.SetColumn(cen.Caja, 1); Grid.SetColumn(der.Caja, 2);
-        rejilla.Children.Add(izq.Caja); rejilla.Children.Add(cen.Caja); rejilla.Children.Add(der.Caja);
-        p.Mas(rejilla);
-
-        void Volcar()
-        {
-            _arbol.PonerLista("Modulos", "Izquierda", izq.Lista.Items.Cast<string>());
-            _arbol.PonerLista("Modulos", "Centro", cen.Lista.Items.Cast<string>());
-            _arbol.PonerLista("Modulos", "Derecha", der.Lista.Items.Cast<string>());
-            Cambio();
-        }
-        foreach (var l in new[] { izq, cen, der }) l.AlCambiar = Volcar;
-
-        p.Grupo("Disponibles (doble clic para añadir a la izquierda)", IconoDeGrupo("Disponibles (doble clic para añadir a la izquierda)"));
-        var disponibles = new WrapPanel();
-        foreach (var m in _modulosDisponibles)
-        {
-            var etiqueta = m;
-            var b = new Button
-            {
-                Content = etiqueta,
-                Margin = new Thickness(0, 0, 6, 6),
-                Padding = new Thickness(10, 4, 10, 4),
-                Background = _superficie,
-                Foreground = _texto,
-                BorderThickness = new Thickness(0),
-                Cursor = Cursors.Hand
-            };
-            b.Click += (_, _) => { izq.Lista.Items.Add(etiqueta); Volcar(); };
-            disponibles.Children.Add(b);
-        }
-        p.Mas(disponibles);
-        p.Mas(new TextBlock
-        {
-            Text = "Doble clic en un módulo de una columna para quitarlo.",
-            Foreground = _textoAtenuado, Margin = new Thickness(0, 6, 0, 0)
-        });
-        return p.Fin();
-    }
-
-    sealed class CajaModulos
-    {
-        public Border Caja = new();
-        public ListBox Lista = new();
-        public Action? AlCambiar;
-    }
-
-    CajaModulos ListaModulos(string titulo, List<string> valores)
-    {
-        var r = new CajaModulos();
-        r.Lista = new ListBox
-        {
-            Height = 190,
-            Background = _superficie,
-            Foreground = _texto,
-            BorderThickness = new Thickness(0),
-            AllowDrop = true
-        };
-        foreach (var v in valores) r.Lista.Items.Add(v);
-
-        // Arrastrar y soltar entre columnas y dentro de la misma
-        r.Lista.PreviewMouseLeftButtonDown += (s, e) =>
-        {
-            if (r.Lista.SelectedItem is string sel && e.ClickCount == 1)
-                r.Lista.Tag = sel;
-        };
-        r.Lista.MouseMove += (s, e) =>
-        {
-            if (e.LeftButton != MouseButtonState.Pressed) return;
-            if (r.Lista.Tag is not string sel) return;
-            DragDrop.DoDragDrop(r.Lista, new DataObject("modulo", new object[] { sel, r }), DragDropEffects.Move);
-            r.Lista.Tag = null;
-        };
-        r.Lista.DragOver += (s, e) =>
-        {
-            e.Effects = e.Data.GetDataPresent("modulo") ? DragDropEffects.Move : DragDropEffects.None;
-            e.Handled = true;
-        };
-        r.Lista.Drop += (s, e) =>
-        {
-            if (e.Data.GetData("modulo") is not object[] datos) return;
-            var texto = (string)datos[0];
-            var origen = (CajaModulos)datos[1];
-            origen.Lista.Items.Remove(texto);
-
-            int destino = IndiceBajoElRaton(r.Lista, e.GetPosition(r.Lista));
-            if (destino < 0 || destino > r.Lista.Items.Count) destino = r.Lista.Items.Count;
-            r.Lista.Items.Insert(destino, texto);
-
-            origen.AlCambiar?.Invoke();
-            r.AlCambiar?.Invoke();
-            e.Handled = true;
-        };
-        r.Lista.MouseDoubleClick += (s, e) =>
-        {
-            if (r.Lista.SelectedItem is string sel) { r.Lista.Items.Remove(sel); r.AlCambiar?.Invoke(); }
-        };
-
-        var pila = new StackPanel { Margin = new Thickness(4) };
-        pila.Children.Add(new TextBlock { Text = titulo, Foreground = _acento, Margin = new Thickness(2, 0, 0, 4) });
-        pila.Children.Add(r.Lista);
-        r.Caja = new Border { Child = pila };
-        return r;
-    }
-
-    static int IndiceBajoElRaton(ListBox lista, Point p)
-    {
-        for (int i = 0; i < lista.Items.Count; i++)
-        {
-            if (lista.ItemContainerGenerator.ContainerFromIndex(i) is not FrameworkElement fe) continue;
-            var sup = fe.TranslatePoint(new Point(0, 0), lista);
-            if (p.Y < sup.Y + fe.ActualHeight / 2) return i;
-        }
-        return lista.Items.Count;
-    }
+    // ---------- La página de módulos ----------
+    //
+    // Vive en `VentanaAjustes.Modulos.cs`. Aquí queda solo la entrada: la página se rehizo
+    // entera y meterla en medio de este fichero de tres mil líneas no ayudaba a nadie.
+    //
+    // Lo que había, para que no vuelva: tres `ListBox` con los IDS EN CRUDO —«fijadas»,
+    // «musica-caratula»— y una fila de botones de texto cuyo rótulo decía «doble clic para
+    // añadir a la izquierda» mientras el manejador era un `Click` sencillo… que además
+    // añadía siempre a la izquierda, dijeras lo que dijeras. No se veía qué estaba puesto
+    // ni dónde, no se sabía qué se podía repetir, y mover era arrastrar o nada.
+    UIElement SeccionModulos() => PaginaDeModulos();
 
     // Lista editable con subir y bajar: el ORDEN importa en las apps fijadas
     UIElement ListaEditable(String seccion, String clave, String ayuda)
@@ -1791,7 +2281,7 @@ public sealed class VentanaAjustes : Window
         var aviso = new TextBlock { Foreground = Brushes.Tomato, Margin = new Thickness(0, 6, 0, 0), TextWrapping = TextWrapping.Wrap };
         var campo = new TextBox
         {
-            Text = _arbol.Texto("Barra", "AtajoVistaGeneral", "Ctrl+Alt+Space"),
+            Text = _arbol.Texto("Barra", "AtajoVistaGeneral", Barra.AtajoDeSerie),
             IsReadOnly = true,
             Height = 30,
             Padding = new Thickness(8, 0, 8, 0),
@@ -1859,6 +2349,8 @@ public sealed class VentanaAjustes : Window
         // Comprobar la que ya está guardada es justamente donde avisar sirve de algo,
         // porque esa combinación no se podría volver a teclear. Se deja apuntado para
         // llamarlo cuando la ventana tenga handle: antes RegisterHotKey no vale.
+        GrupoDeAtajosDeHypr(p);
+
         _revisarAtajo = () =>
         {
             if (ComprobarAtajo(campo.Text, out string problema))
@@ -1876,23 +2368,333 @@ public sealed class VentanaAjustes : Window
         return p.Fin();
     }
 
+
+    // ================= D5: el editor de atajos de NubeHypr =================
+    //
+    // ---------- Por qué hace falta y no vale editar el JSON ----------
+    //
+    // Midiendo el registro real salieron **9 de 19 combinaciones ya cogidas** por otras
+    // aplicaciones en este equipo. Unos atajos que solo se cambian abriendo el config a
+    // mano no son usables: el usuario no sabe cuáles están ocupados, no sabe qué nombres
+    // existen, y cada intento es un reinicio.
+    //
+    // ---------- La limitación que manda en el diseño ----------
+    //
+    // **Una combinación que ya tiene otra aplicación no se puede teclear aquí**: Windows
+    // se la entrega a esa aplicación y nunca llega a este campo. Es la misma nota que ya
+    // estaba escrita para el atajo de la vista general, y tiene dos consecuencias:
+    //
+    //  1. Lo ocupado se descubre **comprobando lo que ya está guardado**, con
+    //     `ComprobarAtajo`, que registra de verdad y suelta.
+    //  2. Si al teclear una combinación no llega nada, eso *también* es información: la
+    //     tiene alguien. Pero no se puede distinguir de "no has pulsado todavía", así que
+    //     el botón de comprobar es el que da la respuesta fiable.
+    void GrupoDeAtajosDeHypr(Pagina p)
+    {
+        p.Grupo("Atajos de organización de ventanas", IconoDeGrupo("Atajos"),
+                "La capa de organización nace apagada. Estos atajos solo se registran " +
+                "cuando la enciendes.");
+
+        // Lo que hay guardado, o los de serie si no hay nada puesto. Se trabaja sobre una
+        // copia: hasta que no se pulsa guardar, el config no se toca.
+        var puestos = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var cfg = Config.Cargar() ?? new Config();
+        if (cfg.NubeHypr.Atajos.Count > 0)
+            foreach (var (k, v) in cfg.NubeHypr.Atajos) puestos[HyprAtajos.Normalizar(k)] = v;
+        else
+            foreach (var (k, v) in HyprAtajos.DeSerie()) puestos[HyprAtajos.Normalizar(k)] = v;
+
+        // De nombre de comando a combinación, que es como lo lee el usuario: una fila por
+        // comando, no una por combinación.
+        var porComando = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (combo, nombre) in puestos) porComando[nombre] = combo;
+
+        var avisoGeneral = new TextBlock
+        {
+            Foreground = _textoAtenuado, TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 2, 0, 8),
+        };
+        p.Mas(avisoGeneral);
+
+        var filas = new Dictionary<string, (TextBox Campo, TextBlock Estado)>(StringComparer.OrdinalIgnoreCase);
+
+        void Revisar()
+        {
+            // ---------- Los conflictos, ANTES de guardar ----------
+            //
+            // Se construye el mapa con lo que hay en los campos y se enseñan sus
+            // problemas: repetidos, nombres que no existen, y el choque con el atajo de la
+            // vista general, que entra como reservado.
+            var crudo = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (nombre, fila) in filas)
+            {
+                var c = HyprAtajos.Normalizar(fila.Campo.Text);
+                if (c.Length > 0) crudo[c] = nombre;
+            }
+            var mapa = HyprAtajos.Construir(crudo, new[] { _arbol.Texto("Barra", "AtajoVistaGeneral", Barra.AtajoDeSerie) });
+
+            foreach (var (nombre, fila) in filas)
+            {
+                var c = HyprAtajos.Normalizar(fila.Campo.Text);
+                if (c.Length == 0)
+                {
+                    fila.Estado.Foreground = _textoAtenuado;
+                    fila.Estado.Text = "sin atajo";
+                    continue;
+                }
+                if (!mapa.Atajos.ContainsKey(c))
+                {
+                    // El mapa lo rechazó: el problema está en sus `Problemas`, y el que
+                    // habla de esta combinación es el que hay que enseñar.
+                    var mio = mapa.Problemas.FirstOrDefault(x => x.Contains(c, StringComparison.OrdinalIgnoreCase));
+                    fila.Estado.Foreground = Brushes.Tomato;
+                    fila.Estado.Text = mio ?? "en conflicto";
+                    continue;
+                }
+                fila.Estado.Foreground = _textoAtenuado;
+                fila.Estado.Text = "pendiente de comprobar";
+            }
+
+            avisoGeneral.Foreground = mapa.Bien ? _textoAtenuado : Brushes.Tomato;
+            avisoGeneral.Text = mapa.Bien
+                ? $"{mapa.Atajos.Count} atajos sin conflictos entre ellos. " +
+                  "«Comprobar» pregunta a Windows cuáles están ya cogidos."
+                : $"{mapa.Problemas.Count} conflicto(s): " + string.Join(" · ", mapa.Problemas);
+        }
+
+        // ---------- Una fila por comando ----------
+        foreach (var nombre in HyprAtajos.Nombres)
+        {
+            var fila = new Grid { Margin = new Thickness(0, 3, 0, 3) };
+            fila.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
+            fila.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) });
+            fila.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            fila.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var rotulo = Rotulo(HyprAtajos.Rotulo(nombre));
+            rotulo.VerticalAlignment = VerticalAlignment.Center;
+            rotulo.ToolTip = nombre;        // el nombre semántico, para quien edite el JSON
+            Grid.SetColumn(rotulo, 0);
+            fila.Children.Add(rotulo);
+
+            var campo = new TextBox
+            {
+                Text = porComando.GetValueOrDefault(nombre, ""),
+                IsReadOnly = true,
+                Height = 28,
+                Padding = new Thickness(8, 0, 8, 0),
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Background = _superficieAlta,
+                Foreground = _texto,
+                BorderThickness = new Thickness(0),
+                Cursor = Cursors.Hand,
+                ToolTip = "Pulsa la combinación que quieras. Supr la borra.",
+            };
+            Grid.SetColumn(campo, 1);
+            fila.Children.Add(campo);
+
+            var estado = new TextBlock
+            {
+                Foreground = _textoAtenuado, FontSize = 11,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(10, 0, 6, 0),
+                TextWrapping = TextWrapping.Wrap,
+            };
+            Grid.SetColumn(estado, 2);
+            fila.Children.Add(estado);
+
+            // El botón de volver al de serie, por fila. Es lo que convierte "lo he liado"
+            // en un clic.
+            var deSerie = HyprAtajos.DeSerie()
+                .FirstOrDefault(x => string.Equals(x.Value, nombre, StringComparison.OrdinalIgnoreCase)).Key;
+            var volver = BotonPlano("De serie", () =>
+            {
+                campo.Text = HyprAtajos.Normalizar(deSerie ?? "");
+                Revisar();
+            }, false);
+            volver.IsEnabled = deSerie != null;
+            volver.ToolTip = deSerie != null ? $"Volver a {HyprAtajos.Normalizar(deSerie)}"
+                                             : "Este comando no tiene atajo de serie";
+            Grid.SetColumn(volver, 3);
+            fila.Children.Add(volver);
+
+            // ---------- Capturar la combinación ----------
+            //
+            // Mismo criterio que el campo del atajo de la vista general: los modificadores
+            // solos no cuentan, y se exige al menos uno — un atajo global de una sola tecla
+            // se la quita al usuario en todo el sistema.
+            campo.PreviewKeyDown += (_, e) =>
+            {
+                e.Handled = true;
+                var tecla = e.Key == Key.System ? e.SystemKey : e.Key;
+
+                if (tecla is Key.Delete or Key.Back)
+                {
+                    campo.Text = "";
+                    Revisar();
+                    return;
+                }
+                if (tecla is Key.LeftCtrl or Key.RightCtrl or Key.LeftAlt or Key.RightAlt
+                          or Key.LeftShift or Key.RightShift or Key.LWin or Key.RWin) return;
+
+                var partes = new List<string>();
+                if ((Keyboard.Modifiers & ModifierKeys.Control) != 0) partes.Add("Ctrl");
+                if ((Keyboard.Modifiers & ModifierKeys.Alt) != 0) partes.Add("Alt");
+                if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0) partes.Add("Shift");
+                if ((Keyboard.Modifiers & ModifierKeys.Windows) != 0) partes.Add("Win");
+                if (partes.Count == 0)
+                {
+                    estado.Foreground = Brushes.Tomato;
+                    estado.Text = "añade Ctrl, Alt, Shift o Win";
+                    return;
+                }
+                partes.Add(tecla == Key.Space ? "Space" : tecla.ToString());
+                campo.Text = HyprAtajos.Normalizar(string.Join("+", partes));
+                Revisar();
+            };
+
+            filas[nombre] = (campo, estado);
+            p.Mas(fila);
+        }
+
+        // ---------- Comprobar contra Windows ----------
+        //
+        // Lo único que dice de verdad quién tiene cogida una combinación. Registra y
+        // suelta, una por una. Es lo que descubre los 1409 que el mapa no puede ver.
+        var acciones = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 10, 0, 0) };
+
+        acciones.Children.Add(BotonPlano("Comprobar cuáles están cogidos", () =>
+        {
+            int libres = 0, cogidos = 0;
+            foreach (var (nombre, fila) in filas)
+            {
+                var c = HyprAtajos.Normalizar(fila.Campo.Text);
+                if (c.Length == 0) { fila.Estado.Text = "sin atajo"; fila.Estado.Foreground = _textoAtenuado; continue; }
+
+                if (ComprobarAtajo(c, out string problema))
+                {
+                    fila.Estado.Foreground = Brushes.YellowGreen;
+                    fila.Estado.Text = "libre";
+                    libres++;
+                }
+                else
+                {
+                    fila.Estado.Foreground = Brushes.Tomato;
+                    fila.Estado.Text = problema;
+                    cogidos++;
+                }
+            }
+            avisoGeneral.Foreground = cogidos > 0 ? Brushes.Tomato : _textoAtenuado;
+            avisoGeneral.Text = $"{libres} libre(s), {cogidos} ya cogido(s) por otras aplicaciones. " +
+                                (cogidos > 0 ? "Cambia los rojos: Windows se los entrega a quien los pidió primero."
+                                             : "Se pueden usar todos.");
+        }, false));
+
+        acciones.Children.Add(BotonPlano("Todos de serie", () =>
+        {
+            var serie = HyprAtajos.DeSerie();
+            foreach (var (nombre, fila) in filas)
+            {
+                var c = serie.FirstOrDefault(x => string.Equals(x.Value, nombre, StringComparison.OrdinalIgnoreCase)).Key;
+                fila.Campo.Text = HyprAtajos.Normalizar(c ?? "");
+            }
+            Revisar();
+        }, false));
+
+        // ---------- Guardar ----------
+        //
+        // No se guarda nada con conflictos. Y guardar vuelve a registrar los atajos: suelta
+        // los de antes y pone los nuevos, que es lo que hace `HyprTeclas.Registrar`, así
+        // que recargar veinte veces no deja veinte atajos.
+        acciones.Children.Add(BotonPlano("Guardar atajos", () =>
+        {
+            var crudo = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (nombre, fila) in filas)
+            {
+                var c = HyprAtajos.Normalizar(fila.Campo.Text);
+                if (c.Length > 0) crudo[c] = nombre;
+            }
+
+            var mapa = HyprAtajos.Construir(crudo, new[] { _arbol.Texto("Barra", "AtajoVistaGeneral", Barra.AtajoDeSerie) });
+            if (!mapa.Bien)
+            {
+                avisoGeneral.Foreground = Brushes.Tomato;
+                avisoGeneral.Text = "No se guarda: " + string.Join(" · ", mapa.Problemas);
+                return;
+            }
+
+            // Se escribe solo `Atajos`, no la sección entera: las claves de `NubeHypr` que
+            // esta versión no conozca se conservan.
+            _arbol.PonerAtajos("NubeHypr", mapa.Atajos);
+            Cambio();
+            avisoGeneral.Foreground = Brushes.YellowGreen;
+            avisoGeneral.Text = $"{mapa.Atajos.Count} atajos guardados. " +
+                                "Se registran al aplicar, y solo si la capa está encendida.";
+            Log.Info($"atajos de NubeHypr: {mapa.Atajos.Count} guardados desde Ajustes");
+        }, true));
+
+        p.Mas(acciones);
+
+        p.Mas(new TextBlock
+        {
+            Text = "Una combinación que YA tenga otra aplicación no se puede teclear aquí: " +
+                   "Windows se la entrega a esa aplicación y nunca llega a este campo. Por eso " +
+                   "está el botón «Comprobar», que la registra de verdad un instante y la suelta. " +
+                   "Qué aplicación la tiene cogida no se puede saber: Windows no lo dice.",
+            Foreground = _textoAtenuado, Margin = new Thickness(0, 10, 0, 0),
+            TextWrapping = TextWrapping.Wrap,
+        });
+
+        Revisar();
+    }
     // Se registra de verdad y se suelta: es la única forma de saber si está cogida
+    // ---------- ¿Está libre esta combinación? ----------
+    //
+    // Se le pregunta a Windows registrándola de verdad y soltándola. Es la única forma: no
+    // existe una API que diga "quién tiene este atajo".
+    //
+    // ---------- Y el detalle que la hacía mentir ----------
+    //
+    // `RegisterHotKey` devuelve 1409 ("ya registrado") tanto si lo tiene OTRA aplicación
+    // como si lo tiene **esta misma**. Y esta misma lo tiene: la isla registra el atajo de
+    // la vista general al arrancar, y Ajustes vive en su proceso. Resultado: el campo
+    // enseñaba siempre "ya la tiene cogida otra aplicación" para tu propio atajo, que
+    // estaba funcionando. Se vio mirando una captura de esta página.
+    //
+    // Así que antes de preguntar se suelta el nuestro y después se vuelve a poner. La isla
+    // se queda sin él unos microsegundos, menos de lo que dura una pulsación.
     bool ComprobarAtajo(string combo, out string problema)
     {
         problema = "";
         var h = new WindowInteropHelper(this).Handle;
         if (h == IntPtr.Zero) { problema = "aún no se puede comprobar"; return false; }
 
-        const int idPrueba = 0xB0CB;
-        if (!Nativo.RegistrarAtajo(h, idPrueba, combo))
+        // ¿Es justamente el que tiene puesto la isla? Entonces hay que soltarlo antes, o la
+        // respuesta será que lo tiene "otra aplicación" — que somos nosotros.
+        var jefa = MainWindow.Islas.FirstOrDefault(i => i.TieneElAtajoDeLaVista);
+        bool loSoltamos = jefa != null &&
+            HyprAtajos.Normalizar(combo) == HyprAtajos.Normalizar(jefa.AtajoDeLaVistaPuesto);
+        if (loSoltamos) jefa!.SoltarAtajoDeLaVista();
+
+        try
         {
-            problema = Nativo.UltimoErrorAtajo == 1409
-                ? "Esa combinación ya la tiene cogida otra aplicación."
-                : $"No se puede registrar (error {Nativo.UltimoErrorAtajo}).";
-            return false;
+            const int idPrueba = 0xB0CB;
+            if (!Nativo.RegistrarAtajo(h, idPrueba, combo))
+            {
+                problema = Nativo.UltimoErrorAtajo == 1409
+                    ? "Esa combinación ya la tiene cogida otra aplicación."
+                    : $"No se puede registrar (error {Nativo.UltimoErrorAtajo}).";
+                return false;
+            }
+            Nativo.QuitarAtajo(h, idPrueba);
+            return true;
         }
-        Nativo.QuitarAtajo(h, idPrueba);
-        return true;
+        finally
+        {
+            // En `finally`: si la comprobación revienta, lo que no puede pasar es que la
+            // isla se quede sin su atajo hasta el siguiente arranque.
+            if (loSoltamos) jefa!.PonerAtajoDeLaVista();
+        }
     }
 
     UIElement SeccionInicio()
@@ -2902,6 +3704,84 @@ public sealed class VentanaAjustes : Window
         pistaReserva.TextWrapping = TextWrapping.Wrap;
         pistaReserva.Opacity = 0.55;
         p.Mas(pistaReserva);
+
+        // ---------- El clima ----------
+        //
+        // Está en «Sistema» y no en «Módulos» a propósito. Módulos es «qué se ve en la barra»;
+        // esto es la única parte de NubeBar que sale a un servidor de otro por su cuenta, y su
+        // sitio es la página donde uno busca qué hace el programa con su equipo — al lado de
+        // la bandeja, las notificaciones y la barra de Windows.
+        p.Grupo("Clima", IconoDeGrupo("Clima"));
+        p.Mas(Interruptor("Enseñar el tiempo en el panel derecho",
+                          _arbol.Bandera("Clima", "Activo", false),
+                          v => _arbol.Poner("Clima", "Activo", v)));
+
+        var ciudad = new TextBox
+        {
+            Text = _arbol.Texto("Clima", "Ciudad", ""),
+            Background = _superficieAlta,
+            Foreground = _texto, BorderBrush = _acento, BorderThickness = new Thickness(1),
+            Padding = new Thickness(6), Margin = new Thickness(0, 6, 0, 0),
+        };
+        ciudad.TextChanged += (_, _) =>
+        {
+            _arbol.Poner("Clima", "Ciudad", ciudad.Text.Trim());
+            // ---------- Y las coordenadas, a cero ----------
+            //
+            // Esto es lo único con truco de todo el grupo. Las coordenadas se guardan para no
+            // volver a buscar la ciudad en cada arranque; si se cambia la ciudad y se dejan,
+            // seguiría dando el tiempo de la anterior **para siempre**, con el nombre nuevo
+            // debajo. Un fallo silencioso y de los peores: el dato parece bueno.
+            _arbol.Poner("Clima", "Latitud", 0d);
+            _arbol.Poner("Clima", "Longitud", 0d);
+        };
+        p.Mas(ciudad);
+
+        // ---------- Y el botón de «dónde estoy» ----------
+        //
+        // Lo pidió el usuario después de escribir su ciudad: «estaría bien que detectase por
+        // IP». Usa el servicio de ubicación de WINDOWS y no un geolocalizador por IP — ver
+        // `Clima.DondeEstoy` para por qué, que no es puntillosidad.
+        //
+        // Rellena el campo de arriba en vez de hacerlo por detrás: así ves lo que ha
+        // entendido y puedes corregirlo, en vez de quedarte con una ubicación invisible que
+        // no sabes de dónde salió.
+        var avisoUbic = Rotulo("");
+        avisoUbic.TextWrapping = TextWrapping.Wrap;
+        avisoUbic.Visibility = Visibility.Collapsed;
+
+        p.Mas(BotonPlano("Detectar mi ubicación", async () =>
+        {
+            avisoUbic.Visibility = Visibility.Visible;
+            avisoUbic.Text = "Preguntando a Windows…";
+            var donde = await Clima.DondeEstoy();
+            if (donde is not { } d)
+            {
+                avisoUbic.Text = (Clima.Error ?? "No se ha podido") +
+                                 ". Escribe tu ciudad a mano y funcionará igual.";
+                return;
+            }
+            // Las coordenadas van directas: ya son el dato bueno, así que no hace falta pasar
+            // por el buscador de ciudades para volver a sacarlas.
+            ciudad.Text = d.Nombre;
+            _arbol.Poner("Clima", "Ciudad", d.Nombre);
+            _arbol.Poner("Clima", "Latitud", Math.Round(d.Lat, 4));
+            _arbol.Poner("Clima", "Longitud", Math.Round(d.Lon, 4));
+            Cambio();
+            avisoUbic.Text = $"Listo: {d.Nombre} ({d.Lat:0.##}, {d.Lon:0.##}).";
+        }, false));
+        p.Mas(avisoUbic);
+
+        var pistaClima = Rotulo(
+            "Escribe tu ciudad: «Madrid», «A Coruña», «Berlín». NubeBar la busca una vez, se " +
+            "guarda las coordenadas y a partir de ahí solo pide la temperatura, cada quince " +
+            "minutos. Los datos son de Open-Meteo, que es gratuito y no pide registro: sale de " +
+            "tu equipo esa coordenada y nada más — ni tu nombre, ni tu IP a un localizador, ni " +
+            "ningún identificador. Con el interruptor apagado, o sin ciudad escrita, NubeBar no " +
+            "hace ninguna petición.");
+        pistaClima.TextWrapping = TextWrapping.Wrap;
+        pistaClima.Opacity = 0.55;
+        p.Mas(pistaClima);
 
         p.Grupo("Archivos", IconoDeGrupo("Archivos"));
         p.Mas(BotonPlano("Abrir la carpeta del config", () =>

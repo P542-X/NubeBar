@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -18,6 +19,18 @@ public class Tema
     public bool EnviarColorAlWallpaper { get; set; } = false;  // manda tu Acento como "schemecolor" al wallpaper
     public bool BordeAcento { get; set; } = true;              // filo de 1 px y brillo suave del color de acento
 
+    // ---------- El estilo visual ----------
+    //
+    // La FORMA de las superficies: cuánto se redondea una tarjeta, cuánto filo tiene, cuánto
+    // aire lleva dentro y si brilla. El tema decide los COLORES; esto decide la forma.
+    //
+    // Estaba escrito en cuatro constantes dentro del código, así que cambiarlo era
+    // recompilar — y es justo lo que el usuario quiere poder elegir.
+    //
+    // «normal» es lo de siempre al píxel: quien no toque nada no nota que esto existe. Lo que
+    // no se entienda cae en «normal» y nunca en el más llamativo (ver `Estilos.Leer`).
+    public string Estilo { get; set; } = "normal";
+
     // ---------- Roles de color (todos opcionales) ----------
     // Un tema puede seguir siendo tres colores: lo que no se ponga aquí, Roles lo
     // deriva del fondo y del texto. Así los seis temas de serie y los que ya tenga
@@ -33,6 +46,62 @@ public class Tema
     public string? Positivo { get; set; }
     public string? Aviso { get; set; }
     public string? Negativo { get; set; }
+}
+
+// Los mandos del halo del estilo «Neón».
+//
+// ---------- Por qué es una sección propia y no va dentro de `Tema` ----------
+//
+// Conceptualmente pertenece al tema. Pero `ConfigArbol.Poner(seccion, clave, valor)` escribe
+// UN nivel: `raiz[seccion][clave]`. Metido en `Tema`, Ajustes habría tenido que escribir
+// claves llamadas literalmente «Neon.Intensidad» dentro de `Tema`, que el modelo tipado no
+// lee — se guardarían los ajustes y no haría ninguno efecto, en silencio.
+//
+// Así que va al lado de `Clima` y `NubeHypr`, que es donde el árbol sabe escribir.
+//
+// ---------- Por qué son ajustes y no números míos ----------
+//
+// «Cuánto tiene que brillar» no tiene respuesta correcta: depende del monitor, del fondo de
+// pantalla y de a quién le canse antes. Lo que para uno es un halo bonito, para otro es una
+// luz de discoteca. Así que se elige, como el estilo.
+//
+// ---------- Y qué NO se puede elegir ----------
+//
+// Que el halo desaparezca del todo o que tape el contenido. `Intensidad` y `Radio` llegan
+// topados (ver `Neon.Limpia`): un ajuste puede decorar, no puede dejar la interfaz rota ni
+// ilegible. Es la misma regla que ya cumple `EstiloVisual`.
+public sealed class OpcionesNeon
+{
+    // Multiplica la opacidad del halo. 1 = lo pensado; 0,3 = casi nada; 2 = fuerte.
+    public double Intensidad { get; set; } = 1.0;
+
+    // Hasta dónde crece el difuminado en el punto más alto de la respiración, en píxeles.
+    public double Radio { get; set; } = 26;
+
+    // Lo que tarda un ciclo entero (crecer y volver), en milisegundos.
+    public int Velocidad { get; set; } = 2600;
+
+    // Apagarlo deja el halo FIJO, no lo quita. Es la diferencia entre «no quiero movimiento»
+    // y «no quiero estilo»: lo segundo ya se consigue eligiendo otro estilo.
+    public bool Respira { get; set; } = true;
+
+    // Vacío = el color de acento del tema. Puesto, manda este. Dos colores separados por
+    // coma = degradado (el primero es el del filo; el segundo, el del halo).
+    public string Color { get; set; } = "";
+}
+
+// Qué secciones lleva cada panel lateral y en qué orden.
+//
+// Vacías = el reparto de serie (ver `Lateral.Repartidas`). Un config que no las tenga —todos
+// los que existen hoy— sigue viendo exactamente lo de siempre.
+//
+// Van como listas de ids y no como objetos: es lo mismo que `ZonasPanel` hace con los módulos
+// de la barra, y por la misma razón — mover una cosa de sitio tiene que ser mover una cadena
+// de sitio, no reescribir una estructura.
+public sealed class OpcionesLaterales
+{
+    public List<string> Izquierda { get; set; } = new();
+    public List<string> Derecha { get; set; } = new();
 }
 
 public class OpcionesWallpaper
@@ -80,10 +149,22 @@ public class Barra
     public bool OcultarBarraWindows { get; set; } = true;
     public int MaxApps { get; set; } = 10;             // iconos de apps visibles a la vez; el resto, con la rueda
     public bool AgruparApps { get; set; } = true;      // las ventanas del mismo programa, en un solo icono
-    // Ctrl+Alt+Space estaba ocupado en el equipo de desarrollo y el registro fallaba
-    // con el error 1409. Ctrl+Alt+W ("W de ventanas") sí está libre, y no choca con
+    // ---------- El atajo de la vista general ----------
+    //
+    // Ctrl+Alt+Space estaba ocupado en el equipo de desarrollo y el registro fallaba con el
+    // error 1409. Ctrl+Alt+W ("W de ventanas") sí está libre, y no choca con
     // Ctrl+Shift+Space, que en Visual Studio es la ayuda de parámetros.
-    public string AtajoVistaGeneral { get; set; } = "Ctrl+Alt+W";       // abre la cuadrícula de ventanas
+    //
+    // El valor de serie es una CONSTANTE y no un literal repetido, y eso salió de un fallo
+    // que se vio mirando una captura de la ventana de Ajustes: la página leía el atajo del
+    // árbol con `"Ctrl+Alt+Space"` de respaldo —el valor viejo— mientras el modelo tipado
+    // usaba `"Ctrl+Alt+W"`. Con la clave ausente del fichero, que es el caso de cualquier
+    // instalación que no la haya tocado, Ajustes enseñaba un atajo que NO era el registrado,
+    // con un error en rojo debajo; y pulsar Guardar habría escrito el valor equivocado
+    // encima de uno que funcionaba.
+    public const string AtajoDeSerie = "Ctrl+Alt+W";
+
+    public string AtajoVistaGeneral { get; set; } = AtajoDeSerie;       // abre la cuadrícula de ventanas
 
     // Arrastrar una ventana a un borde la ajusta a media pantalla, a un cuarto o la
     // maximiza, con una previsualización antes de soltar. Se puede apagar: quien ya
@@ -97,10 +178,50 @@ public class Barra
     // de en medio está "Esconder la isla" en el clic derecho (vuelve con Win).
     public bool OcultarConMaximizada { get; set; } = false;
     public bool Bandeja { get; set; } = true;        // iconos de la bandeja del sistema en la isla
+
+    // ---------- Las rayitas entre grupos ----------
+    //
+    // La barra dibuja una raya fina entre tramos de módulos de distinta categoría (ver
+    // `GruposDeBarra.RayaEntre`). No son módulos, así que **no salen en el editor de
+    // módulos** — y el usuario se encontró dos rayas en su barra que no podía ni encontrar ni
+    // quitar: «en la nube hay 2 separadores que no se ven en los ajustes».
+    //
+    // Tenía razón en el fondo: algo que se ve en la barra tiene que poder apagarse desde
+    // algún sitio.
+    //
+    // ---------- Y nace APAGADO ----------
+    //
+    // Primero se puso encendido, que era lo que había. El usuario lo vio y dijo «quita los
+    // separadores automáticos», así que se invierte el valor de serie en vez de dejárselo
+    // apagado solo a él: lo que molesta a quien lo prueba molestará a quien lo instale.
+    //
+    // El objetivo visual pedía «separadores verticales finos entre grupos», y esto lo
+    // contradice a propósito — con la barra delante no funcionan, y lo que se ve manda sobre
+    // lo que se escribió antes de verlo. El interruptor sigue ahí para quien los quiera.
+    //
+    // Apagados, los grupos se distinguen por el hueco, que es como lo hace cualquier barra
+    // bien hecha y es lo que ya había antes de añadir las rayas.
+    public bool SeparadoresDeGrupo { get; set; } = false;
     public int MaxBandeja { get; set; } = 0;         // cuántos se ven sin abrir el desplegable "^" (0 = solo el "^")
     public bool Notificaciones { get; set; } = true; // las notificaciones asoman en la isla
     public bool AppsDelEscritorio { get; set; } = false;   // el carrusel, solo con las del escritorio virtual actual
     public List<string> AppsFijadas { get; set; } = new();  // apps siempre presentes en el carrusel
+
+    // ---------- E2: el dock ----------
+    //
+    // "siempre" | "alacercarse" | "nunca". De serie **"nunca"**, y no por timidez: el dock es
+    // una superficie nueva que aparece en el escritorio, y una actualización de NubeBar no
+    // puede cambiarle a nadie la forma del escritorio sin que lo haya pedido. Es la misma
+    // regla que con NubeHypr.
+    public string Dock { get; set; } = "nunca";
+
+    // E3/E4: cuándo se abren los paneles laterales. «nunca» o «alacercarse».
+    //
+    // Apagado de serie, como el dock y por lo mismo: una actualización no puede cambiarle a
+    // nadie la forma del escritorio sin que lo haya pedido. Los paneles están construidos
+    // desde la macrofase E y hasta ahora no tenían NINGUNA forma de abrirse —solo los
+    // llamaba el diagnóstico de capturas—, así que esto es su puerta.
+    public string Laterales { get; set; } = "nunca";
     public bool PulsoAudio { get; set; } = true;            // la isla respira con lo que suena (y aberra un poco)
     public bool TeclasVolumen { get; set; } = true;         // las teclas de volumen las atiende la isla, sin el aviso de Windows
     public bool Arrastrable { get; set; } = true;           // se puede apartar con el ratón
@@ -333,6 +454,71 @@ public class Inicio
     public bool Saludo { get; set; } = true;                        // cabecera con "Buenas tardes, ..."
 }
 
+
+// Las opciones de la capa de organización de ventanas. Nace apagada y así se queda:
+// quien la enciende es el usuario, en Ajustes o en el fichero, nunca una migración.
+//
+// Los valores son los de la especificación. `Modo` se lee con `NubeHypr.ModoEfectivo`,
+// que convierte lo desconocido en simulación y nunca en "aplicar".
+public sealed class OpcionesHypr
+{
+    public bool Activo { get; set; }                        // false de serie
+    public string Modo { get; set; } = "simulacion";
+    public int Gap { get; set; } = 8;
+    public int Margen { get; set; } = 12;
+    public string Layout { get; set; } = "principal";
+    public string EspacioInicial { get; set; } = "actual";
+    public bool ConfirmarMovimientos { get; set; } = true;
+    public bool MostrarPrevisualizacion { get; set; } = true;
+
+    // ---------- El hallazgo de D2 ----------
+    //
+    // Nace APAGADA. Apagada, las ventanas maximizadas y minimizadas se quedan fuera del
+    // reparto, con su motivo. Encendida, se sacan de ese estado para poder enlosarlas —y
+    // se guarda qué eran, para poder devolverlas.
+    //
+    // Sacar una ventana de maximizada es una acción visible y sorprendente: el usuario la
+    // dejó a pantalla completa a propósito. Así que hace falta esto Y el modo "aplicar".
+    public bool RestaurarAlOrganizar { get; set; }
+
+    // Vacíos a propósito: una lista vacía es "no has puesto ninguna", no un hueco al que
+    // haya que inventarle contenido.
+    public Dictionary<string, string> Atajos { get; set; } = new();
+
+    // Las reglas de D5. Tipadas: un `List<string>` obligaba a parsear a mano y a que cada
+    // sitio se inventara su formato. Un config antiguo trae `"Reglas": []`, que deserializa
+    // en una lista vacía sin migración ninguna.
+    public List<HyprReglas.Regla> Reglas { get; set; } = new();
+    public List<string> Espacios { get; set; } = new();
+}
+
+// El clima. Cuatro claves, y la primera manda sobre las otras tres.
+//
+// ---------- Por qué nace apagado ----------
+//
+// Es la única parte de NubeBar que saldría a un servidor de otro **por su cuenta**. El test de
+// velocidad también sale a internet, pero porque el usuario pulsa un botón que dice «medir»;
+// esto se refrescaría solo cada quince minutos. Eso se pide, no se asume — y pedirlo cuesta
+// un interruptor en Ajustes y escribir una ciudad.
+//
+// ---------- Por qué se guardan las coordenadas ----------
+//
+// `Ciudad` es lo que escribe el usuario; `Latitud` y `Longitud` es lo que contestó el
+// buscador. Guardarlas convierte la búsqueda en algo de una sola vez: al arrancar se pide el
+// tiempo directamente, sin volver a pasar por el geocodificador. Si el usuario cambia de
+// ciudad se ponen a cero y se busca otra vez (ver `MainWindow.Clima.cs`).
+//
+// Cero es «sin resolver». Las coordenadas 0,0 caen en el Golfo de Guinea, a 500 km de la
+// costa, donde no vive nadie; el centinela honrado —`double?`— habría metido dos nulls en el
+// JSON de todo el mundo para distinguir un caso que no existe.
+public sealed class OpcionesClima
+{
+    public bool Activo { get; set; }                     // apagado de serie, a propósito
+    public string Ciudad { get; set; } = "";
+    public double Latitud { get; set; }
+    public double Longitud { get; set; }
+}
+
 public class Config
 {
     // La versión del esquema de este fichero. Ver Esquema.cs: lo que la mantiene al día
@@ -348,9 +534,132 @@ public class Config
     public Animaciones Animaciones { get; set; } = new();
     public List<PanelNube> Paneles { get; set; } = new();
     public Fondo Fondo { get; set; } = new();
+    public OpcionesHypr NubeHypr { get; set; } = new();
+    public OpcionesClima Clima { get; set; } = new();
+    public OpcionesNeon Neon { get; set; } = new();
+    public OpcionesLaterales Laterales { get; set; } = new();
 
-    public static string Carpeta =>
+    // ---------- Un diagnóstico no escribe en los datos de nadie ----------
+    //
+    // Mientras corre un `--diag*`, la migración se hace EN MEMORIA y no se guarda. El
+    // motivo es concreto y ya mordió: ejecutar un binario de desarrollo con un esquema
+    // más nuevo migró el config real del usuario a una versión que su NubeBar instalada
+    // —la estable, más antigua— ya no sabe migrar, y le dejaba un error en cada arranque.
+    //
+    // Migrar al actualizar es correcto y así se queda. Lo que no es correcto es que lo
+    // haga una herramienta de medida, que por definición solo debería mirar. Con esto, no
+    // depende de que nadie se acuerde de restaurar nada.
+    public static bool SoloLectura;
+
+    // ---------- D8: quién mira y no toca ----------
+    //
+    // Pura sobre los argumentos, para que la protección se pueda COMPROBAR. Antes esto era
+    // un `is ... or ...` de seis líneas dentro de `App.OnStartup`, y la única forma de
+    // probarlo era arrancar un binario de desarrollo y ver si el config del usuario
+    // sobrevivía — que es justamente lo que no se puede hacer.
+    //
+    // ---------- La lista, ahora solo informativa ----------
+    //
+    // Desde el tercer accidente la decisión NO sale de esta lista, sale de `PuedeEscribir`
+    // (más abajo) y está al revés: solo escriben la barra sin argumentos y el guardián.
+    // Esta lista se queda porque sirve para leerla y para que las pruebas comprueben que
+    // cada bandera documentada se comporta como dice — pero ya no es la que decide, y por
+    // eso ya no se puede olvidar de nadie.
+    //
+    // La historia de por qué, que vale más que la lista:
+    //
+    // ---------- Por qué `--salir` está aquí ----------
+    //
+    // Antes NO estaba, con este razonamiento: "cierra la instancia que hay, y la que se
+    // cierra sí puede querer guardar su estado". El razonamiento confundía dos procesos.
+    // El que guarda su estado es el que SE CIERRA; el de `--salir` solo manda la señal y se
+    // va. Y en ese "se va" pasa por `OnExit` → `CerrarIntegracionDeFondo` →
+    // `Config.Cargar()`, que ejecuta las migraciones del esquema.
+    //
+    // Resultado medido durante D8: un `--salir` lanzado desde un binario de desarrollo
+    // migró el config del usuario de la v3 a la v4 — la versión instalada, más antigua, ya
+    // no sabría leerlo. Exactamente el fallo que `SoloLectura` existía para evitar, por una
+    // puerta que nadie había mirado.
+    //
+    // `--salir` no necesita escribir nada: lee la configuración para saber qué hacer con
+    // Wallpaper Engine y nada más. El guardián sí se queda fuera: es el vigilante y tiene
+    // que poder trabajar.
+    //
+    // Y solo cuenta el PRIMER argumento, igual que el resto del arranque: un `--salir
+    // --pruebas` no es una herramienta de medida, es un `--salir` con ruido detrás.
+    public static readonly string[] BanderasQueMiran =
+    {
+        Pruebas.Bandera, Auditoria.Bandera,
+        DiagVista.Bandera, DiagInicio.Bandera, DiagBandeja.Bandera, DiagHypr.Bandera,
+        DiagMotor.Bandera, DiagEspacios.Bandera, DiagAtajos.Bandera, DiagReglas.Bandera,
+        DiagD6.Bandera, DiagD7.Bandera, DiagPrefijos.Bandera,
+        ArnesEspacios.Bandera, ArnesAplicar.Bandera, ArnesLayout.Bandera, DiagCapturas.Bandera,
+        DiagVigilia.Bandera, DiagGuia.Bandera, DiagGuia.BanderaAlias, DiagE0.Bandera,
+        // El de módulos SÍ escribe, pero en un arenero temporal suyo y nunca en el config
+        // del usuario: lo impide `ConfigArbol.NoSeDebeGuardar`, que protege
+        // `Config.RutaDelUsuario` y no se mueve con la redirección de la carpeta.
+        DiagModulos.Bandera,
+        // La rejilla abre ventanas suyas y mide la cuadrícula: no escribe nada.
+        DiagRejilla.Bandera,
+        // La ventanita abre un `Window` y se va; no lee ni escribe la configuración.
+        DiagVentanita.Bandera,
+        // Abre cada panel en cada posición de barra y mira si algo queda fuera. La
+        // orientación la cambia en memoria y la devuelve; el fichero no se toca.
+        DiagPaneles.Bandera,
+        // El clima contra el servicio de verdad. Es el único que sale a internet, y aun así
+        // no lee nada tuyo: la ciudad se la pasas tú o usa Madrid. El config, ni mirarlo.
+        DiagClima.Bandera,
+        // Fotografía el halo del neón a lo largo de dos ciclos. Fuerza el estilo en memoria
+        // y lo devuelve; el fichero, como todas, ni lo toca.
+        DiagNeon.Bandera,
+        Salir.Bandera,
+    };
+
+    // ---------- Y la regla, al revés: solo la barra de verdad escribe ----------
+    //
+    // La primera versión de esto era una LISTA de banderas que no pueden escribir. Falló
+    // tres veces en la misma sesión, y las tres por la misma razón: la lista hay que
+    // acordarse de ampliarla.
+    //
+    //  1. `--salir` no estaba en la lista.
+    //  2. Una bandera desconocida se caía por todas las ramas y arrancaba la barra entera.
+    //  3. Al cerrar ese caso, el propio guardia pasaba por `OnExit` →
+    //     `CerrarIntegracionDeFondo` → `Config.Cargar()`, y eso migra.
+    //
+    // El agujero no era ninguna de las tres: era la forma de la regla. **Cualquier** camino
+    // que no sea el arranque normal acaba en `OnExit`, y `OnExit` lee la configuración. Así
+    // que la pregunta correcta no es "¿esta bandera mira?" sino "¿es esto la barra?".
+    //
+    // Invertida, se mantiene sola: un diagnóstico nuevo nace protegido sin que nadie tenga
+    // que acordarse de nada. Solo escriben dos cosas: la barra sin argumentos y el guardián.
+    public static bool PuedeEscribir(string[]? args) =>
+        args is not { Length: > 0 } ||
+        string.Equals(args[0], Guardian.Bandera, StringComparison.OrdinalIgnoreCase);
+
+    public static bool MiraYNoToca(string[]? args) => !PuedeEscribir(args);
+
+    // ---------- Dónde vive la configuración ----------
+    //
+    // `CarpetaDelUsuario` es la de verdad y no la cambia nadie. `Carpeta` es la que usa
+    // el programa, y normalmente son la misma.
+    //
+    // Se separan por un motivo concreto. Hay fallos —«añado un módulo y no aparece»—
+    // que solo se reproducen recorriendo el camino entero: editar, GUARDAR, que salte la
+    // recarga en caliente, remontar las zonas y mirar la pantalla. Un diagnóstico no
+    // puede hacer eso contra el config del usuario, y sin escribir no reproduce nada.
+    //
+    // Así que un diagnóstico puede apuntar `Carpeta` a una carpeta temporal suya, y
+    // entonces escribe de verdad —en su arenero—. La garantía que importa no se mueve:
+    // `NoSeDebeGuardar` protege `RutaDelUsuario`, que es independiente de esto, así que
+    // redirigir no abre ninguna puerta al fichero del usuario.
+    internal static string? CarpetaDeArena;
+
+    public static string CarpetaDelUsuario =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NubeBar");
+
+    public static string RutaDelUsuario => Path.Combine(CarpetaDelUsuario, "config.json");
+
+    public static string Carpeta => CarpetaDeArena ?? CarpetaDelUsuario;
     public static string Ruta => Path.Combine(Carpeta, "config.json");
 
     static readonly JsonSerializerOptions Opc = new()
@@ -358,7 +667,13 @@ public class Config
         PropertyNameCaseInsensitive = true,
         ReadCommentHandling = JsonCommentHandling.Skip,
         AllowTrailingCommas = true,
-        WriteIndented = true
+        WriteIndented = true,
+
+        // Una entrada de `NubeHypr.Reglas` que no sea un objeto no puede tumbar la carga
+        // del config entero. `Reglas` era `List<string>`: si alguien tiene cadenas ahí,
+        // sin esto `Cargar` devolvería null y NubeBar arrancaría de serie — el usuario
+        // perdería su configuración entera por una clave. Ver HyprReglas.LectorTolerante.
+        Converters = { new HyprReglas.LectorTolerante() },
     };
 
     // Devuelve null si el JSON está mal escrito, así se mantiene el tema anterior
@@ -387,7 +702,7 @@ public class Config
             // Solo escribe si de verdad hay algo que migrar, y si falla no escribe nada:
             // entonces se sigue adelante con el fichero tal cual, que es lo que había
             // antes de existir esto y funciona. Ver Esquema.MigrarFichero.
-            Esquema.MigrarFichero(Ruta);
+            if (!SoloLectura) Esquema.MigrarFichero(Ruta);
             var c = JsonSerializer.Deserialize<Config>(File.ReadAllText(Ruta), Opc);
             if (c == null) return null;
 
@@ -401,6 +716,13 @@ public class Config
             c.Wallpaper ??= new();
             c.Fondo ??= new();
             c.Fondo.PorMonitor ??= new();
+            c.Clima ??= new();
+            c.Clima.Ciudad ??= "";
+            c.Neon ??= new();
+            c.Neon.Color ??= "";
+            c.Laterales ??= new();
+            c.Laterales.Izquierda ??= new();
+            c.Laterales.Derecha ??= new();
             if (c.Version < 1) c.Version = Esquema.Actual;
             c.Inicio ??= new();
             c.Barra.AppsFijadas ??= new();
@@ -415,16 +737,76 @@ public class Config
             c.Paneles ??= new();
             ModulosDeSerie(c);
             if (MigrarYDerivarPaneles(c)) GuardarPanelesMigrados(c);
+
+            // ---------- El modo de demostración, aquí y en ningún otro sitio ----------
+            //
+            // Hay media docena de sitios que llaman a `Cargar()`: la isla, Ajustes, los
+            // monitores, el wallpaper. Si cada uno tuviera que acordarse de apagar NubeHypr
+            // en modo demostración, el que se olvidara sería el que lo encendiera — y sería
+            // el único que importa. Puesto aquí, no hay forma de saltárselo.
+            DiagGuia.Apagar(c);
             return c;
         }
         catch (Exception ex)
         {
             // Sin esto, un solo valor con el tipo equivocado ("Alto": "38") dejaba la
             // isla con el tema de fábrica y ni una palabra en el log
-            Log.Error("leer config.json (se usa la configuración de fábrica)", ex);
-            return null;
+            Log.Error("leer config.json (se intenta rescatar de una copia)", ex);
+            return Rescatar();
         }
 
+    }
+
+    // ---------- D7: el rescate ----------
+    //
+    // Antes, un config ilegible significaba arrancar con la configuración de serie: tema de
+    // fábrica, módulos de fábrica, y el trabajo del usuario aparentemente perdido. El
+    // fichero seguía ahí y los respaldos también, pero el usuario no lo sabía — lo que veía
+    // era su escritorio en blanco.
+    //
+    // Ahora se busca la copia más reciente que se pueda leer y se usa ESA. El fichero roto
+    // **no se borra y no se sobrescribe**: se queda para que se pueda mirar, y lo rescatado
+    // vive solo en memoria hasta que el usuario guarde algo. Un rescate que escribe por su
+    // cuenta puede estropear el fichero bueno.
+    //
+    // Ver HyprRescate.cs.
+    static Config? Rescatar()
+    {
+        try
+        {
+            foreach (var linea in HyprRescate.Informe(Ruta)) Log.Info(linea);
+
+            var r = HyprRescate.Cargar(Ruta);
+            if (r == null)
+            {
+                Log.Info("[D7]  no se pudo rescatar nada: se usa la configuración de serie");
+                return null;
+            }
+
+            // El respaldo puede ser de un esquema anterior, así que se migra **en memoria**.
+            // `Esquema.Migrar` trabaja sobre el árbol, que conserva las claves que esta
+            // versión no conoce: rescatar no puede ser una excusa para perderlas.
+            var resultado = Esquema.Migrar(r.Arbol);
+            var c = JsonSerializer.Deserialize<Config>(r.Arbol.ToJsonString(), Opc);
+            if (c == null)
+            {
+                Log.Info("[D7]  el respaldo tampoco se deja leer como configuración");
+                return null;
+            }
+
+            Log.Info($"[D7]  rescatado de {r.DeDonde} (v{r.Version} -> v{c.Version}, " +
+                     $"{resultado.Resumen}, en memoria). " +
+                     "El fichero roto se queda como está.");
+            // También por el camino del rescate: un config roto no puede ser la rendija por
+            // la que la demostración arranca con NubeHypr encendido.
+            DiagGuia.Apagar(c);
+            return c;
+        }
+        catch (Exception ex)
+        {
+            Log.Error("rescatar el config de una copia", ex);
+            return null;
+        }
     }
 
     // ================= Paneles: la autoridad =================

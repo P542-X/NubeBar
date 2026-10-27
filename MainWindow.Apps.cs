@@ -44,6 +44,43 @@ public partial class MainWindow
 
     void ApuntarActivaAlPulsar() => _activaAlPulsar = ActivaAjena();
 
+    // ================= La ventana que conocíamos y se ha escondido =================
+    //
+    // Discord, Steam, Telegram y casi todo lo que vive en la bandeja no se minimizan al
+    // pulsar minimizar o la X: **se esconden**. La ventana sigue existiendo pero deja de ser
+    // visible, así que sale de la lista y el grupo se queda con cero ventanas. Y entonces
+    // NubeBar hacía lo peor posible: relanzar el ejecutable, que no hace nada porque ya hay
+    // un proceso corriendo. Resultado: pulsar el icono no producía ningún efecto.
+    //
+    // ---------- Por qué se RECUERDA en vez de buscarla ----------
+    //
+    // La primera versión de esto recorría todas las ventanas de nivel superior invisibles
+    // buscando una «que parezca la principal» de ese ejecutable. Falló dos veces seguidas en
+    // el diagnóstico: encontraba otra ventana del mismo proceso. Y tiene sentido — un proceso
+    // cualquiera tiene varias ventanas invisibles con título, y **adivinar cuál es la buena
+    // es adivinar**. Enseñar la equivocada sería peor que no hacer nada.
+    //
+    // Pero no hace falta adivinar: si el usuario ha usado esa app, su ventana estuvo en la
+    // lista y `g.Ultima` la guarda. Así que se comprueba esa, y solo esa.
+    //
+    // Lo que este camino NO cubre: una app que ya estaba escondida antes de arrancar NubeBar.
+    // Ahí no hay nada recordado, y pulsar el icono la lanza como siempre.
+    IntPtr EscondidaRecordada(Grupo g)
+    {
+        var h = g.Ultima;
+        if (h == IntPtr.Zero || !Nativo.Existe(h)) return IntPtr.Zero;
+        return Nativo.Ficha(h).Visible ? IntPtr.Zero : h;
+    }
+
+    // Lo mismo para el dock, que no tiene el grupo a mano sino su clave.
+    internal IntPtr EscondidaRecordadaPorClave(string clave)
+    {
+        foreach (var g in _grupos.Values)
+            if (string.Equals(Dock.Clave(g.Exe), clave, StringComparison.OrdinalIgnoreCase))
+                return EscondidaRecordada(g);
+        return IntPtr.Zero;
+    }
+
     // Minimizar y, si la app no atiende el mensaje, insistir por las malas
     void MinimizarVentana(IntPtr h)
     {
@@ -443,6 +480,32 @@ public partial class MainWindow
         {
             CerrarMiniLista();
             if (!g.Fijada) return;
+
+            // ---------- ¿Cerrada, o solo escondida? ----------
+            //
+            // No es lo mismo, y aquí se confundían. Discord, Steam, Telegram y casi todo lo
+            // que vive en la bandeja no se minimizan: **se esconden**. La ventana sigue
+            // existiendo pero deja de ser visible, así que sale de la lista de ventanas y
+            // este código daba la app por cerrada.
+            //
+            // Y entonces hacía lo peor posible: volver a lanzar el ejecutable. El segundo
+            // proceso ve que ya hay uno corriendo y se va sin hacer nada, así que **pulsar el
+            // icono no producía ningún efecto** y la app parecía irrecuperable. Es el fallo
+            // que contó el usuario: «clico dos veces y ya no me deja volver a abrirla».
+            //
+            // Ahora se busca primero la ventana escondida de ese mismo ejecutable y se
+            // enseña, que es lo que hace la barra de tareas de Windows. Si no hay ninguna se
+            // lanza como siempre: en el peor caso, el comportamiento de antes.
+            var escondida = EscondidaRecordada(g);
+            if (escondida != IntPtr.Zero)
+            {
+                Log.Info($"fijada {System.IO.Path.GetFileName(g.Exe)}: no estaba cerrada, estaba " +
+                         $"ESCONDIDA en 0x{escondida.ToInt64():X6} (\"{Nativo.Titulo(escondida)}\"); " +
+                         "se enseña en vez de relanzarla");
+                Nativo.MostrarYActivar(escondida);
+                return;
+            }
+
             Log.Info($"abriendo la app fijada {g.Lanzar}");
             if (g.Boton != null) LatirIcono(g.Exe);   // late mientras la app arranca
             Uso.Apuntar("fijada:" + g.Lanzar);

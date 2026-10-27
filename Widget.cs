@@ -25,7 +25,19 @@ public sealed record DescriptorWidget(
     string Glifo,                   // icono (Segoe Fluent Icons) para la biblioteca
     CategoriaWidget Categoria,
     string ZonaPreferida = "Derecha",   // dónde cae si lo añades sin decir dónde
-    bool Repetible = false);            // ¿tiene sentido tener dos? (el separador, sí)
+    bool Repetible = false,             // ¿tiene sentido tener dos? (el separador, sí)
+
+    // Por qué este widget puede no verse aunque esté puesto, o null si siempre se ve.
+    //
+    // No es una excusa, es información que faltaba. La batería no se dibuja en un equipo
+    // de sobremesa y la carátula no se dibuja si no suena nada: puestos, miden cero por
+    // cero. Sin decirlo en alguna parte, «lo he añadido y no aparece» significa dos cosas
+    // muy distintas —está roto, o no tiene nada que enseñar— y no hay manera de saber
+    // cuál. Que es exactamente el lío del que sale todo esto.
+    //
+    // Lo enseña la biblioteca al lado del botón de añadir, y lo usa `--diagmodulos` para
+    // no contar como fallo un hueco que el widget había anunciado.
+    string? PuedeNoVerse = null);
 
 // Lo que un widget puede pedirle a la isla que lo aloja.
 //

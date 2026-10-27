@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 
 namespace NubeBar;
 
@@ -131,6 +132,48 @@ public sealed class ConfigArbol
     // DERIVE, y eso se dice quitando la clave. Si al cambiar de Nube a Gruvbox se
     // dejara el "Secundario": "#F29C65" puesto, Gruvbox se quedaría con el naranja de
     // Nube para siempre y nadie entendería de dónde sale.
+
+    // ---------- Un diccionario de atajos ----------
+    //
+    // El editor de atajos escribe `NubeHypr.Atajos`, que es un objeto y no una clave
+    // suelta. Va aquí y no en la ventana de Ajustes por lo mismo que `PonerPaneles`: quien
+    // sabe escribir el árbol es el árbol, y hacerlo desde la interfaz sería la segunda
+    // forma de escribir la misma sección.
+    //
+    // Las claves que esta versión no conozca dentro de `NubeHypr` **se conservan**: solo
+    // se sustituye `Atajos`, no la sección entera.
+    public void PonerAtajos(string seccion, IReadOnlyDictionary<string, string> atajos)
+    {
+        var obj = new JsonObject();
+        foreach (var (k, v) in atajos) obj[k] = v;
+        Seccion(seccion)["Atajos"] = obj;
+    }
+    // ---------- Las reglas de NubeHypr ----------
+    //
+    // Una lista de objetos, no un diccionario. Va aquí por lo mismo que `PonerAtajos`: quien
+    // sabe escribir el árbol es el árbol, y hacerlo desde la ventana de Ajustes sería la
+    // segunda forma de escribir la misma sección.
+    //
+    // Se sustituye **solo** `Reglas`: las demás claves de `NubeHypr` —incluidas las que esta
+    // versión no conozca— se quedan donde están. Y cada regla se escribe sin sus nulos: un
+    // `"Clase": null` en el fichero se lee igual que si no estuviera, pero al abrirlo a mano
+    // parece una decisión en vez de un hueco.
+    public void PonerReglas(string seccion, IEnumerable<HyprReglas.Regla> reglas)
+    {
+        try
+        {
+            var opc = new JsonSerializerOptions
+            {
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            };
+            var lista = new JsonArray();
+            foreach (var r in reglas)
+                if (JsonSerializer.SerializeToNode(r, opc) is { } nodo) lista.Add(nodo);
+            Seccion(seccion)["Reglas"] = lista;
+        }
+        catch (Exception ex) { Log.Error($"escribir {seccion}.Reglas en el config", ex); }
+    }
+
     public void Quitar(string seccion, string clave)
     {
         try { Seccion(seccion).Remove(clave); }
@@ -316,8 +359,42 @@ public sealed class ConfigArbol
 
     public string Serializar() => _raiz.ToJsonString(Formato);
 
+    // ¿Toca negarse a guardar ESTE fichero ahora mismo?
+    //
+    // Pura y comprobable, porque la alternativa es una prueba que escriba en el config de
+    // verdad para ver si se protege — y eso es justo lo que no se puede hacer.
+    //
+    // Protege EL config del usuario y nada más: las pruebas escriben árboles en carpetas
+    // temporales y tienen que poder.
+    //
+    // Compara contra `Config.RutaDelUsuario`, no contra `Config.Ruta`, y la diferencia
+    // importa desde que un diagnóstico puede redirigir `Config.Carpeta` a un arenero
+    // temporal. Con la comparación vieja esa redirección habría hecho dos cosas malas a
+    // la vez: bloquear el arenero (y dejar el diagnóstico sin poder reproducir nada) y
+    // DESPROTEGER el fichero del usuario, que ya no sería `Config.Ruta`. Así la garantía
+    // apunta siempre al fichero que hay que proteger, se redirija lo que se redirija.
+    internal static bool NoSeDebeGuardar(string ruta) =>
+        Config.SoloLectura &&
+        string.Equals(ruta, Config.RutaDelUsuario, StringComparison.OrdinalIgnoreCase);
+
     public void Guardar()
     {
+        // ---------- Un diagnóstico mira y no toca ----------
+        //
+        // Ninguna herramienta de medida escribe el config del usuario. Y la escritura que
+        // había que atajar no era la migración del esquema: es ESTA. El modelo tipado
+        // lleva `Version = Esquema.Actual`, así que cualquier guardado rutinario del
+        // arranque —los módulos de serie, la derivación de paneles, el orden de las
+        // apps— sube la versión del fichero sin que ninguna migración haya corrido.
+        //
+        // Con un binario de desarrollo eso le dejaba el config en una versión que su
+        // NubeBar instalada ya no sabe migrar, y un error en cada arranque. Pasó.
+        if (NoSeDebeGuardar(_ruta))
+        {
+            Log.Info($"config: NO se guarda ({System.IO.Path.GetFileName(_ruta)}): " +
+                     "hay un diagnóstico en marcha y un diagnóstico solo mira");
+            return;
+        }
         try
         {
             EscribirAtomico(_ruta, Serializar(), RutaCopia);

@@ -131,6 +131,20 @@ public static class Perfiles
         "Panel.Margen",
         "Panel.Visibilidad",
         "Panel.ReservarEspacio",
+
+        // ---------- D5.1: las reglas y los atajos de NubeHypr ----------
+        //
+        // Un perfil puede traer un juego de reglas y de atajos: "Trabajo" con el editor
+        // en el espacio 2 y el navegador flotante, "Juego" sin ninguna. Es exactamente lo
+        // que pide la especificación de D5.
+        //
+        // Y lo que NO está aquí importa más que lo que está: **`NubeHypr.Activo` y
+        // `NubeHypr.Modo` no son claves de perfil**. Un perfil cambia la configuración,
+        // así que si pudiera encender la capa —o ponerla en "aplicar"— aplicar un perfil
+        // te empezaría a mover ventanas sin haberlo pedido. Encender la capa es una
+        // decisión aparte y se queda aparte.
+        "NubeHypr.Reglas",
+        "NubeHypr.Atajos",
     };
 
     // ¿Puede un perfil escribir esta clave? Pura y pública para poder comprobarla con

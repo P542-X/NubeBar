@@ -4,8 +4,18 @@ using System.Windows.Media.Imaging;
 
 namespace NubeBar;
 
-public record Paleta(Color Fondo, Color Texto, Color Acento)
+// `Media` es el color medio de la imagen TAL CUAL, sin oscurecer. `Fondo` no sirve para
+// eso: lleva un ×0,25 para que la isla quede oscura por encima de cualquier foto, así que
+// preguntarle "¿es claro el escritorio?" contesta que no siempre.
+//
+// Lo necesita D6: la previsualización del ajuste se dibuja encima del escritorio, y para
+// elegir un filo que se vea hay que saber si lo de debajo es claro u oscuro. Es opcional
+// —`MediaReal` cae en `Fondo` si no está— para que nadie que construya una paleta a mano
+// tenga que inventarse un cuarto color.
+public record Paleta(Color Fondo, Color Texto, Color Acento, Color? Media = null)
 {
+    public Color MediaReal => Media ?? Fondo;
+
     // Es esto un color? Hacía falta en un sitio concreto: validar un perfil o un fondo
     // que viene de un fichero importado, donde "Acento": "azulito" tiene que poder
     // rechazarse ANTES de escribir nada. El try/catch estaba repetido suelto en cinco
@@ -75,7 +85,11 @@ static class Extractor
 
             var fondo = Rgb(mr / n * 0.25, mg / n * 0.25, mb / n * 0.25);
             var texto = Mezclar(Colors.White, acento, 0.85); // blanco con un toque del acento
-            return new Paleta(fondo, texto, acento);
+
+            // El medio sin oscurecer: es lo que de verdad hay detrás de una ventana, y lo
+            // que la previsualización del ajuste necesita para elegir un filo que se vea.
+            var media = Rgb(mr / n, mg / n, mb / n);
+            return new Paleta(fondo, texto, acento, media);
         }
         catch { return null; }
     }

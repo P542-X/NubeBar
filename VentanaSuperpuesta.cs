@@ -58,6 +58,25 @@ public sealed class VentanaSuperpuesta : Window
         // NubeBar no terminaría nunca. Siendo de la isla, se cierra con ella.
         Owner = dueña;
 
+        // ---------- Los estilos de la dueña, desde el primer momento ----------
+        //
+        // Los estilos implícitos se buscan subiendo por el árbol hasta **la ventana que
+        // contiene al elemento** y de ahí a la aplicación; nunca pasan por la isla, aunque sea
+        // la dueña. Sin esto, un botón puesto aquí dentro cae a la plantilla de serie de WPF,
+        // que pinta su `Background` —un gris casi blanco— en un Border detrás del contenido, y
+        // un recurso dinámico como "Hover" no resuelve.
+        //
+        // Pasó de verdad: con la barra en vertical los paneles salen en una de estas ventanas,
+        // y TODOS sus botones tenían el fondo claro de serie.
+        //
+        // Va en el constructor y no donde se viste el panel porque esta clase se usa para dos
+        // cosas —los paneles al lado y la previsualización del ajuste— y la segunda no pasa
+        // por ahí. Un arreglo que cubra uno de los dos caminos es medio arreglo.
+        //
+        // Se comparte el MISMO diccionario, no una copia: `AplicarTema` lo reescribe en cada
+        // cambio de tema y de nivel de animación, y una copia se quedaría atrás.
+        Resources = dueña.Resources;
+
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
         Background = Brushes.Transparent;

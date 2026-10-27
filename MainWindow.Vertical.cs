@@ -240,6 +240,7 @@ public partial class MainWindow : Window
         }
 
         _panelAbierto = nombre;
+        ApuntarPanelEnLaMesa(nombre, ancho, alto, teclado);   // E0: también el camino vertical
         _panelAncho = ancho;
         _anclaFlotante = ancla;
         _panelScrollPropio = scrollPropio;
@@ -307,6 +308,7 @@ public partial class MainWindow : Window
     {
         if (_panelAbierto == null) return;
         var nombre = _panelAbierto;
+        OlvidarPanelEnLaMesa(nombre);      // E0
         _panelAbierto = null;
         _panelAlto = _panelAncho = 0;
         _anclaFlotante = null;
@@ -429,6 +431,23 @@ public partial class MainWindow : Window
     void VestirPanelFlotante()
     {
         if (_superpuesta is not { } v) return;
+
+        // (Los estilos de la isla —la plantilla del botón, el recurso "Hover"— los recibe esta
+        // ventana al nacer; ver el constructor de `VentanaSuperpuesta` y el porqué.)
+
+        // ---------- Y el fondo del tema, CON su alfa ----------
+        //
+        // Aquí llegué a poner el fondo opaco creyendo que ese 10 % de transparencia era lo
+        // que aclaraba las tarjetas de la vista general. No lo era —era el estilo de botón
+        // que no llegaba, justo arriba— y la prueba de que no lo era es que al cambiarlo los
+        // píxeles no se movieron ni uno.
+        //
+        // Se queda `_fondo`, que es lo correcto: esta tarjeta hace de isla cuando la barra es
+        // vertical, y la isla es translúcida a propósito. Opaca aquí y translúcida allí daría
+        // dos aspectos distintos al mismo panel según el borde en el que tengas la barra.
+        //
+        // (La regla de «la raíz del panel es una superficie opaca» es de `PanelShell`, que va
+        // DENTRO; no de la isla ni de esta tarjeta, que son el recipiente.)
         v.Tarjeta.Background = _fondo;
         v.Tarjeta.BorderBrush = _acento;
         v.Tarjeta.BorderThickness = Isla.BorderThickness;

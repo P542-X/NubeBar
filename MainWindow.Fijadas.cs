@@ -55,9 +55,11 @@ public partial class MainWindow : Window
     // una tira y otra: si la de las fijas no existiera aún, se los quedaría todos.
     void PrepararFijas()
     {
-        bool puesto = _cfg.Modulos.Izquierda.Concat(_cfg.Modulos.Centro).Concat(_cfg.Modulos.Derecha)
-                          .Any(m => m.Equals("fijadas", StringComparison.OrdinalIgnoreCase));
-        if (!puesto) { _tiraFijas = null; return; }
+        // Por `ModuloPuesto`, que mira LO MISMO que se dibuja. Preguntarle a
+        // `_cfg.Modulos` por su cuenta era la segunda fuente de verdad, y cuando se
+        // separó de la primera esta línea dejó `_tiraFijas` en null mientras
+        // `LlenarZonas` seguía montando "fijadas": NullReferenceException y hueco vacío.
+        if (!ModuloPuesto("fijadas")) { _tiraFijas = null; return; }
 
         // Con la barra vertical las fijadas también se apilan, y lo que se fija es su
         // ancho en vez de su alto (ver "El eje de la tira" en MainWindow.Apps.cs).

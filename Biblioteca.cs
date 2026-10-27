@@ -399,6 +399,20 @@ public sealed class Biblioteca
             Cursor = accion == null ? Cursors.No : Cursors.Hand,
             ToolTip = motivo
         };
+        // ---------- Y su nombre para el lector de pantalla ----------
+        //
+        // El contenido es un `TextBlock`, no una cadena: para WPF eso es un objeto, y UIA no
+        // saca de ahí el nombre del botón. Medido: **cuarenta y cuatro** botones de esta
+        // página sin nombre, que son el «Añadir», el «Quitar» y el «Ocultar» de cada widget
+        // del catálogo. Con la ayuda emergente no basta: un tooltip no es un nombre de UIA.
+        //
+        // Y cuando está deshabilitado, el nombre lleva el motivo: «Añadir (no disponible:
+        // este widget no admite más de uno)». Un botón apagado sin explicación deja la misma
+        // pregunta sin respuesta que dejaba el panel de red.
+        System.Windows.Automation.AutomationProperties.SetName(
+            b, accion != null || motivo == null ? texto : $"{texto} (no disponible: {motivo})");
+        if (motivo != null) System.Windows.Automation.AutomationProperties.SetHelpText(b, motivo);
+
         if (accion != null) b.Click += (_, _) => accion();
         return b;
     }

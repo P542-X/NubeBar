@@ -33,6 +33,7 @@ public partial class MainWindow
     internal enum DuenoPrevia { Nadie, Tarjeta, Ventana }
 
     VentanaSuperpuesta? _previa;        // el rectángulo que enseña dónde va a caer
+    string? _rotuloPrevia;              // D8: lo último que se pintó, para no rehacerlo igual
     DuenoPrevia _duenoPrevia = DuenoPrevia.Nadie;
     Zona _zonaPrevia = Zona.Ninguna;
     Monitores.Info? _monitorPrevio;     // y en QUÉ PANTALLA lo prometió
@@ -62,7 +63,9 @@ public partial class MainWindow
             return;
         }
 
-        var hueco = ZonasAjuste.Colocacion(z, ZonasAjuste.AreaUtil(m));
+        // E5: con el dock descontado. La previsualización tiene que enseñar el hueco de
+        // verdad, no uno que al aplicarse deje la ventana debajo del dock.
+        var hueco = ZonasAjuste.Colocacion(z, ZonasAjuste.AreaUtilCon(m, EstorbosDeAhora()));
         if (hueco.Vacio) { _monitorPrevio = null; QuitarPrevia(dueno); return; }
 
         _duenoPrevia = dueno;
@@ -93,33 +96,92 @@ public partial class MainWindow
         return v;
     }
 
-    FrameworkElement CuerpoDeLaPrevia(Zona z)
+    FrameworkElement CuerpoDeLaPrevia(Zona z) => CuerpoConFiloDoble(ZonasAjuste.Nombre(z));
+
+    // ================= D6: el filo doble =================
+    //
+    // ---------- Lo que no funcionaba ----------
+    //
+    // Antes esto era un `Border` con el acento del tema de 2 px y un velo del 20 % dentro.
+    // Sobre un escritorio oscuro se ve perfecto. Sobre una foto clara, un velo del 20 %
+    // casi no se distingue —eso ya estaba escrito aquí— y además **el filo tampoco**: el
+    // acento de Gruvbox es amarillo, y amarillo sobre una playa no es un borde, es nada.
+    // Con Wallpaper Engine moviendo un vídeo, la luminancia de debajo cambia cada
+    // fotograma, así que no hay un color que valga para todos.
+    //
+    // ---------- Y lo que sí ----------
+    //
+    // Dos líneas, no una: una exterior oscura (o clara si se sabe que el fondo es muy
+    // oscuro) y, dentro, la línea azul de "aquí va a caer". Sobre claro se ve la exterior;
+    // sobre oscuro, la azul; sobre un vídeo que cambia, siempre una de las dos. Así "el
+    // filo visible" no depende de medir un fondo que no se puede medir.
+    //
+    // Los cuatro seguros de "los clics la atraviesan" siguen intactos y no se tocan aquí:
+    // `IsHitTestVisible = false` en cada trozo —esta es la mitad de WPF— y
+    // WS_EX_TRANSPARENT + WS_EX_NOACTIVATE + HTTRANSPARENT los pone `HacerseAtravesable`
+    // en cuanto hay hwnd. Las pruebas `PreviaNoRecibeClics` y `PreviaNoRobaFoco` lo
+    // comprueban; este cambio es de color y de grosor, no de comportamiento.
+    FrameworkElement CuerpoConFiloDoble(string rotulo)
     {
-        // Relleno con el velo de "elegido" —un 20 % del acento, para que se siga viendo
-        // lo que hay debajo— y filo con el acento de verdad. El filo no es adorno: sobre
-        // un fondo claro un velo del 20 % casi no se distingue, y lo que tiene que
-        // quedar clarísimo es EL BORDE del hueco, que es la promesa.
-        var caja = new Border
+        var filo = HyprPinta.FiloDelDestino(_roles, DetrasDeLaPrevia());
+
+        var fuera = new Border
         {
-            Background = _elegido,
-            BorderBrush = _acento,
-            BorderThickness = new Thickness(2),
-            IsHitTestVisible = false
+            BorderBrush = Pincel(filo.Exterior),
+            BorderThickness = new Thickness(filo.GrosorExterior),
+            IsHitTestVisible = false,
         };
-        var dentro = new Grid { IsHitTestVisible = false };
-        caja.Child = dentro;
-        dentro.Children.Add(new TextBlock
+        var dentro = new Border
         {
-            Text = ZonasAjuste.Nombre(z),
-            Foreground = _acentoLegible,
-            FontSize = 13,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-            Opacity = 0.9,
-            IsHitTestVisible = false
-        });
-        return caja;
+            Background = Pincel(HyprPinta.RellenoDelDestino(_roles)),
+            BorderBrush = Pincel(filo.Interior),
+            BorderThickness = new Thickness(filo.GrosorInterior),
+            IsHitTestVisible = false,
+        };
+        fuera.Child = dentro;
+
+        var hueco = new Grid { IsHitTestVisible = false };
+        dentro.Child = hueco;
+
+        if (rotulo.Length > 0)
+        {
+            // El rótulo va sobre su propia chapita opaca. Un texto suelto encima del
+            // escritorio tiene el mismo problema que el filo —no se sabe qué hay detrás—
+            // y aquí sí se puede resolver del todo: se pinta su fondo.
+            var chapa = new Border
+            {
+                Background = Pincel(_roles.SuperficieAltaSolida),
+                CornerRadius = new CornerRadius(Math.Min(10, _roles.Radio)),
+                Padding = new Thickness(10, 4, 10, 5),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                IsHitTestVisible = false,
+                Child = new TextBlock
+                {
+                    Text = rotulo,
+                    Foreground = Pincel(HyprPinta.AzulTinta(_roles, _roles.SuperficieAltaSolida)),
+                    FontSize = 13,
+                    FontWeight = FontWeights.SemiBold,
+                    IsHitTestVisible = false,
+                },
+            };
+            hueco.Children.Add(chapa);
+        }
+        return fuera;
     }
+
+    static SolidColorBrush Pincel(Color c)
+    {
+        var p = new SolidColorBrush(c);
+        p.Freeze();                      // congelado: se crea en cada fotograma del arrastre
+        return p;
+    }
+
+    // Qué hay detrás de la previsualización, si se sabe. Es el color medio del wallpaper
+    // cuando Wallpaper Engine está dando uno; en cualquier otro caso, null — y entonces el
+    // filo doble responde por sí solo. Devolver un color inventado sería peor que no
+    // devolver ninguno: elegiría mal el filo con la confianza de haberlo medido.
+    Color? DetrasDeLaPrevia() => _paleta?.MediaReal;
 
     // Solo el dueño la apaga. Quien no la tiene, no la toca: era el camino por el que
     // cerrar la vista en mitad del arrastre de una ventana real se comía el ajuste.
@@ -127,6 +189,9 @@ public partial class MainWindow
     {
         if (_duenoPrevia != DuenoPrevia.Nadie && _duenoPrevia != dueno) return;
         _duenoPrevia = DuenoPrevia.Nadie;
+        // Se olvida el rótulo pintado: el próximo gesto empieza con el contenido recién
+        // hecho y no con el de la vez anterior, que podría ser del otro tipo de arrastre.
+        _rotuloPrevia = null;
         if (_previa == null) return;
         try { if (_previa.IsVisible) _previa.Hide(); }
         catch (Exception ex) { Log.Error("quitar la previsualización del ajuste", ex); }
@@ -140,4 +205,60 @@ public partial class MainWindow
         int i = Monitores.Todos().FindIndex(x => x.Handle == m.Handle);
         return (i < 0 ? "?" : (i + 1).ToString()) + $" ({m.TrabajoX},{m.TrabajoY} {m.TrabajoAncho}x{m.TrabajoAlto})";
     }
+
+    // ================= D2: la previsualización de un destino =================
+    //
+    // ---------- Por qué reutiliza la ventana de C4 y no hace otra ----------
+    //
+    // El rectángulo de "aquí va a caer" ya existe para el ajuste a bordes, y ya resuelve
+    // la parte difícil: `VentanaSuperpuesta` + `HacerseAtravesable` le ponen
+    // WS_EX_TRANSPARENT, WS_EX_NOACTIVATE y la respuesta HTTRANSPARENT a WM_NCHITTEST, y
+    // además `IsHitTestVisible = false` en el contenido, que es la mitad de WPF del
+    // asunto. Una segunda ventana de previsualización sería una segunda ocasión de
+    // olvidarse de uno de esos cuatro.
+    //
+    // Lo único que falta es poder pedirla con un RECTÁNGULO en vez de con una zona de
+    // ajuste, que es lo que D2 necesita: el destino lo calcula el modelo.
+    //
+    // No recibe clics ni foco, y eso no es una promesa: es lo que comprueban
+    // `PreviaNoRecibeClics` y `PreviaNoRobaFoco` en las pruebas.
+    void PonerPreviaHypr(NubeHypr.Rect destino, string rotulo)
+    {
+        if (!destino.Valido) { QuitarPreviaHypr(); return; }
+
+        // El dueño es el mismo token de C4: así el ajuste a bordes y esto no se apagan el
+        // uno al otro, que fue el fallo que hubo que arreglar en su día.
+        if (_duenoPrevia != DuenoPrevia.Nadie && _duenoPrevia != DuenoPrevia.Ventana) return;
+        _duenoPrevia = DuenoPrevia.Ventana;
+
+        _previa ??= CrearPrevia();
+
+        // ---------- El contenido solo se rehace si cambia el rótulo ----------
+        //
+        // Esto se llama en cada paso del gesto, o sea muchas veces por segundo mientras
+        // arrastras. Rehacer el árbol visual en cada paso es construir y tirar seis
+        // elementos por fotograma para enseñar exactamente lo mismo — y es la clase de cosa
+        // que luego se ve como un parpadeo del rótulo. Lo que sí cambia cada paso es la
+        // POSICIÓN, y eso lo hace `Colocar`, que no toca el contenido.
+        if (_rotuloPrevia != rotulo || _previa.Cajon.Content == null)
+        {
+            _rotuloPrevia = rotulo;
+            _previa.Cajon.Content = CuerpoDeLaPreviaHypr(rotulo);
+        }
+
+        _previa.Colocar((int)Math.Round(destino.X), (int)Math.Round(destino.Y),
+                        (int)Math.Round(destino.Ancho), (int)Math.Round(destino.Alto));
+        if (!_previa.IsVisible) _previa.Show();
+        // Necesita hwnd, que no existe hasta el primer Show(). Es idempotente.
+        _previa.HacerseAtravesable();
+        _previa.Elevar();
+    }
+
+    void QuitarPreviaHypr() => QuitarPrevia(DuenoPrevia.Ventana);
+
+    // El destino de NubeHypr y la zona de ajuste comparten cuerpo desde D6. Eran dos
+    // copias del mismo `Border` con el mismo velo y el mismo filo, y con el filo doble
+    // serían dos copias de algo con cuatro números que hay que mantener iguales: la que se
+    // quedara atrás sería la que el usuario viera en el gesto que menos se prueba.
+    FrameworkElement CuerpoDeLaPreviaHypr(string rotulo) => CuerpoConFiloDoble(rotulo);
 }

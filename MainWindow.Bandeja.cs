@@ -23,9 +23,10 @@ public partial class MainWindow : Window
     const string PanelBandeja = "bandeja";
     const double AnchoIconoBandeja = 26;
 
-    bool HayModuloBandeja() =>
-        _cfg.Modulos.Izquierda.Concat(_cfg.Modulos.Centro).Concat(_cfg.Modulos.Derecha)
-                     .Any(m => m.Equals("bandeja", StringComparison.OrdinalIgnoreCase));
+    // Por `ModuloPuesto` (MainWindow.Widgets.cs), que mira las mismas listas que se
+    // dibujan. Tenía su propia consulta a `_cfg.Modulos`, que es la segunda fuente de
+    // verdad que separó a las fijadas de su tira.
+    bool HayModuloBandeja() => ModuloPuesto("bandeja");
 
     UIElement ModuloBandeja()
     {
@@ -134,6 +135,12 @@ public partial class MainWindow : Window
             Padding = new Thickness(0)
         };
 
+        // El nombre para el lector de pantalla: el mismo texto que la ayuda emergente, que
+        // es el que trae el propio icono de bandeja («Wallpaper Engine», «NordVPN
+        // desconectado»). El contenido es una imagen, así que sin esto un lector anuncia
+        // catorce botones idénticos y mudos — la bandeja entera.
+        System.Windows.Automation.AutomationProperties.SetName(b, TipDe(icono));
+
         // El icono cambia solo (Discord con mensajes, el antivirus escaneando...)
         icono.PropertyChanged += (_, e) =>
         {
@@ -157,7 +164,14 @@ public partial class MainWindow : Window
         try
         {
             if (propiedad is null or "Icon") img.Source = icono.Icon;
-            if (propiedad is null or "Title") b.ToolTip = TipDe(icono);
+            // El nombre va con la ayuda emergente: si el icono pasa a decir «Discord: 3
+            // mensajes», un lector de pantalla tiene que oír eso y no el texto de hace una
+            // hora. Dos sitios donde se escribe lo mismo, y por eso van en la misma línea.
+            if (propiedad is null or "Title")
+            {
+                b.ToolTip = TipDe(icono);
+                System.Windows.Automation.AutomationProperties.SetName(b, TipDe(icono));
+            }
             if (propiedad == "IsHidden") RefrescarBandeja();
         }
         catch (Exception ex) { Log.Error("refrescar icono de bandeja", ex); }
@@ -264,8 +278,13 @@ public partial class MainWindow : Window
         int porFila = Math.Min(6, resto.Count);
         int filas = (int)Math.Ceiling(resto.Count / (double)porFila);
 
+        // Con el «^» como ancla: el panel cuelga del botón que lo abre, como el de audio
+        // cuelga del altavoz. Sin ancla se dibujaba de punta a punta de la isla con los
+        // iconos centrados dentro, y no se notaba porque tampoco tenía superficie propia:
+        // sin filo, un contenedor de ancho completo y uno que abraza su contenido se dibujan
+        // exactamente igual. Al darle la concha de C5, la primera captura lo enseñó.
         AlternarPanel(PanelBandeja, () => RejillaBandeja(resto, porFila),
-                      porFila * 40 + 20, filas * 40 + 20);
+                      porFila * 40 + 20, filas * 40 + 20, ancla: _botonMas);
     }
 
     FrameworkElement RejillaBandeja(List<NotifyIcon> iconos, int porFila)
@@ -287,6 +306,15 @@ public partial class MainWindow : Window
             b.Height = 36;
             rejilla.Children.Add(b);
         }
-        return rejilla;
+
+        // Con la concha de C5, como los demás paneles. Éste era el único del programa que no
+        // pintaba **nada** de contenedor —ni fondo, ni filo, ni esquinas—: los iconos
+        // flotaban sobre el fondo de la isla y no había borde que dijera dónde empieza y
+        // acaba el desplegable.
+        //
+        // Aquí el margen no es 0: la rejilla no trae margen propio, así que la concha pone el
+        // suyo. `AlternarPanel` ya reserva ese hueco (`porFila * 40 + 20`), que es de donde
+        // salen los 20 px — el 10 de cada lado que pone `PanelShell`.
+        return PanelShell(rejilla, 10);
     }
 }

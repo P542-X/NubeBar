@@ -51,6 +51,28 @@ static class Contraste
         return max == 0 ? 0 : (max - min) / max;
     }
 
+    // El tono en grados, de 0 a 360: 0 rojo, 60 amarillo, 120 verde, 240 azul.
+    //
+    // Hace falta para poder decir "este color es azul" o "este es coral" sin escribir una
+    // lista de hexadecimales. Lo usa `HyprPinta` para decidir si el color de sistema de un
+    // tema puede hacer de azul de foco o si hay que usar el azul de Nube.
+    //
+    // El extractor del fondo de pantalla tiene su propia cuenta de tono y se queda como
+    // está: la suya trabaja sobre los tres canales en crudo dentro del bucle de píxeles, y
+    // convertir cada píxel a `Color` para llamar aquí sería pagar por nada.
+    public static double Tono(Color c)
+    {
+        double r = c.R / 255.0, g = c.G / 255.0, b = c.B / 255.0;
+        double max = Math.Max(r, Math.Max(g, b)), min = Math.Min(r, Math.Min(g, b));
+        double d = max - min;
+        if (d == 0) return 0;                       // un gris no tiene tono del que hablar
+        double h = max == r ? ((g - b) / d) % 6
+                 : max == g ? (b - r) / d + 2
+                            : (r - g) / d + 4;
+        h *= 60;
+        return h < 0 ? h + 360 : h;
+    }
+
     // La tinta de un RELLENO: blanco o negro, el que más se lea encima.
     //
     // Para un número dentro de una chapita de color no vale `Legible`: esa aclara el

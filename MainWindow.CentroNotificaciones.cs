@@ -101,15 +101,25 @@ public partial class MainWindow : Window
         caja.Unloaded += (_, _) => Centro.Actual.Cambio -= Repintar;
 
         var boton = Boton(caja, "Notificaciones", AbrirNotificaciones);
+        // Se guarda para que el panel cuelgue de la campana, como el de audio cuelga del
+        // altavoz. Ver `AbrirNotificaciones`.
+        _anclaNotas = boton;
         return boton;
     }
+
+    // El botón de la campana, para anclar el panel a él.
+    FrameworkElement? _anclaNotas;
 
     // ---------- Abrir y cerrar ----------
 
     void AbrirNotificaciones()
     {
+        // Anclado a la campana, por el mismo motivo que la batería y la bandeja: sin ancla
+        // el panel se dibuja de punta a punta de la isla con 420 px de contenido centrados
+        // dentro. Con tres paneles iguales en esto, no era un olvido suelto: era que sin
+        // superficie propia no se distinguía, y por eso duró tanto.
         bool abierto = AlternarPanel(PanelNotas, CrearNotificaciones, 420, AltoDeNotas(),
-                                     teclado: false, scrollPropio: true);
+                                     teclado: false, ancla: _anclaNotas, scrollPropio: true);
         if (abierto) MirarEscDelPanel(true);
     }
 
@@ -182,7 +192,10 @@ public partial class MainWindow : Window
 
         columna.Children.Add(CabeceraNotas(centro));
 
-        if (centro.Vacio) { columna.Children.Add(NadaQueContar()); return columna; }
+        // Las dos salidas pasan por la concha de C5 — la de «no hay nada» también. Es el
+        // detalle que se olvida al añadir una superficie: el camino corto se queda sin ella
+        // y el panel vacío se ve distinto del lleno sin que nadie lo haya decidido.
+        if (centro.Vacio) { columna.Children.Add(NadaQueContar()); return PanelShell(columna, 0); }
 
         var lista = new StackPanel();
         foreach (var g in centro.PorApp()) lista.Children.Add(GrupoDeApp(g));
@@ -197,7 +210,11 @@ public partial class MainWindow : Window
             Padding = new Thickness(0, 0, 8, 0)
         };
         columna.Children.Add(desplaza);
-        return columna;
+
+        // Y aquí la razón de más peso para darle concha a éste: son notificaciones, o sea
+        // texto pequeño y mucho. Apoyado en el fondo translúcido de la isla, el escritorio se
+        // transparenta detrás de cada línea.
+        return PanelShell(columna, 0);
     }
 
     FrameworkElement CabeceraNotas(CentroNotificaciones centro)

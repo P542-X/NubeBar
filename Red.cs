@@ -38,6 +38,18 @@ static class Red
         return conSalida.Count > 0 ? conSalida : vivas;
     }
 
+    // Cuántas interfaces vivas hay, salga o no salga internet por ellas.
+    //
+    // Es el dato que separa «hay tarjetas pero ninguna llega a ningún sitio» de «no hay
+    // ninguna tarjeta». Son dos problemas distintos del usuario —uno es del router o del
+    // cable, el otro es del equipo— y antes el panel los pintaba igual porque solo sabía
+    // contar conexiones CON salida.
+    public static int CuantosAdaptadores()
+    {
+        try { return Vivas().Count; }
+        catch { return 0; }
+    }
+
     public static Tipo Estado()
     {
         try
@@ -161,17 +173,55 @@ static class Red
         _ => Seguridad.Otra                                  // WEP: en 2026, no
     };
 
+    // ---------- Lo último que dijo Windows al recorrer las interfaces ----------
+    //
+    // Antes esto no existía, y era la raíz del panel de red que «a veces tiene botones y a
+    // veces no».
+    //
+    // `ConCadaInterfaz` se rendía con un `return` mudo en tres sitios: no se puede abrir
+    // wlanapi, no se pueden enumerar las interfaces, no hay ninguna. Las tres acababan en
+    // una lista de wifis vacía, exactamente igual que «aquí no se ve ninguna red». Y el
+    // panel, al no poder distinguirlas, pintaba lo mismo en los cuatro casos y además
+    // quitaba de en medio los botones que creía inaplicables.
+    //
+    // Son situaciones distintas y la respuesta correcta es distinta en cada una: sin
+    // servicio wifi hay que decirlo; sin permisos hay que decirlo y ofrecer Windows; sin
+    // tarjeta hay que ocultar la sección wifi entera pero NO los botones de la red por
+    // cable; y «no se ve ninguna» es el único de los cuatro que significa lo que parece.
+    //
+    // Guardarlo en un campo estático es feo y es a propósito: `Wifis()` ya existe, la
+    // llaman varios sitios y cambiarle la firma habría tocado medio panel. Esto añade el
+    // dato sin mover nada, y el panel lo lee justo después de pedir la lista.
+    public enum ComoFue { Bien, NoSePuedeAbrir, NoSePuedenEnumerar, SinTarjeta, SinPermisos }
+
+    // 5 = ERROR_ACCESS_DENIED. wlanapi lo devuelve cuando el servicio de configuración
+    // automática (WLANSVC) está parado o la política de grupo lo prohíbe.
+    const int AccesoDenegado = 5;
+
+    public static ComoFue UltimaLectura { get; private set; } = ComoFue.Bien;
+
     // Abre el handle de wlanapi, recorre las interfaces wifi y lo cierra pase lo que pase
     static void ConCadaInterfaz(Action<IntPtr, Guid> hacer)
     {
         IntPtr handle = IntPtr.Zero;
         try
         {
-            if (WlanOpenHandle(2, IntPtr.Zero, out _, out handle) != 0) return;
-            if (WlanEnumInterfaces(handle, IntPtr.Zero, out IntPtr pLista) != 0) return;
+            int r = WlanOpenHandle(2, IntPtr.Zero, out _, out handle);
+            if (r != 0)
+            {
+                UltimaLectura = r == AccesoDenegado ? ComoFue.SinPermisos : ComoFue.NoSePuedeAbrir;
+                return;
+            }
+            r = WlanEnumInterfaces(handle, IntPtr.Zero, out IntPtr pLista);
+            if (r != 0)
+            {
+                UltimaLectura = r == AccesoDenegado ? ComoFue.SinPermisos : ComoFue.NoSePuedenEnumerar;
+                return;
+            }
             try
             {
                 int cuantas = Marshal.ReadInt32(pLista);
+                UltimaLectura = cuantas == 0 ? ComoFue.SinTarjeta : ComoFue.Bien;
                 IntPtr pIface = pLista + 8;                  // dwNumberOfItems + dwIndex
                 int tamIface = Marshal.SizeOf<WLAN_INTERFACE_INFO>();
                 for (int i = 0; i < cuantas; i++)

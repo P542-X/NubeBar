@@ -13,7 +13,15 @@ public partial class MainWindow : Window
 {
     internal const string PanelBateria = "bateria";
 
-    void AbrirBateria() => AlternarPanel(PanelBateria, CrearBateria, 340, 150, teclado: false);
+    // Con su ancla, como audio y red. `_anclaBateria` se guardaba en `MainWindow.Control.cs`
+    // desde que existe el botón… y no la pasaba nadie: el panel se dibujaba de punta a punta
+    // de la isla con 340 px de contenido centrados dentro.
+    //
+    // No se veía porque este panel tampoco tenía superficie propia: sin filo, un contenedor
+    // de ancho completo y uno que abraza el contenido se dibujan igual. Al darle la concha de
+    // C5 quedó a la vista en la primera captura.
+    void AbrirBateria() => AlternarPanel(PanelBateria, CrearBateria, 340, 150,
+                                         teclado: false, ancla: _anclaBateria);
 
     FrameworkElement CrearBateria()
     {
@@ -108,7 +116,16 @@ public partial class MainWindow : Window
         abajo.Children.Add(ajustes);
         columna.Children.Add(abajo);
 
-        return columna;
+        // Con la concha de C5, como audio, red y el centro de control. Hasta aquí este panel
+        // se apoyaba en el fondo de la isla, que es translúcido: el escritorio se
+        // transparentaba detrás del porcentaje y del tiempo restante. Es el mismo
+        // razonamiento que `MainWindow.Laterales.cs` lleva escrito desde E3 —«un panel de
+        // controles con el escritorio transparentándose detrás hace ilegible cualquier texto
+        // pequeño»— aplicado donde faltaba.
+        //
+        // `margen: 0` porque el contenido ya trae el suyo. La concha pondría un segundo
+        // margen encima y el panel engordaría sin que nadie lo hubiera pedido.
+        return PanelShell(columna, 0);
     }
 
     void RefrescarBateria()

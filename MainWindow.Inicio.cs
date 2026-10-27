@@ -529,19 +529,87 @@ public partial class MainWindow
 
         _caja = new TextBox
         {
-            Height = 38,
-            Padding = new Thickness(12, 0, 12, 0),
+            Padding = new Thickness(9, 0, 12, 0),
             VerticalContentAlignment = VerticalAlignment.Center,
-            Background = _superficie,
+            // Transparente a propósito: el fondo y las esquinas los pone el marco de más
+            // abajo. Pintados aquí daban lo que se veía en la captura — un rectángulo gris
+            // de esquinas rectas, de filo a filo, entre tarjetas oscuras redondeadas: la
+            // pieza que peor encajaba de todo el lanzador.
+            Background = Brushes.Transparent,
             Foreground = _texto,
             CaretBrush = _acentoLegible,
             BorderThickness = new Thickness(0),
             FontSize = FontSize + 3,
             Tag = "caja"
         };
-        _caja.TextChanged += (_, _) => Buscar(_caja!.Text);
-        Grid.SetRow(_caja, 1);
-        raiz.Children.Add(_caja);
+        // ---------- Y una pista dentro de la caja ----------
+        //
+        // No la había: el lanzador se abría con una franja vacía y un cursor parpadeando.
+        // Quien no sepa que ahí se busca —y que se buscan aplicaciones, archivos Y la web—
+        // no tiene de dónde deducirlo. Se vio mirando una captura del menú entero, no el
+        // código: en el código la caja parece perfectamente normal.
+        //
+        // Un TextBlock detrás, que no recoge clics y se esconde en cuanto escribes. Es el
+        // mismo patrón que el buscador de la biblioteca; no se toca la plantilla del
+        // TextBox porque eso serían dos formas de poner una pista en la misma aplicación.
+        var pistaDeLaCaja = new TextBlock
+        {
+            Text = "Buscar aplicaciones, archivos y en la web…",
+            Foreground = _texto,
+            Opacity = 0.45,
+            FontSize = FontSize + 3,
+            Margin = new Thickness(10, 0, 13, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            IsHitTestVisible = false,
+        };
+
+        _caja.TextChanged += (_, _) =>
+        {
+            pistaDeLaCaja.Visibility = _caja!.Text.Length == 0
+                                     ? Visibility.Visible : Visibility.Collapsed;
+            Buscar(_caja.Text);
+        };
+
+        // ---------- El marco: lupa dentro y esquinas redondas ----------
+        //
+        // Es la misma construcción que `VentanaAjustes.CajaDeBusqueda`: un borde que pone el
+        // fondo y el radio, una lupa delante y el campo transparente encima. No se toca la
+        // plantilla del TextBox, que es justo lo que pide el comentario de la pista — dos
+        // formas de hacer un buscador en la misma aplicación es lo que había que evitar.
+        //
+        // Y la lupa no es adorno: era una franja gris con un cursor parpadeando. Quien no
+        // supiera ya que ahí se busca no tenía de dónde deducirlo. La pista de texto lo dice
+        // y desaparece al escribir; la lupa se queda.
+        var filaDeLaCaja = new Grid();
+        filaDeLaCaja.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        filaDeLaCaja.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var lupa = Glifo(char.ConvertFromUtf32(0xE721));   // Search
+        lupa.FontSize = 14;
+        lupa.Opacity = 0.5;
+        lupa.Margin = new Thickness(13, 0, 0, 0);
+        lupa.VerticalAlignment = VerticalAlignment.Center;
+        Grid.SetColumn(lupa, 0);
+        filaDeLaCaja.Children.Add(lupa);
+
+        Grid.SetColumn(_caja, 1);
+        filaDeLaCaja.Children.Add(_caja);
+        Grid.SetColumn(pistaDeLaCaja, 1);
+        filaDeLaCaja.Children.Add(pistaDeLaCaja);   // después: por encima del campo
+
+        var marcoDeLaCaja = new Border
+        {
+            Height = 38,
+            Background = _superficie,
+            CornerRadius = new CornerRadius(10),
+            Child = filaDeLaCaja,
+        };
+        Grid.SetRow(marcoDeLaCaja, 1);
+        raiz.Children.Add(marcoDeLaCaja);
+
+        // Y el nombre, para quien no puede ver la pista.
+        System.Windows.Automation.AutomationProperties.SetName(
+            _caja, "Buscar aplicaciones, archivos y en la web");
 
         // El teclado se escucha en la RAÍZ del panel, no solo en la caja: así las
         // flechas, Intro, Tab y Escape siguen funcionando aunque el foco se haya ido a

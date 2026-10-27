@@ -58,6 +58,11 @@ public static class Nativo
     // La bandeja que encontraría Windows al repartir los Shell_NotifyIcon: la
     // primera Shell_TrayWnd en orden Z. Sirve para comprobar si ganamos nosotros.
     // Con "" se exige que el título sea exactamente vacío; con null vale cualquiera.
+    // Una ventana por su título exacto, buscando entre las de nivel superior. La usa el
+    // arnés de D9.5 para encontrar la ventana que ha abierto en otro proceso: su hwnd no lo
+    // sabe nadie de este lado, y el título es único porque lleva la hora con milésimas.
+    public static IntPtr PorTitulo(string titulo) => FindWindow(null!, titulo);
+
     public static IntPtr PrimeraBandeja() => FindWindow("Shell_TrayWnd", null);
 
     // La Shell_TrayWnd de Explorer, la de verdad. Con la bandeja encendida hay dos y
@@ -112,6 +117,48 @@ public static class Nativo
         keybd_event(0x12, 0, 2, UIntPtr.Zero);
         SetForegroundWindow(h);
     }
+
+    // ---------- Enseñar una ventana ESCONDIDA ----------
+    //
+    // `Activar` sirve para una ventana que está ahí, aunque esté minimizada. No sirve para
+    // una que la aplicación ha **escondido**: `SW_RESTORE` sobre algo invisible no lo hace
+    // visible, y `SetForegroundWindow` sobre lo invisible no hace nada.
+    //
+    // Y hace falta de verdad: Discord, Steam, Telegram y casi todo lo que vive en la bandeja
+    // no se minimizan al pulsar la X ni al minimizar — **se esconden**. La ventana sigue
+    // existiendo, pero deja de estar visible, así que sale de la lista de ventanas y NubeBar
+    // creía que la app estaba cerrada.
+    //
+    // `SW_SHOW` primero y después el camino de siempre. Es lo que hace la barra de tareas de
+    // Windows cuando pulsas el icono de una app escondida en la bandeja.
+    // ---------- La memoria INSTALADA, no la que ve Windows ----------
+    //
+    // `TotalPhysicalMemory` da lo que el sistema puede usar, que es algo menos que lo que hay
+    // puesto porque el hardware se reserva un trozo: con 32 GB instalados sale 31,8, y nadie
+    // llama a eso «32 GB». Esta API da lo de la caja, en kilobytes.
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    static extern bool GetPhysicallyInstalledSystemMemory(out long memoriaEnKB);
+
+    public static bool MemoriaInstaladaKB(out long kb)
+    {
+        kb = 0;
+        try { return GetPhysicallyInstalledSystemMemory(out kb); }
+        catch { return false; }
+    }
+
+    // Esconder una ventana, igual que hacen las apps de bandeja. Existe para poder
+    // REPRODUCIR ese caso con una ventana nuestra en un diagnóstico: sin esto, el arreglo de
+    // `EscondidaDe` solo se podría comprobar teniendo Discord delante.
+    public static void Esconder(IntPtr h) => ShowWindow(h, 0);   // SW_HIDE
+
+    public static void MostrarYActivar(IntPtr h)
+    {
+        ShowWindow(h, 5);                   // SW_SHOW
+        if (IsIconic(h)) ShowWindow(h, 9);  // SW_RESTORE, por si además estaba minimizada
+        Activar(h);
+    }
+
 
     [DllImport("user32.dll")] static extern int GetDoubleClickTime();
 
@@ -421,6 +468,24 @@ public static class Nativo
                         "tab"                => 0x09,
                         "enter" or "intro"   => 0x0D,
                         "esc"                => 0x1B,
+                        // ---------- Las flechas y compañía (D3) ----------
+                        //
+                        // Faltaban, y hacen falta: el foco por dirección se ata a las
+                        // flechas porque es lo natural, y sin esto un atajo con flecha
+                        // se quedaba en "no entiendo la combinación" sin decir cuál era
+                        // el trozo que no se entendía.
+                        "left" or "izquierda"  => 0x25,
+                        "up" or "arriba"       => 0x26,
+                        "right" or "derecha"   => 0x27,
+                        "down" or "abajo"      => 0x28,
+                        "oemplus" or "plus" or "mas"    => 0xBB,
+                        "oemminus" or "minus" or "menos" => 0xBD,
+                        "home" or "inicio"     => 0x24,
+                        "end" or "fin"         => 0x23,
+                        "pageup" or "pgup"     => 0x21,
+                        "pagedown" or "pgdn"   => 0x22,
+                        "delete" or "supr"     => 0x2E,
+                        "back" or "retroceso"  => 0x08,
                         _ when t.Length == 1 => (uint)char.ToUpperInvariant(t[0]),
                         _ when t.Length > 1 && t[0] is 'F' or 'f' && int.TryParse(t[1..], out int n) && n is >= 1 and <= 24
                                              => (uint)(0x70 + n - 1),
@@ -725,7 +790,109 @@ public static class Nativo
     [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr obj);
     [DllImport("gdi32.dll")] static extern bool DeleteDC(IntPtr dc);
 
-    public static System.Windows.Media.Imaging.BitmapSource? Foto(IntPtr h, int anchoMax)
+    // ---------- Y una copia de LA PANTALLA ----------
+    //
+    // `PrintWindow` le pide a la ventana que se redibuje en un lienzo nuestro. Eso es lo que
+    // hace falta para las miniaturas, pero **no es lo que el usuario ve**: la ventana se
+    // dibuja a sí misma, sin lo que hay detrás y sin cómo el compositor la mezcla. En una
+    // ventana por capas —y todas las de NubeBar lo son— las dos cosas no tienen por qué
+    // coincidir, y conviene poder comprobar cuál es cuál.
+    //
+    // Esto copia los píxeles de la pantalla, que es lo que ven los ojos. Solo para
+    // diagnóstico: no vale para las miniaturas de la vista general, porque ahí las ventanas
+    // están tapadas unas por otras y lo que se copiaría sería la de encima.
+    [DllImport("user32.dll")] static extern IntPtr GetDC(IntPtr h);
+    [DllImport("gdi32.dll")] static extern bool BitBlt(IntPtr destino, int x, int y, int w, int alt,
+                                                       IntPtr origen, int xo, int yo, uint rop);
+    const uint SRCCOPY = 0x00CC0020, CAPTUREBLT = 0x40000000;
+
+    public static System.Windows.Media.Imaging.BitmapSource? FotoDeLaPantalla(
+        int x, int y, int w, int alt)
+    {
+        if (w <= 0 || alt <= 0 || w > 20000 || alt > 20000) return null;
+
+        IntPtr dcPantalla = IntPtr.Zero, dcMemoria = IntPtr.Zero, mapa = IntPtr.Zero, antiguo = IntPtr.Zero;
+        try
+        {
+            dcPantalla = GetDC(IntPtr.Zero);
+            if (dcPantalla == IntPtr.Zero) return null;
+            dcMemoria = CreateCompatibleDC(dcPantalla);
+            mapa = CreateCompatibleBitmap(dcPantalla, w, alt);
+            if (dcMemoria == IntPtr.Zero || mapa == IntPtr.Zero) return null;
+            antiguo = SelectObject(dcMemoria, mapa);
+
+            // CAPTUREBLT es lo que incluye las ventanas por capas. Sin él, la isla y los
+            // paneles —que son justo lo que hay que fotografiar— salen como un agujero.
+            if (!BitBlt(dcMemoria, 0, 0, w, alt, dcPantalla, x, y, SRCCOPY | CAPTUREBLT))
+                return null;
+
+            var fuente = System.Windows.Interop.Imaging.CreateBitmapSourceFromHBitmap(
+                mapa, IntPtr.Zero, System.Windows.Int32Rect.Empty,
+                System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
+            fuente.Freeze();
+            return fuente;
+        }
+        catch { return null; }
+        finally
+        {
+            if (antiguo != IntPtr.Zero) SelectObject(dcMemoria, antiguo);
+            if (mapa != IntPtr.Zero) DeleteObject(mapa);
+            if (dcMemoria != IntPtr.Zero) DeleteDC(dcMemoria);
+            if (dcPantalla != IntPtr.Zero) ReleaseDC(IntPtr.Zero, dcPantalla);
+        }
+    }
+
+    // ---------- ¿Está lisa? ----------
+    //
+    // Veinticinco puntos repartidos por toda la imagen, bordes incluidos. Si los
+    // veinticinco son el mismo color, ahí no hay una ventana dibujada.
+    //
+    // Se muestrea y no se recorre entera a propósito: esto corre por cada ventana cada vez
+    // que se abre la vista, y leer treinta megapíxeles para contestar «¿hay algo?» costaría
+    // más que sacar la foto.
+    //
+    // La decisión de si una serie de muestras es lisa vive aparte y tiene pruebas
+    // (`Miniaturas.TodasIguales`): lo que no se puede comprobar sin ventanas de verdad es
+    // el muestreo, no el criterio.
+    internal static bool FotoLisa(System.Windows.Media.Imaging.BitmapSource fuente)
+    {
+        try
+        {
+            int ancho = fuente.PixelWidth, alto = fuente.PixelHeight;
+            if (ancho < 4 || alto < 4) return false;      // tan pequeña que no se puede juzgar
+
+            var muestras = new List<uint>(25);
+            var pixel = new byte[4];
+            for (int i = 0; i < 5; i++)
+                for (int j = 0; j < 5; j++)
+                {
+                    int x = Math.Min(ancho - 1, (int)(i * (ancho - 1) / 4.0));
+                    int y = Math.Min(alto - 1, (int)(j * (alto - 1) / 4.0));
+                    fuente.CopyPixels(new System.Windows.Int32Rect(x, y, 1, 1), pixel, 4, 0);
+                    muestras.Add(BitConverter.ToUInt32(pixel, 0));
+                }
+            return Miniaturas.TodasIguales(muestras);
+        }
+        catch
+        {
+            // Si no se puede mirar, se da por buena: quitarle la miniatura a una ventana
+            // por no haber podido comprobarla sería cambiar un fallo por otro.
+            return false;
+        }
+    }
+
+    // `rechazarLisa` solo lo pide quien va a enseñar la foto como MINIATURA de una ventana
+    // (ver `Miniaturas`). Y es opcional por un fallo que duró media hora: se puso dentro de
+    // `Foto` para todo el mundo, y las capturas de diagnóstico de los paneles dejaron de
+    // salir —«PrintWindow no devolvió nada»— porque la isla es una ventana en capas de
+    // 2560 px de ancho casi toda transparente: veinticinco puntos repartidos por ahí caen
+    // todos en el mismo vacío y la foto, que era perfectamente buena, se tiraba.
+    //
+    // La lección: «aquí no hay nada dibujado» depende de PARA QUÉ se quiere la foto. En una
+    // tarjeta de 300 px que enseña una ventana, un rectángulo liso es un fallo; en la
+    // captura de una superficie flotante, es el fondo.
+    public static System.Windows.Media.Imaging.BitmapSource? Foto(IntPtr h, int anchoMax,
+                                                                  bool rechazarLisa = false)
     {
         if (!Existe(h) || IsIconic(h)) return null;
         var r = Rectangulo(h);
@@ -747,6 +914,19 @@ public static class Nativo
             var fuente = System.Windows.Interop.Imaging.CreateBitmapSourceFromHBitmap(
                 mapa, IntPtr.Zero, System.Windows.Int32Rect.Empty,
                 System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
+
+            // ---------- Una foto lisa no es una foto ----------
+            //
+            // `PrintWindow` devuelve `true` y deja el mapa entero de un color con las
+            // aplicaciones que se dibujan con la GPU por su cuenta —Electron y Chromium,
+            // que es media barra de tareas de cualquiera: Discord, ChatGPT, VS Code—.
+            //
+            // El código de antes se fiaba del `true`, ponía ese rectángulo liso en la
+            // tarjeta y escondía el icono de respaldo. En pantalla salían tarjetas grises
+            // vacías: es la diferencia entre un centro de ventanas y una cuadrícula de
+            // huecos. Devolviendo null, la tarjeta se queda con el icono de la aplicación,
+            // que dice bastante más que un rectángulo gris.
+            if (rechazarLisa && FotoLisa(fuente)) return null;
 
             // Se guarda ya encogida: una tarjeta mide 200 px y quedarse la foto entera
             // de un 4K son 33 MB por ventana.

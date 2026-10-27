@@ -152,6 +152,7 @@ public partial class MainWindow : Window
                 MontarArrastre();
                 Aplicar();
                 if (_esJefa) RegistrarAtajos();
+            ApuntarSaludDeHypr();
             }
             catch (Exception ex) { Log.Error("arranque", ex); }
 
@@ -168,7 +169,12 @@ public partial class MainWindow : Window
             {
                 if (_esJefa)
                 {
-                    Guardian.Lanzar();          // por si me matan: alguien tiene que devolver el shell
+                    // Un diagnóstico no lleva vigilante: es otro proceso, no ve la bandera de
+                    // solo lectura y acabaría reescribiendo el config que la medida no debe
+                    // tocar. Y un vigilante que resucite la app a mitad de una medida la
+                    // invalida de todas formas.
+                    if (!Config.SoloLectura)
+                        Guardian.Lanzar();      // por si me matan: alguien tiene que devolver el shell
                     // Encenderla hace que las apps nos manden sus iconos a NOSOTROS en
                     // vez de a Explorer. Si el módulo no está puesto en ninguna zona,
                     // los iconos desaparecerían de la barra de Windows sin aparecer en
@@ -191,6 +197,11 @@ public partial class MainWindow : Window
                         Notificaciones.Arrancar();
                         Centro.Arrancar(_cfg.Barra.NotificacionesSilenciadas, Dispatcher);
                     }
+                    // El clima: solo la jefa. Con tres monitores habría tres islas, y cada
+                    // una pidiendo el tiempo son tres peticiones por cuarto de hora para
+                    // enseñar el mismo número. `Clima` guarda la lectura en estático, así
+                    // que los paneles de las otras islas la leen sin pedir nada.
+                    ArrancarClima();
                 }
                 VigilarWallpaperEngine();
                 MontarPulsoAudio();
@@ -216,6 +227,25 @@ public partial class MainWindow : Window
             if (DiagVista.Encendido && _esJefa) await CorrerDiagnosticoDeLaVista();
             if (DiagInicio.Encendido && _esJefa) await CorrerDiagnosticoDeInicio();
             if (DiagBandeja.Encendido && _esJefa) await CorrerDiagnosticoDeLaBandeja();
+            if (DiagHypr.Encendido && _esJefa) await CorrerDiagnosticoDeHypr();
+            if (DiagMotor.Encendido && _esJefa) await CorrerDiagnosticoDelMotor();
+            if (DiagEspacios.Encendido && _esJefa) await CorrerDiagnosticoDeEspacios();
+            if (DiagAtajos.Encendido && _esJefa) await CorrerDiagnosticoDeAtajos();
+            if (DiagReglas.Encendido && _esJefa) await CorrerDiagnosticoDeReglas();
+            if (DiagD6.Encendido && _esJefa) await CorrerDiagnosticoD6();
+            if (DiagD7.Encendido && _esJefa) await CorrerDiagnosticoD7();
+            if (DiagPrefijos.Encendido && _esJefa) await CorrerDiagnosticoDePrefijos();
+            if (ArnesEspacios.Encendido && _esJefa) await CorrerArnesDeEspacios();
+            if (ArnesAplicar.Encendido && _esJefa) await CorrerArnesDeAplicar();
+            if (ArnesLayout.Encendido && _esJefa) await CorrerArnesDeLayout();
+            if (DiagRejilla.Encendido && _esJefa) await CorrerDiagnosticoDeRejilla();
+            if (DiagCapturas.Encendido && _esJefa) await CorrerCapturas();
+            if (DiagNeon.Encendido && _esJefa) await CorrerDiagnosticoDelNeon();
+            if (DiagVigilia.Encendido && _esJefa) await CorrerVigilia();
+            if (DiagGuia.Encendido && _esJefa) await CorrerGuiaManual();
+            if (DiagE0.Encendido && _esJefa) await CorrerDiagnosticoE0();
+            if (DiagModulos.Encendido && _esJefa) await CorrerDiagnosticoModulos();
+            if (DiagPaneles.Encendido && _esJefa) await CorrerDiagnosticoDePaneles();
         };
         Closed += (_, _) =>
         {
@@ -233,6 +263,13 @@ public partial class MainWindow : Window
             if (!_esJefa) return;                      // lo global lo desmonta solo la jefa
 
             Nativo.QuitarAtajo(_self, IdAtajoVista);   // el atajo vuelve a quien lo quiera
+            // D7: todo lo de NubeHypr se suelta en un solo sitio, con inventario antes y
+            // después. Antes eran dos líneas aquí y el resto repartido; la forma de que una
+            // se quedara sin soltar no era escribirla mal, era añadir la octava y no
+            // acordarse de este cierre. Ver MainWindow.Salud.cs y HyprSalud.HayQueSoltar.
+            SoltarTodoLoDeHypr();
+            SoltarElDock();           // E2: y la superficie del dock, que el tablero quede vacío
+            SoltarTodosLosLaterales();   // E3: los paneles laterales y sus deslizadores
             DesmontarAjusteDeBordes();                 // antes de Parar(): el reloj del ratón es nuestro
             DejarDeEscucharEscape();                   // y el Esc de los paneles se da de baja
             GestorFondos.Apagar();                     // y el reloj de la presentación se suelta
@@ -283,6 +320,18 @@ public partial class MainWindow : Window
             RefrescarMetricasDelControl();
         }
         if (_esJefa) VigilarNotificaciones();
+        // D7: el supervisor de NubeHypr. Cuelga de este reloj y no de uno propio —dos
+        // relojes para cosas parecidas es lo que acaba descompasado—, mira una vez cada
+        // cinco segundos y solo apunta cuando el estado cambia. Ver MainWindow.Salud.cs.
+        VigilarLaSaludDeHypr();
+        NubeAlRecuperarse();      // E6: un destello al salir del modo seguro
+
+        // E2: el dock. Se refresca con el pulso de siempre y NO reconstruye nada si lo que
+        // dibujaría es idéntico a lo que hay: lo decide su huella.
+        RefrescarDock();
+        // E3/E4: y los paneles laterales, con el mismo pulso y el mismo gesto de borde.
+        // Apagados de serie: ver MainWindow.LateralesAlBorde.cs.
+        RefrescarLateralesAlBorde();
         // ---------- Los fantasmas de la bandeja ----------
         //
         // Una app que se cierra bien manda su NIM_DELETE y la colección avisa sola. Una
@@ -438,6 +487,36 @@ public partial class MainWindow : Window
         Isla.BorderThickness = new Thickness(t.BordeAcento ? 1 : 0);
         AjustarBrillo(t.BordeAcento, acento);
 
+        // ---------- Y el halo del neón, también en la BARRA ----------
+        //
+        // Esto faltaba y es lo que hacía que el estilo pareciera no funcionar. El halo se le
+        // puso a `PanelShell`, a `Card` y a la tarjeta de los laterales... y la isla no pasa
+        // por ninguno de los tres: se viste aquí, a mano, desde la fase A.
+        //
+        // O sea que elegías «Neón» y la barra —que es lo que tienes delante todo el día—
+        // seguía exactamente igual. El usuario lo dijo así: «creo que lo del neón no
+        // funciona». Y desde donde él mira, no funcionaba.
+        //
+        // Es el fallo de siempre en este proyecto: la pieza buena existe y hay una superficie
+        // que no la llama. Van ya unas cuantas.
+        //
+        // ---------- Y hay que convivir con el brillo que YA tenía ----------
+        //
+        // `AjustarBrillo` lleva desde la fase A gestionando `Isla.Effect`: es el brillo de
+        // acento que se enciende con `Tema.BordeAcento` y que `AnimarBrillo` sube y baja al
+        // expandirse la isla. Poner el halo encima sin más lo sustituye, y entonces `_brillo`
+        // se queda apuntando a un efecto que ya no está en la isla — la animación de
+        // abrir/cerrar seguiría corriendo sobre un objeto suelto y no se vería nada.
+        //
+        // Con el neón puesto manda el halo y `_brillo` se suelta, así que `AnimarBrillo` se
+        // va de vacío por su propia guarda en vez de animar un fantasma. Sin neón, todo
+        // sigue exactamente como estaba.
+        if (EstiloDeAhora.Brilla)
+        {
+            PonerResplandor(Isla, EstiloDeAhora, Realce.Ambiente);
+            _brillo = null;
+        }
+
         // La orientación va ANTES de montar las zonas: los widgets se construyen según
         // ella (el separador es una raya a lo ancho o a lo alto, el carrusel se apila o
         // se tumba), y montarlos primero habría dejado la mitad girada.
@@ -508,6 +587,8 @@ public partial class MainWindow : Window
         if (!_cerrando) EncolarShell(() => Nativo.MostrarBarraWindows(mostrar, conIsla));
 
         AplicarAtajo();   // por si has cambiado AtajoVistaGeneral en caliente
+        AplicarAtajosDeHypr();   // y los de NubeHypr: `Registrar` suelta antes, no se duplican
+        AplicarReglasDeHypr();   // y la escucha de reglas se engancha o se suelta según el modo
         if (_gancho != null)
         {
             _gancho.Activo = _cfg.Inicio.TeclaWindows;
@@ -856,6 +937,27 @@ public partial class MainWindow : Window
         // hace que aplicar un perfil con fondo —"Noche"— cambie el fondo de verdad, y que
         // guardar cualquier otro ajuste no lo toque.
         _ = GestorFondos.AplicarAsync(nueva.Fondo);
+
+        // ---------- Y el clima, si lo acabas de encender ----------
+        //
+        // Esto faltaba, y se nota en cuanto lo usas: enciendes el clima, escribes tu ciudad,
+        // y el panel sigue diciendo «el tiempo está apagado» hasta el siguiente tick... que
+        // es de QUINCE MINUTOS. Lo contó el usuario: «pongo clima Barcelona y no sale».
+        //
+        // El fallo de fondo es de los de siempre en este proyecto: `ArrancarClima` pide el
+        // tiempo al arrancar, el reloj lo pide cada cuarto de hora, y nadie lo pedía al
+        // cambiar el ajuste — que es justo el instante en que el usuario está mirando.
+        //
+        // Lo pide la jefa, no las tres islas: `Clima` guarda la lectura en estático.
+        try { Islas.FirstOrDefault(i => i._esJefa)?.PedirElClima(); } catch { }
+
+        // Y los paneles laterales que estén abiertos. Son ventanas aparte, así que `Aplicar()`
+        // —que repinta la isla— no les llega: sin esto se quedan con los colores de antes
+        // hasta que los cierras y los vuelves a abrir. Ver `RepintarLateralesAbiertos`.
+        foreach (var i in Islas.ToList())
+        {
+            try { i.RepintarLateralesAbiertos(); } catch { }
+        }
     }
 
     void ProgramarRecarga() => Dispatcher.InvokeAsync(() => { _recarga.Stop(); _recarga.Start(); });
@@ -1019,10 +1121,26 @@ public partial class MainWindow : Window
             pila.Children.Add(b);
         }
 
+        // ---------- Con la concha de C5, como el resto de los paneles ----------
+        //
+        // Un menú contextual sin superficie propia es el único del programa que se apoyaba
+        // entero en el fondo de la isla: sin filo que dijera dónde acaba, y con el escritorio
+        // transparentándose al 10 % detrás de cada opción.
+        var concha = PanelShell(pila, 0);
+
+        // ---------- Y el gesto va en la CONCHA, no en la pila ----------
+        //
+        // Esto no es un detalle de implementación, es el fallo que habría metido al añadir la
+        // concha sin pensarlo: el menú se cierra al salir el ratón, y si el oyente siguiera
+        // en la pila, moverse de la pila al filo de la concha —que es DENTRO del menú, a la
+        // vista— lo cerraría en la cara del usuario.
+        //
+        // De paso arregla el caso que ya existía antes de la concha: la pila no llegaba al
+        // borde de la isla, así que acercarse a su filo ya cerraba el menú.
         bool tocado = false;
-        pila.MouseEnter += (_, _) => tocado = true;
-        pila.MouseLeave += (_, _) => { if (tocado && _panelAbierto == PanelMenu) CerrarPanel(); };
-        return pila;
+        concha.MouseEnter += (_, _) => tocado = true;
+        concha.MouseLeave += (_, _) => { if (tocado && _panelAbierto == PanelMenu) CerrarPanel(); };
+        return concha;
     }
 
     public void AbrirAjustes()
@@ -1191,6 +1309,22 @@ public partial class MainWindow : Window
             Content = contenido, ToolTip = tip, Foreground = _texto,
             Height = Math.Max(20, _cfg.Barra.Alto - 8)
         };
+
+        // ---------- Y su nombre para el lector de pantalla ----------
+        //
+        // Una línea con mucho alcance: por aquí pasan casi todos los botones de la barra y
+        // de sus paneles, y ninguno tenía nombre. Medido con `--diagpaneles`: diecisiete de
+        // diecisiete en audio, veintitrés de veintitrés en Inicio, catorce de catorce en la
+        // bandeja… El contenido suele ser un glifo del área privada o un `Grid`, así que un
+        // lector leía un carácter sin significado, o nada.
+        //
+        // La ayuda emergente ya decía la frase correcta —«Cerrar esta ventana», «Abrir
+        // Energía y batería»— pero un ToolTip NO es el nombre de UIA: es otra propiedad, y
+        // los lectores no la usan como nombre. Estaba el texto bueno escrito y puesto en el
+        // sitio que no era.
+        if (!string.IsNullOrWhiteSpace(tip))
+            System.Windows.Automation.AutomationProperties.SetName(b, tip);
+
         // Soltar algo que venías arrastrando no es pulsar este botón (ver ClicDeArrastre)
         b.Click += (_, _) => { if (ClicDeArrastre()) return; accion(); Tick(); };
         if (levantar) ConLevantado(b);

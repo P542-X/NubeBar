@@ -68,6 +68,50 @@ public static class ZonasAjuste
     public static Hueco AreaUtil(Monitores.Info m) =>
         new(m.TrabajoX, m.TrabajoY, m.TrabajoAncho, m.TrabajoAlto);
 
+    // ---------- E5: con las superficies de NubeBar descontadas ----------
+    //
+    // El área de trabajo de Windows conoce la barra —se registra como appbar cuando reserva
+    // espacio— pero **no conoce el dock**, que flota por encima. Ajustar una ventana a la
+    // mitad inferior la dejaba con su borde de abajo debajo del dock: no tapada a ratos,
+    // tapada siempre.
+    //
+    // Se parte del área de TRABAJO, no del monitor, y solo se descuenta lo que Windows no
+    // sabe. Restar aquí otra vez la barra dejaría una franja muerta de su grosor.
+    //
+    // Por borde se coge el estorbo más grueso, no la suma: sumarlos descontaría dos veces
+    // cuando dos superficies comparten borde.
+    public static Hueco AreaUtilCon(Monitores.Info m, IEnumerable<NubeHypr.Estorbo> estorbos)
+    {
+        double arriba = 0, abajo = 0, izq = 0, der = 0;
+        foreach (var e in estorbos ?? Array.Empty<NubeHypr.Estorbo>())
+        {
+            if (!e.Cuenta) continue;
+            switch (e.Donde)
+            {
+                case NubeHypr.Borde.Arriba: arriba = Math.Max(arriba, e.Grosor); break;
+                case NubeHypr.Borde.Abajo: abajo = Math.Max(abajo, e.Grosor); break;
+                case NubeHypr.Borde.Izquierda: izq = Math.Max(izq, e.Grosor); break;
+                case NubeHypr.Borde.Derecha: der = Math.Max(der, e.Grosor); break;
+            }
+        }
+
+        int w = m.TrabajoAncho, h = m.TrabajoAlto;
+        int qArriba = (int)Math.Round(arriba), qAbajo = (int)Math.Round(abajo);
+        int qIzq = (int)Math.Round(izq), qDer = (int)Math.Round(der);
+
+        // Cada resta limitada a lo que queda: una pantalla pequeña con un dock gordo no puede
+        // dar un área negativa, que acabaría en una ventana de ancho negativo pasada a
+        // Windows. Se deja siempre un mínimo habitable.
+        const int Minimo = 160;
+        qArriba = Math.Clamp(qArriba, 0, Math.Max(0, h - Minimo));
+        qAbajo = Math.Clamp(qAbajo, 0, Math.Max(0, h - Minimo - qArriba));
+        qIzq = Math.Clamp(qIzq, 0, Math.Max(0, w - Minimo));
+        qDer = Math.Clamp(qDer, 0, Math.Max(0, w - Minimo - qIzq));
+
+        return new Hueco(m.TrabajoX + qIzq, m.TrabajoY + qArriba,
+                         w - qIzq - qDer, h - qArriba - qAbajo);
+    }
+
     // A dónde va una ventana ajustada a esa zona.
     //
     // Las mitades se calculan como "la mitad" y "lo que queda": con `Ancho / 2` en las
@@ -191,7 +235,9 @@ public static class ZonasAjuste
     //
     // `activar` dice si esto viene de una elección del usuario. Desde la vista general o
     // soltando una tarjeta, sí; una recolocación de fondo, no.
-    public static bool Ajustar(IntPtr ventana, Zona z, Monitores.Info? monitor = null, bool activar = false)
+    public static bool Ajustar(IntPtr ventana, Zona z, Monitores.Info? monitor = null,
+                               bool activar = false,
+                               IEnumerable<NubeHypr.Estorbo>? estorbos = null)
     {
         if (z == Zona.Ninguna || !Nativo.Existe(ventana)) return false;
         try
@@ -201,7 +247,10 @@ public static class ZonasAjuste
                        : Nativo.EstaMaximizada(ventana) ? EstadoVentana.Maximizada
                        : EstadoVentana.Normal;
 
-            var destino = Colocacion(z, AreaUtil(m));
+            // E5: el mismo hueco que enseñó la previsualización. Si aquí se calculara con el
+            // área de Windows y allí con el dock descontado, la ventana acabaría en un sitio
+            // distinto del que se le prometió al usuario.
+            var destino = Colocacion(z, estorbos == null ? AreaUtil(m) : AreaUtilCon(m, estorbos));
             if (z != Zona.Maximizar && destino.Vacio) return false;
 
             bool ok = true;
