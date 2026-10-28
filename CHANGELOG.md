@@ -6,6 +6,24 @@ construidos por el workflow de Release a partir de la etiqueta.
 
 ---
 
+## v1.4.2
+
+### Nuevo
+
+- **Barra de desplazamiento propia** en toda la app (paneles, laterales, Ajustes): una
+  pastilla fina del color del texto, sin flechas, que engorda al pasar el ratón y se pinta
+  del acento al arrastrarla. Sigue el tema.
+
+### Arreglado
+
+- **Arranque:** la isla aparece ya completa. Antes salía a medias y la hora se quedaba
+  cortada un segundo hasta que la isla se ponía al día. Ahora el ancho se mide después del
+  layout y la primera pasada no espera al reloj de un segundo.
+- **Dock:** ya no se ve «con zoom» ni con los iconos cortados en pantallas al 125 %; se
+  coloca en píxeles reales y se compacta con la pantalla como el resto.
+
+---
+
 ## v1.4.1
 
 Arreglos de paneles, pantallas pequeñas y dos monitores.

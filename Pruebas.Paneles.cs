@@ -31,6 +31,44 @@ public static partial class Pruebas
         RespaldoDeMigracionNuncaSePisa();
         PanelesSeEscalanConLaPantalla();
         IconosOscurosSeReconocen();
+        LaBarraDeScrollEsLaNuestra();
+    }
+
+    // ================= La barra de desplazamiento propia =================
+    //
+    // Va en XAML dentro de una cadena: una errata no la ve el compilador, revienta al
+    // aplicar el tema y deja la barra de Windows. Aquí se monta de verdad, en los dos
+    // sentidos y con temas claros y oscuros.
+    static void LaBarraDeScrollEsLaNuestra()
+    {
+        Grupo("barra de desplazamiento: la nuestra, en vertical y en horizontal");
+
+        foreach (var (tinta, acento) in new[]
+        {
+            (System.Windows.Media.Colors.White, System.Windows.Media.Color.FromRgb(0x7A, 0xA2, 0xF7)),
+            (System.Windows.Media.Colors.Black, System.Windows.Media.Colors.OrangeRed),
+        })
+        {
+            System.Windows.Style? estilo = null;
+            try { estilo = BarraDeScroll.Estilo(tinta, acento); }
+            catch (Exception ex) { Vale(false, $"el XAML de la barra no se lee: {ex.Message}"); continue; }
+
+            Vale(estilo.TargetType == typeof(System.Windows.Controls.Primitives.ScrollBar),
+                 "es un estilo de ScrollBar");
+
+            foreach (var o in new[] { System.Windows.Controls.Orientation.Vertical,
+                                      System.Windows.Controls.Orientation.Horizontal })
+            {
+                var barra = new System.Windows.Controls.Primitives.ScrollBar { Orientation = o, Style = estilo };
+                bool montada = false;
+                try { montada = barra.ApplyTemplate(); }
+                catch (Exception ex) { Vale(false, $"[{o}] la plantilla revienta: {ex.Message}"); continue; }
+                Vale(montada && barra.Track != null, $"[{o}] monta su plantilla y tiene carril");
+                Vale(barra.Track?.Thumb != null, $"[{o}] y pastilla");
+                Igual(o == System.Windows.Controls.Orientation.Vertical, barra.Track?.IsDirectionReversed == true,
+                      $"[{o}] y el sentido bueno (arriba es el principio)");
+            }
+        }
     }
 
     // ================= El tamaño de los paneles según la pantalla =================

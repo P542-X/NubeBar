@@ -231,6 +231,12 @@ public partial class MainWindow : Window
                 MontarPulsoAudio();
                 _tick.Tick += (_, _) => Tick();
                 _tick.Start();
+                // Y la primera pasada YA, no dentro de un segundo: el reloj espera su primer
+                // intervalo antes de saltar, y hasta entonces la isla salía a medias —sin las
+                // apps, sin el «ES» del teclado— y se completaba de golpe un segundo después.
+                // Todo lo que el tick necesita ya está montado aquí (el gestor de ventanas
+                // hace su primera lectura al arrancar).
+                Tick();
                 VigilarPantallaCompleta();
                 await ActualizarWallpaper(true);
             }
@@ -411,6 +417,7 @@ public partial class MainWindow : Window
         _aplicando = true;
         try { AplicarTema(); }
         finally { _aplicando = false; }
+        AjustarAnchoPendiente();
     }
 
     void AplicarTema()
@@ -486,6 +493,16 @@ public partial class MainWindow : Window
         // que pregunte por Roles.Superficie tiene que recibir algo que pegue con lo
         // que está pintado de verdad.
         _roles = Roles.Desde(t, fondo, texto, acento);
+
+        // La barra de desplazamiento propia, para TODA la aplicación: se pone en los
+        // recursos de la app y no en los de esta ventana para que llegue también a Ajustes
+        // y a las ventanas flotantes. Ver `BarraDeScroll`.
+        try
+        {
+            Application.Current.Resources[typeof(System.Windows.Controls.Primitives.ScrollBar)] =
+                BarraDeScroll.Estilo(texto, _cAcentoLegible);
+        }
+        catch (Exception ex) { Log.Error("montar la barra de desplazamiento", ex); }
 
         AnimarColor(_fondo, fondo);
         AnimarColor(_texto, texto);
@@ -785,12 +802,51 @@ public partial class MainWindow : Window
 
     // El contenido cambia solo (minuto, CPU, RAM, apps que abres o cierras): la isla
     // se adapta deslizándose en vez de dar el salto de un fotograma
+    //
+    // ---------- Se mide DESPUÉS del layout, no en caliente ----------
+    //
+    // Aquí estaba por qué la hora salía cortada un segundo al arrancar. Lo contó el
+    // usuario: «cuando se inicia la app, la zona donde está la hora tarda un poco más en
+    // iniciarse». Medido en el log: en el primer tick se meten las apps (la isla mide 584)
+    // y en ese MISMO tick se hace visible el «ES» del teclado; la medida de detrás seguía
+    // diciendo 584, porque un cambio de visibilidad tres niveles más abajo no marca la
+    // zona como sucia hasta que pasa el layout, y `Measure` devuelve lo que tenía guardado.
+    // Hasta el tick siguiente —un segundo— no salía 612, y entretanto la hora quedaba
+    // fuera de la isla.
+    //
+    // Así que pedir un ajuste ya no mide: programa UNA medida para cuando WPF haya hecho
+    // su pasada de layout (prioridad Loaded, que va detrás de la de pintar). Varias
+    // peticiones seguidas —la bandeja manda una por icono al arrancar— se juntan en una.
+    // Y si toca medir en mitad de otra animación de ancho, se repite al terminar esta en
+    // vez de esperar al siguiente tick.
+    bool _anchoProgramado, _anchoTrasAnimar;
+
     void AjustarAncho()
     {
-        if (!EsIsla || _aplicando || _animandoAncho) return;
+        if (_anchoProgramado) return;
+        _anchoProgramado = true;
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            _anchoProgramado = false;
+            AjustarAnchoYa();
+        }), System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    void AjustarAnchoYa()
+    {
+        if (!EsIsla) return;
+        if (_aplicando || _animandoAncho) { _anchoTrasAnimar = true; return; }
         double hasta = Math.Max(MedirAncho(), _panelAncho);   // con panel abierto manda el panel
         if (Math.Abs(hasta - Isla.ActualWidth) < 0.5) return;
         AnimarAncho(hasta, 280, Suave);
+    }
+
+    // Lo que se quedó sin medir mientras la isla se desplegaba o se aplicaba el config.
+    void AjustarAnchoPendiente()
+    {
+        if (!_anchoTrasAnimar) return;
+        _anchoTrasAnimar = false;
+        AjustarAncho();
     }
 
     // Expandir / contraer la isla: el ancho se anima con muelle y los laterales
@@ -839,6 +895,7 @@ public partial class MainWindow : Window
             _animandoAncho = false;
             if (_expandida != abrir) return;   // la interrumpió otra animación
             if (!abrir) Izq.Visibility = Der.Visibility = Visibility.Collapsed;
+            AjustarAnchoPendiente();
         });
 
         foreach (var lado in new Panel[] { Izq, Der })

@@ -332,6 +332,24 @@ public partial class MainWindow
                  $"hueco {h.X:0},{h.Y:0} {h.Ancho:0}x{h.Alto:0} · estorbos: " +
                  string.Join(" ", EstorbosParaLosLaterales().Where(x => x.Cuenta)
                                       .Select(x => $"{x.Donde} {x.Grosor:0}px")));
+
+        // Y lo que WPF cree que tiene, una vez hecho el layout. Los píxeles de arriba son lo
+        // que se le pidió a Windows; esto es lo que la ventana se cree, que es lo que decide
+        // si el scroll sale o no. Si no cuadran (DPI distinto del del monitor), el panel se
+        // corta por abajo SIN barra, porque el scroll piensa que todo cabe.
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            try
+            {
+                var dpi = VisualTreeHelper.GetDpi(v);
+                string scroll = v.Cajon.Content is ScrollViewer sv
+                    ? $"scroll visible {sv.ViewportHeight:0} de {sv.ExtentHeight:0} · barra {sv.ComputedVerticalScrollBarVisibility}"
+                    : "sin scroll";
+                Log.Info($"panel {IdDe(l)} según WPF: {v.ActualWidth:0}x{v.ActualHeight:0} a escala " +
+                         $"{dpi.DpiScaleY:0.00} (monitor {s:0.00}) · tarjeta {v.Tarjeta.ActualHeight:0} · {scroll}");
+            }
+            catch { }
+        }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
     }
 
     // Las secciones que de verdad lleva este panel, con el orden que tenga puesto el usuario.

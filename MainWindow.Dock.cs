@@ -115,7 +115,8 @@ public partial class MainWindow
 
         // Colocar siempre: aunque el contenido no cambie, el monitor puede haber cambiado de
         // tamaño o la barra de borde.
-        var r = Dock.Sitio(UtilDeEstaPantalla(), BordeDelDock, elementos.Count);
+        Escalar(v.Tarjeta, EscalaDePaneles());
+        var r = SitioDelDock(elementos.Count);
         v.Colocar((int)r.X, (int)r.Y, (int)r.Ancho, (int)r.Alto);
         if (!v.IsVisible)
         {
@@ -129,6 +130,25 @@ public partial class MainWindow
                 Kf(0, 1, Transiciones.Duracion(Transiciones.Que.PanelEntra).TotalMilliseconds));
         }
         v.Elevar();
+    }
+
+    // ---------- Dónde va, en PÍXELES ----------
+    //
+    // `Dock.Sitio` cuenta con las medidas del dock —iconos de 44, relleno de 10— que son
+    // unidades de WPF, y lo que sale se le pasa a `Colocar`, que va en píxeles. Al 125 % la
+    // ventana quedaba un 20 % más pequeña que su contenido y los iconos se veían enormes y
+    // apretados. Lo contó el usuario: «en el dock ahora se ve como muy zoomeado». (Antes no
+    // se notaba por casualidad: la primera colocación, sin hwnd, metía esos números como
+    // unidades de WPF y compensaba el error; ver `VentanaSuperpuesta.Colocar`.)
+    //
+    // Mismo arreglo que los laterales: las medidas se pasan a píxeles con la escala del
+    // monitor, y el dock se compacta con `EscalaDePaneles` como el resto de superficies.
+    NubeHypr.Rect SitioDelDock(int cuantos)
+    {
+        double s = Math.Max(0.1, _monitor.Escala);
+        double k = s * EscalaDePaneles();
+        return Dock.Sitio(UtilDeEstaPantalla(), BordeDelDock, cuantos,
+                          Dock.Lado * k, Dock.Hueco * k, Dock.Aire * k, Dock.DelFilo * s);
     }
 
     VentanaSuperpuesta CrearDock()

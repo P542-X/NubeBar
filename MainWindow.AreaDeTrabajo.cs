@@ -67,11 +67,12 @@ public partial class MainWindow
         {
             if (_dock is { IsVisible: true })
             {
-                var r = Dock.Sitio(UtilDeEstaPantalla(), BordeDelDock,
-                                   _dockFila?.Children.Count ?? 0);
+                // El mismo rectángulo que se le da al dock, en píxeles: los estorbos van en
+                // píxeles (ver `SitioDelDock`).
+                var r = SitioDelDock(_dockFila?.Children.Count ?? 0);
                 double grosor = Dock.EsVertical(BordeDelDock) ? r.Ancho : r.Alto;
                 // Más la separación del filo, que es hueco que el dock también ocupa.
-                l.Add(new NubeHypr.Estorbo(BordeDelDock, grosor + Dock.DelFilo));
+                l.Add(new NubeHypr.Estorbo(BordeDelDock, grosor + Dock.DelFilo * Math.Max(0.1, _monitor.Escala)));
             }
         }
         catch (Exception ex) { Log.Error("medir el dock para el área de trabajo", ex); }
