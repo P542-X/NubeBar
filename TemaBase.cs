@@ -119,6 +119,16 @@ public sealed class TemaBase
     public double Radio(string pieza, double siNoLoDice) =>
         Radios.TryGetValue(pieza, out var v) ? v : siNoLoDice;
 
+    // Las medidas de forma que no son radios: el hueco entre tarjetas, el relleno del filo al
+    // contenido y el grosor del filo. Van en el mismo saco que los radios —son forma, no
+    // color— y ninguno de los nueve las declara todavía: la maqueta no las fija, así que lo
+    // que no se decide no puede cambiar de aspecto por accidente (ver `Formas`).
+    public double Medida(string cual, double siNoLoDice) =>
+        Medidas_.TryGetValue(cual, out var v) ? v : siNoLoDice;
+
+    public IReadOnlyDictionary<string, double> Medidas_ { get; init; } =
+        new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+
     public bool Lleva(string decoracion) =>
         Decoraciones.Any(d => d.Equals(decoracion, StringComparison.OrdinalIgnoreCase) ||
                               d.StartsWith(decoracion + ":", StringComparison.OrdinalIgnoreCase));
@@ -249,6 +259,11 @@ public static class TemasDeSerie
                 foreach (var r in jr.EnumerateObject())
                     if (r.Value.TryGetDouble(out var v)) radios[r.Name] = v;
 
+            var medidas = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+            if (j.TryGetProperty("forma", out var jf) && jf.ValueKind == JsonValueKind.Object)
+                foreach (var m in jf.EnumerateObject())
+                    if (m.Value.TryGetDouble(out var v)) medidas[m.Name] = v;
+
             var decoraciones = new List<string>();
             if (j.TryGetProperty("decoraciones", out var jd) && jd.ValueKind == JsonValueKind.Array)
                 foreach (var d in jd.EnumerateArray())
@@ -272,6 +287,7 @@ public static class TemasDeSerie
                 FondoExtra = fondoExtra,
                 Colores = colores,
                 Radios = radios,
+                Medidas_ = medidas,
                 Decoraciones = decoraciones,
                 Textos = textos,
             };

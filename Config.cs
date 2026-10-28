@@ -58,17 +58,13 @@ public class Tema
     public bool EnviarColorAlWallpaper { get; set; } = false;  // manda tu Acento como "schemecolor" al wallpaper
     public bool BordeAcento { get; set; } = true;              // filo de 1 px y brillo suave del color de acento
 
-    // ---------- El estilo visual ----------
+    // `Tema.Estilo` —«normal», «nube» o «neon»— ya no existe aquí. Los tres estilos se
+    // retiraron con el rediseño (decisión A): la forma es un valor del TEMA, no un ajuste
+    // aparte, así que Videojuegos va en chaflán y Sakura redonda sin que haya que acertar
+    // dos veces para que una cosa cuadre. Ver `Forma.cs`.
     //
-    // La FORMA de las superficies: cuánto se redondea una tarjeta, cuánto filo tiene, cuánto
-    // aire lleva dentro y si brilla. El tema decide los COLORES; esto decide la forma.
-    //
-    // Estaba escrito en cuatro constantes dentro del código, así que cambiarlo era
-    // recompilar — y es justo lo que el usuario quiere poder elegir.
-    //
-    // «normal» es lo de siempre al píxel: quien no toque nada no nota que esto existe. Lo que
-    // no se entienda cae en «normal» y nunca en el más llamativo (ver `Estilos.Leer`).
-    public string Estilo { get; set; } = "normal";
+    // En el fichero de quien la tenga, la clave sigue ahí y no molesta: la misma regla que
+    // con las trece de color.
 
     // ---------- El idioma de la interfaz ----------
     //

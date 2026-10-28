@@ -3923,3 +3923,58 @@ sido el primero, además del que menos falta hace: la pregunta cabe donde está 
   golpe es una página que tarda en abrirse y en la que no se encuentra nada. El buscador pasa a
   una lista plana de coincidencias de todas las zonas, para poder buscar «apagar» sin saber en
   qué zona vive.
+
+## Rediseño, fase 0 · Fuera Normal, Nube y Neón
+
+Los tres estilos nacieron bien: la forma estaba en cuatro constantes dentro del código y
+cambiarla era recompilar, así que se sacó a un ajuste. Lo que no resolvían es que seguían
+siendo **tres y los elegí yo**: añadir un cuarto era recompilar igual.
+
+Ahora la forma es un valor del tema (`Forma.cs`): radios, hueco, relleno, grosor del filo y
+resplandor salen de `TemaBase` igual que salen los colores. Videojuegos va a radio 0 y Sakura
+a 25 sin que nadie tenga que acertar dos veces para que una cosa cuadre — elegir «el tema
+Sakura con forma de Neón» no era una libertad, era una trampa.
+
+**El selector de estilo desaparece de Ajustes y no es una función menos**: la decisión de
+verdad era el tema, y está en Colores. Lo que se afina en Apariencia es el radio, que va
+encima del tema y tiene su botón para devolvérselo.
+
+### Lo que un tema no dice
+
+Ninguno de los nueve declara su hueco, su relleno ni su grosor de filo: la maqueta no los
+fija. Así que el valor por omisión son **exactamente** los del estilo «Normal» (hueco 10,
+dentro 13, filo 1), que a su vez eran los que estaban escritos en el código antes de que los
+estilos existieran. Lo que no se decide no puede cambiar de aspecto por accidente.
+
+### El resplandor pasa a ser una decoración
+
+«Lo útil de Neón —el halo con `DropShadowEffect` que respira— pasa a ser una decoración más»,
+dice el plan. Así que ya no hay un estilo que brilla: hay temas que llevan encendida la
+decoración `halo`, y ocho de los nueve la llevan. Oficina no, y además declara su halo
+`transparent`: un tema Fluent claro con un resplandor de neón alrededor de cada tarjeta sería
+otra cosa.
+
+Las **dos** condiciones se comprueban —la decoración encendida y el color visible—, y hay una
+prueba para ello: una decoración cuyo color es invisible no puede encender nada, porque si no
+un tema que apague su halo por el color seguiría pagando el efecto sin que se vea.
+
+### Lo que encontró mirar los nueve
+
+El diagnóstico de capturas dejó de fotografiar los tres estilos y pasó a fotografiar los nueve
+temas, que es la pantalla «Paneles en cada tema» de la maqueta. Y en la primera pasada salió
+un fallo que llevaba ahí desde siempre:
+
+**La concha de un panel lateral se pintaba UNA vez, al crear la ventana.** `CrearLateral` le
+daba su color y `RepintarLateralesAbiertos` repintaba los que estuvieran abiertos — con este
+razonamiento escrito al lado: «reconstruir es lo que ya hace `Rellenar`, y lo que ya se hace
+al abrir el panel». Lo que se reconstruía al abrir era el **contenido**; la concha, no.
+
+Resultado: cambias de tema con un panel cerrado, lo abres, y sus tarjetas salen del tema nuevo
+sobre una concha del tema viejo. Medido: en Sakura la concha salía `#0F0F16` —casi negra— con
+las tarjetas en `#FFFFFF`. Con los ocho temas de antes se notaba poco, porque todos eran
+oscuros; con nueve que van del casi blanco al casi negro, es la mitad del panel pintada del
+tema equivocado.
+
+Arreglado poniendo el pintado de la concha en **un solo sitio** (`PintarConchaLateral`), que
+es de donde salía el problema: estaba escrito dos veces y la tercera faltaba. Comprobado
+midiendo el píxel de la concha en los nueve: cada uno con el suyo.

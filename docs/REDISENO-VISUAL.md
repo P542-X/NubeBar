@@ -528,17 +528,30 @@ Con eso se retiraron los ocho temas de antes (`Temas.Predefinidos`), el puente
 (`TemaBase.DeTemaViejo`) y `Roles.Desde(Tema, …)`. Las pruebas que iban «en los siete temas»
 van ahora en los nueve.
 
-Lo que **falta** de la fase 0:
+Y por último, fuera Normal, Nube y Neón:
 
-1. **Quitar Normal, Nube y Neón** (`Tema.Estilo`, `EstiloVisual.cs`, `Neon.cs`) y rehacer sus
-   usos en `Pruebas.Confirmar.cs`, `MainWindow.DiagNeon.cs` y `VentanaAjustes.cs`. Va aparte
-   porque esos tres no deciden color, deciden **forma** (hueco, relleno, grosor del filo) y
-   resplandor; para retirarlos hay que que esos valores salgan del tema, que es lo primero de
-   la fase 1. El radio ya sale del tema; lo demás, no todavía.
-2. **La fachada `Roles`** se queda hasta que las fases 1 a 8 pasen cada pieza a preguntar por
-   su clave. Mientras tenga consumidores, ahí está.
-3. **De Ajustes > Colores**: editar degradados y «Elegir en pantalla» (ver `DECISIONES.md`
-   para por qué los dos esperan).
+| Pieza | Fichero | Qué hace |
+|---|---|---|
+| La forma | `Forma.cs` | Radios, hueco, relleno, grosor del filo y resplandor salen del TEMA. `EstiloVisual.cs` se borra entero |
+| Las decoraciones | `Decoraciones`, `Medidas` | Los nombres que el código consulta, como constantes: una errata en `"halo"` daba un tema que no brilla y un rato perdido |
+| El resplandor | `Formas.Del` | Ya no hay un estilo que brille: hay temas que llevan la decoración `halo` encendida **y** con color visible. Ocho de nueve |
+| Ajustes | `VentanaAjustes.cs` | El selector de estilo desaparece: la decisión era el tema, y está en Colores. Queda el radio, encima del tema |
+| Las capturas | `MainWindow.DiagCapturas.cs` | Fotografía los nueve temas en vez de los tres estilos — la pantalla «Paneles en cada tema» de la maqueta |
+
+Mirar los nueve destapó un fallo viejo: **la concha de un panel lateral se pintaba una sola
+vez, al crear la ventana**, así que cambiar de tema con el panel cerrado dejaba sus tarjetas
+del tema nuevo sobre una concha del viejo. Medido en Sakura: concha `#0F0F16` con tarjetas
+`#FFFFFF`. Arreglado, y comprobado midiendo el píxel de la concha en los nueve.
+
+**La fase 0 está cerrada.** Lo que queda pendiente y pasa a las fases siguientes:
+
+1. **La fachada `Roles`** se va quedando sin consumidores a medida que las fases 1 a 8 pasen
+   cada pieza a preguntar por su clave. Mientras tenga alguno, ahí está.
+2. **De Ajustes > Colores**: editar degradados y «Elegir en pantalla» (ver `DECISIONES.md`
+   para por qué los dos esperan al Estudio y a las fases 1-8).
+3. **El chaflán** de Videojuegos y Cyberpunk es hoy un radio 0, o sea una esquina recta. La
+   esquina CORTADA en diagonal es de la fase 7, y hasta entonces esos dos temas se ven más
+   cuadrados de lo que la maqueta pide.
 
 Todo lo que se construya en las fases 1 a 8 toma sus colores, medidas y decoraciones **del
 tema**, nunca de un valor escrito en el código: es lo que hace posible que el Estudio pueda

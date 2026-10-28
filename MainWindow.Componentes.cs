@@ -39,10 +39,14 @@ public partial class MainWindow
     //
     // Si cada panel elige sus números, cada panel mide distinto. Estos son los de todos.
     //
-    // Y desde que hay estilos, salen del estilo elegido en vez de estar escritos aquí: eso es
-    // lo que deja al usuario decidir la decoración sin recompilar. `Estilos.Normal` tiene
-    // exactamente los valores que había, así que quien no toque nada ve lo mismo al píxel.
-    internal Estilo EstiloDeAhora => Estilos.Leer(_cfg.Tema.Estilo);
+    // Y desde el rediseño salen del TEMA, no de un ajuste aparte: la forma es un valor del
+    // tema igual que lo son los colores, así que Videojuegos va en chaflán y a radio 0 y
+    // Sakura a 25 sin que nadie tenga que elegir dos cosas que en realidad son una.
+    //
+    // Se calcula una vez por tema aplicado y no en cada pregunta: `Formas.Del` mira
+    // decoraciones y resuelve colores, y esto se pide tres veces por tarjeta.
+    internal Forma EstiloDeAhora => _forma;
+    Forma _forma = Formas.Del(Pintura.PorDefecto());
 
     internal double RadioCard => EstiloDeAhora.RadioCard;
     internal double RadioShell => EstiloDeAhora.RadioShell;
@@ -156,7 +160,7 @@ public partial class MainWindow
     // cada cabecera—: con los dos paneles abiertos hay una docena, y animarlas todas
     // multiplica por tres los efectos que se recalculan en cada fotograma para un latido que
     // en 13 píxeles no se aprecia. El que se ve es el de las tarjetas, y ese sí late.
-    void PonerResplandor(UIElement quien, Estilo e, Realce realce = Realce.Activo,
+    void PonerResplandor(UIElement quien, Forma e, Realce realce = Realce.Activo,
                          bool late = true)
     {
         if (!e.Brilla) { quien.Effect = null; return; }

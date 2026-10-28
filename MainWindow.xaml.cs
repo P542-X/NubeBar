@@ -532,6 +532,7 @@ public partial class MainWindow : Window
         }
 
         _roles = Roles.Desde(pintura);
+        _forma = Formas.Del(pintura);
 
         // La barra de desplazamiento propia, para TODA la aplicación: se pone en los
         // recursos de la app y no en los de esta ventana para que llegue también a Ajustes

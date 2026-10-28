@@ -625,106 +625,88 @@ public static partial class Pruebas
     // decoración.
     static void EstiloLosTresPresets()
     {
-        Grupo("estilo: tres decoraciones, ninguna quita nada");
+        Grupo("forma: sale del tema, y ninguna quita nada");
 
-        // ---------- «Normal» es exactamente lo que había ----------
+        // ---------- Lo que un tema no dice es lo que había ----------
         //
-        // Si no coincide al píxel, el ajuste nuevo no es un ajuste: es un cambio de aspecto
-        // con un interruptor encima, y quien no pidió nada se lo encuentra puesto.
-        var n = Estilos.Normal;
-        Igual(12.0, n.RadioCard, "«Normal» conserva el radio de tarjeta que había");
-        Igual(14.0, n.RadioShell, "y el de la concha");
-        Igual(10.0, n.Hueco, "y el hueco entre tarjetas");
-        Igual(13.0, n.Dentro, "y el relleno de dentro");
-        Vale(!n.Brilla, "y no brilla");
-        Vale(!n.Late, "ni late");
-        Vale(!n.TintaDeAcento, "ni le toca las cabeceras");
+        // Ninguno de los nueve declara su hueco ni su relleno: la maqueta no los fija. Si eso
+        // cambiara de aspecto por accidente, el rediseño habría movido medidas que nadie
+        // decidió. Son los mismos números que tenía el estilo «Normal», que a su vez eran los
+        // que estaban escritos en el código antes de que los estilos existieran.
+        var profesional = Formas.Del(new Pintura(TemasDeSerie.De("profesional")));
+        Igual(Formas.HuecoDeSerie, profesional.Hueco, "el hueco entre tarjetas es el de siempre");
+        Igual(Formas.DentroDeSerie, profesional.Dentro, "y el relleno de dentro");
+        Igual(Formas.FiloDeSerie, profesional.GrosorFilo, "y el grosor del filo");
 
-        // ---------- El neón tiene que ser NEÓN ----------
+        // ---------- Pero los radios SÍ salen del tema ----------
         //
-        // La primera versión solo cambiaba el filo, y el usuario lo dijo al probarlo: «solo
-        // lo aplicas a los bordes y eso no tiene que ser así, tiene que estar animado». Un
-        // marco de color no es neón. Las dos mitades de arreglarlo se exigen aquí.
-        var neon = Estilos.Neon;
-        Vale(neon.Brilla, "«Neón» brilla");
-        Vale(neon.Late, "y el resplandor respira, no se queda quieto");
-        Vale(neon.ResplandorAlto > neon.Resplandor,
-             "el latido crece desde el resplandor de reposo, no al revés");
-        Vale(neon.TintaDeAcento,
-             "y el color entra en las cabeceras: si no, el estilo se queda en el filo");
+        // Es la mitad que de verdad cambia: Videojuegos y Cyberpunk van a 0 porque van en
+        // chaflán, y Sakura va redonda. Un selector de temas en el que todos redondean igual
+        // es un selector que no se nota.
+        Igual(14.0, profesional.RadioCard, "Profesional: el radio de tarjeta es el suyo");
+        Igual(20.0, profesional.RadioShell, "y el de la concha");
+        Igual(0.0, Formas.Del(new Pintura(TemasDeSerie.De("videojuegos"))).RadioShell,
+              "Videojuegos va a radio 0: es de chaflán");
+        Igual(24.0, Formas.Del(new Pintura(TemasDeSerie.De("sakura"))).RadioShell,
+              "y Sakura, bien redonda");
 
-        // «Nube» NO hereda nada de esto. Es el fallo fácil al añadir campos a un record con
-        // valores por defecto: tocar uno y que se cuele en los demás sin que nadie lo note.
-        Vale(!Estilos.Nube.Late, "«Nube» no late");
-        Vale(!Estilos.Nube.TintaDeAcento, "ni enciende las cabeceras: es el sobrio con aire");
-        Vale(!Estilos.Nube.Brilla, "ni brilla");
+        var firmas = TemasDeSerie.Lista
+            .Select(t => Formas.Del(new Pintura(t)))
+            .Select(f => $"{f.RadioCard}/{f.RadioShell}/{f.Resplandor}")
+            .Distinct().Count();
+        Vale(firmas >= 4, $"los nueve temas no se redondean todos igual ({firmas} formas distintas)");
 
-        // ---------- Los tres son distintos de verdad ----------
+        // ---------- El resplandor es una decoración, no un estilo ----------
         //
-        // Un selector con tres opciones que se ven igual es peor que no tenerlo: hace dudar
-        // de si ha funcionado.
-        Igual(3, Estilos.Todos.Length, "hay tres");
-        Igual(3, Estilos.Todos.Select(e => e.Nombre).Distinct().Count(), "con nombres distintos");
-
-        // Esto miraba solo `RadioCard`, y era un proxy: daba por hecho que «distinto» quiere
-        // decir «redondea distinto». Dejó de valer cuando el neón pasó a distinguirse por la
-        // LUZ y no por el redondeo — con el filo de acento fuera, su radio ya no tiene por
-        // qué ser raro solo para que una prueba lo note.
-        //
-        // Lo que de verdad hay que exigir es que el conjunto de lo que define el aspecto sea
-        // distinto en los tres, que es lo que hace que se note cuál está puesto.
-        static string Firma(Estilo e) =>
-            $"{e.RadioCard}/{e.RadioShell}/{e.Hueco}/{e.Dentro}/{e.GrosorFilo}/" +
-            $"{e.Resplandor}/{e.ResplandorAlto}/{e.TintaDeAcento}";
-
-        Igual(3, Estilos.Todos.Select(Firma).Distinct().Count(),
-              "los tres se ven distintos de verdad, no solo en el nombre");
-
-        foreach (var e in Estilos.Todos)
+        // «Lo útil de Neón (el halo con DropShadowEffect que respira) pasa a ser una
+        // decoración más». Así que ya no hay un estilo que brilla: hay temas que llevan
+        // encendida la decoración `halo`.
+        foreach (var t in TemasDeSerie.Lista)
         {
-            Vale(e.Nombre.Length > 0, $"«{e.Que}» tiene nombre");
-            Vale(e.Que_Hace.Length > 0, $"y dice qué hace, para poder elegir sin probar");
-
-            // ---------- Ninguno puede dejar una superficie sin forma ----------
-            //
-            // Un radio o un relleno a cero no es «más sobrio», es una tarjeta rota. Y un filo
-            // de grosor cero deja dos tarjetas pegadas sin línea entre ellas.
-            Vale(e.RadioCard > 0 && e.RadioShell > 0, $"«{e.Nombre}»: las esquinas existen");
-            Vale(e.Dentro >= 8, $"«{e.Nombre}»: el texto no se pega al filo");
-            Vale(e.Hueco > 0, $"«{e.Nombre}»: las tarjetas no se tocan");
-            Vale(e.GrosorFilo > 0, $"«{e.Nombre}»: el filo se ve");
+            var f = Formas.Del(new Pintura(t));
+            bool deberia = t.Lleva(Decoraciones.Halo) &&
+                           !new Pintura(t).R(ClavesBase.Halo).EsInvisible;
+            Igual(deberia, f.Brilla, $"[{t.Nombre}] brilla si y solo si lleva el halo encendido");
+            if (f.Brilla)
+                Vale(f.Late && f.ResplandorAlto > f.Resplandor,
+                     $"[{t.Nombre}] y cuando brilla, respira: el latido crece desde el reposo");
         }
 
-        // Solo el neón brilla: si brillaran dos, el selector tendría dos opciones parecidas y
-        // una de más.
-        Igual(1, Estilos.Todos.Count(e => e.Brilla), "solo uno brilla, y es el neón");
-        Vale(Estilos.Neon.Brilla && Estilos.Neon.Late,
-             "el neón brilla y respira — la luz viene del halo, no de un filo de color");
+        // Oficina es el caso que lo demuestra: declara `halo: transparent` y no lleva la
+        // decoración. Un tema Fluent claro con un resplandor de neón alrededor de cada
+        // tarjeta sería otra cosa, no Oficina.
+        Vale(!Formas.Del(new Pintura(TemasDeSerie.De("oficina"))).Brilla, "Oficina no brilla");
+        Vale(Formas.Del(new Pintura(TemasDeSerie.De("cyberpunk"))).Brilla, "y Cyberpunk sí");
 
-        // ---------- Ida y vuelta por el fichero ----------
-        foreach (var e in Estilos.Todos)
-            Igual(e.Que, Estilos.Leer(Estilos.Clave(e.Que)).Que,
-                  $"«{e.Nombre}» se guarda y se vuelve a leer igual");
+        // Una decoración encendida con el color invisible NO enciende nada. Son dos
+        // condiciones y las dos tienen que cumplirse, o un tema que apague su halo por el
+        // color seguiría pagando el efecto sin que se vea.
+        var haloApagado = new Pintura(TemasDeSerie.De("cyberpunk"),
+                                      new Dictionary<string, string> { ["halo"] = "transparent" });
+        Vale(!Formas.Del(haloApagado).Brilla,
+             "apagar el halo por el color lo apaga de verdad, aunque la decoración siga puesta");
 
-        // ---------- Y lo que no se entiende cae en «Normal» ----------
+        // ---------- Ninguna forma puede dejar una superficie sin forma ----------
         //
-        // Nunca en el más llamativo. Un fichero con una errata no puede dejar el escritorio
-        // lleno de resplandores sin que nadie lo haya pedido: misma regla que
-        // `NubeHypr.ModoEfectivo`, que convierte lo desconocido en simulación y nunca en
-        // aplicar.
-        Igual(EstiloVisual.Normal, Estilos.Leer("cualquier cosa").Que, "una basura es «Normal»");
-        Igual(EstiloVisual.Normal, Estilos.Leer(null).Que, "y sin clave, también");
-        Igual(EstiloVisual.Normal, Estilos.Leer("").Que, "y vacía");
-        Igual(EstiloVisual.Neon, Estilos.Leer("  NEÓN ").Que,
-              "pero «NEÓN» con tilde, mayúsculas y espacios sí se entiende: es lo que alguien escribiría");
-
-        // Las claves del fichero, sin tildes ni mayúsculas: no son rótulos.
-        foreach (var e in Estilos.Todos)
+        // Un relleno a cero no es «más sobrio», es una tarjeta rota; y un filo de grosor cero
+        // deja dos tarjetas pegadas sin línea entre ellas. El radio SÍ puede ser 0: el chaflán
+        // de Videojuegos y Cyberpunk es una decisión de la maqueta, no una tarjeta rota.
+        foreach (var t in TemasDeSerie.Lista)
         {
-            var k = Estilos.Clave(e.Que);
-            Igual(k.ToLowerInvariant(), k, $"la clave de «{e.Nombre}» va en minúsculas");
-            Vale(k.All(char.IsLetter), $"y sin acentos ni símbolos: «{k}»");
+            var f = Formas.Del(new Pintura(t));
+            Vale(f.Dentro >= 8, $"[{t.Nombre}] el texto no se pega al filo");
+            Vale(f.Hueco > 0, $"[{t.Nombre}] las tarjetas no se tocan");
+            Vale(f.GrosorFilo > 0, $"[{t.Nombre}] el filo se ve");
+            Vale(f.RadioCard >= 0 && f.RadioShell >= 0, $"[{t.Nombre}] los radios no son negativos");
         }
+
+        // ---------- Y el usuario manda sobre el radio del tema ----------
+        var conRadio = new Pintura(TemasDeSerie.De("videojuegos"), null,
+                                   new Dictionary<string, double> { ["panel"] = 18 });
+        Igual(18.0, Formas.Del(conRadio).RadioShell,
+              "el radio que pone el usuario manda sobre el del tema");
+        Igual(0.0, Formas.Del(new Pintura(TemasDeSerie.De("videojuegos"))).RadioShell,
+              "y no se pega al tema de al lado");
     }
 
     // ================= El anillo de progreso =================

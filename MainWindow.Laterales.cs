@@ -66,13 +66,7 @@ public partial class MainWindow
                 if (!LateralAbierto(l)) continue;
                 if (!_laterales.TryGetValue(l, out var v)) continue;
 
-                var est = EstiloDeAhora;
-                v.Tarjeta.Background = PincelSolido(_roles.FondoOpaco);
-                v.Tarjeta.BorderBrush = new SolidColorBrush(_roles.Borde);
-                v.Tarjeta.BorderThickness = new Thickness(est.GrosorFilo);
-                v.Tarjeta.CornerRadius = new CornerRadius(est.RadioShell);
-                PonerResplandor(v.Tarjeta, est, Realce.Ambiente);
-
+                PintarConchaLateral(v);
                 Rellenar(l);
                 ColocarLateral(l);
             }
@@ -108,6 +102,20 @@ public partial class MainWindow
             }
 
             var v = _laterales.TryGetValue(l, out var ya) ? ya : CrearLateral(l);
+
+            // ---------- La concha, cada vez que se abre ----------
+            //
+            // Lo pintaba `CrearLateral` y solo él, o sea UNA vez en la vida de la ventana. Y
+            // `RepintarLateralesAbiertos` repinta los que están abiertos, con este
+            // razonamiento escrito al lado: «reconstruir es lo que ya hace `Rellenar`, y lo
+            // que ya se hace al abrir el panel». Lo que se reconstruía al abrir era el
+            // CONTENIDO; la concha no.
+            //
+            // Resultado: cambias de tema con un panel cerrado, lo abres, y sus tarjetas salen
+            // del tema nuevo sobre una concha del tema viejo. Con los ocho temas de antes se
+            // notaba poco —todos eran oscuros—; con Sakura sobre Profesional son tarjetas
+            // blancas sobre un fondo casi negro. Lo cazó `--capturas` midiendo los nueve.
+            PintarConchaLateral(v);
             Rellenar(l);
             ColocarLateral(l);
 
@@ -194,6 +202,31 @@ public partial class MainWindow
         mandos.Clear();
     }
 
+    // ---------- El color y la forma de la concha de un panel lateral ----------
+    //
+    // En un solo sitio porque se pide desde tres: al crear la ventana, al abrirla y al
+    // cambiar de tema con ella abierta. Estaba escrito dos veces y la tercera faltaba, que es
+    // justo como se acaba con un panel del tema nuevo dentro de una concha del viejo.
+    //
+    // Opaco de verdad, no el fondo del tema con su alfa: un panel de controles con el
+    // escritorio transparentándose detrás hace ilegible cualquier texto pequeño. Es la misma
+    // regla que `PanelShell` desde C5.
+    //
+    // Y el halo de AMBIENTE: los laterales no pasan por `PanelShell` —montan su propia
+    // tarjeta—, así que el halo de la concha no les llegaba nunca. Era lo que hacía que el
+    // resplandor no se viera en los paneles por mucho que respirara. El margen lo pone
+    // `ColocarLateral`, que es quien sabe cuánto aire cabe por cada lado; aquí solo se
+    // engancha el efecto.
+    void PintarConchaLateral(VentanaSuperpuesta v)
+    {
+        var est = EstiloDeAhora;
+        v.Tarjeta.Background = PincelSolido(_roles.FondoOpaco);
+        v.Tarjeta.BorderBrush = new SolidColorBrush(_roles.Borde);
+        v.Tarjeta.BorderThickness = new Thickness(est.GrosorFilo);
+        v.Tarjeta.CornerRadius = new CornerRadius(est.RadioShell);
+        PonerResplandor(v.Tarjeta, est, Realce.Ambiente);
+    }
+
     // ================= La ventana =================
     VentanaSuperpuesta CrearLateral(Lateral.Lado l)
     {
@@ -202,22 +235,8 @@ public partial class MainWindow
         // Opaco de verdad, no el fondo del tema: un panel de controles con el escritorio
         // transparentándose detrás hace ilegible cualquier texto pequeño. Es la misma regla
         // que `PanelShell` desde C5.
-        var est = EstiloDeAhora;
-        v.Tarjeta.Background = PincelSolido(_roles.FondoOpaco);
-        v.Tarjeta.BorderBrush = new SolidColorBrush(_roles.Borde);
-        v.Tarjeta.BorderThickness = new Thickness(est.GrosorFilo);
-        v.Tarjeta.CornerRadius = new CornerRadius(est.RadioShell);
         v.Tarjeta.Padding = new Thickness(0);
-
-        // ---------- El halo de AMBIENTE del panel ----------
-        //
-        // Los laterales no pasan por `PanelShell` —montan su propia tarjeta—, así que el halo
-        // que se le había puesto a la concha no les llegaba nunca. Es lo que hacía que el
-        // estilo «Neón» no se viera en los paneles por mucho que respirara.
-        //
-        // El margen de la tarjeta lo pone `ColocarLateral`, que es quien sabe cuánto aire
-        // cabe de verdad por cada lado. Aquí solo se engancha el efecto.
-        PonerResplandor(v.Tarjeta, est, Realce.Ambiente);
+        PintarConchaLateral(v);
 
         var cuerpo = new StackPanel { Margin = new Thickness(14, 12, 14, 14) };
         var scroll = new ScrollViewer

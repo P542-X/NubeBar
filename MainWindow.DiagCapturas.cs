@@ -517,39 +517,56 @@ public partial class MainWindow
     async System.Threading.Tasks.Task LosTresEstilos()
     {
         Apunta("");
-        Apunta("--- los tres estilos ---");
-        string antes = _cfg.Tema.Estilo;
+        Apunta("--- los nueve temas ---");
+
+        // Esto fotografiaba los tres estilos (Normal, Nube y Neón). Ya no existen: la forma es
+        // un valor del tema, así que lo que hay que mirar son los nueve. Y es justo la pantalla
+        // «Paneles en cada tema» de la maqueta: el lateral izquierdo, el mismo, con los nueve
+        // temas puestos, para ver que cada superficie cambia entera con el tema.
+        string antes = _cfg.Tema.Id;
+        var misColores = _cfg.Tema.Colores;
         try
         {
-            foreach (var e in Estilos.Todos)
+            foreach (var t in TemasDeSerie.Lista)
             {
-                _cfg.Tema.Estilo = Estilos.Clave(e.Que);
-                Apunta($"[EST] «{e.Nombre}»: radio {e.RadioCard}/{e.RadioShell} · hueco {e.Hueco} " +
-                       $"· dentro {e.Dentro} · filo {e.GrosorFilo}" +
-                       (e.Brilla ? $" · halo {e.Resplandor}→{e.ResplandorAlto}" : ""));
+                // El tema limpio, sin los retoques del usuario: lo que se fotografía es el
+                // tema, no el tema más lo que tenga puesto quien lanza el diagnóstico.
+                _cfg.Tema.Id = t.Id;
+                _cfg.Tema.Colores = new Dictionary<string, string>();
+                Aplicar();
+                await System.Threading.Tasks.Task.Delay(400);
 
-                // Se vuelve a montar el panel para que tome las medidas nuevas: el estilo se
+                var f = EstiloDeAhora;
+                Apunta($"[TEMA] «{t.Nombre}»: radio {f.RadioCard}/{f.RadioShell} · hueco {f.Hueco} " +
+                       $"· dentro {f.Dentro} · filo {f.GrosorFilo}" +
+                       (f.Brilla ? $" · halo {f.Resplandor}→{f.ResplandorAlto}" : " · sin halo") +
+                       $" · esquinas {t.Esquinas.ToString().ToLowerInvariant()}" +
+                       (t.Decoraciones.Count > 0 ? $" · {string.Join(", ", t.Decoraciones)}" : ""));
+
+                // Se vuelve a montar el panel para que tome las medidas nuevas: la forma se
                 // lee al construir, no se aplica a lo que ya está dibujado.
                 AbrirLateral(Lateral.Lado.Izquierda);
                 await System.Threading.Tasks.Task.Delay(1200);
                 await FotoEnPantalla(_laterales.GetValueOrDefault(Lateral.Lado.Izquierda),
-                                     $"35-estilo-{Estilos.Clave(e.Que)}",
-                                     $"Estilo «{e.Nombre}»: {e.Que_Hace}");
+                                     $"35-tema-{t.Id}",
+                                     $"Tema «{t.Nombre}» ({t.Familia}): el panel lateral entero");
                 CerrarLateral(Lateral.Lado.Izquierda);
                 await System.Threading.Tasks.Task.Delay(500);
             }
         }
         catch (Exception ex)
         {
-            Apunta($"[EST] REVENTÓ: {ex.GetType().Name}: {ex.Message}");
-            Log.Error("fotografiar los tres estilos", ex);
+            Apunta($"[TEMA] REVENTÓ: {ex.GetType().Name}: {ex.Message}");
+            Log.Error("fotografiar los nueve temas", ex);
         }
         finally
         {
-            _cfg.Tema.Estilo = antes;
+            _cfg.Tema.Id = antes;
+            _cfg.Tema.Colores = misColores;
+            Aplicar();
             try { CerrarLateral(Lateral.Lado.Izquierda); } catch { }
             await System.Threading.Tasks.Task.Delay(400);
-            Apunta($"[EST] estilo devuelto a «{antes}» (en memoria; el fichero no se ha tocado)");
+            Apunta($"[TEMA] tema devuelto a «{antes}» (en memoria; el fichero no se ha tocado)");
         }
     }
 

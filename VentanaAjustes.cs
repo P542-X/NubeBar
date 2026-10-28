@@ -1802,28 +1802,21 @@ public sealed partial class VentanaAjustes : Window
         // El tema decide los colores y ya tenía siete variantes; esto decide la FORMA —cuánto
         // se redondea una tarjeta, cuánto filo lleva, cuánto aire y si brilla—, que estaba
         // escrita en cuatro constantes dentro del código.
-        p.Grupo("Estilo", IconoDeGrupo("Forma"),
-                "La forma de las tarjetas y los paneles. Los colores los decide el tema.");
+        p.Grupo("Forma", IconoDeGrupo("Forma"),
+                "Cuánto se redondean las tarjetas y los paneles. Lo pone el tema; aquí se afina.");
 
-        p.Mas(Opciones("Estilo",
-                       Estilos.Todos.Select(e => e.Nombre).ToArray(),
-                       Estilos.Leer(_arbol.Texto("Tema", "Estilo", "normal")).Nombre,
-                       nombre =>
-                       {
-                           var e = Estilos.Todos.FirstOrDefault(x => x.Nombre == nombre)
-                                   ?? Estilos.Normal;
-                           _arbol.Poner("Tema", "Estilo", Estilos.Clave(e.Que));
-                       }));
-
-        // Qué hace cada uno, para poder elegir sin ir probando los tres.
+        // ---------- El selector de estilo ya no está, y no es una función menos ----------
         //
-        // Sin asteriscos: `Pista` pinta texto plano, no markdown, y los `**` salían literales
-        // en pantalla. Lo vi en la captura — que es para lo que están.
-        foreach (var e in Estilos.Todos)
-            p.Pista($"{e.Nombre} — {e.Que_Hace}");
-
-        p.Pista("Ninguno de los tres quita funciones ni esconde controles: lo único que " +
-                "cambia es la decoración.");
+        // Eran tres —Normal, Nube y Neón—, los tres los elegí yo, y añadir un cuarto era
+        // recompilar. Ahora la forma es un valor del TEMA (`docs/REDISENO-VISUAL.md`, decisión
+        // A): Videojuegos y Cyberpunk van en chaflán y a radio 0, Sakura va redonda a 25, y
+        // eso se elige en Colores junto con el resto del tema, que es donde estaba la decisión
+        // de verdad. Elegir «el tema Sakura con forma de Neón» no era una libertad: era tener
+        // que acertar dos veces para que una cosa cuadrara.
+        //
+        // Lo que se afina aquí es lo de encima: el radio, con su botón para devolvérselo al
+        // tema. El resto de la forma —hueco, relleno, grosor del filo— lo trae el Estudio de
+        // temas (fase 9, apartado 3), que es donde se edita un tema entero.
 
         // ================= El halo del neón =================
         //

@@ -17,13 +17,19 @@ public partial class MainWindow
             // ocho fotos salieron con `DirectoryNotFoundException`, una por una.
             System.IO.Directory.CreateDirectory(DiagCapturas.Carpeta);
 
-            // ---------- Se fuerza el estilo «Neón» ----------
+            // ---------- Se fuerza un tema que brille ----------
             //
-            // En memoria y devuelto al final: este diagnóstico existe para mirar el halo, y
-            // con otro estilo puesto no habría halo que mirar. El fichero no se toca —
-            // `--diagneon` es una bandera, así que `Config.PuedeEscribir` ya es falso.
-            string antes = _cfg.Tema.Estilo;
-            _cfg.Tema.Estilo = Estilos.Clave(EstiloVisual.Neon);
+            // Esto forzaba el estilo «Neón», que ya no existe: el halo es ahora una decoración
+            // del tema (ver `Formas`). Se usa Cyberpunk, que la lleva encendida y con un color
+            // bien visible — con un tema sin halo no habría nada que mirar.
+            //
+            // En memoria y devuelto al final. El fichero no se toca: `--diagneon` es una
+            // bandera, así que `Config.PuedeEscribir` ya es falso.
+            string antes = _cfg.Tema.Id;
+            var misColores = _cfg.Tema.Colores;
+            _cfg.Tema.Id = "cyberpunk";
+            _cfg.Tema.Colores = new Dictionary<string, string>();
+            Aplicar();
 
             var n = Neon.Limpia(_cfg.Neon);
             Apunta("=== El halo del neón, a lo largo de dos ciclos ===");
@@ -113,8 +119,10 @@ public partial class MainWindow
 
             CerrarLateral(Lateral.Lado.Izquierda);
             CerrarLateral(Lateral.Lado.Derecha);
-            _cfg.Tema.Estilo = antes;
-            Apunta($"[NEON] estilo devuelto a «{antes}» (en memoria; el fichero no se ha tocado)");
+            _cfg.Tema.Id = antes;
+            _cfg.Tema.Colores = misColores;
+            Aplicar();
+            Apunta($"[NEON] tema devuelto a «{antes}» (en memoria; el fichero no se ha tocado)");
         }
         catch (Exception ex)
         {

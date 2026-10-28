@@ -2841,16 +2841,19 @@ public static partial class Pruebas
         // Y eso es más fuerte que lo de antes: un estilo nuevo que se pasara de rosca con el
         // redondeo, o que pegara el texto al filo, lo caza esto sin que nadie se acuerde de
         // volver aquí.
-        foreach (var e in Estilos.Todos)
+foreach (var t in TemasDeSerie.Lista)
         {
-            Vale(e.RadioCard >= 8 && e.RadioCard <= 20,
-                 $"«{e.Nombre}»: el radio de tarjeta es razonable ({e.RadioCard})");
+            var e = Formas.Del(new Pintura(t));
+            // El radio puede ser 0: Videojuegos y Cyberpunk van en chaflán, y eso es una
+            // decisión de la maqueta, no un número que se haya ido de madre.
+            Vale(e.RadioCard >= 0 && e.RadioCard <= 24,
+                 $"«{t.Nombre}»: el radio de tarjeta es razonable ({e.RadioCard})");
             Vale(e.RadioShell >= e.RadioCard,
-                 $"«{e.Nombre}»: el contenedor redondea al menos tanto como sus tarjetas");
+                 $"«{t.Nombre}»: el contenedor redondea al menos tanto como sus tarjetas");
             Vale(e.Hueco >= 8 && e.Hueco <= 20,
-                 $"«{e.Nombre}»: la separación entre tarjetas es consistente ({e.Hueco})");
+                 $"«{t.Nombre}»: la separación entre tarjetas es consistente ({e.Hueco})");
             Vale(e.Dentro >= 10,
-                 $"«{e.Nombre}»: no pega el contenido al filo ({e.Dentro})");
+                 $"«{t.Nombre}»: no pega el contenido al filo ({e.Dentro})");
         }
 
         // Y el mínimo para poder pulsar NO sale del estilo: eso no es decoración. Un estilo
@@ -3025,22 +3028,23 @@ public static partial class Pruebas
         // y siendo cómodo **con cualquiera de ellos**. Un estilo que se pasara de acolchado
         // dejaría las cuatro acciones rápidas apretadas, y eso se caza aquí sin que nadie se
         // acuerde de volver.
-        foreach (var e in Estilos.Todos)
+foreach (var t in TemasDeSerie.Lista)
         {
-            Vale(e.Dentro <= 16, $"«{e.Nombre}»: las tarjetas no son acolchadas ({e.Dentro})");
+            var e = Formas.Del(new Pintura(t));
+            Vale(e.Dentro <= 16, $"«{t.Nombre}»: las tarjetas no son acolchadas ({e.Dentro})");
             Vale(e.Hueco <= 12,
-                 $"«{e.Nombre}»: ni se separan tanto que parezcan botones sueltos ({e.Hueco})");
+                 $"«{t.Nombre}»: ni se separan tanto que parezcan botones sueltos ({e.Hueco})");
 
             // Cuatro acciones en el ancho del centro dan un botón cómodo y no una tira de
             // iconos perdidos: es lo que se pidió de la rejilla.
             double porAccion = (MainWindow.AnchoDelCentro - 2 * e.Dentro - 24) / 4;
             Vale(porAccion >= 60 && porAccion <= 130,
-                 $"«{e.Nombre}»: cada acción rápida mide {porAccion:0} px: ni diminuta ni desperdigada");
+                 $"«{t.Nombre}»: cada acción rápida mide {porAccion:0} px: ni diminuta ni desperdigada");
 
             // Y dos métricas lado a lado caben sin quedarse anchas.
             double porMetrica = (MainWindow.AnchoDelCentro - 2 * e.Dentro) / 2;
             Vale(porMetrica >= 140 && porMetrica <= 240,
-                 $"«{e.Nombre}»: cada métrica mide {porMetrica:0} px: no se queda con sitio de sobra");
+                 $"«{t.Nombre}»: cada métrica mide {porMetrica:0} px: no se queda con sitio de sobra");
         }
     }
 
