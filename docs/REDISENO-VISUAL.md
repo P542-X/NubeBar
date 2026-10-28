@@ -111,6 +111,38 @@ Cómo se hace:
 7. **Exportar e importar** un tema personalizado como fichero (los colores, las medidas y
    las decoraciones encendidas), para poder compartirlo.
 
+### Alcance: el tema pinta TODA la app
+
+Un tema no es «la isla y el Inicio»: **cada superficie** de NubeBar toma sus colores, formas,
+letra y decoraciones del tema, y cambia con él. Las maquetas solo dibujan algunas en cada
+tema; las demás llevan las mismas piezas y cambian igual. La lista completa:
+
+- **La barra**: la isla (recogida y desplegada), el modo barra de lado a lado, la barra
+  vertical (`MainWindow.Vertical.cs`) y sus paneles flotantes.
+- **Paneles de la isla**: Inicio (portada y lista de resultados), audio, red, batería,
+  centro de notificaciones, bandeja.
+- **Avisos que asoman**: notificaciones en la isla, volumen, brillo, teclas.
+- **Vista general** (`MainWindow.Vista.cs`): tarjetas de ventanas, su menú y la mini lista de
+  ventanas de un grupo.
+- **Menús y diálogos**: clic derecho en apps y en la isla, menú de los resultados del Inicio
+  (`MainWindow.MenuApp.cs`), confirmaciones (cerrar, forzar, apagar).
+- **Laterales** izquierdo y derecho, y el **dock**.
+- **Ajuste de ventanas**: la previsualización de zonas al arrastrar (`MainWindow.Previa.cs`) y
+  los indicadores y avisos de NubeHypr.
+- **La ventana de Ajustes entera**: todas sus páginas, el editor de módulos, la biblioteca de
+  widgets, la guía y los formularios de reglas.
+- **El Estudio de temas** (con su vista previa pintando el tema que se edita).
+- **La escena de arranque**, las barras de desplazamiento y las ayudas emergentes (tooltips).
+
+**Regla de seguridad: un tema nunca puede dejar Ajustes ilegible.** Como el usuario puede
+cambiarlo todo, puede hacer un tema en el que no se lea nada. Por eso:
+
+- Si el texto de Ajustes o del Estudio no llega a 4,5:1 sobre su fondo con el tema puesto,
+  **esas dos ventanas se pintan con Profesional** y avisan arriba de por qué.
+- Siempre hay una salida: **«Volver al tema de serie»** en el menú de clic derecho de la isla,
+  y el modo seguro que ya existe (`Panico.cs`) arranca con Profesional.
+- Un `.nubetema` importado que no pase la validación no se aplica.
+
 ### C. El Estudio de temas: el usuario crea los suyos, con muchísimas herramientas
 
 Maqueta funcional: pantalla «Estudio de temas» (`project/Estudio.dc.html`), con los 10
