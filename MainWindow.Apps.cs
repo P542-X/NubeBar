@@ -399,7 +399,7 @@ public partial class MainWindow
             if (Contraste.Luminancia(_roles.FondoOpaco) < FondoClaro && Iconos.EsOscuro(img.Source))
                 img.Effect = new System.Windows.Media.Effects.DropShadowEffect
                 {
-                    Color = Colors.White, ShadowDepth = 0, BlurRadius = 6, Opacity = 0.85,
+                    Color = _roles.ColorDe("icono.halo"), ShadowDepth = 0, BlurRadius = 6, Opacity = 0.85,
                 };
         }
         catch { }
@@ -680,10 +680,13 @@ public partial class MainWindow
             StartPoint = new Point(0, 0),
             EndPoint = Vertical ? new Point(0, 1) : new Point(1, 0)
         };
-        mascara.GradientStops.Add(new GradientStop(hayAntes ? Colors.Transparent : Colors.Black, 0));
-        mascara.GradientStops.Add(new GradientStop(Colors.Black, borde));
-        mascara.GradientStops.Add(new GradientStop(Colors.Black, 1 - borde));
-        mascara.GradientStops.Add(new GradientStop(hayDespues ? Colors.Transparent : Colors.Black, 1));
+        // Esto es una MÁSCARA de opacidad, no pintura: en una `OpacityMask` de WPF el negro
+        // significa «opaco» y el transparente «no se ve». No son colores, son un uno y un
+        // cero, y cambiarlos por un color del tema rompería el desvanecido del carrusel.
+        mascara.GradientStops.Add(new GradientStop(hayAntes ? Colors.Transparent : Colors.Black, 0));   // color literal a propósito
+        mascara.GradientStops.Add(new GradientStop(Colors.Black, borde));                               // color literal a propósito
+        mascara.GradientStops.Add(new GradientStop(Colors.Black, 1 - borde));                           // color literal a propósito
+        mascara.GradientStops.Add(new GradientStop(hayDespues ? Colors.Transparent : Colors.Black, 1)); // color literal a propósito
         mascara.Freeze();
         _carrusel.OpacityMask = mascara;
     }

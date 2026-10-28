@@ -151,8 +151,9 @@ public partial class MainWindow : Window
                 if (energia.HayBateria)
                 {
                     bat.Text = Bateria.Glifo(energia);
-                    bat.Foreground = energia.Ahorro ? Brushes.Gold
-                                   : energia.PorCiento <= 15 && !energia.Enchufado ? Brushes.Tomato : _texto;
+                    bat.Foreground = energia.Ahorro ? _roles.Pincel("bateria.ahorro")
+                                   : energia.PorCiento <= 15 && !energia.Enchufado
+                                     ? _roles.Pincel("bateria.bajo") : _texto;
                     bBat.ToolTip = $"Batería: {energia.PorCiento}% · {Bateria.Texto(energia)}";
                 }
             }
@@ -1120,8 +1121,8 @@ public partial class MainWindow : Window
         {
             double rad = cfg.Angulo * Math.PI / 180.0;
             hueco.Background = new LinearGradientBrush(
-                Paleta.Leer(cfg.Color1, Colors.Black),
-                Paleta.Leer(cfg.Color2, Colors.White),
+                Paleta.Leer(cfg.Color1, _roles.FondoOpaco),
+                Paleta.Leer(cfg.Color2, _roles.SuperficieAltaSolida),
                 new Point(0.5 - Math.Cos(rad) / 2, 0.5 - Math.Sin(rad) / 2),
                 new Point(0.5 + Math.Cos(rad) / 2, 0.5 + Math.Sin(rad) / 2));
         }

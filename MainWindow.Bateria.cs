@@ -34,7 +34,7 @@ public partial class MainWindow : Window
         cabecera.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         var pila = Glifo(Bateria.Glifo(e));
         pila.FontSize = 26;
-        pila.Foreground = e.Ahorro ? Brushes.Gold : _acentoLegible;
+        pila.Foreground = e.Ahorro ? _roles.Pincel("bateria.ahorro") : _acentoLegible;
         pila.Margin = new Thickness(0, 0, 12, 0);
         cabecera.Children.Add(pila);
 
@@ -54,7 +54,8 @@ public partial class MainWindow : Window
         var lleno = new Border
         {
             Height = 6, CornerRadius = new CornerRadius(3), HorizontalAlignment = HorizontalAlignment.Left,
-            Background = e.Ahorro ? Brushes.Gold : e.PorCiento <= 15 && !e.Enchufado ? Brushes.Tomato : _acento
+            Background = e.Ahorro ? _roles.Pincel("bateria.ahorro")
+                      : e.PorCiento <= 15 && !e.Enchufado ? _roles.Pincel("bateria.bajo") : _acento
         };
         canal.Child = lleno;
         canal.SizeChanged += (_, _) => lleno.Width = canal.ActualWidth * e.PorCiento / 100.0;
@@ -103,7 +104,7 @@ public partial class MainWindow : Window
         var ahorro = Boton(new TextBlock
         {
             Text = e.Ahorro ? "Ahorro de batería: activado" : "Ahorro de batería: desactivado",
-            Foreground = e.Ahorro ? Brushes.Gold : _texto, FontSize = 11, Opacity = e.Ahorro ? 1 : 0.7
+            Foreground = e.Ahorro ? _roles.Pincel("bateria.ahorro") : _texto, FontSize = 11, Opacity = e.Ahorro ? 1 : 0.7
         }, "Abrir el ahorro de batería en Configuración", () => AbrirAjustes("ms-settings:batterysaver"));
         ahorro.HorizontalAlignment = HorizontalAlignment.Left;
         ahorro.Margin = new Thickness(-6, 0, 0, 0);

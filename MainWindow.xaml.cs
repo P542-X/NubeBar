@@ -23,17 +23,27 @@ public partial class MainWindow : Window
     Config _cfg = Config.Cargar() ?? new Config();
     IntPtr _self, _ultimaActiva;
 
+    // ---------- Con qué se pinta antes de que haya tema ----------
+    //
+    // Eran negro, blanco y el azul aciano de WPF, escritos aquí. Duran lo que tarda
+    // `AplicarTema` en correr, pero eran cinco colores de la interfaz fuera del catálogo, y
+    // ninguno de ellos es de ningún tema: `CornflowerBlue` no lo eligió nadie.
+    //
+    // Ahora el estado inicial es el tema de serie. Si algo se pinta antes de aplicar el tema
+    // —o si aplicar el tema falla— lo que se ve es Profesional, no tres colores de nadie.
+    static readonly Roles DeSerie = Roles.PorDefecto();
+
     // Pinceles fijos: cuando cambia el tema se anima su color, y todo lo que los usa cambia suave
-    readonly SolidColorBrush _fondo = new(Colors.Black), _texto = new(Colors.White),
-                             _acento = new(Colors.CornflowerBlue), _hover = new(Color.FromArgb(0x30, 255, 255, 255));
+    readonly SolidColorBrush _fondo = new(DeSerie.Fondo), _texto = new(DeSerie.Texto),
+                             _acento = new(DeSerie.Acento), _hover = new(DeSerie.SuperficieAlta);
     // El acento "legible" es el mismo color corregido para que se lea sobre el
     // fondo. Se usa en TEXTO; para bordes y barras sigue valiendo el de verdad.
-    readonly SolidColorBrush _acentoLegible = new(Colors.CornflowerBlue);
-    Color _cTexto = Colors.White, _cAcento = Colors.CornflowerBlue, _cAcentoLegible = Colors.CornflowerBlue;
+    readonly SolidColorBrush _acentoLegible = new(DeSerie.AcentoTinta);
+    Color _cTexto = DeSerie.Texto, _cAcento = DeSerie.Acento, _cAcentoLegible = DeSerie.AcentoTinta;
 
     // Los colores del tema por rol, para que un widget pueda preguntar "¿de qué color
     // pinto una fila?" sin mezclar a ojo. Se recalcula en AplicarTema.
-    Roles _roles = Roles.PorDefecto();
+    Roles _roles = DeSerie;
 
     // Y sus pinceles, con el mismo truco que los de arriba: el pincel es fijo y lo que
     // cambia es su Color, animado. Por eso al cambiar de tema TODO lo que los use se
@@ -439,7 +449,8 @@ public partial class MainWindow : Window
         // abajo (LlenarZonas): así cambiar el nivel en caliente se ve en el acto.
         Resources[typeof(Button)] = EstiloBoton();
 
-        Color fondo = Hex(t.Fondo, Colors.Black), texto = Hex(t.Texto, Colors.White), acento = Hex(t.Acento, Colors.CornflowerBlue);
+        Color fondo = Hex(t.Fondo, DeSerie.Fondo), texto = Hex(t.Texto, DeSerie.Texto),
+              acento = Hex(t.Acento, DeSerie.Acento);
         if (t.DesdeWallpaper && _paleta is { } p)
         {
             fondo = Color.FromArgb(fondo.A, p.Fondo.R, p.Fondo.G, p.Fondo.B);  // se respeta tu opacidad
@@ -464,7 +475,7 @@ public partial class MainWindow : Window
         // nada que distinguir, así que se vuelve al de por defecto y se avisa.
         if (Contraste.Saturacion(acento) < 0.08 && Contraste.Entre(acento, texto) < 1.5)
         {
-            var porDefecto = Color.FromRgb(0x7A, 0xA2, 0xF7);
+            var porDefecto = DeSerie.Acento;
             Log.Info($"el acento {acento} es un gris igual que el texto {texto}: no se distinguiría " +
                      $"de nada, se usa {porDefecto} (cámbialo en Ajustes > Colores)");
             acento = porDefecto;
@@ -1362,8 +1373,10 @@ public partial class MainWindow : Window
         {
             double ppp = VisualTreeHelper.GetDpi(this).PixelsPerDip;
             var tipo = new Typeface(FontFamily, FontStyle, FontWeight, FontStretch);
+            // El pincel no se pinta: `FormattedText` lo pide para poder dibujar, y aquí solo
+            // se le pregunta el ancho. Da igual cuál sea.
             return new FormattedText(texto, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
-                                     tipo, tamano, Brushes.Black, ppp).Width;
+                                     tipo, tamano, Brushes.Black, ppp).Width;   // color literal a propósito
         }
         catch (Exception ex)
         {

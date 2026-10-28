@@ -3786,3 +3786,66 @@ Las otras tres eran de la maqueta: Sakura (2,13:1), Otoño (3,00) e Invierno (3,
    «restaure el valor de la maqueta» dentro de seis meses sin saber por qué se cambió.
 
 La regla se ajustó donde era injusta y el tema se corrigió donde estaba mal; no al revés.
+
+## Rediseño, fase 0 · Una sola cascada, y el centinela
+
+**`Roles` pasa a ser una fachada, no a desaparecer.** El plan decía «ampliar `Roles.cs` hasta
+cubrir cada elemento». No se puede: `Roles` es una lista fija de propiedades (`Superficie`,
+`AcentoTinta`…) y lo que hace falta son ~130 claves con zona, papel y derivación, buscables
+por nombre desde una lista en Ajustes. Eso es un diccionario, no un objeto con campos.
+
+Así que el catálogo es nuevo (`Catalogo` + `Pintura`) y `Roles` se queda como **fachada**:
+cada rol con nombre viejo es ahora una clave del catálogo. Lo que esto compra es que los
+widgets, `HyprPinta`, `Tonos` y los paneles no se toquen —ni una línea— mientras su color ya
+sale del catálogo y el usuario ya puede cambiarlo. Y lo que esto es: temporal. A medida que las
+fases 1 a 8 pasen cada pieza a preguntar por su clave, la fachada se queda sin consumidores.
+
+**Los temas de antes entran por un puente, no por una segunda cascada.** Los ocho de siempre
+(Nube, Claro, Tokyo Night, Gruvbox…) son tres colores más diez roles opcionales; los nuevos son
+paquetes de 19 valores. Mientras convivan había que elegir: dos cascadas en paralelo, o una y un
+puente. Dos cascadas es incumplir «no hay colores escritos a mano» desde el primer día, con dos
+sitios donde arreglar cada cosa. El puente (`TemaBase.DeTemaViejo`) **declara** lo que el tema
+viejo callaba, con la cuenta que se le aplicaba antes (0x1E para una tarjeta, 0x33 para la de
+debajo del ratón), para que los ocho temas no cambien de aspecto el día que se enchufó el
+catálogo. Cambiarles el tema a quien no ha pedido nada no es migrar: es estropearlo.
+
+### El centinela, y lo que decide que es un color
+
+`Pruebas.SinColoresAMano.cs` lee `MainWindow*.cs`, `VentanaAjustes*.cs` y `Biblioteca.cs` y
+falla si la interfaz decide un color por su cuenta. Hace falta porque un color escrito a mano no
+da error, no se ve raro y es lo más cómodo del mundo de escribir: se quitaron veinticinco, y el
+siguiente entra el día que tenga prisa y ponga un `Brushes.Tomato` porque «es solo un aviso».
+
+Lo difícil no fue escribirlo, fue decidir qué cuenta. Tres cosas que parecen colores y no lo son:
+
+- **`Color.FromArgb(0x2A, color.R, color.G, color.B)`** no es un color: es una **opacidad**
+  aplicada a un color que ya venía del tema. La regla del centinela es exactamente esa — si
+  todos los argumentos son números, es un color decidido aquí; si alguno viene de una variable,
+  es un velo.
+- **`Brushes.Transparent`** es estructural. Sin `Background` puesto, un `Panel` de WPF no recibe
+  el ratón en sus huecos: no se pinta nada, se declara que ahí se puede pulsar.
+- **Las máscaras de opacidad** del carrusel. En una `OpacityMask`, negro significa «opaco» y
+  transparente «no se ve»: son un uno y un cero, no paleta. Cambiarlos por un color del tema
+  rompería el desvanecido de los bordes.
+
+La salida de emergencia es el comentario `// color literal a propósito`. No es un agujero: es la
+obligación de escribir por qué. Hoy lo llevan las cuatro máscaras del carrusel y el pincel que
+`FormattedText` pide para poder dibujar cuando solo se le pregunta el ancho de un texto.
+
+Y lo que el centinela **no** puede hacer: leerse el código desde un exe publicado, porque allí
+no hay código. Busca las fuentes hacia arriba desde el ejecutable y, si no las encuentra, lo
+escribe en el informe y no falla. Donde importa —esta máquina, donde se escribe cada cambio y se
+pasa `--pruebas` antes de publicar— están siempre. La alternativa era un paso de MSBuild que
+mirara los fuentes en cada compilación; se descartó porque un centinela que puede romper la
+compilación de un release por una falsa alarma cuesta más de lo que cuida.
+
+### Por qué el cambio de fuente de verdad no se partió en dos
+
+`Tema.Id` y `Tema.Colores` no entraron en esta tanda, y no por falta de sitio. Hoy el selector
+de temas de Ajustes escribe `Tema.Fondo`, `Tema.Texto` y `Tema.Acento`. Si `Tema.Id` empieza a
+mandar antes de que Ajustes escriba `Id`, elegir Gruvbox deja de hacer nada; y si no manda, hay
+dos fuentes de verdad para el mismo color, que es el problema que todo esto venía a quitar.
+
+Así que el config, la migración, el selector de los nueve temas y Ajustes > Colores son **un
+solo paso** y van en la misma versión. Partirlo deja la barra en un estado en el que un ajuste
+que existe no hace nada, y eso es peor que no haberlo empezado.

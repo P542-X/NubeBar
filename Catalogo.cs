@@ -286,6 +286,37 @@ public static class Catalogo
         C("insignia.texto", ZonaColor.Isla, "Número de la insignia",
           p => Relleno.Liso(Contraste.TintaSobre(p.Color("insignia.fondo"))), Papel.Texto, "insignia.fondo"),
         C("insignia.latido", ZonaColor.Isla, "Latido de la insignia", Igual("insignia.fondo"), Papel.Efecto),
+
+        // El halo claro que se le pone detrás a un icono oscuro para que no desaparezca
+        // sobre la isla (`Legible`, `Iconos.EsOscuro`). Es un efecto, no un color de marca,
+        // pero tiene que poder cambiarse: en un tema CLARO el halo útil es oscuro.
+        C("icono.halo", ZonaColor.Isla, "Halo de los iconos oscuros",
+          p => Relleno.Liso(p.Tema.Claro ? Colors.Black : Colors.White), Papel.Efecto),
+
+        // ---------- Los dos filos del pulso de audio ----------
+        //
+        // Asoman por los lados de la isla al ritmo del sonido, uno frío y otro cálido. Eran
+        // dos hexadecimales escritos en `MainWindow.PulsoAudio.cs`; ahora tienen nombre y se
+        // pueden cambiar. Su derivación es una constante porque ningún tema tiene un color
+        // que signifique «el lado frío del pulso»: cuando un tema quiera los suyos, los
+        // declara, que es justo para lo que sirve el escalón 2 de la cascada.
+        C("pulso.frio", ZonaColor.Isla, "Filo frío del pulso de audio",
+          p => Relleno.Liso(Color.FromRgb(0x4D, 0xE8, 0xFF)), Papel.Efecto),
+        C("pulso.calido", ZonaColor.Isla, "Filo cálido del pulso de audio",
+          p => Relleno.Liso(Color.FromRgb(0xFF, 0x4D, 0x8D)), Papel.Efecto),
+
+        // ---------- Editar la barra ----------
+        //
+        // Las zonas que se encienden al arrastrar un módulo. Eran cuatro velos del acento
+        // escritos a mano (0x12, 0x30, 0x90) dentro de `MainWindow.Edicion.cs`.
+        C("editor.zona.fondo", ZonaColor.Isla, "Editar la barra: fondo de una zona",
+          Velo(ClavesBase.Acento, 0.07)),
+        C("editor.zona.filo", ZonaColor.Isla, "Editar la barra: filo de una zona",
+          Velo(ClavesBase.Acento, 0.19), Papel.Filo),
+        C("editor.zona.fondo.activa", ZonaColor.Isla, "Editar la barra: zona bajo el puntero",
+          Velo(ClavesBase.Acento, 0.19)),
+        C("editor.zona.filo.activa", ZonaColor.Isla, "Editar la barra: filo de la zona bajo el puntero",
+          Velo(ClavesBase.Acento, 0.56), Papel.Filo),
     };
 
     // ---------- El menú Inicio ----------

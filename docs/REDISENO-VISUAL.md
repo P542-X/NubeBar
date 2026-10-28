@@ -493,20 +493,42 @@ Construido y con las pruebas en verde (`NubeBar.exe --pruebas`: 10 583 comprobac
 | La cascada | `Pintura.cs` | Usuario → tema → derivación, con caché, corte de ciclos, medida de contraste y la regla de seguridad de Ajustes (`ParaAjustes()`) |
 | Las pruebas | `Pruebas.Temas.cs` | Que los nueve temas declaren las 19 claves, que las ~130 resuelvan en todos, que ninguna derivación dé vueltas y que todo lo que hace de texto o de icono se lea |
 
-Lo que **falta** de la fase 0, en este orden:
+También construido:
 
-1. **Conectar `Pintura` a la barra**: hoy el catálogo existe y nadie le pregunta. `MainWindow`
-   sigue pintando con `Roles`, que pasa a ser una fachada sobre el catálogo y luego desaparece.
-2. **Los 53 colores escritos a mano** pasados a claves, con la prueba centinela que falla si
-   aparece un color literal fuera del catálogo. Ojo al separar: los `Brushes.Transparent` que
-   hay por ahí son estructurales (sin fondo, un `Panel` no recibe el ratón en los huecos), no
-   decoración, y esos se quedan.
-3. **Quitar Normal, Nube y Neón** con su migración del config (`Tema.Estilo` desaparece) y
-   rehacer sus 31 usos en `Pruebas.Confirmar.cs`, `MainWindow.DiagNeon.cs` y `VentanaAjustes.cs`.
-4. **`Tema.Colores`** en el config: el diccionario `clave → valor` con solo lo que el usuario
-   ha cambiado.
-5. **Ajustes > Colores**: la lista por zonas con buscador, selector, «Restablecer» y «Elegir
-   en pantalla».
+| Pieza | Fichero | Qué hace |
+|---|---|---|
+| La fachada | `Roles.cs` | `Roles` ya no deriva nada: cada rol con nombre viejo es una clave del catálogo. Los widgets, `HyprPinta`, `Tonos` y los paneles no se tocaron, y su color ya sale del catálogo |
+| El puente | `TemaBase.DeTemaViejo` | Los ocho temas de antes entran a la MISMA cascada como paquetes de valores. Una sola cascada, no dos en paralelo |
+| El centinela | `Pruebas.SinColoresAMano.cs` | Lee `MainWindow*.cs`, `VentanaAjustes*.cs` y `Biblioteca.cs` y falla si la interfaz decide un color por su cuenta |
+
+Los colores escritos a mano se pasaron a claves: `Brushes.Gold` → `bateria.ahorro`,
+`Brushes.Tomato` → `bateria.bajo` / `boton.destructivo.texto` / `ajustes.aviso.mal`,
+`Brushes.YellowGreen` → `ajustes.aviso.bien`, los dos hexadecimales del pulso de audio →
+`pulso.frio` / `pulso.calido`, los cuatro velos del editor de la barra → `editor.zona.*`, y
+los colores de «antes de que haya tema» (negro, blanco y `CornflowerBlue`) → el tema de serie.
+
+El centinela deja pasar tres cosas, y ninguna es un color: `Brushes.Transparent` (estructural
+— sin fondo, un `Panel` no recibe el ratón en los huecos), `Color.FromArgb(0x2A, c.R, c.G,
+c.B)` (una opacidad sobre un color que ya venía del tema) y lo que lleve el comentario
+`// color literal a propósito`, que hoy son las máscaras de opacidad del carrusel y el pincel
+que `FormattedText` pide para medir un ancho y nunca pinta.
+
+Lo que **falta** de la fase 0:
+
+1. **El cambio de fuente de verdad**: `Tema.Id` + `Tema.Colores` en el config, con la
+   migración (`Tema.Estilo` desaparece; `normal` y `neon` → Profesional; `nube` → Anime si no
+   ha tocado colores, y si no → Profesional conservando sus colores como personalizaciones).
+2. **Ajustes > Colores** y el **selector de los nueve temas**.
+3. **Quitar Normal, Nube y Neón** y rehacer sus usos en `Pruebas.Confirmar.cs`,
+   `MainWindow.DiagNeon.cs` y `VentanaAjustes.cs`.
+4. **Retirar los ocho temas de antes** (`Temas.Predefinidos`), y con ellos el puente y la
+   fachada.
+
+**Estos cuatro van juntos y no se pueden partir**, y conviene saber por qué antes de empezar:
+hoy el selector de temas de Ajustes escribe `Tema.Fondo`, `Tema.Texto` y `Tema.Acento`. Si
+`Tema.Id` empieza a mandar antes de que Ajustes escriba `Id`, elegir Gruvbox deja de hacer
+nada; y si no manda, hay dos fuentes de verdad para el mismo color. Así que el paso siguiente
+es uno solo: el config, la migración, el selector y Ajustes > Colores en la misma versión.
 
 Todo lo que se construya en las fases 1 a 8 toma sus colores, medidas y decoraciones **del
 tema**, nunca de un valor escrito en el código: es lo que hace posible que el Estudio pueda

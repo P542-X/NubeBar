@@ -84,57 +84,75 @@ public sealed class Roles
         Contraste.Legible(color, superficie, MinimoSuperficie);
 
     // ================= Construcción =================
+    //
+    // ---------- Roles ya no deriva nada: pregunta al catálogo ----------
+    //
+    // Antes esto tenía sus propias cuentas (el velo de la tarjeta, el texto atenuado, la
+    // selección) y el resto de la interfaz tenía las suyas escritas a mano. Dos sitios donde
+    // decidir el mismo color es un sitio de más, y el rediseño lo prohíbe de frente: «nada de
+    // colores escritos a mano en la interfaz» (decisión B).
+    //
+    // Así que la cascada está ahora en un solo sitio, `Pintura`, y Roles es la FACHADA: cada
+    // rol es una clave del catálogo con un nombre viejo. Lo que esto compra es que los
+    // widgets, `HyprPinta`, `Tonos` y los paneles sigan pintando igual —no se toca ni una
+    // línea de ellos— mientras el color de verdad ya sale del catálogo y el usuario ya puede
+    // cambiarlo.
+    //
+    // Y lo que esto es: temporal. A medida que las fases 1 a 8 pasen cada pieza a preguntar
+    // por su clave (`deslizador.pomo` en vez de `Roles.Acento`), esta fachada se queda sin
+    // consumidores y desaparece. Mientras tenga alguno, aquí está.
+    public Pintura Pintura { get; init; } = null!;
 
-    // De un Tema del config a los roles. Lo que el tema no diga se deriva del fondo y
-    // del texto, que es lo que mantiene a los temas viejos pintando igual.
-    public static Roles Desde(Tema t, Color fondo, Color texto, Color acento)
+    // Atajos para preguntar por CLAVE desde donde ya hay un `_roles` a mano. Es el camino por
+    // el que la interfaz va dejando de tener colores escritos: `_roles.Pincel("bateria.ahorro")`
+    // en vez de `Brushes.Gold`. Cuando no quede ningún rol con nombre viejo, estos dos son lo
+    // único que seguirá hablando, y entonces lo que sobra es la fachada, no ellos.
+    // `ColorDe` y no `Color`: un miembro llamado `Color` dentro de esta clase tapa al tipo
+    // `System.Windows.Media.Color` y obliga a cualificarlo en cada línea de las de abajo.
+    public Brush Pincel(string clave) => Pintura.Pincel(clave);
+    public Color ColorDe(string clave) => Pintura.Color(clave);
+
+    public static Roles Desde(Pintura p)
     {
+        var fondo = p.Color("isla.fondo");
         var fondoOpaco = Color.FromRgb(fondo.R, fondo.G, fondo.B);
 
-        // Las superficies derivadas son un VELO TRANSLÚCIDO del color de texto, no un
-        // color opaco. Es exactamente lo que el código venía haciendo a mano por todas
-        // partes —`FromArgb(0x14 / 0x22 / 0x33, _cTexto…)`— y es lo que hace que una
-        // fila de un panel deje pasar un poco el fondo de pantalla, igual que la isla.
-        //
-        // Si se derivaran opacas, los seis temas de siempre cambiarían de aspecto el
-        // día que empezaran a usar roles, que es justo lo que no puede pasar. Un tema
-        // que las declare manda, y puede darlas opacas: el tema Nube lo hace.
-        var superficie     = Leer(t.Superficie)     ?? Velo(texto, VeloSuperficie);
-        var superficieAlta = Leer(t.SuperficieAlta) ?? Velo(texto, VeloAlta);
-        var borde          = Leer(t.Borde)          ?? Velo(texto, VeloBorde);
+        var texto = p.Color(ClavesBase.Tinta);
+        var acento = p.Color(ClavesBase.Acento);
+        var superficie = p.Color(ClavesBase.Tarjeta);
+        var superficieAlta = p.Color("tarjeta.fondo.raton");
+        var secundario = p.Color(ClavesBase.Sec1);
+        var sistema = p.Color(ClavesBase.Sec2);
+        var positivo = p.Color(ClavesBase.Ok);
+        var aviso = p.Color("aviso");
+        var negativo = p.Color(ClavesBase.Peligro);
 
-        // El texto atenuado sí es opaco: es tinta, y bajarle el alfa lo dejaría
-        // dependiendo del fondo de pantalla para poder leerse.
-        var atenuado       = Leer(t.TextoAtenuado)  ?? Contraste.Mezclar(texto, fondoOpaco, 0.35);
-
-        // Secundario y Sistema, si el tema no los da, son el propio acento: así un tema
-        // que solo trae tres colores NO se inventa un naranja que su autor no eligió.
-        var secundario = Leer(t.Secundario) ?? acento;
-        var sistema    = Leer(t.Sistema)    ?? acento;
-
-        // Los semánticos sí tienen color propio aunque el tema calle: un "batería baja"
-        // en rojo tiene que seguir siendo rojo en Gruvbox.
-        var positivo = Leer(t.Positivo) ?? Color.FromRgb(0x2E, 0xA0, 0x72);
-        var aviso    = Leer(t.Aviso)    ?? Color.FromRgb(0xE8, 0x9C, 0x3C);
-        var negativo = Leer(t.Negativo) ?? Color.FromRgb(0xDA, 0x44, 0x53);
+        // La selección se calcula aquí y no se lee de `resultado.fondo.elegido` a propósito.
+        // El catálogo trae el valor de la MAQUETA (acento al 18 %) y este rol llevaba el de
+        // antes (0x33, o sea 20 %). Son casi iguales pero no iguales, y mientras la fachada
+        // exista su trabajo es que nada cambie de aspecto sin que se haya decidido. Cuando el
+        // menú y los paneles pasen a preguntar por su clave, se irán al 18 % de la maqueta.
+        var seleccion = Velo(acento, VeloSeleccion);
 
         return new Roles
         {
+            Pintura = p,
+
             Fondo = fondo,
             FondoOpaco = fondoOpaco,
             Superficie = superficie,
             SuperficieSolida = Aplanar(superficie, fondoOpaco),
             SuperficieAlta = superficieAlta,
             SuperficieAltaSolida = Aplanar(superficieAlta, fondoOpaco),
-            Borde = borde,
+            Borde = p.Color(ClavesBase.Filo),
 
             Texto = texto,
-            TextoAtenuado = atenuado,
+            TextoAtenuado = p.Color(ClavesBase.Tenue),
 
             Acento = acento,
             AcentoTinta = Contraste.Legible(acento, fondoOpaco),
-            Seleccion = Velo(acento, VeloSeleccion),
-            SeleccionSolida = Aplanar(Velo(acento, VeloSeleccion), fondoOpaco),
+            Seleccion = seleccion,
+            SeleccionSolida = Aplanar(seleccion, fondoOpaco),
             Secundario = secundario,
             SecundarioTinta = Contraste.Legible(secundario, fondoOpaco),
             Sistema = sistema,
@@ -147,14 +165,23 @@ public sealed class Roles
             Negativo = negativo,
             NegativoTinta = Contraste.Legible(negativo, fondoOpaco),
 
-            Radio = t.Radio
+            Radio = p.Radio(Piezas.Isla),
         };
     }
+
+    // ---------- Y la entrada de los temas de antes ----------
+    //
+    // La firma de siempre, para no tocar los veinte sitios que la llaman. Por dentro ya no
+    // deriva: construye el paquete de valores equivalente (`TemaBase.DeTemaViejo`, que es
+    // donde viven ahora las cuentas de antes) y lo pasa por la misma cascada que los nueve
+    // temas nuevos.
+    public static Roles Desde(Tema t, Color fondo, Color texto, Color acento) =>
+        Desde(new Pintura(TemaBase.DeTemaViejo(t, fondo, texto, acento)));
 
     // Los alfas de los velos derivados. No son números redondos por capricho: son los
     // que el código ya usaba a mano (0x14 y 0x22 para una fila, 0x33 para la fila bajo
     // el ratón), promediados, para que los temas de siempre no cambien de aspecto.
-    const byte VeloSuperficie = 0x1E, VeloAlta = 0x33, VeloBorde = 0x3A, VeloSeleccion = 0x33;
+    const byte VeloSeleccion = 0x33;
 
     static Color Velo(Color sobre, byte alfa) => Color.FromArgb(alfa, sobre.R, sobre.G, sobre.B);
 
@@ -168,21 +195,7 @@ public sealed class Roles
     internal static Color Aplanar(Color c, Color fondo) =>
         c.A == 0xFF ? c : Contraste.Mezclar(fondo, Color.FromRgb(c.R, c.G, c.B), c.A / 255.0);
 
-    // Un hex del config, o null si no está puesto o está mal escrito. Un color mal
-    // escrito no puede tumbar el arranque: se deriva y se apunta.
-    static Color? Leer(string? hex)
-    {
-        if (string.IsNullOrWhiteSpace(hex)) return null;
-        try { return (Color)ColorConverter.ConvertFromString(hex); }
-        catch
-        {
-            Log.Info($"el color \"{hex}\" del tema no se entiende: se usa el derivado");
-            return null;
-        }
-    }
-
     // Roles de emergencia, para antes de que haya tema aplicado (y para los tests de
     // un widget suelto). Nunca se devuelve null: un widget siempre tiene de qué pintar.
-    public static Roles PorDefecto() =>
-        Desde(new Tema(), Color.FromArgb(0xE6, 0, 0, 0), Colors.White, Color.FromRgb(0x7A, 0xA2, 0xF7));
+    public static Roles PorDefecto() => Desde(Pintura.PorDefecto());
 }

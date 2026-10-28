@@ -151,8 +151,9 @@ public partial class MainWindow
                 icono.Text = Bateria.Glifo(energia);
                 // El color dice lo que pasa: ámbar en ahorro, coral cuando queda poco y no
                 // está enchufado. Por debajo del 15 % y sin cable es cuando hay que mirar.
-                icono.Foreground = energia.Ahorro ? Brushes.Gold
-                                 : energia.PorCiento <= 15 && !energia.Enchufado ? Brushes.Tomato
+                icono.Foreground = energia.Ahorro ? _roles.Pincel("bateria.ahorro")
+                                 : energia.PorCiento <= 15 && !energia.Enchufado
+                                   ? _roles.Pincel("bateria.bajo")
                                  : _texto;
                 b.ToolTip = $"Batería: {energia.PorCiento}% · {Bateria.Texto(energia)}";
             }

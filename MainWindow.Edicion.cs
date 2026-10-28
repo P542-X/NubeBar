@@ -592,8 +592,8 @@ public partial class MainWindow : Window
         {
             var fondo = new Border
             {
-                Background = new SolidColorBrush(Color.FromArgb(0x12, _roles.Acento.R, _roles.Acento.G, _roles.Acento.B)),
-                BorderBrush = new SolidColorBrush(Color.FromArgb(0x30, _roles.Acento.R, _roles.Acento.G, _roles.Acento.B)),
+                Background = _roles.Pincel("editor.zona.fondo"),
+                BorderBrush = _roles.Pincel("editor.zona.filo"),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(6),
                 Margin = new Thickness(1, 1, 1, 1),
@@ -628,10 +628,8 @@ public partial class MainWindow : Window
         foreach (var (nombre, fondo) in _fondosZona)
         {
             bool activa = zona != null && string.Equals(nombre, zona, StringComparison.OrdinalIgnoreCase);
-            fondo.Background = new SolidColorBrush(Color.FromArgb(activa ? (byte)0x30 : (byte)0x12,
-                                                                 _roles.Acento.R, _roles.Acento.G, _roles.Acento.B));
-            fondo.BorderBrush = new SolidColorBrush(Color.FromArgb(activa ? (byte)0x90 : (byte)0x30,
-                                                                  _roles.Acento.R, _roles.Acento.G, _roles.Acento.B));
+            fondo.Background = _roles.Pincel(activa ? "editor.zona.fondo.activa" : "editor.zona.fondo");
+            fondo.BorderBrush = _roles.Pincel(activa ? "editor.zona.filo.activa" : "editor.zona.filo");
         }
     }
 }

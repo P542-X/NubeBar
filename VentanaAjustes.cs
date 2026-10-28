@@ -39,18 +39,29 @@ public sealed partial class VentanaAjustes : Window
     const string FuenteDeIconos = MainWindow.FuenteIconos;
 
 
-    SolidColorBrush _fondo = new(Color.FromRgb(0x16, 0x16, 0x1A));
-    SolidColorBrush _texto = new(Colors.White);
-    SolidColorBrush _acento = new(Color.FromRgb(0x7A, 0xA2, 0xF7));
-    SolidColorBrush _superficie = new(Color.FromArgb(0x1E, 255, 255, 255));
-    SolidColorBrush _superficieAlta = new(Color.FromArgb(0x33, 255, 255, 255));
-    SolidColorBrush _textoAtenuado = new(Color.FromRgb(0xA0, 0xA0, 0xA0));
+    // ---------- Los colores de antes de leer el tema ----------
+    //
+    // Eran seis hexadecimales escritos aquí. Duraban los milisegundos que tarda
+    // `LeerColoresDelTema` en correr, pero eran seis colores de la interfaz que el usuario no
+    // podía cambiar, y además eran OTROS: un gris #16161A que no es el fondo de ningún tema.
+    //
+    // Ahora salen del tema de serie, igual que todo lo demás. Si algún día esta ventana se
+    // abre antes de que haya tema, lo que se ve un instante es Profesional y no un gris que
+    // no es de nadie.
+    static readonly Roles DeSerie = Roles.PorDefecto();
+
+    SolidColorBrush _fondo = new(DeSerie.FondoOpaco);
+    SolidColorBrush _texto = new(DeSerie.Texto);
+    SolidColorBrush _acento = new(DeSerie.Acento);
+    SolidColorBrush _superficie = new(DeSerie.Superficie);
+    SolidColorBrush _superficieAlta = new(DeSerie.SuperficieAlta);
+    SolidColorBrush _textoAtenuado = new(DeSerie.TextoAtenuado);
     // El fondo de lo ELEGIDO y el acento cuando hace de texto. Salen de los roles, no de
     // una mezcla a mano: es la regla desde la Fase A y lo que hace que funcionen igual en
     // los siete temas, en claro y en oscuro.
-    SolidColorBrush _elegido = new(Color.FromArgb(0x33, 0x7A, 0xA2, 0xF7));
-    SolidColorBrush _acentoLegible = new(Color.FromRgb(0x7A, 0xA2, 0xF7));
-    internal Roles _roles = Roles.PorDefecto();
+    SolidColorBrush _elegido = new(DeSerie.Seleccion);
+    SolidColorBrush _acentoLegible = new(DeSerie.AcentoTinta);
+    internal Roles _roles = DeSerie;
 
     TabControl _pestanas = new();
     readonly RegistroAjustes _modulos = new();
@@ -123,9 +134,9 @@ public sealed partial class VentanaAjustes : Window
     {
         // El fondo de esta ventana es OPACO a propósito, aunque el tema traiga alfa:
         // es una ventana normal, no la isla.
-        var fondo  = Opaco(Hex(_arbol.Texto("Tema", "Fondo", "#E6000000"), Color.FromRgb(0x16, 0x16, 0x1A)));
-        var texto  = Hex(_arbol.Texto("Tema", "Texto", "#FFFFFF"), Colors.White);
-        var acento = Hex(_arbol.Texto("Tema", "Acento", "#7AA2F7"), Color.FromRgb(0x7A, 0xA2, 0xF7));
+        var fondo  = Opaco(Hex(_arbol.Texto("Tema", "Fondo", "#E6000000"), DeSerie.FondoOpaco));
+        var texto  = Hex(_arbol.Texto("Tema", "Texto", "#FFFFFF"), DeSerie.Texto);
+        var acento = Hex(_arbol.Texto("Tema", "Acento", "#7AA2F7"), DeSerie.Acento);
 
         _fondo = new SolidColorBrush(fondo);
         _texto = new SolidColorBrush(texto);
@@ -298,7 +309,7 @@ public sealed partial class VentanaAjustes : Window
             BorderBrush = new SolidColorBrush(_roles.Borde),
             BorderThickness = new Thickness(1),
             Effect = new System.Windows.Media.Effects.DropShadowEffect
-            { BlurRadius = 24, ShadowDepth = 0, Opacity = 0.5, Color = Colors.Black }
+            { BlurRadius = 24, ShadowDepth = 0, Opacity = 0.5, Color = _roles.ColorDe(ClavesBase.Sombra) }
         };
 
         var rejilla = new Grid();
@@ -1389,7 +1400,7 @@ public sealed partial class VentanaAjustes : Window
             Content = texto,
             Margin = new Thickness(8, 0, 0, 0),
             Padding = new Thickness(18, 7, 18, 7),
-            Foreground = destacado ? Brushes.Black : _texto,
+            Foreground = destacado ? _roles.Pincel(ClavesBase.SobreAcento) : _texto,
             Background = destacado ? _acento : _superficieAlta,
             BorderThickness = new Thickness(0),
             Cursor = Cursors.Hand
@@ -2007,19 +2018,19 @@ public sealed partial class VentanaAjustes : Window
 
         p.Grupo("Fondo (con opacidad)", IconoDeGrupo("Fondo (con opacidad)"));
         var selFondo = new SelectorColor { ConOpacidad = true }.Montar();
-        selFondo.Valor = Hex(_arbol.Texto("Tema", "Fondo", "#E6000000"), Colors.Black);
+        selFondo.Valor = Hex(_arbol.Texto("Tema", "Fondo", "#E6000000"), DeSerie.Fondo);
         selFondo.Cambiado += v => { _arbol.Poner("Tema", "Fondo", SelectorColor.AHex(v, true)); Cambio(); };
         p.Mas(selFondo);
 
         p.Grupo("Texto", IconoDeGrupo("Texto"));
         var selTexto = new SelectorColor { ConOpacidad = false }.Montar();
-        selTexto.Valor = Hex(_arbol.Texto("Tema", "Texto", "#FFFFFF"), Colors.White);
+        selTexto.Valor = Hex(_arbol.Texto("Tema", "Texto", "#FFFFFF"), DeSerie.Texto);
         selTexto.Cambiado += v => { _arbol.Poner("Tema", "Texto", SelectorColor.AHex(v, false)); Cambio(); };
         p.Mas(selTexto);
 
         p.Grupo("Acento", IconoDeGrupo("Acento"));
         var selAcento = new SelectorColor { ConOpacidad = false }.Montar();
-        selAcento.Valor = Hex(_arbol.Texto("Tema", "Acento", "#7AA2F7"), Colors.CornflowerBlue);
+        selAcento.Valor = Hex(_arbol.Texto("Tema", "Acento", "#7AA2F7"), DeSerie.Acento);
         selAcento.Cambiado += v => { _arbol.Poner("Tema", "Acento", SelectorColor.AHex(v, false)); Cambio(); };
         p.Mas(selAcento);
 
@@ -2048,7 +2059,7 @@ public sealed partial class VentanaAjustes : Window
             tira.Children.Add(new Border
             {
                 Width = 18, Height = 10,
-                Background = new SolidColorBrush(Opaco(Hex(hex, Colors.Gray))),
+                Background = new SolidColorBrush(Opaco(Hex(hex, _roles.TextoAtenuado))),
                 CornerRadius = new CornerRadius(2),
                 Margin = new Thickness(0, 0, 3, 0)
             });
@@ -2306,7 +2317,7 @@ public sealed partial class VentanaAjustes : Window
         var p = NuevaPagina("atajos");
         p.Grupo("Vista general de ventanas", IconoDeGrupo("Vista general de ventanas"));
 
-        var aviso = new TextBlock { Foreground = Brushes.Tomato, Margin = new Thickness(0, 6, 0, 0), TextWrapping = TextWrapping.Wrap };
+        var aviso = new TextBlock { Foreground = _roles.Pincel("ajustes.aviso.mal"), Margin = new Thickness(0, 6, 0, 0), TextWrapping = TextWrapping.Wrap };
         var campo = new TextBox
         {
             Text = _arbol.Texto("Barra", "AtajoVistaGeneral", Barra.AtajoDeSerie),
@@ -2342,14 +2353,14 @@ public sealed partial class VentanaAjustes : Window
 
             if (ComprobarAtajo(combo, out string problema))
             {
-                aviso.Foreground = Brushes.YellowGreen;
+                aviso.Foreground = _roles.Pincel("ajustes.aviso.bien");
                 aviso.Text = "Libre: se puede usar.";
                 _arbol.Poner("Barra", "AtajoVistaGeneral", combo);
                 Cambio();
             }
             else
             {
-                aviso.Foreground = Brushes.Tomato;
+                aviso.Foreground = _roles.Pincel("ajustes.aviso.mal");
                 aviso.Text = problema;
             }
         };
@@ -2383,12 +2394,12 @@ public sealed partial class VentanaAjustes : Window
         {
             if (ComprobarAtajo(campo.Text, out string problema))
             {
-                aviso.Foreground = Brushes.YellowGreen;
+                aviso.Foreground = _roles.Pincel("ajustes.aviso.bien");
                 aviso.Text = "La combinación guardada está libre.";
             }
             else
             {
-                aviso.Foreground = Brushes.Tomato;
+                aviso.Foreground = _roles.Pincel("ajustes.aviso.mal");
                 aviso.Text = problema;
             }
         };
@@ -2475,7 +2486,7 @@ public sealed partial class VentanaAjustes : Window
                     // El mapa lo rechazó: el problema está en sus `Problemas`, y el que
                     // habla de esta combinación es el que hay que enseñar.
                     var mio = mapa.Problemas.FirstOrDefault(x => x.Contains(c, StringComparison.OrdinalIgnoreCase));
-                    fila.Estado.Foreground = Brushes.Tomato;
+                    fila.Estado.Foreground = _roles.Pincel("ajustes.aviso.mal");
                     fila.Estado.Text = mio ?? "en conflicto";
                     continue;
                 }
@@ -2483,7 +2494,7 @@ public sealed partial class VentanaAjustes : Window
                 fila.Estado.Text = "pendiente de comprobar";
             }
 
-            avisoGeneral.Foreground = mapa.Bien ? _textoAtenuado : Brushes.Tomato;
+            avisoGeneral.Foreground = mapa.Bien ? _textoAtenuado : _roles.Pincel("ajustes.aviso.mal");
             avisoGeneral.Text = mapa.Bien
                 ? $"{mapa.Atajos.Count} atajos sin conflictos entre ellos. " +
                   "«Comprobar» pregunta a Windows cuáles están ya cogidos."
@@ -2572,7 +2583,7 @@ public sealed partial class VentanaAjustes : Window
                 if ((Keyboard.Modifiers & ModifierKeys.Windows) != 0) partes.Add("Win");
                 if (partes.Count == 0)
                 {
-                    estado.Foreground = Brushes.Tomato;
+                    estado.Foreground = _roles.Pincel("ajustes.aviso.mal");
                     estado.Text = "añade Ctrl, Alt, Shift o Win";
                     return;
                 }
@@ -2601,18 +2612,18 @@ public sealed partial class VentanaAjustes : Window
 
                 if (ComprobarAtajo(c, out string problema))
                 {
-                    fila.Estado.Foreground = Brushes.YellowGreen;
+                    fila.Estado.Foreground = _roles.Pincel("ajustes.aviso.bien");
                     fila.Estado.Text = "libre";
                     libres++;
                 }
                 else
                 {
-                    fila.Estado.Foreground = Brushes.Tomato;
+                    fila.Estado.Foreground = _roles.Pincel("ajustes.aviso.mal");
                     fila.Estado.Text = problema;
                     cogidos++;
                 }
             }
-            avisoGeneral.Foreground = cogidos > 0 ? Brushes.Tomato : _textoAtenuado;
+            avisoGeneral.Foreground = cogidos > 0 ? _roles.Pincel("ajustes.aviso.mal") : _textoAtenuado;
             avisoGeneral.Text = $"{libres} libre(s), {cogidos} ya cogido(s) por otras aplicaciones. " +
                                 (cogidos > 0 ? "Cambia los rojos: Windows se los entrega a quien los pidió primero."
                                              : "Se pueden usar todos.");
@@ -2646,7 +2657,7 @@ public sealed partial class VentanaAjustes : Window
             var mapa = HyprAtajos.Construir(crudo, new[] { _arbol.Texto("Barra", "AtajoVistaGeneral", Barra.AtajoDeSerie) });
             if (!mapa.Bien)
             {
-                avisoGeneral.Foreground = Brushes.Tomato;
+                avisoGeneral.Foreground = _roles.Pincel("ajustes.aviso.mal");
                 avisoGeneral.Text = "No se guarda: " + string.Join(" · ", mapa.Problemas);
                 return;
             }
@@ -2655,7 +2666,7 @@ public sealed partial class VentanaAjustes : Window
             // esta versión no conozca se conservan.
             _arbol.PonerAtajos("NubeHypr", mapa.Atajos);
             Cambio();
-            avisoGeneral.Foreground = Brushes.YellowGreen;
+            avisoGeneral.Foreground = _roles.Pincel("ajustes.aviso.bien");
             avisoGeneral.Text = $"{mapa.Atajos.Count} atajos guardados. " +
                                 "Se registran al aplicar, y solo si la capa está encendida.";
             Log.Info($"atajos de NubeHypr: {mapa.Atajos.Count} guardados desde Ajustes");
@@ -3508,7 +3519,7 @@ public sealed partial class VentanaAjustes : Window
     {
         var fila = new StackPanel();
         var sel = new SelectorColor { ConOpacidad = false }.Montar();
-        sel.Valor = Paleta.Leer(LeerFondo(clave, porDefecto), Colors.Black);
+        sel.Valor = Paleta.Leer(LeerFondo(clave, porDefecto), _roles.FondoOpaco);
         sel.Cambiado += v => EscribirFondo(clave, SelectorColor.AHex(v, false));
         fila.Children.Add(sel);
         return fila;
@@ -3587,7 +3598,7 @@ public sealed partial class VentanaAjustes : Window
             switch (tipo)
             {
                 case "solido":
-                    marco.Background = new SolidColorBrush(Paleta.Leer(LeerFondo("Color1", "#1A1B26"), Colors.Black));
+                    marco.Background = new SolidColorBrush(Paleta.Leer(LeerFondo("Color1", "#1A1B26"), _roles.FondoOpaco));
                     break;
 
                 case "degradado":
@@ -3595,8 +3606,8 @@ public sealed partial class VentanaAjustes : Window
                     double g = LeerNumFondo("Angulo", 135);
                     double rad = g * Math.PI / 180.0;
                     marco.Background = new LinearGradientBrush(
-                        Paleta.Leer(LeerFondo("Color1", "#0B0D14"), Colors.Black),
-                        Paleta.Leer(LeerFondo("Color2", "#7AA2F7"), Colors.White),
+                        Paleta.Leer(LeerFondo("Color1", "#0B0D14"), _roles.FondoOpaco),
+                        Paleta.Leer(LeerFondo("Color2", "#7AA2F7"), _roles.SuperficieAltaSolida),
                         new Point(0.5 - Math.Cos(rad) / 2, 0.5 - Math.Sin(rad) / 2),
                         new Point(0.5 + Math.Cos(rad) / 2, 0.5 + Math.Sin(rad) / 2));
                     break;
@@ -3666,7 +3677,7 @@ public sealed partial class VentanaAjustes : Window
         p.Mas(Interruptor("Arrancar con Windows", Arranque.Activo, v =>
         {
             bool ok = Arranque.Poner(v, out string msg);
-            estado.Foreground = ok ? _texto : Brushes.Tomato;
+            estado.Foreground = ok ? _texto : _roles.Pincel("ajustes.aviso.mal");
             estado.Opacity = ok ? 0.6 : 1;
             estado.Text = (ok ? "Hecho: " : "No se pudo: ") + msg;
         }));

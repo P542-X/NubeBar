@@ -97,6 +97,7 @@ public static partial class Pruebas
 
             // Fase 0 del rediseño: el catálogo de colores y los nueve temas de serie
             CorrerTemas();
+            SinColoresAMano();
 
             // C5: esquema y migraciones
             EsquemaDeducir();

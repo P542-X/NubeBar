@@ -140,7 +140,7 @@ public sealed class Pintura
         }
 
         // ---------- 2. El tema ----------
-        if (Tema.Color(clave) is { } delTema) return delTema;
+        if (Tema.Declarado(clave) is { } delTema) return delTema;
 
         // ---------- 3. La derivación ----------
         if (ficha is null)

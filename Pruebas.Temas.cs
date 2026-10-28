@@ -109,15 +109,15 @@ public static partial class Pruebas
         // de la maqueta aprobada, y una que falte significa que se perdió al copiarla.
         foreach (var t in todos.Values)
             foreach (var clave in ClavesBase.Todas)
-                Vale(t.Color(clave) is not null, $"[{t.Id}] declara «{clave}»");
+                Vale(t.Declarado(clave) is not null, $"[{t.Id}] declara «{clave}»");
 
         // Valores concretos de la maqueta, como centinelas de que el fichero es el bueno y no
         // una copia vieja.
         var pro = TemasDeSerie.De("profesional");
-        Igual("#FF8DA9E8", Relleno.Hex(pro.Color(ClavesBase.Acento)!.Color), "Profesional: el acento es #8DA9E8");
+        Igual("#FF8DA9E8", Relleno.Hex(pro.Declarado(ClavesBase.Acento)!.Color), "Profesional: el acento es #8DA9E8");
         Vale(!pro.Claro, "Profesional es oscuro");
         Igual(23.0, pro.Radio(Piezas.Isla, 0), "Profesional: la isla tiene radio 23");
-        Vale(pro.Color(ClavesBase.FiloPanel)!.EsDegradado, "Profesional: el filo del panel es un degradado");
+        Vale(pro.Declarado(ClavesBase.FiloPanel)!.EsDegradado, "Profesional: el filo del panel es un degradado");
 
         var juegos = TemasDeSerie.De("videojuegos");
         Igual(Esquinas.Chaflan, juegos.Esquinas, "Videojuegos va en chaflán");
@@ -145,13 +145,13 @@ public static partial class Pruebas
         // le exige a la etiqueta de un control relleno. Pasó a su propia tinta ciruela, que da
         // 4,77:1 y ya estaba en su paleta. Esta prueba existe para que nadie «restaure el
         // valor de la maqueta» dentro de seis meses sin saber por qué se cambió.
-        Igual("#FF4A3B5C", Relleno.Hex(TemasDeSerie.De("sakura").Color(ClavesBase.SobreAcento)!.Color),
+        Igual("#FF4A3B5C", Relleno.Hex(TemasDeSerie.De("sakura").Declarado(ClavesBase.SobreAcento)!.Color),
               "Sakura escribe en ciruela encima de su acento, no en blanco (2,13:1 era ilegible)");
 
         var oficina = TemasDeSerie.De("oficina");
         Vale(oficina.Claro, "Oficina es claro");
         Igual(0, oficina.Decoraciones.Count, "y no lleva ninguna decoración: sin mascota ni partículas");
-        Vale(oficina.Color(ClavesBase.Halo)!.EsInvisible, "su halo está apagado a propósito");
+        Vale(oficina.Declarado(ClavesBase.Halo)!.EsInvisible, "su halo está apagado a propósito");
 
         // El fondo con prosa detrás se guarda sin perderla.
         Vale(juegos.FondoExtra?.Contains("rejilla") == true,

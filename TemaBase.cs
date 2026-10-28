@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
+using System.Windows.Media;
 
 namespace NubeBar;
 
@@ -109,7 +110,11 @@ public sealed class TemaBase
     // Lo que el tema DECLARA para esa clave, o null si calla. Null significa «derívalo»,
     // nunca «transparente»: un tema que quiera apagar algo escribe `transparent`, que sí es
     // un valor (es lo que hacen Oficina con el halo y el destello).
-    public Relleno? Color(string clave) =>
+    // Se llama «Declarado» y no «Color» porque es exactamente eso —lo que el tema dice, no lo
+    // que acaba pintándose, que lo decide la cascada— y porque un miembro llamado `Color`
+    // dentro de esta clase tapa a `System.Windows.Media.Color` y obliga a cualificar el tipo
+    // en cada línea.
+    public Relleno? Declarado(string clave) =>
         Colores.TryGetValue(clave, out var r) ? r : null;
 
     public double Radio(string pieza, double siNoLoDice) =>
@@ -135,6 +140,93 @@ public sealed class TemaBase
     public string? Texto(string clave) => Textos.TryGetValue(clave, out var t) ? t : null;
 
     public override string ToString() => $"{Nombre} ({Id})";
+
+    // ================= El puente con los temas de antes del rediseño =================
+    //
+    // ---------- Por qué existe y cuándo se va ----------
+    //
+    // Los temas de antes (`Temas.Predefinidos`: Nube, Claro, Tokyo Night, Gruvbox…) son tres
+    // colores más diez roles opcionales dentro de `Tema`, y los deriva `Roles` con sus propias
+    // cuentas. Los nuevos son paquetes de 19 valores que resuelve el catálogo.
+    //
+    // Mientras los dos convivan hay que elegir: o dos cascadas en paralelo, o una sola y un
+    // puente. Dos cascadas es la respuesta equivocada —es exactamente el «no hay colores
+    // escritos a mano» incumplido desde el primer día, con dos sitios donde arreglar cada
+    // cosa— así que: una sola cascada, y los temas viejos entran por aquí.
+    //
+    // ---------- Y por qué repite las derivaciones de antes ----------
+    //
+    // A propósito, y es lo único feo de este fichero. Las derivaciones del catálogo son las de
+    // la MAQUETA (la tarjeta al 12 %, el elegido al 18 %); las de antes eran otras (0x1E,
+    // 0x33). Si un tema viejo entrara sin sus valores, los ocho temas de siempre cambiarían de
+    // aspecto el día que se enchufó el catálogo — y eso no es «migrar al rediseño», es
+    // estropearle el tema a quien no ha pedido nada.
+    //
+    // Así que el puente DECLARA lo que el tema viejo callaba, con la cuenta que se le aplicaba
+    // antes. El tema viejo deja de tener derivaciones propias: pasa a ser un paquete de
+    // valores, como los nuevos. Cuando los ocho temas de antes se retiren (fase 0, último
+    // paso), este método se va con ellos.
+    public static TemaBase DeTemaViejo(Tema t, Color fondo, Color texto, Color acento)
+    {
+        var fondoOpaco = Color.FromRgb(fondo.R, fondo.G, fondo.B);
+        var colores = new Dictionary<string, Relleno>(StringComparer.OrdinalIgnoreCase);
+
+        void Poner(string clave, Color c) => colores[clave] = Relleno.Liso(c);
+        Color Velo(Color sobre, byte alfa) => Color.FromArgb(alfa, sobre.R, sobre.G, sobre.B);
+        Color? Leido(string? hex) => Relleno.LeerColor(hex);
+
+        // Los tres de siempre, ya resueltos por quien llama (con el wallpaper aplicado y el
+        // acento corregido): no se vuelven a leer del config.
+        Poner(ClavesBase.Superficie, fondo);
+        Poner(ClavesBase.Tinta, texto);
+        Poner(ClavesBase.Acento, acento);
+
+        // Y los diez roles opcionales, con la derivación de antes cuando el tema calla. Los
+        // alfas son los que tenía escritos `Roles` (0x1E para una tarjeta, 0x33 para la de
+        // debajo del ratón, 0x3A para un filo), que a su vez eran los que el código usaba a
+        // mano antes de que los roles existieran.
+        Poner(ClavesBase.Tarjeta, Leido(t.Superficie) ?? Velo(texto, 0x1E));
+        Poner("tarjeta.fondo.raton", Leido(t.SuperficieAlta) ?? Velo(texto, 0x33));
+        Poner(ClavesBase.Filo, Leido(t.Borde) ?? Velo(texto, 0x3A));
+        Poner(ClavesBase.Tenue, Leido(t.TextoAtenuado) ?? Contraste.Mezclar(texto, fondoOpaco, 0.35));
+
+        // `Secundario` y `Sistema`, si el tema no los da, son el propio acento: un tema de
+        // tres colores NO se inventa un naranja que su autor no eligió. Era la regla de
+        // `Roles` y sigue siendo la correcta.
+        Poner(ClavesBase.Sec1, Leido(t.Secundario) ?? acento);
+        Poner(ClavesBase.Sec2, Leido(t.Sistema) ?? acento);
+
+        // Los semánticos sí tienen color propio aunque el tema calle: un «batería baja» en
+        // rojo tiene que seguir siendo rojo en Gruvbox.
+        Poner(ClavesBase.Ok, Leido(t.Positivo) ?? Color.FromRgb(0x2E, 0xA0, 0x72));
+        Poner("aviso", Leido(t.Aviso) ?? Color.FromRgb(0xE8, 0x9C, 0x3C));
+        Poner(ClavesBase.Peligro, Leido(t.Negativo) ?? Color.FromRgb(0xDA, 0x44, 0x53));
+
+        // El panel se pintaba con el mismo fondo de la isla, y el filo de la isla y el del
+        // panel eran el mismo filo. Los temas nuevos los separan; los viejos no los tenían.
+        Poner(ClavesBase.PanelFondo, fondo);
+        colores[ClavesBase.FiloIsla] = colores[ClavesBase.Filo];
+        colores[ClavesBase.FiloPanel] = colores[ClavesBase.Filo];
+
+        return new TemaBase
+        {
+            Id = "(tema anterior)",
+            Nombre = "Personalizado",
+            Familia = "Mis temas",
+            // Claro u oscuro se MIDE, no se declara: los temas de antes no lo decían, y de
+            // esto dependen las derivaciones que el puente no cubre (las ~110 claves de la
+            // interfaz, que sí salen del catálogo).
+            Claro = Contraste.Luminancia(fondoOpaco) >= 0.5,
+            Fuente = string.IsNullOrWhiteSpace(t.Fuente) ? "Segoe UI" : t.Fuente,
+            FuenteTitulos = string.IsNullOrWhiteSpace(t.Fuente) ? "Segoe UI" : t.Fuente,
+            Colores = colores,
+            Radios = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase)
+            {
+                [Piezas.Isla] = t.Radio,
+                [Piezas.Panel] = t.Radio,
+            },
+        };
+    }
 }
 
 // ================= Los nueve de serie =================
