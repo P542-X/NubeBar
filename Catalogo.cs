@@ -153,18 +153,6 @@ public static class Catalogo
             return Relleno.Liso(Contraste.Legible(Contraste.Mezclar(p.Color(otra), fondo, k), fondo, minimo));
         };
 
-    // Dos colores que dirían lo mismo. «Aquí estás» y «cuidado» no pueden salir del mismo
-    // tono: si salen, el color deja de informar y queda de adorno. Se mide por TONO y solo
-    // cuenta si los dos están saturados — dos grises no se confunden, se parecen.
-    const double TonosQueSeTocan = 32;
-
-    internal static bool SeConfunden(Color a, Color b)
-    {
-        if (Contraste.Saturacion(a) < 0.25 || Contraste.Saturacion(b) < 0.25) return false;
-        double d = Math.Abs(Contraste.Tono(a) - Contraste.Tono(b));
-        return Math.Min(d, 360 - d) < TonosQueSeTocan;
-    }
-
     // ================= La tabla =================
 
     static ClaveColor[] Montar() => Comunes()
@@ -304,24 +292,30 @@ public static class Catalogo
         // pero tiene que poder cambiarse: en un tema CLARO el halo útil es oscuro.
         // ---------- El escritorio actual ----------
         //
-        // Era un cian fijo (`HyprPinta.AzulNube`) con este motivo escrito al lado: «el azul no
-        // es el acento del tema; si lo fuera, en el tema Nube "aquí estás" saldría coral, que
-        // es el color de los avisos».
+        // Era un cian fijo (`HyprPinta.AzulNube`), y SIGUE SIENDO ese color: el usuario lo pidió
+        // así al verlo cambiado — «el botón 1 déjalo como estaba». Lo único que cambia es que
+        // ahora tiene nombre y se puede editar, que es lo que pide la decisión B; el aspecto no
+        // se mueve ni un tono.
         //
-        // El motivo es bueno y se conserva; lo que no se puede conservar es el color escrito a
-        // mano. Con los nueve temas ese cian no es de ninguno: el usuario lo vio en Profesional
-        // y lo dijo — «sobresale un rectángulo, queda feísimo». Así que la regla pasa a ser la
-        // DERIVACIÓN: manda el acento, y solo si el acento se confunde con el color de peligro
-        // —que es lo que pasa en Samurái, Sakura y Otoño— manda el secundario. Un tema puede
-        // declarar el suyo y el usuario cambiarlo, como cualquier otra clave.
+        // El motivo del color sigue escrito donde lo dejó su autor (`MainWindow.Escritorios.cs`)
+        // y es bueno: en NubeHypr el azul significa «aquí estás», y si saliera del acento, un
+        // tema de acento rojo diría «aquí estás» con el color de los avisos. La regla entera
+        // vive ahora en esta derivación: manda el color de sistema del tema si de verdad es
+        // azul, y si no, el azul de la casa. Es lo mismo que hacía `HyprPinta.Azul`.
         C("escritorio.actual.fondo", ZonaColor.Isla, "Escritorio actual",
-          p => Relleno.Liso(SeConfunden(p.Color(ClavesBase.Acento), p.Color(ClavesBase.Peligro))
+          p => Relleno.Liso(HyprPinta.EsAzul(p.Color(ClavesBase.Sec2))
                                 ? p.Color(ClavesBase.Sec2)
-                                : p.Color(ClavesBase.Acento))),
-        // Blanco o negro, el que más se lea. No vale aclarar la tinta del tema hacia el
-        // relleno: partiendo de un texto casi blanco, `Legible` no tiene a dónde ir sobre un
-        // acento de tono medio y se queda en 2,3:1 — lo midieron las pruebas en los nueve.
-        // Es la misma cuenta que `sobre-acento`, y por el mismo motivo.
+                                : HyprPinta.AzulNube)),
+        // ---------- Y el número de encima, que SÍ cambia ----------
+        //
+        // Hacía `Legible(tinta, relleno)`: coger el texto del tema y acercarlo al blanco o al
+        // negro hasta que se lea. El problema es que la tinta de un tema oscuro ya es casi
+        // blanca, así que sobre un cian claro no tiene a dónde ir: se quedaba en **2,2:1** en
+        // Profesional, Videojuegos, Samurái y Sad. O sea, el número del escritorio en el que
+        // estás era lo que peor se leía de la barra, y nadie lo había medido hasta ahora.
+        //
+        // Blanco o negro, el que más se lea — la misma cuenta que `sobre-acento`. La pastilla
+        // no cambia de color; lo que cambia es que el número se lee.
         C("escritorio.actual.texto", ZonaColor.Isla, "Número del escritorio actual",
           p => Relleno.Liso(Contraste.TintaSobre(p.ColorOpaco("escritorio.actual.fondo"))),
           Papel.Texto, "escritorio.actual.fondo"),
