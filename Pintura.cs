@@ -48,12 +48,20 @@ public sealed class Pintura
     readonly HashSet<string> _enCurso = new(StringComparer.OrdinalIgnoreCase);
     readonly Dictionary<string, Brush> _pinceles = new(StringComparer.OrdinalIgnoreCase);
 
-    public Pintura(TemaBase tema, IReadOnlyDictionary<string, string>? delUsuario = null)
+    // Los radios que el usuario ha cambiado, por pieza. Misma cascada que los colores:
+    // usuario, tema, y un valor razonable si ninguno dice nada.
+    public IReadOnlyDictionary<string, double> RadiosDelUsuario { get; }
+
+    public Pintura(TemaBase tema, IReadOnlyDictionary<string, string>? delUsuario = null,
+                   IReadOnlyDictionary<string, double>? radios = null)
     {
         Tema = tema;
         DelUsuario = delUsuario is null
             ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             : new Dictionary<string, string>(delUsuario, StringComparer.OrdinalIgnoreCase);
+        RadiosDelUsuario = radios is null
+            ? new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, double>(radios, StringComparer.OrdinalIgnoreCase);
     }
 
     public static Pintura PorDefecto() => new(TemasDeSerie.De(TemasDeSerie.Predeterminado));
@@ -111,13 +119,17 @@ public sealed class Pintura
         return System.Windows.Media.Color.FromRgb(s.R, s.G, s.B);
     }
 
-    public double Radio(string pieza) => Tema.Radio(pieza, pieza switch
+    public double Radio(string pieza)
     {
-        Piezas.Isla => 20,
-        Piezas.Panel => 18,
-        Piezas.Tarjeta => 12,
-        _ => 10,
-    });
+        if (RadiosDelUsuario.TryGetValue(pieza, out var mio)) return Math.Clamp(mio, 0, 48);
+        return Tema.Radio(pieza, pieza switch
+        {
+            Piezas.Isla => 20,
+            Piezas.Panel => 18,
+            Piezas.Tarjeta => 12,
+            _ => 10,
+        });
+    }
 
     public bool Personalizado(string clave) => DelUsuario.ContainsKey(clave);
 

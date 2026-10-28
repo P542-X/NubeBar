@@ -130,58 +130,43 @@ public sealed partial class VentanaAjustes : Window
         MouseLeftButtonDown += (_, e) => { if (e.ButtonState == MouseButtonState.Pressed) DragMove(); };
     }
 
+    // Si el tema puesto deja esta ventana ilegible, se pinta con Profesional y hay que
+    // decírselo al usuario. Lo decide `Pintura.ParaAjustes()`; esto solo recuerda que pasó
+    // para que el aviso de arriba pueda contarlo (ver `AvisoDeTemaIlegible`).
+    internal bool TemaIlegible { get; private set; }
+
     void LeerColoresDelTema()
     {
-        // El fondo de esta ventana es OPACO a propósito, aunque el tema traiga alfa:
-        // es una ventana normal, no la isla.
-        var fondo  = Opaco(Hex(_arbol.Texto("Tema", "Fondo", "#E6000000"), DeSerie.FondoOpaco));
-        var texto  = Hex(_arbol.Texto("Tema", "Texto", "#FFFFFF"), DeSerie.Texto);
-        var acento = Hex(_arbol.Texto("Tema", "Acento", "#7AA2F7"), DeSerie.Acento);
-
-        _fondo = new SolidColorBrush(fondo);
-        _texto = new SolidColorBrush(texto);
-        _acento = new SolidColorBrush(acento);
-
-        // Los mismos roles que la isla, calculados aquí porque esta ventana lee el
-        // árbol del config y no el Config ya cargado (así la vista previa es en vivo).
+        // ---------- La cascada, igual que en la barra ----------
         //
-        // Antes, los fondos de esta ventana eran blancos fijos
-        // —`FromArgb(0x18, 255, 255, 255)`— escritos ocho veces. Con un tema claro eso
-        // es un velo blanco sobre blanco: invisible. Ahora salen del color de texto
-        // del tema, así que funcionan igual en claro y en oscuro.
-        _roles = Roles.Desde(TemaDelArbol(), fondo, texto, acento);
+        // Se lee del ÁRBOL y no del `Config` ya cargado para que la vista previa sea en vivo:
+        // tocas un color y esta ventana se repinta con él antes de guardar nada.
+        var pintura = new Pintura(TemasDeSerie.De(_arbol.Texto("Tema", "Id", "profesional")),
+                                  _arbol.Colores("Tema"), _arbol.Radios("Tema"));
+
+        // ---------- La regla de seguridad ----------
+        //
+        // «Un tema nunca puede dejar Ajustes ilegible». El usuario puede cambiarlo todo, así
+        // que puede hacerse un tema en el que no se lea nada — y si lo que no se lee es esta
+        // ventana, se ha quedado sin el sitio desde el que arreglarlo. Entonces se pinta con
+        // Profesional y se avisa arriba de por qué.
+        var segura = pintura.ParaAjustes();
+        TemaIlegible = !ReferenceEquals(segura, pintura);
+        pintura = segura;
+
+        // El fondo de esta ventana es OPACO a propósito, aunque el tema traiga alfa: es una
+        // ventana normal, no la isla.
+        var fondo = Opaco(pintura.Color(ClavesBase.Superficie));
+
+        _roles = Roles.Desde(pintura);
+        _fondo = new SolidColorBrush(fondo);
+        _texto = new SolidColorBrush(_roles.Texto);
+        _acento = new SolidColorBrush(_roles.Acento);
         _superficie = new SolidColorBrush(_roles.Superficie);
         _superficieAlta = new SolidColorBrush(_roles.SuperficieAlta);
         _textoAtenuado = new SolidColorBrush(_roles.TextoAtenuado);
         _elegido = new SolidColorBrush(_roles.Seleccion);
         _acentoLegible = new SolidColorBrush(_roles.AcentoTinta);
-    }
-
-    // Un Tema con lo que haya en el árbol, para poder pedirle los roles. Las claves de
-    // rol que no estén quedan vacías, y Roles las deriva.
-    Tema TemaDelArbol()
-    {
-        string? Opcional(string clave)
-        {
-            var v = _arbol.Texto("Tema", clave, "");
-            return string.IsNullOrWhiteSpace(v) ? null : v;
-        }
-        return new Tema
-        {
-            Fondo = _arbol.Texto("Tema", "Fondo", "#E6000000"),
-            Texto = _arbol.Texto("Tema", "Texto", "#FFFFFF"),
-            Acento = _arbol.Texto("Tema", "Acento", "#7AA2F7"),
-            Radio = _arbol.Numero("Tema", "Radio", 20),
-            Superficie = Opcional("Superficie"),
-            SuperficieAlta = Opcional("SuperficieAlta"),
-            Borde = Opcional("Borde"),
-            TextoAtenuado = Opcional("TextoAtenuado"),
-            Secundario = Opcional("Secundario"),
-            Sistema = Opcional("Sistema"),
-            Positivo = Opcional("Positivo"),
-            Aviso = Opcional("Aviso"),
-            Negativo = Opcional("Negativo")
-        };
     }
 
     static Color Opaco(Color c) => Color.FromRgb(c.R, c.G, c.B);
@@ -1941,8 +1926,27 @@ public sealed partial class VentanaAjustes : Window
                                   v => _arbol.PonerDelPanel(Principal, "Grosor", v)));
         p.Mas(Deslizador("Margen", 0, 32, _arbol.NumeroDelPanel(Principal, "Margen", 8),
                                   v => _arbol.PonerDelPanel(Principal, "Margen", v)));
-        p.Mas(Deslizador("Radio de esquinas", 0, 36, _arbol.Numero("Tema", "Radio", 20),
-                                  v => _arbol.Poner("Tema", "Radio", v)));
+        // ---------- El radio sale del tema, y esto lo cambia ENCIMA ----------
+        //
+        // Antes era `Tema.Radio`, un número suelto del config. Ahora el radio es un valor del
+        // tema —Profesional lo quiere en 23 y Videojuegos en 0, en chaflán— y este deslizador
+        // escribe una personalización en `Tema.Radios`, igual que el selector de un color
+        // escribe en `Tema.Colores`. Así cambiar de tema vuelve a traer el radio del tema, y
+        // quien lo haya movido conserva el suyo.
+        p.Mas(Deslizador("Radio de esquinas", 0, 36, _roles.Pintura.Radio(Piezas.Isla), v =>
+        {
+            var radios = _arbol.Radios("Tema");
+            radios[Piezas.Isla] = v;
+            radios[Piezas.Panel] = v;
+            _arbol.PonerRadios("Tema", radios);
+        }));
+        if (_arbol.Radios("Tema").Count > 0)
+            p.Mas(BotonPlano("Devolverle el radio al tema", () =>
+            {
+                _arbol.PonerRadios("Tema", new Dictionary<string, double>());
+                _arbol.Guardar();
+                RehacerPagina("apariencia", SeccionApariencia);
+            }, false));
 
         p.Grupo("Texto", IconoDeGrupo("Texto"));
         var fuentes = Fonts.SystemFontFamilies
@@ -2007,132 +2011,6 @@ public sealed partial class VentanaAjustes : Window
         return p.Fin();
     }
 
-    UIElement SeccionColores()
-    {
-        var p = NuevaPagina("colores");
-
-        p.Grupo("Temas listos", IconoDeGrupo("Temas listos"));
-        var muestras = new WrapPanel();
-        foreach (var t in Temas.Predefinidos) muestras.Children.Add(MuestraTema(t));
-        p.Mas(muestras);
-
-        p.Grupo("Fondo (con opacidad)", IconoDeGrupo("Fondo (con opacidad)"));
-        var selFondo = new SelectorColor { ConOpacidad = true }.Montar();
-        selFondo.Valor = Hex(_arbol.Texto("Tema", "Fondo", "#E6000000"), DeSerie.Fondo);
-        selFondo.Cambiado += v => { _arbol.Poner("Tema", "Fondo", SelectorColor.AHex(v, true)); Cambio(); };
-        p.Mas(selFondo);
-
-        p.Grupo("Texto", IconoDeGrupo("Texto"));
-        var selTexto = new SelectorColor { ConOpacidad = false }.Montar();
-        selTexto.Valor = Hex(_arbol.Texto("Tema", "Texto", "#FFFFFF"), DeSerie.Texto);
-        selTexto.Cambiado += v => { _arbol.Poner("Tema", "Texto", SelectorColor.AHex(v, false)); Cambio(); };
-        p.Mas(selTexto);
-
-        p.Grupo("Acento", IconoDeGrupo("Acento"));
-        var selAcento = new SelectorColor { ConOpacidad = false }.Montar();
-        selAcento.Valor = Hex(_arbol.Texto("Tema", "Acento", "#7AA2F7"), DeSerie.Acento);
-        selAcento.Cambiado += v => { _arbol.Poner("Tema", "Acento", SelectorColor.AHex(v, false)); Cambio(); };
-        p.Mas(selAcento);
-
-        p.Mas(Interruptor("Colores desde el wallpaper", _arbol.Bandera("Tema", "DesdeWallpaper", false),
-                                   v => _arbol.Poner("Tema", "DesdeWallpaper", v)));
-        p.Mas(Interruptor("Borde de acento alrededor de la isla", _arbol.Bandera("Tema", "BordeAcento", true),
-                                   v => _arbol.Poner("Tema", "BordeAcento", v)));
-
-        p.Grupo("Mis temas", IconoDeGrupo("Mis temas"));
-        var fila = new StackPanel { Orientation = Orientation.Horizontal };
-        fila.Children.Add(BotonPlano("Exportar", ExportarTema, false));
-        fila.Children.Add(BotonPlano("Importar", () => ImportarTema(selFondo, selTexto, selAcento), false));
-        fila.Children.Add(BotonPlano("Abrir carpeta", () =>
-        {
-            Directory.CreateDirectory(Temas.Carpeta);
-            Process.Start(new ProcessStartInfo(Temas.Carpeta) { UseShellExecute = true })?.Dispose();
-        }, false));
-        p.Mas(fila);
-        return p.Fin();
-    }
-
-    UIElement MuestraTema(TemaGuardado t)
-    {
-        var tira = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 0) };
-        foreach (var hex in new[] { t.Fondo, t.Texto, t.Acento })
-            tira.Children.Add(new Border
-            {
-                Width = 18, Height = 10,
-                Background = new SolidColorBrush(Opaco(Hex(hex, _roles.TextoAtenuado))),
-                CornerRadius = new CornerRadius(2),
-                Margin = new Thickness(0, 0, 3, 0)
-            });
-
-        var caja = new StackPanel();
-        caja.Children.Add(new TextBlock { Text = t.Nombre, Foreground = _texto, FontSize = 12 });
-        caja.Children.Add(tira);
-
-        var b = new Button
-        {
-            Content = caja,
-            Margin = new Thickness(0, 0, 10, 10),
-            Padding = new Thickness(10, 8, 10, 8),
-            Background = _superficie,
-            BorderBrush = _acento,
-            BorderThickness = new Thickness(1),
-            Foreground = _texto,
-            Cursor = Cursors.Hand
-        };
-
-        // El contenido es una pila con el nombre y tres rectángulos de color. Para UIA eso
-        // es un objeto sin nombre, así que los siete temas se anunciaban como siete botones
-        // iguales y mudos. Y el color NO puede ser el único portador: quien no lo ve
-        // necesita el nombre del tema, que es lo que de verdad distingue uno de otro.
-        System.Windows.Automation.AutomationProperties.SetName(b, $"Tema {t.Nombre}");
-
-        b.Click += (_, _) => AplicarTema(t);
-        return b;
-    }
-
-    void AplicarTema(TemaGuardado t)
-    {
-        _arbol.Poner("Tema", "Fondo", t.Fondo);
-        _arbol.Poner("Tema", "Texto", t.Texto);
-        _arbol.Poner("Tema", "Acento", t.Acento);
-        _arbol.Poner("Tema", "Radio", t.Radio);
-
-        // Y los roles de color. Van con PonerOQuitar porque un tema que NO trae un rol
-        // quiere que se derive, y eso se dice borrando la clave: si solo se escribieran
-        // los que vienen, pasar de Nube a Gruvbox dejaría el naranja y el azul nube de
-        // Nube puestos encima de Gruvbox para siempre.
-        _arbol.PonerOQuitar("Tema", "Superficie", t.Superficie);
-        _arbol.PonerOQuitar("Tema", "SuperficieAlta", t.SuperficieAlta);
-        _arbol.PonerOQuitar("Tema", "Borde", t.Borde);
-        _arbol.PonerOQuitar("Tema", "TextoAtenuado", t.TextoAtenuado);
-        _arbol.PonerOQuitar("Tema", "Secundario", t.Secundario);
-        _arbol.PonerOQuitar("Tema", "Sistema", t.Sistema);
-        _arbol.PonerOQuitar("Tema", "Positivo", t.Positivo);
-        _arbol.PonerOQuitar("Tema", "Aviso", t.Aviso);
-        _arbol.PonerOQuitar("Tema", "Negativo", t.Negativo);
-
-        _arbol.Guardar();
-
-        // Los selectores se quedan con los valores viejos: se recarga la página de
-        // colores. Por id y no por Items[1]: con el registro, el orden de las páginas
-        // puede cambiar y un número escrito a mano recargaría la equivocada.
-        int donde = _modulos.Indice("colores");
-        if (donde < 0 || donde >= _pestanas.Items.Count)
-        {
-            Log.Info("no encuentro la página de colores para recargarla");
-            return;
-        }
-        var i = _pestanas.SelectedIndex;
-        ((TabItem)_pestanas.Items[donde]).Content = new ScrollViewer
-        {
-            Content = SeccionColores(),
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            Padding = new Thickness(8, 12, 8, 8)
-        };
-        _pestanas.SelectedIndex = i;
-    }
-
-
     // ---------- Volver a construir una página ----------
     //
     // Por id y no por índice: con el registro de módulos el orden de las páginas puede
@@ -2159,36 +2037,6 @@ public sealed partial class VentanaAjustes : Window
     // La de perfiles se recarga a cada acción: aplicar, duplicar, renombrar o borrar
     // cambia qué tarjetas hay y cuál va marcada como puesta.
     void Rehacer() => RehacerPagina("perfiles", SeccionPerfiles);
-
-    void ExportarTema()
-    {
-        var t = new TemaGuardado(
-            "Mi tema " + DateTime.Now.ToString("yyyy-MM-dd HHmm"),
-            _arbol.Texto("Tema", "Fondo", "#E6000000"),
-            _arbol.Texto("Tema", "Texto", "#FFFFFF"),
-            _arbol.Texto("Tema", "Acento", "#7AA2F7"),
-            _arbol.Numero("Tema", "Radio", 20));
-        var ruta = Path.Combine(Temas.Carpeta, t.Nombre.Replace(':', '-') + ".json");
-        try
-        {
-            Temas.Exportar(t, ruta);
-            Avisar("Tema guardado en " + ruta, false);
-        }
-        catch (Exception ex) { Avisar("No se pudo exportar: " + ex.Message, true); }
-    }
-
-    void ImportarTema(SelectorColor f, SelectorColor t, SelectorColor a)
-    {
-        var dlg = new Microsoft.Win32.OpenFileDialog
-        {
-            Filter = "Temas de la nube (*.json)|*.json",
-            InitialDirectory = Directory.Exists(Temas.Carpeta) ? Temas.Carpeta : Config.Carpeta
-        };
-        if (dlg.ShowDialog() != true) return;
-        if (Temas.Importar(dlg.FileName) is not { } tema) { Avisar("Ese archivo no es un tema", true); return; }
-        AplicarTema(tema);
-        Avisar("Tema importado: " + tema.Nombre, false);
-    }
 
     // La biblioteca de widgets. La construye Biblioteca.cs, que no sabe nada de esta
     // ventana: así el modo edición de la isla podrá usar la misma sin tocarla.

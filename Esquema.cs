@@ -44,7 +44,10 @@ public static class Esquema
     //  1  Fase A .. B4   — manda `Barra`; no existe `Paneles`
     //  2  B5 / B6        — manda `Paneles`; `Barra` es una vista derivada en memoria
     //  3  C5             — hay sección `Fondo`, y `Wallpaper` lleva la integración
-    public const int Actual = 4;
+    //  4  D0             — hay sección `NubeHypr`, apagada
+    //  5  Rediseño f.0   — `Tema.Id` dice qué tema está puesto y `Tema.Colores` lo que el
+    //                      usuario le ha cambiado; las claves de color de antes dejan de leerse
+    public const int Actual = 5;
 
     public const string Clave = "Version";
 
@@ -178,6 +181,7 @@ public static class Esquema
         1 => new Migracion("v1→v2: sellar la derivación de Paneles", De1A2),
         2 => new Migracion("v2→v3: declarar la sección Fondo", De2A3),
         3 => new Migracion("v3→v4: declarar la sección NubeHypr, apagada", De3A4),
+        4 => new Migracion("v4→v5: declarar el tema puesto y tus colores", De4A5),
         _ => null,
     };
 
@@ -294,6 +298,131 @@ public static class Esquema
         //   if (h["MostrarPrevisualizacion"] == null) h["MostrarPrevisualizacion"] = true;
         //   if (h["Espacios"] == null) h["Espacios"] = new JsonArray();
     }
+    // ---------- v4 → v5 ----------
+    //
+    // El rediseño cambia de dónde sale el color: antes eran tres colores más diez roles
+    // dentro de `Tema`; ahora es **un tema** (`Tema.Id`) más **lo que le hayas cambiado**
+    // (`Tema.Colores`), resuelto por el catálogo (ver `Catalogo`, `Pintura`).
+    //
+    // ---------- Las dos preguntas que contesta ----------
+    //
+    // **¿Qué tema le toca?** El plan lo fija: `normal` y `neon` pasan a Profesional; `nube`
+    // pasa a Anime —Sakura, que es la variante que la maqueta usa de cabecera— si el usuario
+    // no ha tocado colores, y si no, a Profesional.
+    //
+    // **¿Y sus colores?** Se conservan como personalizaciones SIEMPRE que los haya elegido.
+    // Es lo que el plan pide para el caso de `nube`, y es lo único defendible para los otros
+    // dos: tirarle los colores a quien lleva meses con Gruvbox porque su estilo era «normal»
+    // sería estropearle la configuración, no migrarla.
+    //
+    // Lo que no se conserva son los valores POR DEFECTO, porque nadie los eligió: un fichero
+    // con `#E6000000`, `#FFFFFF` y `#7AA2F7` es un fichero en el que no se tocó el color, y
+    // arrastrarlos dejaría a todo el mundo con la isla negra de siempre y sin ver nunca el
+    // tema nuevo. Se mira clave por clave, así que quien solo cambió el acento conserva el
+    // acento y estrena el resto.
+    //
+    // ---------- Y por qué NO borra nada ----------
+    //
+    // Las claves viejas (`Fondo`, `Texto`, `Acento`, `Superficie`…) se quedan donde están, y
+    // `Estilo` también. El plan dice que `Tema.Estilo` «desaparece», y desaparece de donde
+    // importa: nadie lo lee para pintar. Pero borrarlo del fichero de alguien es otra cosa, y
+    // es justo lo que este proyecto lleva varios accidentes aprendiendo a no hacer. Una clave
+    // que nadie lee no molesta; una clave borrada no vuelve.
+    //
+    // Por eso también es IDEMPOTENTE de hecho: si `Id` ya está, no se toca.
+    static void De4A5(JsonObject raiz)
+    {
+        if (raiz["Tema"] is not JsonObject t)
+        {
+            t = new JsonObject();
+            raiz["Tema"] = t;
+        }
+
+        string? Hex(string clave) =>
+            t[clave] is JsonValue v && v.TryGetValue<string>(out var s) && !string.IsNullOrWhiteSpace(s)
+                ? s.Trim() : null;
+
+        static bool Mismo(string? a, string? b) =>
+            string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+
+        // ---------- Los valores que nadie eligió ----------
+        //
+        // Van escritos aquí y no leídos de ningún sitio a propósito: una migración describe un
+        // estado PASADO del fichero, así que sus constantes son historia y no deben moverse
+        // cuando el programa cambie. Los tres primeros son los de `Tema` recién construido;
+        // los tres siguientes, los del tema «Nube» que `Config.Cargar` ponía en una
+        // instalación nueva.
+        const string DefFondo = "#E6000000", DefTexto = "#FFFFFF", DefAcento = "#7AA2F7";
+        const string NubeFondo = "#E6101A2B", NubeTexto = "#F4F7FA", NubeAcento = "#E87562";
+
+        bool esNubeDeSerie = Mismo(Hex("Fondo"), NubeFondo) && Mismo(Hex("Texto"), NubeTexto) &&
+                             Mismo(Hex("Acento"), NubeAcento);
+
+        var estilo = (Hex("Estilo") ?? "normal").ToLowerInvariant();
+
+        if (t["Id"] == null)
+            t["Id"] = estilo is "nube" && esNubeDeSerie ? "sakura" : "profesional";
+
+        // ---------- Los colores, a claves del catálogo ----------
+        //
+        // El par es «clave de antes» → «clave del catálogo». `Secundario` y `Sistema` eran el
+        // naranja y el azul de Nube: en el catálogo son los dos secundarios.
+        var mapa = new (string Vieja, string Nueva, string? NadieLaEligio)[]
+        {
+            ("Fondo",          ClavesBase.Superficie, DefFondo),
+            ("Texto",          ClavesBase.Tinta,      DefTexto),
+            ("Acento",         ClavesBase.Acento,     DefAcento),
+            ("Superficie",     ClavesBase.Tarjeta,    null),
+            ("SuperficieAlta", "tarjeta.fondo.raton", null),
+            ("Borde",          ClavesBase.Filo,       null),
+            ("TextoAtenuado",  ClavesBase.Tenue,      null),
+            ("Secundario",     ClavesBase.Sec1,       null),
+            ("Sistema",        ClavesBase.Sec2,       null),
+            ("Positivo",       ClavesBase.Ok,         null),
+            ("Aviso",          "aviso",               null),
+            ("Negativo",       ClavesBase.Peligro,    null),
+        };
+
+        if (t["Colores"] is not JsonObject colores)
+        {
+            colores = new JsonObject();
+            t["Colores"] = colores;
+        }
+
+        // Si venía con el Nube de serie y se va a Sakura, no se arrastra nada: sus colores
+        // eran los de Nube, no suyos, y encima de Sakura dejarían un tema que no es ninguno
+        // de los dos.
+        if (estilo is "nube" && esNubeDeSerie) return;
+
+        foreach (var (vieja, nueva, nadie) in mapa)
+        {
+            if (colores[nueva] != null) continue;            // ya migrado: no se pisa
+            var valor = Hex(vieja);
+            if (valor == null) continue;                     // no estaba o estaba en blanco
+            if (nadie != null && Mismo(valor, nadie)) continue;   // es el de serie: nadie lo eligió
+            colores[nueva] = valor;
+        }
+
+        // ---------- Y el radio ----------
+        //
+        // `Tema.Radio` era un número para todo. Ahora el radio es un valor del tema (23 en
+        // Profesional, 0 en Videojuegos) y lo del usuario va encima, por pieza. Se arrastra
+        // solo si está cambiado: el 20 era el de serie de entonces, así que nadie lo eligió, y
+        // arrastrarlo dejaría a todo el mundo con la isla en 20 sin ver nunca la forma del tema.
+        const double RadioDeSerie = 20;
+        if (t["Radios"] is not JsonObject radios)
+        {
+            radios = new JsonObject();
+            t["Radios"] = radios;
+        }
+        if (t["Radio"] is JsonValue rv && rv.TryGetValue<double>(out var radio) &&
+            Math.Abs(radio - RadioDeSerie) > 0.01)
+        {
+            if (radios["isla"] == null) radios["isla"] = radio;
+            if (radios["panel"] == null) radios["panel"] = radio;
+        }
+    }
+
     // ================= Validar antes de escribir =================
     //
     // Lo mínimo que tiene que ser verdad de un árbol migrado para que merezca tocar el

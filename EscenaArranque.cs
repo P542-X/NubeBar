@@ -95,7 +95,7 @@ public sealed class EscenaArranque : Window
             }
 
             Log.Info($"escena de entrada: {porque} (nivel {Animacion.Nivel.ToString().ToLowerInvariant()})");
-            EnSuHilo(LeerColor(arbol.Texto("Tema", "Acento", "#7AA2F7")), LeerBarra(arbol),
+            EnSuHilo(AcentoDelTema(arbol), LeerBarra(arbol),
                      apuntarVista: !vista, yaLista: false);
         }
         catch (Exception ex)
@@ -166,10 +166,28 @@ public sealed class EscenaArranque : Window
 
     // El acento del usuario. La nube ya no lo usa —es la marca, va en azul nube— pero se
     // sigue leyendo porque la escena lo recibe y puede volver a hacer falta.
-    static Color LeerColor(string hex)
+    // ---------- El color de la escena sale del tema, no de una clave ----------
+    //
+    // Antes leía `Tema.Acento` del árbol. Con el rediseño el acento es una clave del catálogo
+    // y puede venir del tema o de lo que el usuario le haya cambiado, así que se pide a la
+    // cascada —igual que lo pide la barra— y la escena entra del color con el que la barra va
+    // a salir, que es lo que esta escena existe para anunciar.
+    //
+    // Se lee del ÁRBOL y no del `Config` cargado porque esto corre antes de que haya barra.
+    static Color AcentoDelTema(ConfigArbol arbol)
     {
-        try { return (Color)ColorConverter.ConvertFromString(hex); }
-        catch { return Color.FromRgb(0x7A, 0xA2, 0xF7); }
+        try
+        {
+            var pintura = new Pintura(TemasDeSerie.De(arbol.Texto("Tema", "Id", TemasDeSerie.Predeterminado)),
+                                      arbol.Colores("Tema"));
+            return pintura.Color(ClavesBase.Acento);
+        }
+        catch (Exception ex)
+        {
+            // Que la escena no sepa de qué color va NO puede impedir que la nube arranque.
+            Log.Error("leer el acento para la escena de entrada", ex);
+            return Pintura.PorDefecto().Color(ClavesBase.Acento);
+        }
     }
 
     // Lo ÚNICO que la escena sabe de la nube de verdad: por qué borde sale y cuánto
@@ -234,7 +252,7 @@ public sealed class EscenaArranque : Window
             Log.Info("vista previa de la escena de entrada");
             var arbol = ConfigArbol.Cargar();
             // "yaLista" porque aquí no hay ningún arranque que esperar
-            EnSuHilo(LeerColor(arbol.Texto("Tema", "Acento", "#7AA2F7")), LeerBarra(arbol),
+            EnSuHilo(AcentoDelTema(arbol), LeerBarra(arbol),
                      apuntarVista: false, yaLista: true);
         }
         catch (Exception ex)

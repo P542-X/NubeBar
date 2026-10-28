@@ -5,127 +5,45 @@ using System.Text.Json;
 
 namespace NubeBar;
 
-// Un tema guardado. Los cuatro primeros campos son los de siempre; los roles van
-// detrás y son opcionales, así que un .json de tema exportado con una NubeBar
-// anterior se sigue leyendo igual (las claves que faltan quedan en null y Roles las
-// deriva).
-public sealed record TemaGuardado(
-    string Nombre, string Fondo, string Texto, string Acento, double Radio,
-    string? Superficie = null, string? SuperficieAlta = null, string? Borde = null,
-    string? TextoAtenuado = null, string? Secundario = null, string? Sistema = null,
-    string? Positivo = null, string? Aviso = null, string? Negativo = null);
+// Un tema del usuario, en un fichero.
+//
+// ---------- Lo que es un tema desde el rediseño ----------
+//
+// Antes era «tres colores más diez roles». Ahora es **el tema de partida y lo que le has
+// cambiado**: `Id` dice de cuál de los nueve sales y `Colores` lleva solo las claves del
+// catálogo que has tocado. Es exactamente lo que guarda `config.json`, así que exportar es
+// copiar y no traducir — y traducir es donde se pierden valores.
+//
+// ---------- Y lo que todavía NO es ----------
+//
+// El formato que pide el plan es un `.nubetema`: un zip con el JSON de valores, las fuentes y
+// las imágenes dentro, validado al importarlo (apartado 10 del Estudio de temas, fase 9).
+// Esto es el JSON legible y nada más. Se llama distinto a propósito: cuando llegue el
+// `.nubetema` no habrá dos cosas peleándose por el mismo nombre.
+//
+// Al leerlo, lo que no se entienda se ignora y se apunta — lo hace quien lo importa
+// (`VentanaAjustes.ImportarTema`): un tema de otra versión, o editado a mano con una errata,
+// no puede tumbar la barra.
+public sealed record TemaExportado(
+    string Nombre,
+    string Id,
+    Dictionary<string, string>? Colores);
 
-// Temas listos para usar y guardado/carga de los tuyos en %APPDATA%\NubeBar\temas
+// Guardado y carga de los temas del usuario en %APPDATA%\NubeBar\temas
 public static class Temas
 {
     public static string Carpeta => Path.Combine(Config.Carpeta, "temas");
 
-    // El tema de la especificación: coral, naranja y azul nube sobre azul profundo.
-    // Es el que se aplica en una instalación NUEVA (ver Config.Cargar); a quien ya
-    // tiene su config.json no se le toca nada.
-    //
-    // Dos correcciones sobre la paleta del documento, las dos de contraste:
-    //
-    //  1. El documento da "#172033" como texto principal y "#101A2B" como fondo
-    //     profundo. Uno sobre otro dan 1,1:1, que es invisible. El #172033 es el
-    //     texto de las SUPERFICIES CLARAS (#F4F7FA), no el de la isla. Como la isla
-    //     es oscura, aquí el texto es el #F4F7FA.
-    //  2. El coral #E87562 queda en 5,9:1 sobre el fondo profundo, así que sirve de
-    //     tinta tal cual. Sobre una superficie clara se cae a 2,7:1, y por eso
-    //     Roles.TintaSobre lo profundiza cuando hace de texto ahí. Como relleno,
-    //     filo y rayita de la app activa se usa el coral de verdad.
-    public static readonly TemaGuardado Nube = new(
-        Nombre: "Nube",
-        Fondo:  "#E6101A2B",     // "Fondo profundo" con la opacidad de la isla
-        Texto:  "#F4F7FA",       // corrección 1: la "superficie clara" hace de tinta
-        Acento: "#E87562",       // coral de acción
-        Radio:  18,
-        Superficie:     "#1B2740",   // el azul profundo, un paso levantado
-        SuperficieAlta: "#24324F",
-        Borde:          "#33415C",
-        TextoAtenuado:  "#A9B6CA",
-        Secundario:     "#F29C65",   // naranja secundario: detalles cálidos
-        Sistema:        "#65B8D6");  // azul nube: red, volumen, batería, reloj
-
-    // ---------- El claro ----------
-    //
-    // Los siete temas de serie eran oscuros, así que la acción rápida «Tema claro» no tenía
-    // nada que aplicar y abría Ajustes. El usuario lo dijo mirándola: «si pongo tema oscuro
-    // se abre ajustes en vez de aplicarlo». Una pastilla con aspecto de interruptor cuya
-    // única función es abrir una ventana miente, por muy honesto que fuera el motivo.
-    //
-    // Los colores van elegidos por CONTRASTE y no por gusto: el texto da ~14:1 sobre el fondo
-    // y el acento ~5:1, que pasa AA de sobra. Y las superficies se escriben con alfa sobre
-    // NEGRO: en un tema claro, «un paso levantado» es un velo oscuro, no uno blanco — con los
-    // velos blancos de los temas oscuros, una tarjeta clara sobre fondo claro desaparecería.
-    public static readonly TemaGuardado Claro = new(
-        Nombre: "Claro",
-        Fondo:  "#F2F7F9FC",
-        Texto:  "#1B2231",
-        Acento: "#2F6BD8",
-        Radio:  18,
-        Superficie:     "#14000000",
-        SuperficieAlta: "#22000000",
-        Borde:          "#2E000000",
-        TextoAtenuado:  "#5A6476",
-        Secundario:     "#B4531C",
-        Sistema:        "#1F6FB8");
-
-    public static readonly TemaGuardado[] Predefinidos =
-    {
-        Nube,
-        Claro,
-        new("Negro iPhone",      "#E6000000", "#FFFFFF", "#7AA2F7", 20),
-        new("Tokyo Night",       "#E61A1B26", "#C0CAF5", "#7AA2F7", 18),
-        new("Catppuccin Mocha",  "#E61E1E2E", "#CDD6F4", "#CBA6F7", 20),
-        new("Nord",              "#E62E3440", "#ECEFF4", "#88C0D0", 16),
-        new("Dracula",           "#E6282A36", "#F8F8F2", "#BD93F9", 18),
-        new("Gruvbox",           "#E6282828", "#EBDBB2", "#FABD2F", 14)
-    };
-
-    // Volcar un tema guardado sobre el Tema del config. Los roles que el tema no
-    // trae se ponen a null a propósito: null significa "derívalo", y si se dejara el
-    // valor del tema anterior, cambiar de Nube a Gruvbox dejaría el naranja coral
-    // puesto en Secundario para siempre.
-    public static void Aplicar(TemaGuardado t, Tema destino)
-    {
-        destino.Fondo = t.Fondo;
-        destino.Texto = t.Texto;
-        destino.Acento = t.Acento;
-        destino.Radio = t.Radio;
-        destino.Superficie = t.Superficie;
-        destino.SuperficieAlta = t.SuperficieAlta;
-        destino.Borde = t.Borde;
-        destino.TextoAtenuado = t.TextoAtenuado;
-        destino.Secundario = t.Secundario;
-        destino.Sistema = t.Sistema;
-        destino.Positivo = t.Positivo;
-        destino.Aviso = t.Aviso;
-        destino.Negativo = t.Negativo;
-    }
-
-    public static void Exportar(TemaGuardado tema, string ruta)
+    public static void Exportar(TemaExportado tema, string ruta)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(ruta)!);
-        ConfigArbol.EscribirAtomico(ruta, JsonSerializer.Serialize(tema, new JsonSerializerOptions { WriteIndented = true }));
+        ConfigArbol.EscribirAtomico(ruta,
+            JsonSerializer.Serialize(tema, new JsonSerializerOptions { WriteIndented = true }));
     }
 
-    public static TemaGuardado? Importar(string ruta)
+    public static TemaExportado? Importar(string ruta)
     {
-        try { return JsonSerializer.Deserialize<TemaGuardado>(File.ReadAllText(ruta)); }
+        try { return JsonSerializer.Deserialize<TemaExportado>(File.ReadAllText(ruta)); }
         catch (Exception ex) { Log.Error("importar tema", ex); return null; }
-    }
-
-    public static List<TemaGuardado> Mios()
-    {
-        var lista = new List<TemaGuardado>();
-        try
-        {
-            if (!Directory.Exists(Carpeta)) return lista;
-            foreach (var f in Directory.EnumerateFiles(Carpeta, "*.json"))
-                if (Importar(f) is { } t) lista.Add(t);
-        }
-        catch { }
-        return lista;
     }
 }

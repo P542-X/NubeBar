@@ -739,7 +739,7 @@ public static partial class Pruebas
         }
 
         // Y el esquema va por donde tiene que ir: v4 es la que trae la sección de NubeHypr.
-        Igual(4, Esquema.Actual, "el esquema está en la v4");
+        Vale(Esquema.Actual >= 4, $"el esquema va por la v{Esquema.Actual} (la capa llegó en la v4)");
         Vale(Esquema.Actual >= 4, "y no ha bajado");
     }
 }

@@ -169,15 +169,6 @@ public sealed class Roles
         };
     }
 
-    // ---------- Y la entrada de los temas de antes ----------
-    //
-    // La firma de siempre, para no tocar los veinte sitios que la llaman. Por dentro ya no
-    // deriva: construye el paquete de valores equivalente (`TemaBase.DeTemaViejo`, que es
-    // donde viven ahora las cuentas de antes) y lo pasa por la misma cascada que los nueve
-    // temas nuevos.
-    public static Roles Desde(Tema t, Color fondo, Color texto, Color acento) =>
-        Desde(new Pintura(TemaBase.DeTemaViejo(t, fondo, texto, acento)));
-
     // Los alfas de los velos derivados. No son números redondos por capricho: son los
     // que el código ya usaba a mano (0x14 y 0x22 para una fila, 0x33 para la fila bajo
     // el ratón), promediados, para que los temas de siempre no cambien de aspecto.

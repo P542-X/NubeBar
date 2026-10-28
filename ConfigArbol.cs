@@ -174,6 +174,70 @@ public sealed class ConfigArbol
         catch (Exception ex) { Log.Error($"escribir {seccion}.Reglas en el config", ex); }
     }
 
+    // ---------- Las personalizaciones de color ----------
+    //
+    // `Tema.Colores` es un diccionario `clave del catálogo → color`, con SOLO lo que el
+    // usuario ha cambiado. Va aquí por lo mismo que `PonerAtajos` y `PonerReglas`: quien sabe
+    // escribir el árbol es el árbol, y hacerlo desde la ventana de Ajustes sería la segunda
+    // forma de escribir la misma sección.
+    //
+    // Se sustituye **solo** `Colores`: el resto de `Tema` —incluidas las claves que esta
+    // versión no conozca— se queda donde está.
+    public Dictionary<string, string> Colores(string seccion)
+    {
+        var fuera = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            if (Seccion(seccion)["Colores"] is JsonObject obj)
+                foreach (var (k, v) in obj)
+                    if (v is JsonValue jv && jv.TryGetValue<string>(out var s) &&
+                        !string.IsNullOrWhiteSpace(s))
+                        fuera[k] = s;
+        }
+        catch (Exception ex) { Log.Error($"leer {seccion}.Colores del config", ex); }
+        return fuera;
+    }
+
+    public void PonerColores(string seccion, IReadOnlyDictionary<string, string> colores)
+    {
+        try
+        {
+            var obj = new JsonObject();
+            // Ordenadas: el fichero lo abre gente a mano, y un diccionario que cambia de orden
+            // en cada guardado convierte cualquier `diff` en ruido.
+            foreach (var k in colores.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase))
+                obj[k] = colores[k];
+            Seccion(seccion)["Colores"] = obj;
+        }
+        catch (Exception ex) { Log.Error($"escribir {seccion}.Colores en el config", ex); }
+    }
+
+    // Los radios que el usuario ha cambiado, por pieza. Igual que `Colores`, y por lo mismo.
+    public Dictionary<string, double> Radios(string seccion)
+    {
+        var fuera = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            if (Seccion(seccion)["Radios"] is JsonObject obj)
+                foreach (var (k, v) in obj)
+                    if (v is JsonValue jv && jv.TryGetValue<double>(out var d)) fuera[k] = d;
+        }
+        catch (Exception ex) { Log.Error($"leer {seccion}.Radios del config", ex); }
+        return fuera;
+    }
+
+    public void PonerRadios(string seccion, IReadOnlyDictionary<string, double> radios)
+    {
+        try
+        {
+            var obj = new JsonObject();
+            foreach (var k in radios.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase))
+                obj[k] = radios[k];
+            Seccion(seccion)["Radios"] = obj;
+        }
+        catch (Exception ex) { Log.Error($"escribir {seccion}.Radios en el config", ex); }
+    }
+
     public void Quitar(string seccion, string clave)
     {
         try { Seccion(seccion).Remove(clave); }

@@ -40,23 +40,15 @@ public static partial class Pruebas
 
     // ================= La paleta =================
 
-    static Roles RolesDe(TemaGuardado t)
-    {
-        var tema = new Tema();
-        Temas.Aplicar(t, tema);
-        return Roles.Desde(tema,
-                           Paleta.Leer(tema.Fondo, Colors.Black),
-                           Paleta.Leer(tema.Texto, Colors.White),
-                           Paleta.Leer(tema.Acento, Colors.CornflowerBlue));
-    }
+    static Roles RolesDe(TemaBase t) => Roles.Desde(new Pintura(t));
 
     static void D6AzulYCoralEnLosSieteTemas()
     {
-        Grupo("D6: el azul de foco y el coral de aviso, en los siete temas");
+        Grupo("D6: el azul de foco y el coral de aviso, en los nueve temas");
 
         HyprPinta.Forzado = false;      // sin alto contraste, para medir la rama normal
 
-        foreach (var t in Temas.Predefinidos)
+        foreach (var t in TemasDeSerie.Lista)
         {
             var r = RolesDe(t);
             var azul = HyprPinta.Azul(r);
@@ -79,16 +71,30 @@ public static partial class Pruebas
                  >= Roles.MinimoSuperficie, $"{t.Nombre}: y el coral también");
         }
 
-        // El tema Nube es el que da los dos colores de referencia, así que ahí el azul
-        // tiene que ser EXACTAMENTE su azul de sistema y no una corrección.
-        var nube = RolesDe(Temas.Nube);
-        Igual(HyprPinta.AzulNube, HyprPinta.Azul(nube), "en el tema Nube el azul es el azul nube");
+        // ---------- La regla, en vez de dos temas con nombre ----------
+        //
+        // Esto nombraba a «Nube» (cuyo azul de sistema ES el azul de foco) y a «Gruvbox»
+        // (cuyo amarillo no puede hacer de azul, así que cae en el de la casa). Los dos
+        // desaparecieron con el rediseño, y reescribir la prueba con dos de los nueve dejaría
+        // el mismo problema para la próxima vez.
+        //
+        // Así que se comprueba la REGLA, que no depende de ningún tema: si el color de
+        // sistema del tema es azul de verdad, ése es el azul de foco; si no, el de la casa.
+        foreach (var t in TemasDeSerie.Lista)
+        {
+            var r = RolesDe(t);
+            if (HyprPinta.EsAzul(r.Sistema))
+                Igual(r.Sistema, HyprPinta.Azul(r), $"{t.Nombre}: su color de sistema es azul, y es el azul de foco");
+            else
+                Igual(HyprPinta.AzulNube, HyprPinta.Azul(r), $"{t.Nombre}: su color de sistema no es azul, así que se usa el de la casa");
+        }
 
-        // Gruvbox no declara `Sistema`, así que `Sistema` ES su acento amarillo. Un amarillo
-        // no puede hacer de azul de foco: tiene que caer en el azul de Nube.
-        var gruvbox = RolesDe(Temas.Predefinidos.First(t => t.Nombre == "Gruvbox"));
-        Vale(!HyprPinta.EsAzul(gruvbox.Sistema), "en Gruvbox el color de sistema no es azul");
-        Igual(HyprPinta.AzulNube, HyprPinta.Azul(gruvbox), "y entonces se usa el azul de Nube");
+        // Y que las dos ramas se recorren de verdad: con nueve temas que todos cayeran del
+        // mismo lado dejaría media regla sin probar y nadie se enteraría.
+        Vale(TemasDeSerie.Lista.Any(t => HyprPinta.EsAzul(RolesDe(t).Sistema)),
+             "al menos un tema de serie trae un color de sistema azul");
+        Vale(TemasDeSerie.Lista.Any(t => !HyprPinta.EsAzul(RolesDe(t).Sistema)),
+             "y al menos uno no, que es el que prueba el respaldo");
 
         HyprPinta.Forzado = null;
     }
@@ -99,12 +105,15 @@ public static partial class Pruebas
 
         // ---------- Un tema CLARO ----------
         //
-        // Ninguno de los siete de serie lo es, y eso es justo el agujero: el usuario puede
-        // escribir el suyo. Sobre un fondo casi blanco, un azul claro deja de leerse, y la
-        // corrección tiene que oscurecerlo en vez de aclararlo más.
-        var claro = new Tema { Fondo = "#FFF4F7FA", Texto = "#172033", Acento = "#2A6FB5" };
-        var rClaro = Roles.Desde(claro, Color.FromRgb(0xF4, 0xF7, 0xFA),
-                                 Color.FromRgb(0x17, 0x20, 0x33), Color.FromRgb(0x2A, 0x6F, 0xB5));
+        // Esto se escribía a mano porque ninguno de los temas de antes era claro. Con el
+        // rediseño hay cuatro de serie (Oficina, Invierno, Sakura y Otoño), así que se mide
+        // sobre uno de verdad: Oficina, que es el claro sobrio.
+        //
+        // Lo que se comprueba es lo mismo: sobre un fondo casi blanco un azul claro deja de
+        // leerse, y la corrección tiene que OSCURECERLO en vez de aclararlo más.
+        var temaClaro = TemasDeSerie.De("oficina");
+        Vale(temaClaro.Claro, "Oficina es un tema claro, que es lo que esta prueba necesita");
+        var rClaro = Roles.Desde(new Pintura(temaClaro));
 
         var azulClaro = HyprPinta.AzulTinta(rClaro, rClaro.SuperficieSolida);
         Vale(Contraste.Entre(azulClaro, rClaro.SuperficieSolida) >= Roles.MinimoSuperficie,
@@ -141,7 +150,7 @@ public static partial class Pruebas
         Grupo("D6: el filo doble se ve sobre fondo claro, oscuro y desconocido");
 
         HyprPinta.Forzado = false;
-        var r = RolesDe(Temas.Nube);
+        var r = RolesDe(TemasDeSerie.De(TemasDeSerie.Predeterminado));
 
         // ---------- Sin saber qué hay detrás ----------
         var ciego = HyprPinta.FiloDelDestino(r, null);

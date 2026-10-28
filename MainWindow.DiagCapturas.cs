@@ -180,12 +180,11 @@ public partial class MainWindow
     //
     // Y por eso lo importante de este bloque no son las fotos, son los NÚMEROS: las mismas
     // medidas que hace `--diagd6`, pero sobre el fondo claro.
-    static readonly TemaGuardado ClaroParaLaFoto = new(
-        Nombre: "Claro (solo para la captura)",
-        Fondo:  "#E6F4F7FA",
-        Texto:  "#172033",
-        Acento: "#E87562",
-        Radio:  18);
+    // Ya no se inventa: es **Oficina**, el claro sobrio de los nueve temas de serie. Lo que
+    // decía el párrafo de arriba sigue valiendo —que funcione con éste no demuestra que
+    // funcione con el tuyo— pero al menos ahora es un tema que existe y que alguien puede
+    // elegir, no una paleta que solo vive en esta función.
+    const string ClaroParaLaFoto = "oficina";
 
     async System.Threading.Tasks.Task ConTemaClaro()
     {
@@ -194,7 +193,8 @@ public partial class MainWindow
         var guardado = System.Text.Json.JsonSerializer.Serialize(_cfg.Tema);
         try
         {
-            Temas.Aplicar(ClaroParaLaFoto, _cfg.Tema);
+            _cfg.Tema.Id = ClaroParaLaFoto;
+            _cfg.Tema.Colores = new Dictionary<string, string>();   // sin tus retoques: el tema limpio
             Aplicar();
             await System.Threading.Tasks.Task.Delay(2000);
 
@@ -258,7 +258,7 @@ public partial class MainWindow
                 if (tuyo != null) _cfg.Tema = tuyo;
                 Aplicar();
                 await System.Threading.Tasks.Task.Delay(1200);
-                Apunta($"[CAP] tu tema devuelto: fondo={_roles.FondoOpaco} acento={_cfg.Tema.Acento}");
+                Apunta($"[CAP] tu tema devuelto: {_cfg.Tema.Id} fondo={_roles.FondoOpaco} acento={_roles.Acento}");
             }
             catch (Exception ex) { Log.Error("devolver el tema del usuario", ex); }
         }
@@ -562,7 +562,7 @@ public partial class MainWindow
             Apunta($"ejecutable medido: {Environment.ProcessPath}  pid {Environment.ProcessId}");
             Apunta($"configuración en solo lectura={Config.SoloLectura}");
             Apunta($"carpeta: {DiagCapturas.Carpeta}");
-            Apunta($"tema puesto: fondo={_roles.FondoOpaco} acento={_cfg.Tema.Acento} " +
+            Apunta($"tema puesto: {_cfg.Tema.Id} fondo={_roles.FondoOpaco} acento={_roles.Acento} " +
                    $"alto contraste de Windows={SystemParameters.HighContrast}");
             // Seis segundos, no dos y medio: las dos primeras capturas de la tanda anterior
             // salieron con la isla a medio montar —sin su zona derecha— y parecían un fallo

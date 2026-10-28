@@ -21,16 +21,11 @@ public static partial class Pruebas
     // ================= Los siete temas =================
     static void E8LasSuperficiesEnLosSieteTemas()
     {
-        Grupo("E8: las superficies de E se leen en los siete temas");
+        Grupo("E8: las superficies de E se leen en los nueve temas");
 
-        foreach (var t in NubeBar.Temas.Predefinidos)
+        foreach (var t in TemasDeSerie.Lista)
         {
-            var tema = new Tema();
-            NubeBar.Temas.Aplicar(t, tema);
-            var fondo = (Color)ColorConverter.ConvertFromString(tema.Fondo)!;
-            var texto = (Color)ColorConverter.ConvertFromString(tema.Texto)!;
-            var acento = (Color)ColorConverter.ConvertFromString(tema.Acento)!;
-            var r = Roles.Desde(tema, fondo, texto, acento);
+            var r = Roles.Desde(new Pintura(t));
 
             // ---------- El fondo de un panel lateral ----------
             //

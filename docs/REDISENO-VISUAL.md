@@ -513,22 +513,32 @@ c.B)` (una opacidad sobre un color que ya venía del tema) y lo que lleve el com
 `// color literal a propósito`, que hoy son las máscaras de opacidad del carrusel y el pincel
 que `FormattedText` pide para medir un ancho y nunca pinta.
 
+Y el cambio de fuente de verdad, que fue un solo paso porque no se podía partir:
+
+| Pieza | Fichero | Qué hace |
+|---|---|---|
+| El config | `Config.cs` | `Tema.Id` (cuál de los nueve) + `Tema.Colores` y `Tema.Radios` (lo que le has cambiado). Las trece claves de color de antes se quitaron de la clase; del fichero de nadie se borran |
+| La migración | `Esquema.cs`, v4→v5 | `normal` y `neon` → Profesional; `nube` → Sakura si no tocaste colores. Lo que elegiste se conserva clave por clave; lo que era el valor por defecto no se arrastra |
+| La barra | `MainWindow.xaml.cs` | El color sale de `Tema.Id` por la cascada; el wallpaper y las correcciones entran como personalizaciones de la sesión |
+| Ajustes | `VentanaAjustes.Colores.cs` | El selector de los nueve por familias, la lista de las ~130 claves por zonas con buscador, contraste en vivo, «Restablecer» y «Restablecer todo» |
+| Exportar | `Temas.cs` | Un tema del usuario es su tema de partida y lo que le cambió. El `.nubetema` con fuentes e imágenes es la fase 9 |
+| Las pruebas | `Pruebas.MigracionTema.cs` | La migración, caso por caso: los dos estilos, Nube tocado y sin tocar, un Gruvbox entero, los radios, que no borra nada y que migrar dos veces no pisa nada |
+
+Con eso se retiraron los ocho temas de antes (`Temas.Predefinidos`), el puente
+(`TemaBase.DeTemaViejo`) y `Roles.Desde(Tema, …)`. Las pruebas que iban «en los siete temas»
+van ahora en los nueve.
+
 Lo que **falta** de la fase 0:
 
-1. **El cambio de fuente de verdad**: `Tema.Id` + `Tema.Colores` en el config, con la
-   migración (`Tema.Estilo` desaparece; `normal` y `neon` → Profesional; `nube` → Anime si no
-   ha tocado colores, y si no → Profesional conservando sus colores como personalizaciones).
-2. **Ajustes > Colores** y el **selector de los nueve temas**.
-3. **Quitar Normal, Nube y Neón** y rehacer sus usos en `Pruebas.Confirmar.cs`,
-   `MainWindow.DiagNeon.cs` y `VentanaAjustes.cs`.
-4. **Retirar los ocho temas de antes** (`Temas.Predefinidos`), y con ellos el puente y la
-   fachada.
-
-**Estos cuatro van juntos y no se pueden partir**, y conviene saber por qué antes de empezar:
-hoy el selector de temas de Ajustes escribe `Tema.Fondo`, `Tema.Texto` y `Tema.Acento`. Si
-`Tema.Id` empieza a mandar antes de que Ajustes escriba `Id`, elegir Gruvbox deja de hacer
-nada; y si no manda, hay dos fuentes de verdad para el mismo color. Así que el paso siguiente
-es uno solo: el config, la migración, el selector y Ajustes > Colores en la misma versión.
+1. **Quitar Normal, Nube y Neón** (`Tema.Estilo`, `EstiloVisual.cs`, `Neon.cs`) y rehacer sus
+   usos en `Pruebas.Confirmar.cs`, `MainWindow.DiagNeon.cs` y `VentanaAjustes.cs`. Va aparte
+   porque esos tres no deciden color, deciden **forma** (hueco, relleno, grosor del filo) y
+   resplandor; para retirarlos hay que que esos valores salgan del tema, que es lo primero de
+   la fase 1. El radio ya sale del tema; lo demás, no todavía.
+2. **La fachada `Roles`** se queda hasta que las fases 1 a 8 pasen cada pieza a preguntar por
+   su clave. Mientras tenga consumidores, ahí está.
+3. **De Ajustes > Colores**: editar degradados y «Elegir en pantalla» (ver `DECISIONES.md`
+   para por qué los dos esperan).
 
 Todo lo que se construya en las fases 1 a 8 toma sus colores, medidas y decoraciones **del
 tema**, nunca de un valor escrito en el código: es lo que hace posible que el Estudio pueda

@@ -3849,3 +3849,77 @@ dos fuentes de verdad para el mismo color, que es el problema que todo esto ven�
 Así que el config, la migración, el selector de los nueve temas y Ajustes > Colores son **un
 solo paso** y van en la misma versión. Partirlo deja la barra en un estado en el que un ajuste
 que existe no hace nada, y eso es peor que no haberlo empezado.
+
+## Rediseño, fase 0 · El cambio de fuente de verdad
+
+Lo que pintaba la barra eran `Tema.Fondo`, `Tema.Texto` y `Tema.Acento` más diez roles.
+Ahora es **`Tema.Id`** (uno de los nueve temas) más **`Tema.Colores`** y **`Tema.Radios`** (lo
+que el usuario le haya cambiado), resuelto por el catálogo.
+
+**Fue un solo paso y no cuatro, a propósito.** El selector de temas de Ajustes escribía
+`Tema.Fondo`. Si `Tema.Id` empieza a mandar antes de que Ajustes escriba `Id`, elegir un tema
+deja de hacer nada; y si no manda, hay dos fuentes de verdad para el mismo color, que es el
+problema que todo esto venía a quitar. Así que el config, la migración, el selector de los
+nueve temas, Ajustes > Colores y la retirada de los ocho temas de antes entran juntos.
+
+### La migración, clave por clave
+
+El plan fija el tema: `normal` y `neon` → Profesional; `nube` → Anime (Sakura) si no se
+tocaron colores. Lo que el plan no cerraba es qué pasa con los colores de los otros dos casos,
+y la respuesta es la única defendible: **se conservan siempre que el usuario los haya
+elegido**. Tirarle los colores a quien lleva meses con Gruvbox porque su estilo era «normal»
+sería estropearle la configuración, no migrarla.
+
+Y al revés: **lo que nadie eligió no se arrastra.** Un `#E6000000` que está ahí porque es el
+valor por defecto no es una decisión. Si se arrastrara, todo el mundo se quedaría con la isla
+negra de siempre y no vería nunca el tema nuevo — la migración habría «funcionado» y el
+rediseño no se vería en ninguna máquina. Se mira clave por clave, así que quien solo cambió el
+acento conserva el acento y estrena el resto.
+
+**No se borra nada.** `Tema.Estilo` «desaparece» de donde importa —nadie lo lee para pintar—
+pero del fichero no se toca, y las trece claves de color se quedan donde están. Sí se han
+quitado de la clase `Tema`: trece propiedades que nadie lee son código muerto. El fichero las
+conserva porque `ConfigArbol` conserva lo que no conoce; borrar claves del config de alguien es
+lo que este proyecto lleva varios accidentes aprendiendo a no hacer.
+
+### Tres cosas que habrían quedado mintiendo
+
+Al cambiar de dónde sale el color, tres sitios se quedaban prometiendo algo que ya no hacían.
+Ninguno daba error:
+
+- **El deslizador «Radio de esquinas»** escribía `Tema.Radio`, y el radio pasó a ser un valor
+  del tema (23 en Profesional, 0 en Videojuegos y Cyberpunk, 25 en Sakura). Habría quedado un
+  deslizador que se mueve y no mueve nada. Se arregló con la misma idea que los colores: una
+  capa de personalización (`Tema.Radios`, por pieza) que va ENCIMA del tema, y un botón para
+  devolverle el radio al tema.
+- **Los perfiles** pueden escribir `Tema.*`, así que un perfil con `Tema.Acento` se habría
+  aplicado «bien» sin cambiar ningún color. Esas trece claves están ahora declaradas retiradas
+  y se informan como ignoradas, que es el canal que ya existía («válido, N clave(s)
+  ignoradas»). Y como los colores viven dentro de `Tema.Colores`, se valida su contenido: cada
+  clave tiene que estar en el catálogo y cada valor tiene que entenderse.
+- **La escena de arranque** leía `Tema.Acento` del árbol. Ahora pide el acento a la cascada,
+  igual que la barra, así que la escena entra del color con el que la barra va a salir — que es
+  lo que esa escena existe para anunciar.
+
+### «Se pregunta», sin un cuadro de diálogo
+
+El plan dice que al cambiar de tema se pregunta si conservar las personalizaciones. Se pregunta
+**dentro de la página**, con dos botones y un «Dejarlo», y no con un `MessageBox`. No por gusto:
+este producto no tiene ni un cuadro de diálogo del sistema en más de doscientos ficheros —cerrar
+una app, apagar y probar un perfil se confirman dentro de su propia superficie— y éste habría
+sido el primero, además del que menos falta hace: la pregunta cabe donde está la decisión.
+
+### Lo que Ajustes > Colores todavía no hace
+
+- **Los degradados se enseñan pero no se editan.** `SelectorColor` da un color; un degradado son
+  paradas, ángulo y opacidad. Es el apartado 3 del Estudio de temas (fase 9). Mientras tanto una
+  clave con degradado se ve, se puede restablecer y se puede sustituir por un color liso.
+- **«Elegir en pantalla»** (pulsar un elemento de la barra y que se abra su color) pide que cada
+  cosa pintada sepa de qué clave salió. Eso llega cuando las fases 1 a 8 pasen cada pieza a
+  preguntar por su clave; hacerlo antes sería mantener a mano un segundo mapa «elemento →
+  clave», y ese mapa se desincroniza el primer día.
+- **La lista va en desplegables por zona**, con «Colores base» abierto y el contenido de cada
+  zona construido la primera vez que se abre. Ciento treinta filas con su selector de color de
+  golpe es una página que tarda en abrirse y en la que no se encuentra nada. El buscador pasa a
+  una lista plana de coincidencias de todas las zonas, para poder buscar «apagar» sin saber en
+  qué zona vive.

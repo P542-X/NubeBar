@@ -443,12 +443,13 @@ public partial class MainWindow
         string guardado = System.IO.Path.Combine(Temas.Carpeta, "_antes-del-claro.json");
         bool estoyEnClaro = Contraste.Luminancia(_roles.FondoOpaco) > 0.5;
 
-        TemaGuardado destino;
+        TemaExportado destino;
         if (estoyEnClaro)
         {
             // Volver: lo que hubiera guardado, y si no hay nada —porque entraste en claro por
-            // otro camino— el tema de la casa, que es oscuro.
-            destino = Temas.Importar(guardado) ?? Temas.Nube;
+            // otro camino— el tema de serie, que es oscuro.
+            destino = Temas.Importar(guardado)
+                      ?? new TemaExportado("el de serie", TemasDeSerie.Predeterminado, null);
         }
         else
         {
@@ -465,47 +466,36 @@ public partial class MainWindow
                 AbrirAjustesEn("colores");
                 return;
             }
-            destino = Temas.Claro;
+            // Oficina es el claro sobrio de los nueve: blanco, grises y azul, sin mascota ni
+            // partículas. Un «tema claro» no puede sorprenderte con pétalos cayendo.
+            destino = new TemaExportado("Oficina", "oficina", null);
         }
 
         AplicarYGuardarTema(destino);
     }
 
-    // El tema que hay puesto AHORA, como `TemaGuardado`. Lee del config y no de los roles:
-    // los roles ya están derivados y aplanados, así que reconstruir desde ellos devolvería un
-    // tema parecido pero no el tuyo.
-    TemaGuardado TemaDeAhora(string nombre)
-    {
-        var t = _cfg.Tema;
-        return new TemaGuardado(nombre, t.Fondo, t.Texto, t.Acento, t.Radio,
-                                t.Superficie, t.SuperficieAlta, t.Borde, t.TextoAtenuado,
-                                t.Secundario, t.Sistema, t.Positivo, t.Aviso, t.Negativo);
-    }
+    // El tema que hay puesto AHORA. Lee del config y no de los roles: los roles ya están
+    // derivados y aplanados, así que reconstruir desde ellos devolvería un tema parecido pero
+    // no el tuyo. Son dos cosas: de qué tema sales y qué le has cambiado.
+    TemaExportado TemaDeAhora(string nombre) =>
+        new(nombre, _cfg.Tema.Id, new Dictionary<string, string>(_cfg.Tema.Colores));
 
     // Se escribe con `ConfigArbol` por lo de siempre: para no perder las claves que NubeBar no
-    // conoce del fichero del usuario. Y los roles que el tema no trae se escriben VACÍOS, no
-    // se dejan como estaban — vacío significa «derívalo», y conservarlos dejaría el coral de
-    // «Nube» metido en un tema claro para siempre. Es la misma regla que `Temas.Aplicar`.
-    void AplicarYGuardarTema(TemaGuardado t)
+    // conoce del fichero del usuario.
+    //
+    // Y los colores del usuario se SUSTITUYEN enteros, no se mezclan. Si se conservaran, al
+    // pasarte a claro te quedaría tu fondo oscuro de siempre puesto encima del tema claro —o
+    // sea, ni uno ni otro—. Al volver se restauran desde el fichero, que es para lo que se
+    // guardó. Es la misma regla que cumplía la versión anterior escribiendo los roles vacíos.
+    void AplicarYGuardarTema(TemaExportado t)
     {
         try
         {
             var arbol = ConfigArbol.Cargar();
-            arbol.Poner("Tema", "Fondo", t.Fondo);
-            arbol.Poner("Tema", "Texto", t.Texto);
-            arbol.Poner("Tema", "Acento", t.Acento);
-            arbol.Poner("Tema", "Radio", t.Radio);
-            arbol.Poner("Tema", "Superficie", t.Superficie ?? "");
-            arbol.Poner("Tema", "SuperficieAlta", t.SuperficieAlta ?? "");
-            arbol.Poner("Tema", "Borde", t.Borde ?? "");
-            arbol.Poner("Tema", "TextoAtenuado", t.TextoAtenuado ?? "");
-            arbol.Poner("Tema", "Secundario", t.Secundario ?? "");
-            arbol.Poner("Tema", "Sistema", t.Sistema ?? "");
-            arbol.Poner("Tema", "Positivo", t.Positivo ?? "");
-            arbol.Poner("Tema", "Aviso", t.Aviso ?? "");
-            arbol.Poner("Tema", "Negativo", t.Negativo ?? "");
+            arbol.Poner("Tema", "Id", TemasDeSerie.De(t.Id).Id);
+            arbol.PonerColores("Tema", t.Colores ?? new Dictionary<string, string>());
             arbol.Guardar();
-            Log.Info($"tema cambiado a «{t.Nombre}» desde la acción rápida");
+            Log.Info($"tema cambiado a «{t.Nombre}» ({t.Id}) desde la acción rápida");
             // Lo demás lo hace la recarga en caliente: el vigilante del config ve la
             // escritura y repinta las islas. No hace falta repintar a mano, y hacerlo
             // dejaría la barra con un tema y los paneles con otro durante un instante.

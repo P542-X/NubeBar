@@ -149,9 +149,30 @@ public static class Perfiles
 
     // ¿Puede un perfil escribir esta clave? Pura y pública para poder comprobarla con
     // claves inventadas, incluidas las maliciosas de un fichero importado.
+    // ---------- Las claves de `Tema` que ya no pintan nada ----------
+    //
+    // `Tema.*` deja entrar cualquier clave de la sección, y eso estaba bien cuando los colores
+    // del tema eran estas trece. Desde el rediseño el color sale de `Tema.Id` y `Tema.Colores`
+    // (ver `Catalogo`), y estas trece **no las lee nadie**.
+    //
+    // Si se dejaran pasar, un perfil del usuario con `Tema.Acento` se aplicaría «bien» y no
+    // cambiaría ningún color: un perfil que miente. Así que se declaran retiradas y se
+    // informan como ignoradas, que es el canal que ya existe para esto («válido, N clave(s)
+    // ignoradas»). El perfil sigue aplicándose; lo que no hace es prometer.
+    public static readonly string[] ClavesRetiradas =
+    {
+        "Tema.Fondo", "Tema.Texto", "Tema.Acento", "Tema.Radio", "Tema.Superficie",
+        "Tema.SuperficieAlta", "Tema.Borde", "Tema.TextoAtenuado", "Tema.Secundario",
+        "Tema.Sistema", "Tema.Positivo", "Tema.Aviso", "Tema.Negativo", "Tema.Estilo",
+    };
+
+    public static bool Retirada(string seccion, string clave) =>
+        ClavesRetiradas.Any(c => c.Equals($"{seccion}.{clave}", StringComparison.OrdinalIgnoreCase));
+
     public static bool Permitida(string seccion, string clave)
     {
         if (string.IsNullOrWhiteSpace(seccion) || string.IsNullOrWhiteSpace(clave)) return false;
+        if (Retirada(seccion, clave)) return false;
         foreach (var c in Claves)
         {
             int p = c.IndexOf('.');
@@ -256,17 +277,50 @@ public static class Perfiles
 
             if (seccion.Equals("Tema", StringComparison.OrdinalIgnoreCase))
             {
-                if (clave is "Radio" or "TamanoFuente")
+                if (clave is "TamanoFuente")
                 {
                     double d = valor.GetValue<double>();
                     return d >= 0 && d <= 200 ? null : "fuera de 0..200";
                 }
-                // Los colores: si parece un color, tiene que serlo
-                if (valor.GetValueKind() == JsonValueKind.String && EsNombreDeColor(clave))
+
+                // ---------- Los colores del tema, que ahora viven DENTRO de una clave ----------
+                //
+                // Antes eran trece claves de la sección y se validaba una a una. Ahora son un
+                // diccionario (`Tema.Colores`), así que se valida su contenido: cada clave tiene
+                // que estar en el catálogo y cada valor tiene que entenderse. Sin esto, un perfil
+                // podría traer `{"no.existe": "azulito"}` y aplicarse «bien».
+                //
+                // Un null dentro vale: significa «quita esta personalización», o sea «que lo
+                // ponga el tema». Es la misma idea que el null de antes («deriva este rol»).
+                if (clave.Equals("Colores", StringComparison.OrdinalIgnoreCase))
                 {
-                    var s = valor.GetValue<string>() ?? "";
-                    return Paleta.EsColor(s) ? null : $"\"{s}\" no es un color";
+                    if (valor is not JsonObject co) return "Colores tiene que ser un objeto";
+                    foreach (var (k, v) in co)
+                    {
+                        if (v == null) continue;
+                        if (!Catalogo.Existe(k)) return $"\"{k}\" no es un color del catálogo";
+                        var s = v.GetValueKind() == JsonValueKind.String ? v.GetValue<string>() ?? "" : "";
+                        if (Relleno.Leer(s) is null) return $"\"{s}\" no es un color";
+                    }
+                    return null;
                 }
+
+                if (clave.Equals("Radios", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (valor is not JsonObject ra) return "Radios tiene que ser un objeto";
+                    foreach (var (k, v) in ra)
+                    {
+                        if (v == null) continue;
+                        if (v.GetValueKind() != JsonValueKind.Number) return $"el radio de \"{k}\" no es un número";
+                        double d = v.GetValue<double>();
+                        if (d < 0 || d > 200) return $"el radio de \"{k}\" se sale de 0..200";
+                    }
+                    return null;
+                }
+
+                // El id de un tema que no existe NO es un error: cae en Profesional y queda
+                // apuntado (`TemasDeSerie.De`). Rechazar el perfil entero por eso sería más duro
+                // de lo que es el resto del programa con la misma situación.
             }
 
             if (seccion.Equals("Fondo", StringComparison.OrdinalIgnoreCase))

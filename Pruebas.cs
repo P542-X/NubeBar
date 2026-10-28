@@ -1837,8 +1837,19 @@ public static partial class Pruebas
     {
         Grupo("perfiles: solo pueden tocar lo suyo");
 
-        Vale(Perfiles.Permitida("Tema", "Acento"), "el tema sí");
-        Vale(Perfiles.Permitida("Tema", "Secundario"), "incluidos sus roles");
+        Vale(Perfiles.Permitida("Tema", "Id"), "el tema sí");
+        Vale(Perfiles.Permitida("Tema", "Colores"), "incluidos los colores que le hayas cambiado");
+        Vale(Perfiles.Permitida("Tema", "Radios"), "y los radios");
+
+        // ---------- Y las claves de color de antes del rediseño ----------
+        //
+        // Siguen entrando por `Tema.*`, y ya no las lee nadie. Si se dejaran pasar, un perfil
+        // con `Tema.Acento` se aplicaría «bien» y no cambiaría ningún color: un perfil que
+        // miente. Se informan como ignoradas, que es el canal que ya existe para esto.
+        foreach (var retirada in new[] { "Fondo", "Texto", "Acento", "Radio", "Superficie",
+                                         "Secundario", "Sistema", "Estilo" })
+            Vale(!Perfiles.Permitida("Tema", retirada),
+                 $"Tema.{retirada} está retirada: un perfil ya no puede prometerla");
         Vale(Perfiles.Permitida("Animaciones", "Nivel"), "el nivel de animación sí");
         Vale(Perfiles.Permitida("Modulos", "Ocultos"), "los widgets ocultos sí");
         Vale(Perfiles.Permitida("Panel", "Posicion"), "la posición del panel sí");
@@ -1857,7 +1868,8 @@ public static partial class Pruebas
 
         Vale(!Perfiles.Permitida("", "Acento"), "sin sección, no");
         Vale(!Perfiles.Permitida("Tema", ""), "sin clave, no");
-        Vale(Perfiles.Permitida("tema", "acento"), "las mayúsculas no cambian el permiso");
+        Vale(Perfiles.Permitida("tema", "colores"), "las mayúsculas no cambian el permiso");
+        Vale(!Perfiles.Permitida("TEMA", "ACENTO"), "ni cambian que una clave esté retirada");
     }
 
     static void PerfilesValidar()
@@ -1870,7 +1882,7 @@ public static partial class Pruebas
             Version = Perfiles.VersionEsquema,
             Ajustes = new JsonObject
             {
-                ["Tema"] = new JsonObject { ["Acento"] = "#7AA2F7" },
+                ["Tema"] = new JsonObject { ["Id"] = "sakura" },
                 ["Animaciones"] = new JsonObject { ["Nivel"] = "reducido" },
             }
         };
@@ -1902,8 +1914,21 @@ public static partial class Pruebas
         Vale(!Perfiles.Validar(malNivel).Vale, "un nivel de animación inventado se rechaza");
 
         var malColor = Bueno();
-        malColor.Ajustes["Tema"] = new JsonObject { ["Acento"] = "azulito" };
+        malColor.Ajustes["Tema"] = new JsonObject { ["Colores"] = new JsonObject { ["acento"] = "azulito" } };
         Vale(!Perfiles.Validar(malColor).Vale, "un color que no es un color se rechaza");
+
+        var claveInventada = Bueno();
+        claveInventada.Ajustes["Tema"] = new JsonObject { ["Colores"] = new JsonObject { ["no.existe"] = "#FFF" } };
+        Vale(!Perfiles.Validar(claveInventada).Vale,
+             "y una clave de color que no está en el catálogo, también");
+
+        var buenColor = Bueno();
+        buenColor.Ajustes["Tema"] = new JsonObject { ["Colores"] = new JsonObject { ["acento"] = "#FF8FB8" } };
+        Vale(Perfiles.Validar(buenColor).Vale, "un color bueno con su clave buena vale");
+
+        var malRadio = Bueno();
+        malRadio.Ajustes["Tema"] = new JsonObject { ["Radios"] = new JsonObject { ["isla"] = 9999.0 } };
+        Vale(!Perfiles.Validar(malRadio).Vale, "un radio imposible se rechaza");
 
         var malPos = Bueno();
         malPos.Ajustes["Panel"] = new JsonObject { ["Posicion"] = "diagonal" };
@@ -1919,8 +1944,8 @@ public static partial class Pruebas
 
         // Un null es legítimo: significa "deriva este rol"
         var conNull = Bueno();
-        conNull.Ajustes["Tema"] = new JsonObject { ["Secundario"] = null };
-        Vale(Perfiles.Validar(conNull).Vale, "un null vale: es \"deriva este rol\"");
+        conNull.Ajustes["Tema"] = new JsonObject { ["Colores"] = new JsonObject { ["sec1"] = null } };
+        Vale(Perfiles.Validar(conNull).Vale, "un null vale: es \"quita esa personalización\"");
 
         // ---------- Claves desconocidas: se conservan, no invalidan ----------
         var conExtra = Bueno();
@@ -2039,7 +2064,7 @@ public static partial class Pruebas
             Id = "x", Nombre = "X",
             Ajustes = new JsonObject
             {
-                ["Tema"] = new JsonObject { ["Acento"] = "#112233", ["Secundario"] = null },
+                ["Tema"] = new JsonObject { ["Id"] = "sakura", ["Colores"] = null },
                 ["Panel"] = new JsonObject { ["Posicion"] = "abajo", ["Grosor"] = 44.0 },
                 ["Modulos"] = new JsonObject { ["Centro"] = new JsonArray("reloj") },
                 ["Barra"] = new JsonObject { ["AtajoVistaGeneral"] = "Ctrl+Z" },   // no es suyo
@@ -2058,13 +2083,13 @@ public static partial class Pruebas
 
         // Un null se conserva como null: significa "quita la clave", que para un rol de
         // color es "derívalo". Perderlo dejaría el rol del tema anterior puesto.
-        var sec = es.First(e => e.Clave == "Secundario");
+        var sec = es.First(e => e.Clave == "Colores");
         Vale(sec.Valor == null, "un null sobrevive a la traducción");
 
         // Y es una copia: tocar el perfil después no cambia las escrituras ya calculadas
-        p.Ajustes["Tema"]!["Acento"] = "#FFFFFF";
-        var ac = es.First(e => e.Clave == "Acento");
-        Igual("#112233", ac.Valor!.GetValue<string>(), "las escrituras son una copia del perfil");
+        p.Ajustes["Tema"]!["Id"] = "cyberpunk";
+        var ac = es.First(e => e.Clave == "Id");
+        Igual("sakura", ac.Valor!.GetValue<string>(), "las escrituras son una copia del perfil");
 
         Igual(0, Perfiles.Escrituras(new Perfil()).Count, "un perfil sin ajustes no escribe nada");
     }
@@ -2083,7 +2108,7 @@ public static partial class Pruebas
             var inicial = new JsonObject
             {
                 ["Version"] = Esquema.Actual,
-                ["Tema"] = new JsonObject { ["Acento"] = "#AAAAAA", ["Fondo"] = "#E6000000" },
+                ["Tema"] = new JsonObject { ["Id"] = "profesional", ["Fuente"] = "Segoe UI" },
                 ["Barra"] = new JsonObject
                 {
                     ["AtajoVistaGeneral"] = "Ctrl+Alt+W",
@@ -2104,7 +2129,7 @@ public static partial class Pruebas
                 Id = "prueba", Nombre = "Prueba", Descripcion = "Para la prueba",
                 Ajustes = new JsonObject
                 {
-                    ["Tema"] = new JsonObject { ["Acento"] = "#112233" },
+                    ["Tema"] = new JsonObject { ["Id"] = "sakura" },
                     ["Animaciones"] = new JsonObject { ["Nivel"] = "reducido" },
                     ["Barra"] = new JsonObject { ["PulsoAudio"] = false },
                     ["Panel"] = new JsonObject { ["Posicion"] = "abajo", ["Grosor"] = 44.0 },
@@ -2117,7 +2142,7 @@ public static partial class Pruebas
             Igual(5, r.Escritas, "cinco claves escritas");
 
             var despues = JsonNode.Parse(File.ReadAllText(ruta))!.AsObject();
-            Igual("#112233", despues["Tema"]!["Acento"]!.GetValue<string>(), "el acento es el del perfil");
+            Igual("sakura", despues["Tema"]!["Id"]!.GetValue<string>(), "el tema es el del perfil");
             Igual("reducido", despues["Animaciones"]!["Nivel"]!.GetValue<string>(), "y el nivel de animación");
             Igual(false, despues["Barra"]!["PulsoAudio"]!.GetValue<bool>(), "y el pulso de audio");
             Igual("abajo", despues["Paneles"]![0]!["Posicion"]!.GetValue<string>(),
@@ -2131,8 +2156,8 @@ public static partial class Pruebas
                   "ni sus apps fijadas");
             Igual(true, despues["Animaciones"]!["RobotVisto"]!.GetValue<bool>(),
                   "ni que ya vio la escena");
-            Igual("#E6000000", despues["Tema"]!["Fondo"]!.GetValue<string>(),
-                  "ni el fondo del tema, que el perfil no menciona");
+            Igual("Segoe UI", despues["Tema"]!["Fuente"]!.GetValue<string>(),
+                  "ni la fuente del tema, que el perfil no menciona");
             Vale(despues["LoDelFuturo"] is JsonObject, "ni una sección de una versión futura");
             Igual(Esquema.Actual, despues["Version"]!.GetValue<int>(), "y la versión sigue puesta");
 
@@ -2147,14 +2172,15 @@ public static partial class Pruebas
                  "recién aplicado, el perfil no está modificado");
 
             // Tocar algo que el perfil SÍ controla lo marca como modificado
-            arbol.Poner("Tema", "Acento", "#FF0000");
+            arbol.Poner("Tema", "Id", "cyberpunk");
             arbol.Guardar();
             Vale(Perfiles.Modificado(est.HuellaAlAplicar, Perfiles.Huella(perfil, ConfigArbol.Cargar(ruta))),
                  "cambiar a mano algo del perfil lo marca como modificado");
 
             // Pero tocar algo que NO controla, no
             var a2 = ConfigArbol.Cargar(ruta);
-            a2.Poner("Tema", "Acento", "#112233");      // se devuelve
+            a2.Poner("Tema", "Id", "sakura");           // se devuelve a lo que puso el perfil
+            a2.Poner("Tema", "Fuente", "Consolas");     // esto el perfil no lo menciona
             a2.Poner("Barra", "AtajoVistaGeneral", "Ctrl+Alt+Q");
             a2.Guardar();
             Vale(!Perfiles.Modificado(est.HuellaAlAplicar, Perfiles.Huella(perfil, ConfigArbol.Cargar(ruta))),
@@ -2165,7 +2191,7 @@ public static partial class Pruebas
             Vale(Perfiles.Deshacer(ruta), "se deshace");
 
             var vuelto = JsonNode.Parse(File.ReadAllText(ruta))!.AsObject();
-            Igual("#AAAAAA", vuelto["Tema"]!["Acento"]!.GetValue<string>(), "el acento vuelve al de antes");
+            Igual("profesional", vuelto["Tema"]!["Id"]!.GetValue<string>(), "el tema vuelve al de antes");
             Igual("completo", vuelto["Animaciones"]!["Nivel"]!.GetValue<string>(), "y el nivel");
             Igual(true, vuelto["Barra"]!["PulsoAudio"]!.GetValue<bool>(), "y el pulso de audio");
             Igual("arriba", vuelto["Paneles"]![0]!["Posicion"]!.GetValue<string>(), "y el panel");
@@ -2750,14 +2776,9 @@ public static partial class Pruebas
         // Esto es la queja de fondo, y es medible. `Superficie` es un velo translúcido;
         // `SuperficieSolida` es ese mismo color aplanado sobre el fondo opaco del tema.
         // Lo que no puede pasar es que una tarjeta deje pasar el escritorio.
-        foreach (var t in Temas.Predefinidos)
+        foreach (var t in TemasDeSerie.Lista)
         {
-            var tema = new Tema();
-            Temas.Aplicar(t, tema);
-            var fondo = (Color)ColorConverter.ConvertFromString(tema.Fondo)!;
-            var texto = (Color)ColorConverter.ConvertFromString(tema.Texto)!;
-            var acento = (Color)ColorConverter.ConvertFromString(tema.Acento)!;
-            var r = Roles.Desde(tema, fondo, texto, acento);
+            var r = Roles.Desde(new Pintura(t));
 
             Igual((byte)255, r.SuperficieSolida.A, $"{t.Nombre}: la superficie de tarjeta es OPACA");
             Igual((byte)255, r.SuperficieAltaSolida.A, $"{t.Nombre}: y la elevada también");
@@ -3401,10 +3422,10 @@ public static partial class Pruebas
         Vale(MainWindow.FuenteIconos.Contains("Segoe", StringComparison.OrdinalIgnoreCase),
              $"y es una Segoe ({MainWindow.FuenteIconos})");
     }
-    // ---------- El panel en los siete temas ----------
+    // ---------- El panel en los nueve temas ----------
     //
     // Esto es la parte comprobable de la "verificación visual": que los colores que usa
-    // el centro de notificaciones se LEEN en los siete temas. No dice si es bonito —eso
+    // el centro de notificaciones se LEEN en los nueve temas. No dice si es bonito —eso
     // hay que mirarlo— pero sí caza lo que de verdad rompe un panel: un texto atenuado
     // sobre una superficie levantada que en un tema claro se queda en nada.
     //
@@ -3413,20 +3434,15 @@ public static partial class Pruebas
     // estaba escrita en Roles.cs; aquí se comprueba que el panel la respeta.
     static void SieteTemas()
     {
-        Grupo("centro: se lee en los siete temas");
+        Grupo("centro: se lee en los nueve temas");
 
         // 4,5 es el mínimo de la norma para texto normal; 3,0 para texto grande o
         // secundario, que es lo que son el segundo renglón y la hora.
         const double MinimoTexto = 4.5, MinimoSecundario = 3.0;
 
-        foreach (var t in NubeBar.Temas.Predefinidos)
+        foreach (var t in TemasDeSerie.Lista)
         {
-            var tema = new Tema();
-            NubeBar.Temas.Aplicar(t, tema);
-            var fondo = (Color)ColorConverter.ConvertFromString(tema.Fondo)!;
-            var texto = (Color)ColorConverter.ConvertFromString(tema.Texto)!;
-            var acento = (Color)ColorConverter.ConvertFromString(tema.Acento)!;
-            var r = Roles.Desde(tema, fondo, texto, acento);
+            var r = Roles.Desde(new Pintura(t));
 
             void Mide(Color tinta, Color detras, double minimo, string que)
             {
@@ -3799,16 +3815,11 @@ public static partial class Pruebas
 
         Vale(!MainWindow.EsShellOpaco(null), "y preguntar por nada no revienta");
 
-        // Y la superficie que usa PanelShell es opaca en los siete temas: es de donde
+        // Y la superficie que usa PanelShell es opaca en los nueve temas: es de donde
         // sale el color, así que si un tema la define con alfa el panel se traspasa.
-        foreach (var t in NubeBar.Temas.Predefinidos)
+        foreach (var t in TemasDeSerie.Lista)
         {
-            var tema = new Tema();
-            NubeBar.Temas.Aplicar(t, tema);
-            var fondo = (Color)ColorConverter.ConvertFromString(tema.Fondo)!;
-            var texto = (Color)ColorConverter.ConvertFromString(tema.Texto)!;
-            var acento = (Color)ColorConverter.ConvertFromString(tema.Acento)!;
-            var r = Roles.Desde(tema, fondo, texto, acento);
+            var r = Roles.Desde(new Pintura(t));
 
             Igual(255, (int)r.SuperficieSolida.A, $"[{t.Nombre}] la superficie sólida es opaca");
             Igual(255, (int)r.SuperficieAltaSolida.A, $"[{t.Nombre}] y la levantada también");
@@ -3825,8 +3836,9 @@ public static partial class Pruebas
             Vale(MainWindow.EsShellOpaco(new Border { Background = new SolidColorBrush(r.FondoOpaco) }),
                  $"[{t.Nombre}] el fondo opaco vale como raíz de un panel flotante");
 
-            if (fondo.A < 255)
-                Vale(!MainWindow.EsShellOpaco(new Border { Background = new SolidColorBrush(fondo) }),
+            var conAlfa = r.Fondo;
+            if (conAlfa.A < 255)
+                Vale(!MainWindow.EsShellOpaco(new Border { Background = new SolidColorBrush(conAlfa) }),
                      $"[{t.Nombre}] y el del tema, con alfa, NO vale como raíz de un panel");
         }
     }
@@ -4088,7 +4100,7 @@ public static partial class Pruebas
 
     static void InicioSeVeEnLosDosTemasYDpi()
     {
-        Grupo("inicio: se lee en los siete temas y a cualquier DPI");
+        Grupo("inicio: se lee en los nueve temas y a cualquier DPI");
 
         // La parte comprobable de "ningún texto del escritorio atravesando la superficie"
         // es que la superficie sea OPACA y que lo que lleva escrito se lea encima. Se mide
@@ -4096,14 +4108,9 @@ public static partial class Pruebas
         // luminancia propia hasta que se sabe qué hay detrás.
         const double MinimoTexto = 4.5, MinimoSecundario = 3.0;
 
-        foreach (var t in NubeBar.Temas.Predefinidos)
+        foreach (var t in TemasDeSerie.Lista)
         {
-            var tema = new Tema();
-            NubeBar.Temas.Aplicar(t, tema);
-            var fondo = (Color)ColorConverter.ConvertFromString(tema.Fondo)!;
-            var texto = (Color)ColorConverter.ConvertFromString(tema.Texto)!;
-            var acento = (Color)ColorConverter.ConvertFromString(tema.Acento)!;
-            var r = Roles.Desde(tema, fondo, texto, acento);
+            var r = Roles.Desde(new Pintura(t));
 
             // La superficie del panel y de sus tarjetas, opacas: es lo que impide que el
             // escritorio se lea a través
@@ -4555,7 +4562,7 @@ public static partial class Pruebas
     {
         Grupo("D0: la migración declara la capa y no la enciende");
 
-        Igual(4, Esquema.Actual, "el esquema va por la versión 4");
+        Vale(Esquema.Actual >= 4, $"el esquema va por la versión {Esquema.Actual}");
 
         // Un config de la v3 al migrar: aparece la sección, apagada
         var v3 = new JsonObject
@@ -4567,7 +4574,7 @@ public static partial class Pruebas
         Vale(!Esquema.ActivoAntes(v3), "antes de migrar no había capa encendida");
 
         var r = Esquema.Migrar(v3);
-        Igual(4, r.Hasta, "se migra a la 4");
+        Igual(Esquema.Actual, r.Hasta, "se migra hasta la versión de hoy");
         Vale(r.Cambio, "y el fichero cambia");
         Vale(v3["NubeHypr"] is JsonObject, "la sección NubeHypr aparece");
         Igual(false, v3["NubeHypr"]!["Activo"]!.GetValue<bool>(), "APAGADA");
@@ -4633,8 +4640,8 @@ public static partial class Pruebas
         // Desde la v1, pasando por todas: la capa también acaba declarada y apagada
         var v1 = new JsonObject { ["Tema"] = new JsonObject() };
         var largo = Esquema.Migrar(v1);
-        Igual(4, largo.Hasta, "desde un config sin versión se llega a la 4");
-        Igual(3, largo.Aplicadas.Count, "con las tres migraciones");
+        Igual(Esquema.Actual, largo.Hasta, "desde un config sin versión se llega a la de hoy");
+        Igual(Esquema.Actual - 1, largo.Aplicadas.Count, "aplicando cada paso una sola vez");
         Igual(false, v1["NubeHypr"]!["Activo"]!.GetValue<bool>(), "y la capa acaba apagada");
 
         // ---------- La validación ----------
@@ -7166,7 +7173,7 @@ public static partial class Pruebas
                     ["Activo"] = true,        // esta tiene que caerse
                     ["Modo"] = "aplicar",     // y esta también
                 },
-                ["Tema"] = new JsonObject { ["Acento"] = "#112233" },
+                ["Tema"] = new JsonObject { ["Id"] = "sakura" },
             },
         };
 
@@ -7179,7 +7186,7 @@ public static partial class Pruebas
              "encender la capa se descarta, aunque venga en el fichero del perfil");
         Vale(!escrituras.Any(e => e.Clave == "Modo"),
              "y poner el modo en «aplicar», igual: se descarta");
-        Vale(escrituras.Any(e => e.Seccion == "Tema" && e.Clave == "Acento"),
+        Vale(escrituras.Any(e => e.Seccion == "Tema" && e.Clave == "Id"),
              "y lo demás del perfil sigue funcionando");
 
         // Las reglas llegan como el nodo entero, no aplanadas: una lista es un valor.

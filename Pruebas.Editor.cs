@@ -382,24 +382,16 @@ public static partial class Pruebas
     // ================= Y se ve =================
     static void EditorElSeparadorSeVe()
     {
-        Grupo("separador: la rayita se distingue del fondo en los siete temas");
+        Grupo("separador: la rayita se distingue del fondo en los nueve temas");
 
         // La otra mitad de «los separadores no van»: se pintaban con el rol `Borde`, que
         // lleva un velo del 23 %. Una línea de un píxel al 23 % sobre el fondo de la barra
         // está dibujada, ocupa su sitio y no se ve — por eso las pruebas de módulos la
         // daban por buena: medían que existiera y que midiera algo, y las dos cosas eran
         // ciertas.
-        foreach (var t in NubeBar.Temas.Predefinidos)
+        foreach (var t in TemasDeSerie.Lista)
         {
-            var tema = new Tema();
-            NubeBar.Temas.Aplicar(t, tema);
-            var fondo = (System.Windows.Media.Color)System.Windows.Media.ColorConverter
-                            .ConvertFromString(tema.Fondo)!;
-            var texto = (System.Windows.Media.Color)System.Windows.Media.ColorConverter
-                            .ConvertFromString(tema.Texto)!;
-            var acento = (System.Windows.Media.Color)System.Windows.Media.ColorConverter
-                            .ConvertFromString(tema.Acento)!;
-            var r = Roles.Desde(tema, fondo, texto, acento);
+            var r = Roles.Desde(new Pintura(t));
 
             var color = MainWindow.ColorDelSeparador(r);
             double ratio = Contraste.Entre(color, r.FondoOpaco);

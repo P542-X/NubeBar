@@ -25,6 +25,7 @@ public static partial class Pruebas
         CascadaDeColores();
         ContrasteDeLosNueve();
         AjustesNuncaIlegible();
+        MigracionDelTema();
     }
 
     // ================= Relleno: leer lo que escribió la maqueta =================

@@ -449,8 +449,19 @@ public partial class MainWindow : Window
         // abajo (LlenarZonas): así cambiar el nivel en caliente se ve en el acto.
         Resources[typeof(Button)] = EstiloBoton();
 
-        Color fondo = Hex(t.Fondo, DeSerie.Fondo), texto = Hex(t.Texto, DeSerie.Texto),
-              acento = Hex(t.Acento, DeSerie.Acento);
+        // ---------- De dónde sale el color desde el rediseño ----------
+        //
+        // Del tema puesto (`Tema.Id`, uno de los nueve de serie) pasado por la cascada, con
+        // encima lo que el usuario le haya cambiado (`Tema.Colores`). Antes salía de tres
+        // claves del config; ahora esas tres son solo dos entradas más de la cascada, y la
+        // migración v4→v5 ya las movió ahí.
+        var tema = TemasDeSerie.De(t.Id);
+        var pintura = new Pintura(tema, t.Colores, t.Radios);
+
+        Color fondo = pintura.Color(ClavesBase.Superficie),
+              texto = pintura.Color(ClavesBase.Tinta),
+              acento = pintura.Color(ClavesBase.Acento);
+        Color fondoDelTema = fondo, textoDelTema = texto, acentoDelTema = acento;
         if (t.DesdeWallpaper && _paleta is { } p)
         {
             fondo = Color.FromArgb(fondo.A, p.Fondo.R, p.Fondo.G, p.Fondo.B);  // se respeta tu opacidad
@@ -499,11 +510,28 @@ public partial class MainWindow : Window
 
         _cTexto = texto; _cAcento = acento;
 
-        // Los roles se recalculan con los colores YA resueltos (con el wallpaper
-        // aplicado y el acento corregido), no con los del config en bruto: un widget
-        // que pregunte por Roles.Superficie tiene que recibir algo que pegue con lo
-        // que está pintado de verdad.
-        _roles = Roles.Desde(t, fondo, texto, acento);
+        // ---------- Y la pintura se rehace con lo que de verdad se va a pintar ----------
+        //
+        // El wallpaper y las tres correcciones de arriba pueden haber movido el fondo, el
+        // texto o el acento. Si lo han hecho, los tres entran como personalizaciones DE ESTA
+        // SESIÓN —encima de las del usuario, sin tocar el config— y todo lo que se deriva de
+        // ellos se recalcula con los valores de verdad.
+        //
+        // Antes esto era lo mismo pero dicho de otra forma: «los roles se recalculan con los
+        // colores ya resueltos, no con los del config en bruto». Un widget que pregunte por
+        // `tarjeta.fondo` tiene que recibir algo que pegue con lo que está pintado.
+        if (fondo != fondoDelTema || texto != textoDelTema || acento != acentoDelTema)
+        {
+            var deLaSesion = new Dictionary<string, string>(t.Colores, StringComparer.OrdinalIgnoreCase)
+            {
+                [ClavesBase.Superficie] = Relleno.Hex(fondo),
+                [ClavesBase.Tinta] = Relleno.Hex(texto),
+                [ClavesBase.Acento] = Relleno.Hex(acento),
+            };
+            pintura = new Pintura(tema, deLaSesion, t.Radios);
+        }
+
+        _roles = Roles.Desde(pintura);
 
         // La barra de desplazamiento propia, para TODA la aplicación: se pone en los
         // recursos de la app y no en los de esta ventana para que llegue también a Ajustes
@@ -533,7 +561,10 @@ public partial class MainWindow : Window
         AnimarColor(_secundario, _roles.SecundarioTinta);
         AnimarColor(_sistema, _roles.SistemaTinta);
 
-        Isla.CornerRadius = new CornerRadius(t.Radio);
+        // El radio sale del tema (o de lo que el usuario haya puesto encima), no de una clave
+        // suelta del config: es lo que permite que Videojuegos y Cyberpunk vayan a radio 0 y
+        // que Sakura vaya a 25.
+        Isla.CornerRadius = new CornerRadius(pintura.Radio(Piezas.Isla));
         FontFamily = new FontFamily(t.Fuente);
         FontSize = t.TamanoFuente;
 

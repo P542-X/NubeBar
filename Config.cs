@@ -9,10 +9,49 @@ namespace NubeBar;
 
 public class Tema
 {
-    public string Fondo { get; set; } = "#E6000000";   // ARGB: los 2 primeros dígitos son la opacidad
-    public string Texto { get; set; } = "#FFFFFF";
-    public string Acento { get; set; } = "#7AA2F7";
-    public double Radio { get; set; } = 20;
+    // ---------- Qué tema está puesto ----------
+    //
+    // El id de uno de los nueve de serie (`temas-de-serie.json`) o de uno del usuario. Es la
+    // ÚNICA fuente de verdad del color desde el rediseño: lo que se pinta sale de
+    // `TemasDeSerie.De(Id)` pasado por la cascada de `Pintura`, no de las claves de abajo.
+    //
+    // Un id que no se conozca cae en Profesional y queda apuntado (`TemasDeSerie.De`). Nunca
+    // en el más llamativo: un config con una errata no puede dejarte el escritorio lleno de
+    // neón. Es la misma regla que cumplían `Estilos.Leer` y `NubeHypr.ModoEfectivo`.
+    public string Id { get; set; } = "profesional";
+
+    // ---------- Y lo que el usuario ha cambiado de él ----------
+    //
+    // Clave del catálogo → color o degradado, SOLO lo que ha tocado. Un diccionario y no una
+    // lista de propiedades porque el catálogo tiene ~130 claves y crecerá: `boton.fondo.raton`
+    // no puede ser un campo de esta clase (ver `Catalogo`).
+    //
+    // Vacío es lo normal: significa «el tema tal cual». Lo que haya aquí manda sobre el tema
+    // (escalón 1 de la cascada), y una clave que no esté en el catálogo o un color mal escrito
+    // se ignoran con una línea en el registro — nunca tumban el arranque.
+    public Dictionary<string, string> Colores { get; set; } = new();
+
+    // ---------- Y los radios ----------
+    //
+    // Pieza (`isla`, `panel`, `tarjeta`, `boton`) → radio, solo lo que el usuario ha tocado.
+    // Mismo mecanismo que `Colores` y por el mismo motivo: el radio es un valor del tema
+    // —Profesional la quiere en 23 y Videojuegos en 0, en chaflán— y lo que el usuario cambia
+    // va encima, no en lugar de.
+    //
+    // Antes era `Tema.Radio`, un número para todo. La migración v4→v5 lo pasó aquí si estaba
+    // cambiado; si valía 20 (el de serie de entonces) no se arrastra, porque nadie lo eligió.
+    public Dictionary<string, double> Radios { get; set; } = new();
+
+    // Las trece claves de color de antes del rediseño (`Fondo`, `Texto`, `Acento`, `Radio`,
+    // `Superficie`…) se han quitado de aquí: la migración v4→v5 las pasó a `Colores` y a
+    // `Radios` con el nombre que tienen en el catálogo, y desde entonces no las leía nadie.
+    // Dejarlas declaradas era dejar trece propiedades muertas.
+    //
+    // En el FICHERO de quien las tenga siguen estando, y eso es a propósito: borrar claves del
+    // config de alguien es lo que este proyecto lleva varios accidentes aprendiendo a no hacer,
+    // y `ConfigArbol` conserva las que no conoce. Una clave que nadie lee no molesta; una clave
+    // borrada no vuelve.
+
     public string Fuente { get; set; } = "Segoe UI";
     public double TamanoFuente { get; set; } = 13;
     public bool DesdeWallpaper { get; set; } = false;          // colores sacados del wallpaper actual (tipo pywal)
@@ -694,12 +733,16 @@ public class Config
             if (!File.Exists(Ruta))
             {
                 Directory.CreateDirectory(Carpeta);
-                // Instalación nueva: entra con el tema Nube puesto. A quien ya tiene
+                // Instalación nueva: entra con el tema de serie puesto. A quien ya tiene
                 // config.json no se le toca el tema, que es suyo.
+                //
+                // Antes esto volcaba los diez colores del tema «Nube» dentro de `Tema`. Ya no
+                // hace falta: el tema es un id (`Tema.Id`, que nace en Profesional) y sus
+                // colores salen del catálogo. Un config nuevo son dos líneas y no doce.
                 var recien = new Config();
-                Temas.Aplicar(Temas.Nube, recien.Tema);
+                recien.Tema.Id = TemasDeSerie.Predeterminado;
                 File.WriteAllText(Ruta, JsonSerializer.Serialize(recien, Opc));
-                Log.Info("config nuevo creado con el tema Nube");
+                Log.Info($"config nuevo creado con el tema {TemasDeSerie.Predeterminado}");
             }
 
             // ---------- Las migraciones, antes de deserializar ----------
