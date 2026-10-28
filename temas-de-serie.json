@@ -1,0 +1,379 @@
+{
+  "origen": "Copia literal del objeto \"temas\" de docs/maqueta-rediseno/temas.json (la maqueta aprobada el 28/10/2026). Este fichero SI se compila: es el recurso del que salen los 9 temas de serie. El de docs/ es referencia y no se publica.",
+  "correcciones": [
+    "sakura.sobre-acento: #FFFFFF -> #4A3B5C (su propia tinta ciruela). El blanco de la maqueta sobre el acento sakura #FF8FB8 da 2,13:1, por debajo incluso del 3:1 que se exige a la etiqueta de un control relleno; la tinta ciruela da 4,77:1 y ya estaba en la paleta del tema. Es la UNICA desviacion respecto a docs/maqueta-rediseno/temas.json. Decidido el 28/10/2026."
+  ],
+  "temas": {
+    "profesional": {
+      "nombre": "Profesional",
+      "familia": "Sobrios",
+      "claro": false,
+      "colores": {
+        "acento": "#8DA9E8",
+        "acento-tinta": "#A9BEEE",
+        "sobre-acento": "#0C0E14",
+        "sec1": "#5E6E8F",
+        "sec2": "#C9D2E6",
+        "tinta": "#E6E9F2",
+        "tenue": "#9AA3B8",
+        "superficie": "rgba(12,14,20,.94)",
+        "tarjeta": "rgba(255,255,255,.035)",
+        "panel-fondo": "rgba(12,14,20,.96)",
+        "filo": "rgba(255,255,255,.09)",
+        "filo-isla": "rgba(255,255,255,.09)",
+        "filo-panel": "linear-gradient(180deg,rgba(201,210,230,.25),rgba(255,255,255,.06))",
+        "sombra": "rgba(0,0,0,.85)",
+        "halo": "rgba(141,169,232,.5)",
+        "destello": "rgba(201,210,230,.6)",
+        "ok": "#8FC1A0",
+        "peligro": "#E3A08F",
+        "fondo-escritorio": "linear-gradient(160deg,#1b2130 0%,#10141d 45%,#0a0c12 100%)"
+      },
+      "fuente": "Segoe UI Variable",
+      "fuente-titulos": "Segoe UI Variable",
+      "radios": {
+        "isla": 23,
+        "panel": 20,
+        "tarjeta": 14,
+        "boton": 10
+      },
+      "esquinas": "redondas",
+      "decoraciones": [
+        "halo",
+        "destello-filo"
+      ]
+    },
+    "oficina": {
+      "nombre": "Oficina",
+      "familia": "Sobrios",
+      "claro": true,
+      "colores": {
+        "acento": "#2F6FDB",
+        "acento-tinta": "#1F55B3",
+        "sobre-acento": "#FFFFFF",
+        "sec1": "#9AA6B8",
+        "sec2": "#5B8DEF",
+        "tinta": "#1F2733",
+        "tenue": "#5A6577",
+        "superficie": "rgba(255,255,255,.97)",
+        "tarjeta": "#FFFFFF",
+        "panel-fondo": "#F6F8FB",
+        "filo": "#E1E6EE",
+        "filo-isla": "#D5DCE6",
+        "filo-panel": "#D5DCE6",
+        "sombra": "rgba(31,39,51,.2)",
+        "halo": "transparent",
+        "destello": "transparent",
+        "ok": "#3BB273",
+        "peligro": "#C93C3C",
+        "fondo-escritorio": "linear-gradient(180deg,#EEF2F7,#DDE4EE)"
+      },
+      "fuente": "Segoe UI Variable",
+      "fuente-titulos": "Segoe UI Variable",
+      "radios": {
+        "isla": 12,
+        "panel": 12,
+        "tarjeta": 8,
+        "boton": 6
+      },
+      "esquinas": "redondas",
+      "decoraciones": []
+    },
+    "videojuegos": {
+      "nombre": "Videojuegos",
+      "familia": "Juego",
+      "claro": false,
+      "colores": {
+        "acento": "#39FF88",
+        "acento-tinta": "#5CFFA0",
+        "sobre-acento": "#05140B",
+        "sec1": "#5B6075",
+        "sec2": "#FF3DCB",
+        "tinta": "#ECEFF6",
+        "tenue": "#A3A9BC",
+        "superficie": "rgba(10,10,15,.95)",
+        "tarjeta": "#13141C",
+        "panel-fondo": "#0D0E15",
+        "filo": "rgba(57,255,136,.18)",
+        "filo-isla": "#39FF88",
+        "filo-panel": "linear-gradient(180deg,#39FF88,#FF3DCB)",
+        "sombra": "rgba(0,0,0,.85)",
+        "halo": "#39FF88",
+        "destello": "#FFFFFF",
+        "ok": "#39FF88",
+        "peligro": "#FF4D6A",
+        "fondo-escritorio": "linear-gradient(180deg,#0B0B14,#12091A 55%,#05050A) + rejilla en perspectiva verde"
+      },
+      "fuente": "Rajdhani",
+      "fuente-titulos": "Rajdhani",
+      "radios": {
+        "isla": 0,
+        "panel": 0,
+        "tarjeta": 0,
+        "boton": 0
+      },
+      "esquinas": "chaflan",
+      "decoraciones": [
+        "halo",
+        "destello-filo",
+        "modo-rgb",
+        "particulas:pixel-sube",
+        "mascota:auriculares"
+      ]
+    },
+    "invierno": {
+      "nombre": "Invierno",
+      "familia": "Estaciones",
+      "claro": true,
+      "colores": {
+        "acento": "#3A8FD6",
+        "acento-tinta": "#236AA8",
+        "sobre-acento": "#FFFFFF",
+        "sec1": "#A8CFEA",
+        "sec2": "#7CC3E8",
+        "tinta": "#1E3446",
+        "tenue": "#4F6A80",
+        "superficie": "rgba(250,253,255,.96)",
+        "tarjeta": "#FFFFFF",
+        "panel-fondo": "#F2F8FD",
+        "filo": "rgba(58,143,214,.16)",
+        "filo-isla": "linear-gradient(90deg,#A8CFEA,#FFFFFF,#A8CFEA)",
+        "filo-panel": "linear-gradient(180deg,#FFFFFF,#A8CFEA)",
+        "sombra": "rgba(35,106,168,.25)",
+        "halo": "#A8CFEA",
+        "destello": "#FFFFFF",
+        "ok": "#3BB273",
+        "peligro": "#C9303E",
+        "fondo-escritorio": "linear-gradient(180deg,#CFE6F7,#E6F2FB 55%,#F7FBFE) + colinas nevadas y pinos"
+      },
+      "fuente": "Nunito",
+      "fuente-titulos": "Nunito",
+      "radios": {
+        "isla": 24,
+        "panel": 22,
+        "tarjeta": 16,
+        "boton": 12
+      },
+      "esquinas": "redondas",
+      "decoraciones": [
+        "halo",
+        "destello-filo",
+        "particulas:copo",
+        "mascota:gorro"
+      ]
+    },
+    "cyberpunk": {
+      "nombre": "Cyberpunk",
+      "familia": "Juego",
+      "claro": false,
+      "colores": {
+        "acento": "#FCEE0A",
+        "acento-tinta": "#FCEE0A",
+        "sobre-acento": "#0A0614",
+        "sec1": "#5E4A7A",
+        "sec2": "#00F0FF",
+        "tinta": "#EDE6FF",
+        "tenue": "#A99BC8",
+        "superficie": "rgba(10,6,20,.95)",
+        "tarjeta": "#140C24",
+        "panel-fondo": "#0E0819",
+        "filo": "rgba(0,240,255,.22)",
+        "filo-isla": "linear-gradient(90deg,#FF2A6D,#FCEE0A,#00F0FF)",
+        "filo-panel": "linear-gradient(180deg,#00F0FF,#FF2A6D)",
+        "sombra": "rgba(255,42,109,.35)",
+        "halo": "#FF2A6D",
+        "destello": "#FCEE0A",
+        "ok": "#00F0FF",
+        "peligro": "#FF2A6D",
+        "fondo-escritorio": "linear-gradient(180deg,#1A0B2E,#2A0E33 50%,#07040D) + ciudad con letreros de neon"
+      },
+      "fuente": "Rajdhani",
+      "fuente-titulos": "Orbitron",
+      "radios": {
+        "isla": 0,
+        "panel": 0,
+        "tarjeta": 0,
+        "boton": 0
+      },
+      "esquinas": "chaflan",
+      "decoraciones": [
+        "halo",
+        "destello-filo",
+        "reloj-glitch",
+        "lineas-de-barrido",
+        "particulas:lluvia-neon",
+        "mascota:visor"
+      ]
+    },
+    "sakura": {
+      "nombre": "Sakura",
+      "familia": "Anime",
+      "claro": true,
+      "colores": {
+        "acento": "#FF8FB8",
+        "acento-tinta": "#C2477A",
+        "sobre-acento": "#4A3B5C",
+        "sec1": "#B8A4F4",
+        "sec2": "#7EC8F5",
+        "tinta": "#4A3B5C",
+        "tenue": "#75628C",
+        "superficie": "rgba(255,251,253,.96)",
+        "tarjeta": "#FFFFFF",
+        "panel-fondo": "#FFF7FB",
+        "filo": "rgba(194,71,122,.14)",
+        "filo-isla": "linear-gradient(90deg,#FF8FB8,#B8A4F4)",
+        "filo-panel": "linear-gradient(180deg,#FF8FB8,#B8A4F4)",
+        "sombra": "rgba(194,71,122,.3)",
+        "halo": "#FF8FB8",
+        "destello": "#FFFFFF",
+        "ok": "#7FD8B5",
+        "peligro": "#C2477A",
+        "fondo-escritorio": "linear-gradient(165deg,#FFE4EF,#F1E6FF 48%,#DCEEFF) + nubes blancas"
+      },
+      "fuente": "M PLUS Rounded 1c",
+      "fuente-titulos": "M PLUS Rounded 1c",
+      "radios": {
+        "isla": 25,
+        "panel": 24,
+        "tarjeta": 18,
+        "boton": 14
+      },
+      "esquinas": "redondas",
+      "decoraciones": [
+        "halo",
+        "destello-filo",
+        "destellos-reloj",
+        "particulas:petalo",
+        "mascota:coloretes"
+      ]
+    },
+    "samurai": {
+      "nombre": "Samurái",
+      "familia": "Anime",
+      "claro": false,
+      "colores": {
+        "acento": "#D7263D",
+        "acento-tinta": "#F06A76",
+        "sobre-acento": "#FFFFFF",
+        "sec1": "#C9A55C",
+        "sec2": "#E8DCC4",
+        "tinta": "#F1E9DA",
+        "tenue": "#B9AE98",
+        "superficie": "rgba(16,14,18,.95)",
+        "tarjeta": "#1B181D",
+        "panel-fondo": "#130F14",
+        "filo": "rgba(201,165,92,.28)",
+        "filo-isla": "linear-gradient(90deg,#D7263D,#C9A55C)",
+        "filo-panel": "linear-gradient(180deg,#C9A55C,#D7263D)",
+        "sombra": "rgba(0,0,0,.8)",
+        "halo": "#D7263D",
+        "destello": "#E8DCC4",
+        "ok": "#C9A55C",
+        "peligro": "#E8505F",
+        "fondo-escritorio": "linear-gradient(180deg,#1C1424,#2C1820 58%,#0E0A0D) + sol rojo, montanas y kanji 侍"
+      },
+      "fuente": "Zen Maru Gothic",
+      "fuente-titulos": "Shippori Mincho",
+      "radios": {
+        "isla": 14,
+        "panel": 12,
+        "tarjeta": 8,
+        "boton": 6
+      },
+      "esquinas": "redondas",
+      "decoraciones": [
+        "halo",
+        "destello-filo",
+        "particulas:petalo-rojo",
+        "mascota:hachimaki",
+        "marca-de-agua:侍"
+      ]
+    },
+    "otono": {
+      "nombre": "Otoño",
+      "familia": "Anime",
+      "claro": true,
+      "colores": {
+        "acento": "#E8743B",
+        "acento-tinta": "#A9461A",
+        "sobre-acento": "#FFFFFF",
+        "sec1": "#F2A541",
+        "sec2": "#8E3B46",
+        "tinta": "#4A2E24",
+        "tenue": "#7A5646",
+        "superficie": "rgba(255,248,238,.96)",
+        "tarjeta": "#FFFDF8",
+        "panel-fondo": "#FFF4E8",
+        "filo": "rgba(169,70,26,.16)",
+        "filo-isla": "linear-gradient(90deg,#E8743B,#F2A541)",
+        "filo-panel": "linear-gradient(180deg,#F2A541,#8E3B46)",
+        "sombra": "rgba(169,70,26,.32)",
+        "halo": "#E8743B",
+        "destello": "#FFF2D6",
+        "ok": "#9CA25A",
+        "peligro": "#B5481B",
+        "fondo-escritorio": "linear-gradient(170deg,#FFD9B3,#F4A97A 45%,#9C5A6E) + colinas y arboles"
+      },
+      "fuente": "Zen Maru Gothic",
+      "fuente-titulos": "Zen Maru Gothic",
+      "radios": {
+        "isla": 22,
+        "panel": 20,
+        "tarjeta": 16,
+        "boton": 12
+      },
+      "esquinas": "redondas",
+      "decoraciones": [
+        "halo",
+        "destello-filo",
+        "particulas:hoja-de-arce",
+        "mascota:bufanda"
+      ]
+    },
+    "sad": {
+      "nombre": "Sad",
+      "familia": "Anime",
+      "claro": false,
+      "colores": {
+        "acento": "#8FA8D8",
+        "acento-tinta": "#B4C6EA",
+        "sobre-acento": "#151926",
+        "sec1": "#6C7A99",
+        "sec2": "#9AA7BF",
+        "tinta": "#DCE2EE",
+        "tenue": "#A0AABD",
+        "superficie": "rgba(24,28,38,.95)",
+        "tarjeta": "#1F2432",
+        "panel-fondo": "#191D29",
+        "filo": "rgba(143,168,216,.18)",
+        "filo-isla": "linear-gradient(90deg,#8FA8D8,#6C7A99)",
+        "filo-panel": "linear-gradient(180deg,#8FA8D8,#6C7A99)",
+        "sombra": "rgba(0,0,0,.7)",
+        "halo": "#8FA8D8",
+        "destello": "#C8D3EA",
+        "ok": "#7E8DA8",
+        "peligro": "#D99AA0",
+        "fondo-escritorio": "linear-gradient(180deg,#2A3142,#1B2030 60%,#121520) + ciudad bajo la lluvia"
+      },
+      "fuente": "Zen Maru Gothic",
+      "fuente-titulos": "Zen Maru Gothic",
+      "radios": {
+        "isla": 22,
+        "panel": 20,
+        "tarjeta": 16,
+        "boton": 12
+      },
+      "esquinas": "redondas",
+      "decoraciones": [
+        "halo",
+        "destello-filo",
+        "particulas:lluvia",
+        "mascota:triste-con-lagrima"
+      ],
+      "textos": {
+        "saludo": "{saludo}, {nombre}…",
+        "pista": "Busca algo… lo que sea…"
+      }
+    }
+  }
+}

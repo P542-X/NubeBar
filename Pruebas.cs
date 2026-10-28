@@ -95,6 +95,9 @@ public static partial class Pruebas
             OrdenCongelado();
             GlifoDelAspa();
 
+            // Fase 0 del rediseño: el catálogo de colores y los nueve temas de serie
+            CorrerTemas();
+
             // C5: esquema y migraciones
             EsquemaDeducir();
             EsquemaMigrar();

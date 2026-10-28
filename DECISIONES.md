@@ -3729,3 +3729,60 @@ pantalla, con la mitad de **su** ancho.
 Sobre el total que imprime `--pruebas`, ver la advertencia de C4.1c: no es una constante,
 porque unas pocas comprobaciones recorren las aplicaciones abiertas de la máquina. Con
 siete abiertas, el árbol completo da 515 y ninguna mal.
+
+## Rediseño, fase 0 · El catálogo de colores y los nueve temas
+
+El plan es `docs/REDISENO-VISUAL.md`. Lo que decidí yo al construir sus cimientos:
+
+**Los temas y el catálogo comparten UN juego de nombres.** `temas-de-serie.json` declara 19
+claves (`acento`, `superficie`, `filo-isla`…) y el catálogo tiene ~130, las 19 incluidas con
+ese mismo nombre. Así `Pintura` resuelve cualquier clave con la misma cascada —usuario, tema,
+derivación— sin preguntar si la clave es «base» o «de la interfaz», y un tema del usuario
+puede declarar `deslizador.pomo` si le da la gana sin que haya que inventar un segundo
+mecanismo. La alternativa (dos espacios de nombres, uno para el tema y otro para la interfaz)
+obligaba a mapear uno sobre otro, y ese mapa es exactamente donde se pierden las claves.
+
+**Las derivaciones preguntan a `Pintura`, no al tema en bruto.** `boton.fondo` sale de
+`tarjeta`, que sale del tema. Si cada derivación mirara el tema directamente, cambiar
+`tarjeta` en el Estudio no movería los botones, y el usuario vería que un selector de color
+no hace lo que dice. El precio es que una derivación puede dar vueltas sobre sí misma: hay un
+corte con contador (`Pintura.Ciclos`) y una prueba que exige que sea 0 en los nueve temas.
+
+**El formato de color es el de CSS.** `rgba(12,14,20,.94)` y
+`linear-gradient(90deg,#FF2A6D,#FCEE0A,#00F0FF)` se leen tal cual, porque es como están
+escritos los 9 × 19 valores de la maqueta aprobada. Inventar una sintaxis propia habría
+significado traducir a mano 171 valores, que es donde se cuela la errata que nadie vuelve a
+ver. `Relleno` es el tipo: liso o degradado, serializable y medible (un degradado sabe dar su
+color medio ponderado por tramos, que es con lo que se mide contraste).
+
+### Las dos correcciones de contraste
+
+Las pruebas de los nueve temas encontraron **33 claves ilegibles**, todas en los cuatro temas
+CLAROS. Treinta eran fallos de mis derivaciones, no de la maqueta, y el patrón era siempre el
+mismo: *un velo del color del texto no sirve para apagar nada en un tema claro*. En un tema
+oscuro la tinta es clara y un velo al 45 % sobre fondo negro se ve; en un tema claro la tinta
+es oscura y el mismo velo sobre fondo blanco da un gris a 2,3:1. Lo que había:
+
+- el punto de una app abierta era `tinta` al 45 % → es `tenue` corregida a 3:1;
+- el punto de la app activa era el acento crudo → es `acento-tinta`, que es para lo que la
+  maqueta lo trae («el acento cuando hace de texto o icono»);
+- el pomo del interruptor era blanco, sobre una pista gris clara: 1,5:1, un interruptor sin
+  pomo → es el blanco o el negro que más se lea sobre la pista apagada (en claro sale oscuro,
+  que es lo que hacen los interruptores claros de Windows);
+- «desactivado» y «días de otro mes» se apagaban un 35-40 % hacia el fondo y se caían por
+  debajo de 3:1 → se apagan igual y luego se les devuelve lo justo para llegar al mínimo. Un
+  botón desactivado tiene que ser no pulsable, no invisible.
+
+Las otras tres eran de la maqueta: Sakura (2,13:1), Otoño (3,00) e Invierno (3,45) escriben en
+**blanco sobre su acento**. Resuelto en dos mitades, consultado antes de tocar nada:
+
+1. **A `sobre-acento` se le exige 3:1 y no 4,5.** Rotula un control relleno —el glifo de play
+   en su círculo, la cifra de la insignia, la palabra de un segmento activo—, no un párrafo.
+   Con 4,5 el aviso saltaba en Otoño y en Invierno, que se ven perfectamente.
+2. **Sakura cambia su blanco por su propia tinta ciruela `#4A3B5C`** (4,77:1). A 3:1 seguía sin
+   pasar, y el color ya estaba en su paleta, así que el tema sigue siendo Sakura. Es la **única**
+   desviación respecto a `docs/maqueta-rediseno/temas.json`; está apuntada en el propio
+   `temas-de-serie.json` («correcciones») y la vigila una prueba con nombre, para que nadie
+   «restaure el valor de la maqueta» dentro de seis meses sin saber por qué se cambió.
+
+La regla se ajustó donde era injusta y el tema se corrigió donde estaba mal; no al revés.

@@ -480,6 +480,34 @@ Cada fase se publica como versión para probarla antes de seguir.
    movimiento y textos; vista previa, deshacer y medidor de consumo; automático; exportar e
    importar `.nubetema`.
 
+### Fase 0: lo que ya está en pie
+
+Construido y con las pruebas en verde (`NubeBar.exe --pruebas`: 10 583 comprobaciones, 0 mal):
+
+| Pieza | Fichero | Qué hace |
+|---|---|---|
+| El valor «color» | `Relleno.cs` | Un color liso o un degradado lineal, en el formato de la maqueta (`rgba()`, `linear-gradient()`). Se lee, se escribe, se mide y se convierte en pincel de WPF |
+| El tema como paquete | `TemaBase.cs` | Un tema son datos: 19 colores, letra, radios, esquinas y decoraciones. Ni un `switch` por tema |
+| Los nueve de serie | `temas-de-serie.json` | Copia del objeto `temas` de la maqueta, incrustada en el exe. Una sola desviación, apuntada dentro (ver `DECISIONES.md`) |
+| El catálogo | `Catalogo.cs` | ~130 claves con nombre, zona, papel y de dónde salen. Las 19 base son claves como las demás |
+| La cascada | `Pintura.cs` | Usuario → tema → derivación, con caché, corte de ciclos, medida de contraste y la regla de seguridad de Ajustes (`ParaAjustes()`) |
+| Las pruebas | `Pruebas.Temas.cs` | Que los nueve temas declaren las 19 claves, que las ~130 resuelvan en todos, que ninguna derivación dé vueltas y que todo lo que hace de texto o de icono se lea |
+
+Lo que **falta** de la fase 0, en este orden:
+
+1. **Conectar `Pintura` a la barra**: hoy el catálogo existe y nadie le pregunta. `MainWindow`
+   sigue pintando con `Roles`, que pasa a ser una fachada sobre el catálogo y luego desaparece.
+2. **Los 53 colores escritos a mano** pasados a claves, con la prueba centinela que falla si
+   aparece un color literal fuera del catálogo. Ojo al separar: los `Brushes.Transparent` que
+   hay por ahí son estructurales (sin fondo, un `Panel` no recibe el ratón en los huecos), no
+   decoración, y esos se quedan.
+3. **Quitar Normal, Nube y Neón** con su migración del config (`Tema.Estilo` desaparece) y
+   rehacer sus 31 usos en `Pruebas.Confirmar.cs`, `MainWindow.DiagNeon.cs` y `VentanaAjustes.cs`.
+4. **`Tema.Colores`** en el config: el diccionario `clave → valor` con solo lo que el usuario
+   ha cambiado.
+5. **Ajustes > Colores**: la lista por zonas con buscador, selector, «Restablecer» y «Elegir
+   en pantalla».
+
 Todo lo que se construya en las fases 1 a 8 toma sus colores, medidas y decoraciones **del
 tema**, nunca de un valor escrito en el código: es lo que hace posible que el Estudio pueda
 cambiarlo todo.

@@ -41,6 +41,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Los 9 temas de serie del rediseno (docs/REDISENO-VISUAL.md, decision A). Van
+         incrustados y no al lado del exe: el exe es de un solo archivo, y un tema de serie
+         que se pueda borrar por accidente no es de serie. Los lee `TemasDeSerie`. -->
+    <EmbeddedResource Include="temas-de-serie.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Using Remove="System.Windows.Forms" />
     <Using Remove="System.Drawing" />
   </ItemGroup>
