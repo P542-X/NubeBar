@@ -1109,7 +1109,17 @@ public partial class MainWindow
         if (r.HayScroll && !r.ScrollInterno)
             yield return "el scroll es un envoltorio de fuera: PanelShell deja de ser la raíz y la " +
                          "fila Star del panel se queda sin acotar";
-        if (r.HayScroll && r.Viewport > 0 && r.OffsetY > r.Extent - r.Viewport + 1)
+        // ---------- Y por qué hace falta el `Extent > Viewport` ----------
+        //
+        // Sin él, esto cantaba MAL en todo panel cuyo contenido fuera MÁS CORTO que su hueco:
+        // con extent 332 y viewport 338 el máximo desplazable sale -6, y un offset de 0 es
+        // «mayor que -5». O sea que avisaba de que el contenido se ha ido fuera justo en el
+        // caso en que no hay nada que irse. Lo cazó `--diaginicio` después del rediseño.
+        //
+        // Un diagnóstico que avisa cuando no pasa nada es peor que no tenerlo: enseña a no
+        // mirarlo. Solo se mide si hay algo de verdad que desplazar.
+        if (r.HayScroll && r.Viewport > 0 && r.Extent > r.Viewport &&
+            r.OffsetY > r.Extent - r.Viewport + 1)
             yield return $"el contenido está desplazado fuera del viewport (offset {r.OffsetY:0} de {r.Extent - r.Viewport:0})";
         if (r.HayScroll && r.Viewport is > 0 and < 60)
             yield return $"el viewport mide {r.Viewport:0} px: no cabe nada dentro";
