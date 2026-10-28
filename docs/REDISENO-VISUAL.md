@@ -38,7 +38,10 @@ gusta en Ajustes, con una vista previa de cada uno.
 | Tema | Idea | Estado |
 |---|---|---|
 | **Profesional** | Gris carbón, azul acero, plata. Sobrio | Maqueta: «Isla e Inicio», «Laterales y dock» y los paneles |
-| **Anime** | Pastel claro (sakura, lavanda, cielo, menta), letra redondeada, Nubecita, pétalos | Maqueta: «Tema anime» |
+| **Anime · Sakura** | Pastel claro (sakura, lavanda, cielo, menta), letra redondeada, Nubecita sonriente, pétalos rosas | Maqueta: «Temas anime» |
+| **Anime · Samurái** | Noche de tinta: laca negra, bermellón `#D7263D` y oro `#C9A55C`; títulos con letra de pincel (Shippori Mincho), radios pequeños; Nubecita con *hachimaki*; pétalos rojo oscuro; fondo con sol rojo, montañas y el kanji 侍 | Maqueta: «Temas anime» |
+| **Anime · Otoño** | Crema cálido, naranja arce `#E8743B`, ámbar y granate; hojas de arce cayendo; Nubecita con bufanda; fondo de atardecer con colinas | Maqueta: «Temas anime» |
+| **Anime · Sad** | Noche lluviosa azul grisácea, acento `#8FA8D8`; lluvia cayendo en el Inicio; Nubecita gris con lágrima y boca triste; saludo con puntos suspensivos; fondo de ciudad con ventanas encendidas | Maqueta: «Temas anime» |
 | **Oficina** | Claro y neutro tipo Fluent: blanco, grises, azul `#2F6FDB`. Sin adornos | Falta maqueta |
 | **Videojuegos** | Oscuro casi negro con un acento neón (`#39FF88` o `#FF3DCB`), esquinas más rectas, brillos marcados | Falta maqueta |
 
@@ -127,9 +130,20 @@ Encaje en el código: estos son los valores del tema Profesional dentro del cat�
 decisión B; lo que no se fije aquí lo deriva `Roles` como ya hace. Comprobar contraste con
 `Contraste.Entre` (las pruebas de E8 ya miden texto sobre superficies).
 
-## Tema Anime: los colores y lo suyo
+## Temas Anime: los colores y lo suyo
 
-Pantalla «Tema anime» de la maqueta. Es un tema **claro**.
+Pantalla «Temas anime» de la maqueta: **una sola pantalla con un selector abajo** para pasar
+entre Sakura, Samurái, Otoño y Sad en vivo, que es justo como debe sentirse el selector de
+temas en Ajustes. Las cuatro variantes usan **las mismas piezas**; cambian sus valores
+(colores, letra, radios), la mascota (accesorio y cara), la partícula que cae en el Inicio
+(pétalo, hoja o gota) y el fondo de escritorio. Los valores exactos de cada una están en el
+código de la maqueta (`project/Anime.dc.html`, objeto `TEMAS`).
+
+Letras de las variantes, todas con licencia OFL e incrustables: M PLUS Rounded 1c (Sakura),
+Shippori Mincho para títulos y Zen Maru Gothic para el resto (Samurái), Zen Maru Gothic
+(Otoño y Sad).
+
+Lo que sigue es la variante **Sakura**, que es un tema **claro**.
 
 | Papel | Valor |
 |---|---|
