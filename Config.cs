@@ -42,6 +42,17 @@ public class Tema
     // cambiado; si valía 20 (el de serie de entonces) no se arrastra, porque nadie lo eligió.
     public Dictionary<string, double> Radios { get; set; } = new();
 
+    // ---------- Y las letras ----------
+    //
+    // `texto` y `titulos`, solo lo que el usuario haya cambiado. Mismo mecanismo que
+    // `Colores` y `Radios`: la letra es un valor del tema —Cyberpunk pide Orbitron en los
+    // títulos y Rajdhani en el resto— y lo que el usuario elija va encima.
+    //
+    // Antes era `Tema.Fuente`, una sola para todo. La migración v5→v6 la pasa aquí si estaba
+    // cambiada; si valía «Segoe UI» (la de serie de entonces) no se arrastra, porque nadie la
+    // eligió y arrastrarla dejaría a todo el mundo sin ver nunca la letra del tema.
+    public Dictionary<string, string> Letras { get; set; } = new();
+
     // Las trece claves de color de antes del rediseño (`Fondo`, `Texto`, `Acento`, `Radio`,
     // `Superficie`…) se han quitado de aquí: la migración v4→v5 las pasó a `Colores` y a
     // `Radios` con el nombre que tienen en el catálogo, y desde entonces no las leía nadie.

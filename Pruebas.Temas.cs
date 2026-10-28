@@ -269,6 +269,27 @@ public static partial class Pruebas
         Igual("#FF102030", Relleno.Hex(conTarjeta.Color("boton.fondo")),
               "cambiar el fondo de las tarjetas cambia el de los botones");
 
+        // ---------- La letra, con la misma cascada ----------
+        //
+        // Es media identidad de un tema: Cyberpunk pide Orbitron en los títulos y Rajdhani en
+        // el resto, Sakura una redondeada y Samurái una de pincel. Hasta la fase 1 el tema la
+        // declaraba, se guardaba, se probaba… y no la usaba nadie.
+        Igual("Segoe UI Variable", pro.Fuente(Letras.Texto), "Profesional escribe en Segoe UI Variable");
+        var cy = new Pintura(TemasDeSerie.De("cyberpunk"));
+        Igual("Rajdhani", cy.Fuente(Letras.Texto), "Cyberpunk, en Rajdhani");
+        Igual("Orbitron", cy.Fuente(Letras.Titulos), "y sus títulos en Orbitron");
+
+        var conLetra = new Pintura(TemasDeSerie.De("cyberpunk"), null, null,
+                                   new Dictionary<string, string> { [Letras.Texto] = "Consolas" });
+        Igual("Consolas", conLetra.Fuente(Letras.Texto), "la letra que pone el usuario manda");
+        Igual("Orbitron", conLetra.Fuente(Letras.Titulos),
+              "y cambiar la del cuerpo no le toca la de los títulos");
+
+        // Un tema que no dice nada escribe con la de Windows, no con la de otro tema.
+        var mudo = new TemaBase { Id = "mudo", Nombre = "Mudo" };
+        Igual("Segoe UI Variable", new Pintura(mudo).Fuente(Letras.Texto),
+              "un tema que no declara letra usa la del sistema");
+
         // Y el radio sale del tema, con un valor razonable si el tema calla.
         Igual(23.0, pro.Radio(Piezas.Isla), "el radio de la isla sale del tema");
         Vale(new Pintura(cuatro).Radio(Piezas.Isla) > 0, "y un tema sin radios tiene uno igualmente");

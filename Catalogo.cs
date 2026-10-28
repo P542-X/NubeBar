@@ -322,6 +322,52 @@ public static class Catalogo
         C("escritorio.numero", ZonaColor.Isla, "Números de los demás escritorios",
           TintaDe(ClavesBase.Tenue, ClavesBase.Superficie, 3.0), Papel.Icono, "isla.fondo"),
 
+        // ---------- El color de las partículas ----------
+        //
+        // Sale de la FORMA que el tema declara, porque es lo que dice de qué están hechas: un
+        // copo es blanco, la lluvia de neón es el color del halo, y un pétalo, una hoja o un
+        // píxel son del acento del tema — que es justo lo que los nueve ya traen (el rosa de
+        // Sakura, el bermellón de Samurái, el arce de Otoño, el verde de Videojuegos).
+        //
+        // Así un tema no tiene que declarar un color más: con decir `particulas:copo` ya cae
+        // nieve blanca. Y el usuario puede cambiarlo, como cualquier otra clave.
+        // ---------- Y que se VEAN ----------
+        //
+        // La primera versión tenía la regla de arriba y nada más, y en Invierno dejaba nieve
+        // BLANCA sobre un panel casi blanco: cayendo de verdad y sin verse. Lo cazó la foto
+        // del Inicio en los nueve temas, que es para lo que se hizo.
+        //
+        // Así que al color que toca por la forma se le exige separarse del panel, y si no lo
+        // hace se prueban los otros colores DEL PROPIO TEMA por orden. Se queda en 1,6:1 —muy
+        // por debajo de lo que se le pide a un texto— porque una partícula no se lee: se ve
+        // pasar, y pedirle contraste de texto la convertiría en confeti.
+        C("particula.color", ZonaColor.Inicio, "Color de las partículas",
+          p =>
+          {
+              var porLaForma = p.Tema.Argumento(Decoraciones.Particulas) switch
+              {
+                  "copo" => ClavesBase.Destello,
+                  "lluvia-neon" => ClavesBase.Halo,
+                  _ => ClavesBase.Acento,
+              };
+              var panel = p.ColorOpaco("inicio.fondo");
+              foreach (var clave in new[] { porLaForma, ClavesBase.Sec2, ClavesBase.Sec1,
+                                            ClavesBase.Acento, ClavesBase.Tenue })
+              {
+                  var r = p.R(clave);
+                  if (!r.EsInvisible && Contraste.Entre(p.ColorOpaco(clave), panel) >= 1.6) return r;
+              }
+              return p.R(ClavesBase.Tenue);
+          }, Papel.Efecto),
+
+        // ---------- La marca de agua ----------
+        //
+        // El kanji 侍 de Samurái detrás de las tarjetas. Sale del secundario del tema —el oro,
+        // en su caso— y muy bajito: una marca de agua que compite con el contenido deja de ser
+        // una marca de agua y pasa a ser una imagen de fondo con texto encima.
+        C("marca.agua", ZonaColor.Inicio, "Marca de agua del tema",
+          Velo(ClavesBase.Sec1, 0.16), Papel.Efecto),
+
         C("icono.halo", ZonaColor.Isla, "Halo de los iconos oscuros",
           p => Relleno.Liso(p.Tema.Claro ? Colors.Black : Colors.White), Papel.Efecto),
 
@@ -412,8 +458,10 @@ public static class Catalogo
         C("panel.sombra", ZonaColor.Paneles, "Sombra", Igual(ClavesBase.Sombra), Papel.Efecto),
         C("panel.icono.abierto", ZonaColor.Paneles, "Icono del que cuelga el panel", Velo(ClavesBase.Acento, 0.18)),
 
-        C("tarjeta.fondo", ZonaColor.Paneles, "Fondo de una tarjeta", Igual(ClavesBase.Tarjeta)),
-        C("tarjeta.fondo.raton", ZonaColor.Paneles, "Tarjeta bajo el ratón", Velo(ClavesBase.Tinta, 0.20)),
+        C("tarjeta.fondo", ZonaColor.Paneles, "Fondo de una tarjeta",
+          Igual(ClavesBase.Tarjeta), Papel.Relleno, "panel.fondo"),
+        C("tarjeta.fondo.raton", ZonaColor.Paneles, "Tarjeta bajo el ratón",
+          Velo(ClavesBase.Tinta, 0.20), Papel.Relleno, "panel.fondo"),
         C("tarjeta.filo", ZonaColor.Paneles, "Filo de una tarjeta", Igual(ClavesBase.Filo), Papel.Filo),
 
         C("seccion.titulo", ZonaColor.Paneles, "Título de sección", Igual(ClavesBase.Tenue), Papel.Texto, "panel.fondo"),

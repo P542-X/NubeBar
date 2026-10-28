@@ -52,8 +52,12 @@ public sealed class Pintura
     // usuario, tema, y un valor razonable si ninguno dice nada.
     public IReadOnlyDictionary<string, double> RadiosDelUsuario { get; }
 
+    // Las letras que el usuario ha cambiado, por papel: «texto» y «titulos».
+    public IReadOnlyDictionary<string, string> LetrasDelUsuario { get; }
+
     public Pintura(TemaBase tema, IReadOnlyDictionary<string, string>? delUsuario = null,
-                   IReadOnlyDictionary<string, double>? radios = null)
+                   IReadOnlyDictionary<string, double>? radios = null,
+                   IReadOnlyDictionary<string, string>? letras = null)
     {
         Tema = tema;
         DelUsuario = delUsuario is null
@@ -62,7 +66,23 @@ public sealed class Pintura
         RadiosDelUsuario = radios is null
             ? new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase)
             : new Dictionary<string, double>(radios, StringComparer.OrdinalIgnoreCase);
+        LetrasDelUsuario = letras is null
+            ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(letras, StringComparer.OrdinalIgnoreCase);
     }
+
+    // ---------- La letra ----------
+    //
+    // Dos papeles: `Letras.Texto` para el cuerpo y `Letras.Titulos` para títulos y relojes.
+    // Cascada igual que todo lo demás: lo que puso el usuario, lo que dice el tema, y si
+    // ninguno dice nada, la de Windows.
+    //
+    // Devuelve el NOMBRE, no una `FontFamily`: quien pinta decide qué hacer si esa letra no
+    // está instalada (ver `MainWindow.Tipografia`). Así esto se puede probar sin WPF montado.
+    public string Fuente(string papel) =>
+        LetrasDelUsuario.TryGetValue(papel, out var mia) && !string.IsNullOrWhiteSpace(mia) ? mia
+        : papel.Equals(Letras.Titulos, StringComparison.OrdinalIgnoreCase) ? Tema.FuenteTitulos
+        : Tema.Fuente;
 
     public static Pintura PorDefecto() => new(TemasDeSerie.De(TemasDeSerie.Predeterminado));
 

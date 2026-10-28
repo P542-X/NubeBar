@@ -41,6 +41,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Las letras de los temas (fase 6 del rediseno).
+         Van como `Resource` y no como `EmbeddedResource`: WPF solo sabe cargar una
+         familia desde un `pack://application:,,,/` si esta puesta asi.
+         Las seis son OFL; sus licencias viajan al lado, que es lo que la OFL pide.
+         Las tres japonesas van RECORTADAS al juego que la interfaz usa: enteras
+         pesaban 36 MB de kanji que NubeBar no escribe nunca. -->
+    <Resource Include="Fuentes\*.ttf" />
+    <None Include="Fuentes\OFL-*.txt" Pack="true" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Los 9 temas de serie del rediseno (docs/REDISENO-VISUAL.md, decision A). Van
          incrustados y no al lado del exe: el exe es de un solo archivo, y un tema de serie
          que se pueda borrar por accidente no es de serie. Los lee `TemasDeSerie`. -->

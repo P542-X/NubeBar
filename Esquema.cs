@@ -47,7 +47,8 @@ public static class Esquema
     //  4  D0             — hay sección `NubeHypr`, apagada
     //  5  Rediseño f.0   — `Tema.Id` dice qué tema está puesto y `Tema.Colores` lo que el
     //                      usuario le ha cambiado; las claves de color de antes dejan de leerse
-    public const int Actual = 5;
+    //  6  Rediseño f.1   — la LETRA también sale del tema; `Tema.Letras` guarda la del usuario
+    public const int Actual = 6;
 
     public const string Clave = "Version";
 
@@ -182,6 +183,7 @@ public static class Esquema
         2 => new Migracion("v2→v3: declarar la sección Fondo", De2A3),
         3 => new Migracion("v3→v4: declarar la sección NubeHypr, apagada", De3A4),
         4 => new Migracion("v4→v5: declarar el tema puesto y tus colores", De4A5),
+        5 => new Migracion("v5→v6: la letra sale del tema", De5A6),
         _ => null,
     };
 
@@ -421,6 +423,40 @@ public static class Esquema
             if (radios["isla"] == null) radios["isla"] = radio;
             if (radios["panel"] == null) radios["panel"] = radio;
         }
+    }
+
+    // ---------- v5 → v6 ----------
+    //
+    // La letra deja de ser una clave suelta del config y pasa a ser un valor del TEMA, con las
+    // del usuario encima (`Tema.Letras`), exactamente igual que los colores y los radios.
+    //
+    // Mismo criterio que en la v5, y por el mismo motivo: se arrastra lo que el usuario
+    // ELIGIÓ y no lo que había por defecto. «Segoe UI» era la de serie de entonces, así que
+    // arrastrarla dejaría a todo el mundo con ella puesta y sin ver nunca la letra del tema —
+    // y la letra es media identidad de Cyberpunk y de Sakura.
+    //
+    // `Tema.Fuente` no se borra del fichero. Nadie la lee ya; borrar claves del config de
+    // alguien es lo que este proyecto lleva varios accidentes aprendiendo a no hacer.
+    static void De5A6(JsonObject raiz)
+    {
+        if (raiz["Tema"] is not JsonObject t)
+        {
+            t = new JsonObject();
+            raiz["Tema"] = t;
+        }
+
+        if (t["Letras"] is not JsonObject letras)
+        {
+            letras = new JsonObject();
+            t["Letras"] = letras;
+        }
+
+        const string LetraDeSerie = "Segoe UI";
+        if (letras["texto"] == null &&
+            t["Fuente"] is JsonValue fv && fv.TryGetValue<string>(out var f) &&
+            !string.IsNullOrWhiteSpace(f) &&
+            !f.Trim().Equals(LetraDeSerie, StringComparison.OrdinalIgnoreCase))
+            letras["texto"] = f.Trim();
     }
 
     // ================= Validar antes de escribir =================

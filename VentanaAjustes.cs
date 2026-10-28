@@ -102,7 +102,9 @@ public sealed partial class VentanaAjustes : Window
         AllowsTransparency = true;
         Background = Brushes.Transparent;
         ShowInTaskbar = true;
-        FontFamily = new FontFamily(_arbol.Texto("Tema", "Fuente", "Segoe UI"));
+        FontFamily = MainWindow.LetraDe(
+            new Pintura(TemasDeSerie.De(_arbol.Texto("Tema", "Id", TemasDeSerie.Predeterminado)),
+                        null, null, _arbol.Letras("Tema")).Fuente(Letras.Texto));
         FontSize = 13;
 
         Content = Montar();
@@ -142,7 +144,7 @@ public sealed partial class VentanaAjustes : Window
         // Se lee del ÁRBOL y no del `Config` ya cargado para que la vista previa sea en vivo:
         // tocas un color y esta ventana se repinta con él antes de guardar nada.
         var pintura = new Pintura(TemasDeSerie.De(_arbol.Texto("Tema", "Id", "profesional")),
-                                  _arbol.Colores("Tema"), _arbol.Radios("Tema"));
+                                  _arbol.Colores("Tema"), _arbol.Radios("Tema"), _arbol.Letras("Tema"));
 
         // ---------- La regla de seguridad ----------
         //
@@ -1946,8 +1948,25 @@ public sealed partial class VentanaAjustes : Window
             .Select(f => f.Source)
             .OrderBy(s => s, StringComparer.CurrentCultureIgnoreCase)
             .ToArray();
-        p.Mas(Opciones("Fuente", fuentes, _arbol.Texto("Tema", "Fuente", "Segoe UI"),
-                                v => _arbol.Poner("Tema", "Fuente", v)));
+        // La letra del tema es la de partida; esto escribe ENCIMA, como el selector de un
+        // color escribe en `Tema.Colores`. Así cambiar de tema vuelve a traer la suya.
+        var laDelTema = _roles.Pintura.Fuente(Letras.Texto);
+        p.Mas(Opciones("Fuente", fuentes, _arbol.Letras("Tema").TryGetValue(Letras.Texto, out var mia) ? mia : laDelTema,
+                                v =>
+                                {
+                                    var l = _arbol.Letras("Tema");
+                                    l[Letras.Texto] = v;
+                                    _arbol.PonerLetras("Tema", l);
+                                }));
+        if (_arbol.Letras("Tema").Count > 0)
+            p.Mas(BotonPlano("Devolverle la letra al tema", () =>
+            {
+                _arbol.PonerLetras("Tema", new Dictionary<string, string>());
+                _arbol.Guardar();
+                RehacerPagina("apariencia", SeccionApariencia);
+            }, false));
+        p.Pista($"El tema puesto pide «{laDelTema}». Seis de los nueve usan letras que todavía " +
+                "no están incrustadas en el programa: hasta las fases 6 y 7 se ven con la del sistema.");
         p.Mas(Deslizador("Tamaño", 9, 22, _arbol.Numero("Tema", "TamanoFuente", 13),
                                   v => _arbol.Poner("Tema", "TamanoFuente", v)));
 

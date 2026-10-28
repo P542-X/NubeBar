@@ -85,7 +85,8 @@ public partial class MainWindow : Window, IAnfitrionWidget
         // significa. La hora va como en el panel de Plasma: las horas sobre los minutos.
         R("reloj", "Reloj", "La hora, en horas y minutos", Reloj, CategoriaWidget.Reloj,
           i => i.Etiqueta(() => DateTime.Now.ToString("HH:mm"), animar: true,
-                          vertical: () => DateTime.Now.ToString("HH") + Salto + DateTime.Now.ToString("mm")),
+                          vertical: () => DateTime.Now.ToString("HH") + Salto + DateTime.Now.ToString("mm"),
+                          brillo: true),
           zona: "Centro");
 
         R("fecha", "Fecha", "El día de la semana, el día y el mes", Calendario, CategoriaWidget.Reloj,

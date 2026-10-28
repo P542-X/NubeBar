@@ -29,6 +29,18 @@
          dependía de que la franja de 54 px se ensanchara y de que el orden Z de la
          barra le valiera, y ninguna de las dos cosas se cumple siempre. -->
     <Grid x:Name="Raiz">
+        <!-- ══ El aura de la isla ══
+             Una envoltura SIN fondo y SIN recorte, cuyo único trabajo es llevar el
+             `DropShadowEffect` del halo.
+
+             Por qué no va en la isla: `Isla` tiene `ClipToBounds="True"` —lo necesita, es lo
+             que recorta el cajón al crecer— y un efecto sobre un elemento recortado se
+             recorta con él, al RECTÁNGULO de la caja y no a la forma redondeada. Salía un
+             halo cuadrado asomando por las puntas, y el usuario lo cazó al primer vistazo.
+
+             Puesto aquí, lo que el efecto difumina es el CONTENIDO de la envoltura, que es la
+             isla con sus esquinas redondas. La silueta sale bien y nada la recorta. -->
+        <Border x:Name="Aura">
         <Border x:Name="Isla" Padding="10,0" MinWidth="120" ClipToBounds="True" Opacity="0"
                 VerticalAlignment="Top"
                 MouseEnter="Isla_MouseEnter" MouseLeave="Isla_MouseLeave"
@@ -60,6 +72,7 @@
                 <!-- El cajón: aquí dentro van la mini lista, la vista general y el menú Inicio -->
                 <ContentPresenter x:Name="Cajon" Grid.Row="1"/>
             </Grid>
+        </Border>
         </Border>
     </Grid>
 </Window>

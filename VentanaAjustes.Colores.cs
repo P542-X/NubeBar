@@ -116,9 +116,12 @@ public partial class VentanaAjustes
         p.Pista("Con esto encendido, el fondo, el texto y el acento salen de tu wallpaper y " +
                 "mandan sobre el tema y sobre lo que hayas cambiado a mano.");
 
-        p.Grupo("Mis temas", IconoDeGrupo("export"));
-        var fila = new StackPanel { Orientation = Orientation.Horizontal };
-        fila.Children.Add(BotonPlano("Exportar", ExportarTema, false));
+        p.Grupo("Mis temas", IconoDeGrupo("export"),
+                "Guárdate lo que has afinado con un nombre y vuelve a él cuando quieras.");
+        p.Mas(GuardarTemaMio());
+        p.Mas(ListaDeMisTemas());
+
+        var fila = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 10, 0, 0) };
         fila.Children.Add(BotonPlano("Importar", ImportarTema, false));
         fila.Children.Add(BotonPlano("Abrir carpeta", () =>
         {
@@ -126,8 +129,10 @@ public partial class VentanaAjustes
             Process.Start(new ProcessStartInfo(Temas.Carpeta) { UseShellExecute = true })?.Dispose();
         }, false));
         p.Mas(fila);
-        p.Pista("Un tema exportado lleva el tema de partida y los colores que le has cambiado. " +
-                "El formato completo —con las fuentes y las imágenes dentro— llega con el Estudio de temas.");
+        p.Pista("Un tema tuyo lleva el tema de partida, los colores que le has cambiado, los radios " +
+                "y las letras. Es un JSON legible en la carpeta de temas, así que se puede pasar a " +
+                "otro ordenador copiándolo. El formato empaquetado —con las fuentes y las " +
+                "imágenes dentro— llega con el Estudio de temas.");
 
         return p.Fin();
     }
@@ -555,6 +560,201 @@ public partial class VentanaAjustes
     {
         _arbol.PonerColores("Tema", new Dictionary<string, string>());
         _arbol.Guardar();
+        RehacerPagina("colores", SeccionColores);
+    }
+
+    // ================= Guardar un tema tuyo =================
+    //
+    // El apartado 9 del plan. Lo que el Estudio de temas completo hará algún día con vista
+    // previa en vivo y deshacer; lo que se puede tener hoy sin prometer de más: ponerle un
+    // nombre a lo que has afinado, que aparezca en una lista, y poder volver a él.
+    //
+    // ---------- Por qué un tema tuyo no es una copia de los colores ----------
+    //
+    // Guarda el ID DEL TEMA DE PARTIDA y encima lo que le cambiaste, no los ~130 colores
+    // resueltos. Dos razones, y las dos se notan:
+    //
+    //   - Un tema tuyo que guardase los colores ya resueltos se quedaría congelado: el día
+    //     que Sakura mejore su rosa, tu tema seguiría con el viejo. Guardando «Sakura y estas
+    //     cuatro cosas», mejora contigo.
+    //   - Y guardando solo lo que cambiaste, el fichero se lee. Treinta líneas que dicen qué
+    //     decidiste, en vez de ciento treinta que no dicen nada.
+    //
+    // Van también los radios y las letras, que es lo que faltaba: un tema con las esquinas a
+    // cero y la letra cambiada no es el mismo tema si al volver a él recupera solo el color.
+
+    string _nombreDelTemaMio = "";
+
+    UIElement GuardarTemaMio()
+    {
+        var caja = CajaDeTexto(_nombreDelTemaMio);
+        caja.MinWidth = 190;
+        caja.VerticalAlignment = VerticalAlignment.Center;
+        System.Windows.Automation.AutomationProperties.SetName(caja, Textos.T("Nombre del tema"));
+        caja.TextChanged += (_, _) => _nombreDelTemaMio = caja.Text ?? "";
+
+        // Un nombre por defecto que no sea «Mi tema 3»: el del tema de partida más la fecha.
+        // Es lo que el usuario reconocerá en la lista dentro de tres meses.
+        if (_nombreDelTemaMio.Length == 0)
+            caja.Text = _nombreDelTemaMio =
+                TemasDeSerie.De(_arbol.Texto("Tema", "Id", TemasDeSerie.Predeterminado)).Nombre +
+                " " + DateTime.Now.ToString("d MMM");
+
+        var fila = new StackPanel { Orientation = Orientation.Horizontal };
+        fila.Children.Add(caja);
+        fila.Children.Add(BotonPlano("Guardar lo que tengo", () => GuardarMio(caja.Text), true));
+        return fila;
+    }
+
+    void GuardarMio(string? nombre)
+    {
+        nombre = (nombre ?? "").Trim();
+        if (nombre.Length == 0) { Avisar("Ponle un nombre al tema", true); return; }
+
+        var t = new TemaExportado(
+            nombre,
+            _arbol.Texto("Tema", "Id", TemasDeSerie.Predeterminado),
+            _arbol.Colores("Tema"),
+            _arbol.Radios("Tema"),
+            _arbol.Letras("Tema"));
+
+        var ruta = Temas.RutaPara(nombre);
+        // Pisar un tema del mismo nombre es lo que se espera de «guardar»: es lo que hace
+        // cualquier programa. Lo que no se puede hacer es pisarlo CALLADO, así que el aviso
+        // dice cuál de las dos cosas ha pasado.
+        bool habia = File.Exists(ruta);
+        try
+        {
+            Temas.Exportar(t, ruta);
+            RehacerPagina("colores", SeccionColores);
+            Avisar(habia ? $"«{nombre}» actualizado" : $"«{nombre}» guardado en tus temas", false);
+        }
+        catch (Exception ex) { Avisar("No se pudo guardar: " + ex.Message, true); }
+    }
+
+    // ---------- La lista ----------
+    //
+    // Cada uno con su tira de colores, igual que los de serie: un tema que en la lista es
+    // solo un nombre obliga a probárselo para saber cuál era.
+    UIElement ListaDeMisTemas()
+    {
+        var pila = new StackPanel { Margin = new Thickness(0, 10, 0, 0) };
+        var mios = Temas.Mios();
+
+        if (mios.Count == 0)
+        {
+            pila.Children.Add(new TextBlock
+            {
+                Text = Textos.T("Todavía no has guardado ninguno."),
+                Foreground = _textoAtenuado, FontSize = 11.5,
+            });
+            return pila;
+        }
+
+        foreach (var (fichero, tema) in mios) pila.Children.Add(FilaDeTemaMio(fichero, tema));
+        return pila;
+    }
+
+    UIElement FilaDeTemaMio(string fichero, TemaExportado tema)
+    {
+        var fila = new Grid();
+        fila.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        fila.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var izq = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        izq.Children.Add(TiraDeTemaMio(tema));
+        izq.Children.Add(new TextBlock
+        {
+            Text = tema.Nombre, Foreground = _texto, FontSize = 12.5,
+            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+        });
+
+        // De qué tema de serie sale. Hace falta: dos temas tuyos pueden tener la misma tira
+        // de cuatro colores y venir de familias distintas.
+        izq.Children.Add(new TextBlock
+        {
+            Text = "· " + TemasDeSerie.De(tema.Id).Nombre,
+            Foreground = _textoAtenuado, FontSize = 11,
+            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0),
+        });
+
+        var der = new StackPanel { Orientation = Orientation.Horizontal };
+        der.Children.Add(BotonPlano("Ponérmelo", () => PonermeMio(tema), false));
+        der.Children.Add(BotonPlano("Borrar", () => BorrarMio(fichero, tema.Nombre), false));
+
+        Grid.SetColumn(der, 1);
+        fila.Children.Add(izq);
+        fila.Children.Add(der);
+
+        return new Border
+        {
+            Background = _superficie,
+            BorderBrush = new SolidColorBrush(_roles.Borde),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(7),
+            Padding = new Thickness(9, 6, 9, 6),
+            Margin = new Thickness(0, 0, 0, 5),
+            Child = fila,
+        };
+    }
+
+    // La tira de un tema tuyo se calcula POR ENCIMA de su tema de partida: si le cambiaste el
+    // acento, la tira tiene que enseñar el tuyo. Pintarla con el tema de serie a secas haría
+    // que dos temas tuyos sacados del mismo de serie se vieran idénticos, que es justo el
+    // caso en el que la tira hace falta.
+    UIElement TiraDeTemaMio(TemaExportado tema)
+    {
+        var pintura = new Pintura(TemasDeSerie.De(tema.Id), tema.Colores);
+        var tira = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        foreach (var clave in new[] { ClavesBase.Superficie, ClavesBase.Tinta,
+                                      ClavesBase.Acento, ClavesBase.Sec2 })
+            tira.Children.Add(new Border
+            {
+                Width = 16, Height = 16,
+                Background = new SolidColorBrush(pintura.ColorOpaco(clave)),
+                BorderBrush = new SolidColorBrush(_roles.Borde),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(3),
+                Margin = new Thickness(0, 0, 2, 0),
+            });
+        return tira;
+    }
+
+    void PonermeMio(TemaExportado tema)
+    {
+        // Lo mismo que importar, con la misma limpieza: un tema tuyo editado a mano con una
+        // errata no puede tumbar la barra. Las claves que el catálogo no conoce y los valores
+        // que no se entienden se quedan fuera.
+        var colores = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (k, v) in tema.Colores ?? new Dictionary<string, string>())
+            if (Catalogo.Existe(k) && Relleno.Leer(v) is not null) colores[k] = v;
+
+        _arbol.Poner("Tema", "Id", TemasDeSerie.De(tema.Id).Id);
+        _arbol.PonerColores("Tema", colores);
+        if (tema.Radios is { Count: > 0 }) _arbol.PonerRadios("Tema", tema.Radios);
+        if (tema.Letras is { Count: > 0 }) _arbol.PonerLetras("Tema", tema.Letras);
+        _arbol.Guardar();
+        RehacerPagina("colores", SeccionColores);
+        Avisar($"Tema «{tema.Nombre}» puesto", false);
+    }
+
+    // Borrar pide confirmación DENTRO de la página, como el resto de la casa: no hay un
+    // `MessageBox` en todo el programa y este no va a ser el primero. Dos pulsaciones: la
+    // primera avisa, la segunda borra.
+    string? _temaMioABorrar;
+
+    void BorrarMio(string fichero, string nombre)
+    {
+        if (_temaMioABorrar != fichero)
+        {
+            _temaMioABorrar = fichero;
+            Avisar($"Pulsa «Borrar» otra vez para tirar «{nombre}»", true);
+            return;
+        }
+        _temaMioABorrar = null;
+        if (Temas.Borrar(fichero)) Avisar($"«{nombre}» borrado", false);
+        else Avisar("No se pudo borrar ese tema", true);
         RehacerPagina("colores", SeccionColores);
     }
 

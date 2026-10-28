@@ -145,6 +145,66 @@ public static class Monitores
         return p;
     }
 
+    // ---------- ¿Lleva el ratón alguien que no eres tú? ----------
+    //
+    // Las dos sondas que `GestosDeBorde` necesita para no abrir paneles dentro de una partida.
+    // Están aquí porque este fichero ya es el que le pregunta a Windows por el puntero, y una
+    // segunda casa para preguntar lo mismo es una segunda casa que se queda sin actualizar.
+    //
+    // Las dos fallan hacia «no»: si Windows no contesta, se supone que el ratón es tuyo y los
+    // gestos siguen funcionando. Es lo correcto en la duda — un gesto que deja de funcionar
+    // por una llamada que falló es peor que uno que se dispara de más.
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct CURSORINFO
+    {
+        public int cbSize;
+        public int flags;
+        public IntPtr hCursor;
+        public POINT ptScreenPos;
+    }
+
+    [DllImport("user32.dll")] static extern bool GetCursorInfo(ref CURSORINFO ci);
+    [DllImport("user32.dll")] static extern bool GetClipCursor(out RECT r);
+
+    const int CURSOR_SHOWING = 0x0001;
+    const int SM_XVIRTUALSCREEN = 76, SM_YVIRTUALSCREEN = 77;
+    const int SM_CXVIRTUALSCREEN = 78, SM_CYVIRTUALSCREEN = 79;
+
+    [DllImport("user32.dll")] static extern int GetSystemMetrics(int i);
+
+    // Confinado a un rectángulo más pequeño que el escritorio entero. Lo hace `ClipCursor`, y
+    // lo hacen los juegos para que el puntero no se te escape a la otra pantalla.
+    //
+    // Se compara con holgura de 1 px: el rectángulo del escritorio virtual y el que devuelve
+    // `GetClipCursor` salen del mismo sitio, pero con varias pantallas de DPI distinto se ha
+    // visto bailar un píxel, y un píxel de baile apagaría los gestos para siempre.
+    public static bool RatonAcotado()
+    {
+        try
+        {
+            if (!GetClipCursor(out var c)) return false;
+            int x = GetSystemMetrics(SM_XVIRTUALSCREEN), y = GetSystemMetrics(SM_YVIRTUALSCREEN);
+            int an = GetSystemMetrics(SM_CXVIRTUALSCREEN), al = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+            if (an <= 0 || al <= 0) return false;
+            return c.Left > x + 1 || c.Top > y + 1 ||
+                   c.Right < x + an - 1 || c.Bottom < y + al - 1;
+        }
+        catch { return false; }
+    }
+
+    // Sin puntero dibujado. Señal débil a propósito: ver `GestosDeBorde.EsTuGesto`.
+    public static bool RatonEscondido()
+    {
+        try
+        {
+            var ci = new CURSORINFO { cbSize = Marshal.SizeOf<CURSORINFO>() };
+            if (!GetCursorInfo(ref ci)) return false;
+            return (ci.flags & CURSOR_SHOWING) == 0;
+        }
+        catch { return false; }
+    }
+
     [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(POINT p);
 
     // La ventana que hay bajo el puntero (la de más arriba)

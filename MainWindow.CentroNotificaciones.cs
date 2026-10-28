@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 
 namespace NubeBar;
 
@@ -50,13 +51,35 @@ public partial class MainWindow : Window
         campana.FontSize = 15;
         caja.Children.Add(campana);
 
-        // La chapita de no leídas: un círculo del acento con el número dentro, pegado
-        // arriba a la derecha de la campana. Con más de nueve pone "9+", que es lo que
+        // ---------- El latido, DETRÁS de la chapa ----------
+        //
+        // La maqueta lo pide así: «insignia con el número y un latido — anillo coral que crece
+        // y se desvanece en 2,4 s». Es un anillo y no un parpadeo de la propia chapa a
+        // propósito: parpadear el número lo hace más difícil de leer justo cuando hay algo que
+        // leer, y lo que tiene que llamar la atención es que HAY avisos, no cuántos.
+        //
+        // Va antes que la chapa en el Grid para quedar por detrás. Se anima la escala y la
+        // opacidad de una pieza que no lleva texto, así que nada se vuelve ilegible.
+        var latido = new Border
+        {
+            CornerRadius = new CornerRadius(7),
+            MinWidth = 14, Height = 14,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(0, -6, -7, 0),
+            IsHitTestVisible = false,
+            Visibility = Visibility.Collapsed,
+            RenderTransformOrigin = new Point(0.5, 0.5),
+        };
+        caja.Children.Add(latido);
+
+        // La chapita de no leídas: una pastilla del color de aviso con el número dentro,
+        // pegada arriba a la derecha de la campana. Con más de nueve pone "9+", que es lo que
         // cabe sin que el círculo se convierta en una pastilla.
         var chapa = new Border
         {
             CornerRadius = new CornerRadius(7),
-            Background = _acento,
+            Background = _roles.Pincel("insignia.fondo"),
             MinWidth = 14, Height = 14,
             Padding = new Thickness(3, 0, 3, 0),
             HorizontalAlignment = HorizontalAlignment.Right,
@@ -81,12 +104,46 @@ public partial class MainWindow : Window
             campana.Foreground = n > 0 && !mudo ? _acentoLegible : _texto;
             campana.Opacity = mudo ? 0.6 : 1;
             chapa.Visibility = n > 0 ? Visibility.Visible : Visibility.Collapsed;
-            chapa.Background = mudo ? _textoAtenuado : _acento;
+            chapa.Background = mudo ? _textoAtenuado : _roles.Pincel("insignia.fondo");
             cifra.Text = n > 9 ? "9+" : n.ToString();
-            // El número va sobre el acento, así que su tinta es la que se lee AHÍ y no
-            // la del texto de la isla. Es la misma regla de los roles: un color de
-            // relleno y un color de texto no son lo mismo.
-            cifra.Foreground = new SolidColorBrush(Contraste.TintaSobre(_roles.Acento));
+            // El número va sobre la insignia, así que su tinta es la que se lee AHÍ y no la
+            // del texto de la isla. Es la misma regla de siempre: un color de relleno y un
+            // color de texto no son lo mismo.
+            cifra.Foreground = _roles.Pincel("insignia.texto");
+
+            // ---------- Cuándo late ----------
+            //
+            // Solo si hay avisos Y no estás en «no molestar»: un latido en una barra que te
+            // acabas de silenciar es exactamente lo que acabas de pedir que no pase. Y solo
+            // con nivel de adorno: en «reducido» la insignia se queda, quieta.
+            bool late = n > 0 && !mudo && Animacion.Adorno;
+            latido.Visibility = late ? Visibility.Visible : Visibility.Collapsed;
+            latido.Background = _roles.Pincel("insignia.latido");
+            if (late && latido.RenderTransform is not ScaleTransform)
+            {
+                var escala = new ScaleTransform(1, 1);
+                latido.RenderTransform = escala;
+
+                var crece = new DoubleAnimation(1, 2.3, TimeSpan.FromMilliseconds(2400))
+                {
+                    RepeatBehavior = RepeatBehavior.Forever,
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+                };
+                var apaga = new DoubleAnimation(0.55, 0, TimeSpan.FromMilliseconds(2400))
+                {
+                    RepeatBehavior = RepeatBehavior.Forever,
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+                };
+                crece.Freeze(); apaga.Freeze();
+                escala.BeginAnimation(ScaleTransform.ScaleXProperty, crece);
+                escala.BeginAnimation(ScaleTransform.ScaleYProperty, crece);
+                latido.BeginAnimation(OpacityProperty, apaga);
+            }
+            else if (!late)
+            {
+                latido.BeginAnimation(OpacityProperty, null);
+                latido.RenderTransform = Transform.Identity;
+            }
             var tip = n == 0 ? "No hay notificaciones sin leer"
                              : n == 1 ? "1 notificación sin leer"
                                       : $"{n} notificaciones sin leer";

@@ -600,13 +600,40 @@ public partial class MainWindow
         Grid.SetColumn(pistaDeLaCaja, 1);
         filaDeLaCaja.Children.Add(pistaDeLaCaja);   // después: por encima del campo
 
+        // ---------- El filo del buscador, y la franja ----------
+        //
+        // La maqueta: «Buscador: filo de 1 px. Al pasar el ratón o con foco, una franja del
+        // acento recorre el filo (misma técnica que la isla, 4 s)».
+        //
+        // Por qué solo al enfocar o al pasar por encima: una luz girando sin parar alrededor
+        // del campo de texto es movimiento junto a lo que estás leyendo y escribiendo. Girando
+        // SOLO cuando lo señalas, la luz dice «aquí vas a escribir», que es información.
         var marcoDeLaCaja = new Border
         {
             Height = 38,
-            Background = _superficie,
-            CornerRadius = new CornerRadius(10),
+            Background = _roles.Pincel("buscador.fondo"),
+            BorderBrush = _roles.Pincel("buscador.filo"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(_roles.Pintura.Radio(Piezas.Boton)),
             Child = filaDeLaCaja,
         };
+
+        void FranjaDelBuscador(bool encendida)
+        {
+            if (encendida && Animacion.Adorno)
+                marcoDeLaCaja.BorderBrush = FiloQueRecorre(
+                    _roles.ColorDe("buscador.filo"),
+                    _roles.ColorDe("buscador.filo.foco"),
+                    _roles.ColorDe(ClavesBase.Acento), 4);
+            else
+                marcoDeLaCaja.BorderBrush = encendida
+                    ? _roles.Pincel("buscador.filo.foco")
+                    : _roles.Pincel("buscador.filo");
+        }
+        marcoDeLaCaja.MouseEnter += (_, _) => FranjaDelBuscador(true);
+        marcoDeLaCaja.MouseLeave += (_, _) => { if (!_caja!.IsKeyboardFocusWithin) FranjaDelBuscador(false); };
+        _caja.GotKeyboardFocus += (_, _) => FranjaDelBuscador(true);
+        _caja.LostKeyboardFocus += (_, _) => { if (!marcoDeLaCaja.IsMouseOver) FranjaDelBuscador(false); };
         Grid.SetRow(marcoDeLaCaja, 1);
         raiz.Children.Add(marcoDeLaCaja);
 
@@ -700,10 +727,10 @@ public partial class MainWindow
         return PanelShell(raiz, 0);
     }
 
-    ScrollViewer? _portada;
+    FrameworkElement? _portada;
 
     // Entra escalonada: cada tarjeta un pelín después que la anterior
-    ScrollViewer CrearPortada()
+    FrameworkElement CrearPortada()
     {
         // ---------- Montar es LEER ----------
         //
@@ -724,7 +751,7 @@ public partial class MainWindow
         }
     }
 
-    ScrollViewer MontarPortada()
+    FrameworkElement MontarPortada()
     {
         var pila = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
 
@@ -766,20 +793,82 @@ public partial class MainWindow
         {
             pila.Children.Add(piezas[i]);
             if (piezas[i] is not FrameworkElement fe) continue;
-            var mover = new TranslateTransform { Y = 14 };
+            // Los tiempos son los de la maqueta: «cada tarjeta escalonada 50 ms más tarde
+            // que la anterior (sube 10 px y aparece)». Estaban en 45 ms y 14 px, que es lo
+            // mismo con otros números — pero el plan los fija, y que el código y el plan
+            // digan lo mismo es lo que hace que el plan siga sirviendo dentro de seis meses.
+            var mover = new TranslateTransform { Y = 10 };
             fe.RenderTransform = mover;
-            double retardo = 90 + i * 45;
+            double retardo = 90 + i * 50;
             fe.BeginAnimation(OpacityProperty, Kf(0, 1, 240, retardo));
-            mover.BeginAnimation(TranslateTransform.YProperty, Kf(14, 0, 420, retardo, Muelle));
+            mover.BeginAnimation(TranslateTransform.YProperty, Kf(10, 0, 420, retardo, Muelle));
             mover.Y = 0;
         }
 
-        return new ScrollViewer
+        var desplazable = new ScrollViewer
         {
             Content = pila,
             VerticalScrollBarVisibility = ScrollBarVisibility.Hidden,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
         };
+
+        // ---------- Las decoraciones del tema ----------
+        //
+        // Dos capas y en este orden, que importa:
+        //
+        //   - La MARCA DE AGUA va DETRÁS del contenido. Es un fondo; delante taparía texto.
+        //   - Las PARTÍCULAS van DELANTE, que es donde se ven caer. Ninguna recibe el ratón.
+        //
+        // «Pétalos de sakura cayendo SOLO dentro del menú Inicio, nunca sobre el escritorio».
+        //
+        // Las dos funciones devuelven null si el tema no las lleva o si el nivel de animación
+        // dice que no, y entonces no se monta nada: una capa vacía también cuesta.
+        var marca = MarcaDeAgua();
+        var lluvia = Particulas.Para(_roles.Pintura);
+        if (marca == null && lluvia == null) return desplazable;
+
+        var capas = new Grid();
+        if (marca != null) capas.Children.Add(marca);
+        capas.Children.Add(desplazable);
+        if (lluvia != null) capas.Children.Add(lluvia);
+        return capas;
+    }
+
+    // ---------- La marca de agua ----------
+    //
+    // El argumento de la decoración ES lo que se pinta: `marca-de-agua:侍` pinta un kanji, y
+    // `marca-de-agua:★` pintaría una estrella. Así un tema del usuario puede poner la suya sin
+    // que haya que tocar código ni añadir una imagen al programa.
+    //
+    // Abajo a la derecha y sobresaliendo por el borde: una marca centrada se lee como un logo
+    // mal puesto; medio salida se lee como lo que es, papel con filigrana.
+    UIElement? MarcaDeAgua()
+    {
+        var texto = _roles.Pintura.Tema.Argumento(Decoraciones.MarcaDeAgua);
+        if (string.IsNullOrWhiteSpace(texto)) return null;
+
+        var t = new TextBlock
+        {
+            Text = texto,
+            // Grande y medio salida por la esquina. Con la primera medida (-42 abajo) solo
+            // asomaban los trazos de arriba y se leía como un kanji CORTADO, que es otra cosa:
+            // una filigrana se reconoce porque la ves entera y apagada, no porque adivines un
+            // trozo. Subida, el cuerpo queda detrás de las tarjetas —que es su sitio— y lo que
+            // se ve por el hueco de abajo es su mitad, no su borde.
+            FontSize = 140,
+            Foreground = _roles.Pincel("marca.agua"),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            Margin = new Thickness(0, 0, -8, -8),
+            IsHitTestVisible = false,
+        };
+        // Al lector de pantalla no se le anuncia: es papel pintado, no contenido. Anunciarlo
+        // sería leerle un adorno en medio del menú. En WPF eso se dice sacándolo del árbol de
+        // automatización, no poniéndole un nombre vacío —un nombre vacío sigue siendo un nodo
+        // que el lector recorre—.
+        System.Windows.Automation.AutomationProperties.SetIsOffscreenBehavior(
+            t, System.Windows.Automation.IsOffscreenBehavior.Offscreen);
+        return new Grid { Children = { t }, ClipToBounds = true, IsHitTestVisible = false };
     }
 
     // ================= Búsqueda =================

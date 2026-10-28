@@ -57,6 +57,10 @@ public partial class MainWindow : Window
             {
                 try { i.VigilarClicFueraDelMenu(); i.VigilarClicFueraDelPanel(); i.VigilarEscDelPanel(); }
                 catch (Exception ex) { Log.Error("clic fuera del menú", ex); }
+                // Antes de decidir nada: quién lleva el ratón y cuánto lleva en el filo.
+                // Va delante a propósito — lo que viene detrás lo consulta.
+                try { i.MuestrearBordes(); }
+                catch (Exception ex) { Log.Error("muestrear los bordes", ex); }
                 try { i.RevisarPantallaCompleta(); }
                 catch (Exception ex) { Log.Error("pantalla completa", ex); }
             }
@@ -210,8 +214,13 @@ public partial class MainWindow : Window
         }
         if (!_recogida) return;
 
-        // Escondida: el ratón pegado al filo durante 300 ms la hace asomar
-        bool enElBorde = RatonEnElFilo();
+        // Escondida: el ratón pegado al filo durante 300 ms la hace asomar.
+        //
+        // Con la guardia delante. Esto era el otro síntoma del fallo de los paneles: en un
+        // juego, mirar rápido hacia arriba clava el puntero contra el filo de arriba y la isla
+        // asomaba sola en mitad de la partida. Los 300 ms no lo evitaban porque el puntero no
+        // pasa por el filo — se queda ahí mientras sigas girando.
+        bool enElBorde = _ratonEsTuyo && RatonEnElFilo();
 
         if (!_asomada)
         {

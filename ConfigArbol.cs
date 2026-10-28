@@ -238,6 +238,33 @@ public sealed class ConfigArbol
         catch (Exception ex) { Log.Error($"escribir {seccion}.Radios en el config", ex); }
     }
 
+    // Las letras que el usuario ha cambiado, por papel. Igual que `Colores` y `Radios`.
+    public Dictionary<string, string> Letras(string seccion)
+    {
+        var fuera = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            if (Seccion(seccion)["Letras"] is JsonObject obj)
+                foreach (var (k, v) in obj)
+                    if (v is JsonValue jv && jv.TryGetValue<string>(out var s) &&
+                        !string.IsNullOrWhiteSpace(s)) fuera[k] = s;
+        }
+        catch (Exception ex) { Log.Error($"leer {seccion}.Letras del config", ex); }
+        return fuera;
+    }
+
+    public void PonerLetras(string seccion, IReadOnlyDictionary<string, string> letras)
+    {
+        try
+        {
+            var obj = new JsonObject();
+            foreach (var k in letras.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase))
+                obj[k] = letras[k];
+            Seccion(seccion)["Letras"] = obj;
+        }
+        catch (Exception ex) { Log.Error($"escribir {seccion}.Letras en el config", ex); }
+    }
+
     public void Quitar(string seccion, string clave)
     {
         try { Seccion(seccion).Remove(clave); }

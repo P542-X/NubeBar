@@ -137,6 +137,22 @@ public static partial class Pruebas
         Igual(28.0, radioTocado["Radios"]!["isla"]!.GetValue<double>(), "un radio cambiado sí");
         Igual(28.0, radioTocado["Radios"]!["panel"]!.GetValue<double>(), "para la isla y para el panel");
 
+        // ---------- La letra (v5→v6) ----------
+        //
+        // Mismo criterio que con los colores y el radio: se arrastra la que el usuario ELIGIÓ.
+        // «Segoe UI» era la de serie, así que arrastrarla dejaría a todo el mundo con ella y
+        // sin ver nunca la letra del tema — y la letra es media identidad de Cyberpunk.
+        var letraDeSerie = Migrado(V4(("Fuente", "Segoe UI")));
+        Vale(letraDeSerie["Letras"] is JsonObject { Count: 0 },
+             "la letra de serie no se arrastra: nadie la eligió");
+
+        var letraMia = Migrado(V4(("Fuente", "Consolas")));
+        Igual("Consolas", letraMia["Letras"]!["texto"]!.GetValue<string>(),
+              "una letra elegida a mano sí se conserva");
+
+        var sinLetra = Migrado(V4(("Fuente", "   ")));
+        Vale(sinLetra["Letras"] is JsonObject { Count: 0 }, "y una en blanco tampoco se arrastra");
+
         // ---------- No se borra NADA ----------
         //
         // Es la regla de la casa, y la que más caro ha salido aprender. `Estilo` «desaparece»

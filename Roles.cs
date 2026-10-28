@@ -112,6 +112,11 @@ public sealed class Roles
     public Brush Pincel(string clave) => Pintura.Pincel(clave);
     public Color ColorDe(string clave) => Pintura.Color(clave);
 
+    // El color de una clave YA COMPUESTO sobre lo que tiene detrás. Hace falta donde la
+    // superficie tiene que ser opaca de verdad: un panel de controles con el escritorio
+    // transparentándose por detrás hace ilegible cualquier texto pequeño (regla de C5).
+    public Color OpacoDe(string clave) => Pintura.ColorOpaco(clave);
+
     public static Roles Desde(Pintura p)
     {
         var fondo = p.Color("isla.fondo");

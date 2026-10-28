@@ -99,6 +99,9 @@ public static partial class Pruebas
             CorrerTemas();
             SinColoresAMano();
 
+            // El fallo de los paneles dentro de un juego: ver Pruebas.GestosDeBorde.cs
+            CorrerGestosDeBorde();
+
             // C5: esquema y migraciones
             EsquemaDeducir();
             EsquemaMigrar();

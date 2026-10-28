@@ -172,7 +172,22 @@ public partial class MainWindow
         // La identidad va siempre del color de la casa. El estado lo lleva la insignia de
         // debajo, que es su sitio: una cosa, un trabajo.
         nube.Fill = new SolidColorBrush(HyprPinta.Azul(_roles));
-        fila.Children.Add(nube);
+
+        // ---------- Y su accesorio, si el tema se lo pone ----------
+        //
+        // Samurái le ata el hachimaki, Invierno le pone el gorro, Videojuegos los auriculares.
+        // Va encima de la nube y en la misma celda, así que lo que se mueve o se tiñe sigue
+        // siendo la nube: el accesorio no es otra pieza que haya que mantener a su lado, es
+        // una capa suya (ver `Accesorios`).
+        if (Accesorios.Para(_roles.Pintura, lado) is { } puesto)
+        {
+            var conGorro = new Grid { Margin = nube.Margin, VerticalAlignment = VerticalAlignment.Center };
+            nube.Margin = new Thickness(0);
+            conGorro.Children.Add(nube);
+            conGorro.Children.Add(puesto);
+            fila.Children.Add(conGorro);
+        }
+        else fila.Children.Add(nube);
 
         var textos = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
 

@@ -58,7 +58,19 @@ public partial class MainWindow : Window
                       : e.PorCiento <= 15 && !e.Enchufado ? _roles.Pincel("bateria.bajo") : _acento
         };
         canal.Child = lleno;
-        canal.SizeChanged += (_, _) => lleno.Width = canal.ActualWidth * e.PorCiento / 100.0;
+        // ---------- Se llena al abrir, no aparece llena ----------
+        //
+        // La maqueta: «barra que se llena al abrir (de 0 a su valor, 1 s)». Lo que gana no es
+        // vistosidad: una barra que crece te dice CUÁNTO ha crecido, así que el 74 % se lee
+        // sin tener que mirar la cifra. Apareciendo ya llena, la barra es un adorno al lado
+        // del número.
+        canal.SizeChanged += (_, _) =>
+        {
+            double destino = canal.ActualWidth * e.PorCiento / 100.0;
+            if (!Animacion.Adorno) { lleno.Width = destino; return; }
+            lleno.Width = 0;
+            lleno.BeginAnimation(WidthProperty, Kf(0, destino, 1000, 0, Suave));
+        };
         columna.Children.Add(canal);
 
         // --- Modo de energía ---

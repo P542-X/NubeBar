@@ -168,6 +168,14 @@ public static class Decoraciones
     public const string TintaDeAcento = "tinta-de-acento";
 }
 
+// Los dos papeles de letra. Como constantes por lo mismo que `ClavesBase`: una errata en
+// `"titulos"` no da error de compilación, da un reloj con la letra del cuerpo.
+public static class Letras
+{
+    public const string Texto = "texto";
+    public const string Titulos = "titulos";
+}
+
 // Las medidas de forma que un tema puede declarar, además de los radios.
 public static class Medidas
 {

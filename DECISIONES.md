@@ -3978,3 +3978,53 @@ tema equivocado.
 Arreglado poniendo el pintado de la concha en **un solo sitio** (`PintarConchaLateral`), que
 es de donde salía el problema: estaba escrito dos veces y la tercera faltaba. Comprobado
 midiendo el píxel de la concha en los nueve: cada uno con el suyo.
+
+## Los gestos de borde preguntan de quién es el ratón
+
+**Qué pasaba.** Jugando a pantalla completa con los paneles laterales en «al acercarse»,
+girar la cámara rápido abría un panel encima de la partida; mirar hacia arriba hacía asomar
+la isla; el dock hacía lo mismo por abajo.
+
+**Por qué.** `Dock.RatonCerca` hacía bien su cuenta. El error estaba en la pregunta: se
+preguntaba «¿está el puntero en el filo?» cuando lo que hay que preguntar es «¿lo has llevado
+tú?». Un juego lee el ratón en crudo y deja el puntero del escritorio donde caiga; donde cae,
+girando deprisa, es clavado contra el tope que el juego le haya puesto con `ClipCursor`. Entre
+ese recorte y la recolocación al centro que muchos hacen cada fotograma, el puntero aparece
+pegado a un filo cualquiera — por eso mirar a la derecha abría el panel de la izquierda.
+
+**Lo decidido.** Dos señales, con peso distinto a propósito:
+
+- **Acotado** (`GetClipCursor` devuelve algo más pequeño que el escritorio): basta sola. Nadie
+  encierra tu ratón si no lo está usando, y exigir además pantalla completa dejaba fuera a los
+  juegos en ventana sin bordes.
+- **Escondido** (`GetCursorInfo` sin `CURSOR_SHOWING`): solo cuenta **si además** hay algo a
+  pantalla completa. Un reproductor de vídeo también esconde el puntero cuando llevas un rato
+  quieto, y ahí sí quieres poder asomar la barra para ver la hora.
+
+Pantalla completa **sola** no apaga nada. Ese era el arreglo fácil y es el equivocado: un vídeo
+a pantalla completa con el puntero a la vista es exactamente cuando el gesto hace falta. Hay
+una prueba que lo exige, para que no se «arregle» así en el futuro.
+
+**Y de paso, el reposo.** El dock y los laterales abrían con el puntero de paso: no pedían
+tiempo. La isla sí (300 ms), y por eso era la que menos se abría sola. Ahora los tres piden lo
+mismo. Se muestrea en el vigilante de 150 ms que ya existía —el de un segundo no distingue un
+roce de una intención— y por borde, no una marca para todos: con el dock abajo y un panel a la
+izquierda, una sola marca haría que dejar el puntero abajo abriese además el de la izquierda.
+
+**Las dos sondas fallan hacia «sí es tuyo».** Si Windows no contesta, los gestos siguen
+funcionando. Un gesto que deja de funcionar por una llamada que falló es peor que uno que se
+dispara de más.
+
+## Un tema tuyo guarda la receta, no el resultado
+
+`TemaExportado` lleva el **id del tema de partida** más lo que le cambiaste (colores, radios,
+letras), y no los ~130 colores ya resueltos.
+
+Guardar el resultado habría sido más fácil y deja el tema congelado: el día que Sakura mejore
+su rosa, tu tema seguiría con el viejo para siempre. Guardando «Sakura y estas cuatro cosas»,
+mejora contigo. Y el fichero se lee: treinta líneas que dicen qué decidiste, en vez de ciento
+treinta que no dicen nada.
+
+El precio es que un tema tuyo depende de que su tema de partida siga existiendo. Se paga con
+lo de siempre: un id desconocido cae en Profesional, no en una excepción.
+

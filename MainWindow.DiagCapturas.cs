@@ -551,7 +551,21 @@ public partial class MainWindow
                                      $"35-tema-{t.Id}",
                                      $"Tema «{t.Nombre}» ({t.Familia}): el panel lateral entero");
                 CerrarLateral(Lateral.Lado.Izquierda);
-                await System.Threading.Tasks.Task.Delay(500);
+                await System.Threading.Tasks.Task.Delay(400);
+
+                // ---------- Y el Inicio, que es donde viven las decoraciones ----------
+                //
+                // El lateral enseña los colores y la forma; las partículas, la mascota y los
+                // destellos caen DENTRO del menú Inicio. Sin esta foto, las fases 6 y 7 se
+                // comprueban mirando el tema equivocado.
+                AbrirMenuInicio();
+                await System.Threading.Tasks.Task.Delay(1600);   // tiempo a que la lluvia entre
+                var part = t.Argumento(Decoraciones.Particulas);
+                await Foto($"36-inicio-{t.Id}",
+                           $"Tema «{t.Nombre}»: el menú Inicio" +
+                           (string.IsNullOrEmpty(part) ? " (sin partículas)" : $" (partículas: {part})"));
+                CerrarPanel();
+                await System.Threading.Tasks.Task.Delay(400);
             }
         }
         catch (Exception ex)

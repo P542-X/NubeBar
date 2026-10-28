@@ -299,12 +299,34 @@ public partial class MainWindow : Window
             Width = porFila * 40,
             HorizontalAlignment = HorizontalAlignment.Center
         };
+        // ---------- Entran con rebote, uno detrás de otro ----------
+        //
+        // La maqueta: «los iconos entran con un pequeño rebote escalonado». No es adorno: una
+        // rejilla de diez iconos que aparece de golpe se lee como una imagen; entrando uno
+        // detrás de otro se lee como una lista, que es lo que es, y el ojo la recorre en el
+        // orden en que está puesta.
+        //
+        // Respeta el nivel de animación: sin adorno entran puestos y ya está.
+        int n = 0;
         foreach (var i in iconos)
         {
             var b = BotonBandeja(i);
             b.Width = 36;
             b.Height = 36;
             rejilla.Children.Add(b);
+
+            if (Animacion.Adorno)
+            {
+                double retardo = n * 40;
+                var escala = new ScaleTransform(0.4, 0.4);
+                b.RenderTransformOrigin = new Point(0.5, 0.5);
+                b.RenderTransform = escala;
+                b.Opacity = 0;
+                b.BeginAnimation(OpacityProperty, Kf(0, 1, 180, retardo));
+                escala.BeginAnimation(ScaleTransform.ScaleXProperty, Kf(0.4, 1, 420, retardo, Muelle));
+                escala.BeginAnimation(ScaleTransform.ScaleYProperty, Kf(0.4, 1, 420, retardo, Muelle));
+            }
+            n++;
         }
 
         // Con la concha de C5, como los demás paneles. Éste era el único del programa que no

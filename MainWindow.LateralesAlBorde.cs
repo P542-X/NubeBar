@@ -48,6 +48,62 @@ public partial class MainWindow
     // puede tener la última palabra sobre superficies que no ha abierto él.
     readonly HashSet<Lateral.Lado> _lateralesDelBorde = new();
 
+    // ================= El muestreo de los bordes =================
+    //
+    // Por qué existe esto y no se mira el ratón en el sitio donde se decide: porque el dock y
+    // los laterales se deciden en el pulso de un segundo, y un segundo no distingue «has
+    // dejado el puntero en el filo» de «lo has cruzado». Con el pulso fino de 150 ms sí se
+    // distingue, así que el filo se MUESTREA ahí y aquí solo se consulta lo muestreado.
+    //
+    // El porqué de cada señal está en `GestosDeBorde.cs`. Esto es el cableado.
+    readonly GestosDeBorde.Reposo _reposoDeBordes = new();
+
+    bool _ratonEsTuyo = true;
+
+    // Si el ratón lo lleva otro —un juego a pantalla completa, básicamente—, los gestos de
+    // borde se apagan: ni dock, ni laterales, ni isla asomando. Público porque los tres lo
+    // preguntan y uno de ellos vive en otro fichero.
+    internal bool RatonEsTuyo => _ratonEsTuyo;
+
+    internal void MuestrearBordes()
+    {
+        try
+        {
+            // `RatonEscondido` es una llamada; `HayPantallaCompleta` recorre ventanas. Así que
+            // la segunda solo se pregunta cuando la primera ha dicho algo: fuera de un juego,
+            // este muestreo cuesta dos llamadas a user32 y nada más.
+            bool acotado = Monitores.RatonAcotado();
+            bool escondido = Monitores.RatonEscondido();
+            bool pc = escondido && HayPantallaCompleta();
+
+            bool tuyo = GestosDeBorde.EsTuGesto(acotado, escondido, pc);
+            if (tuyo != _ratonEsTuyo)
+            {
+                _ratonEsTuyo = tuyo;
+                // Al cambiar de manos se olvida lo medido. Si no, al salir del juego quedaría
+                // un reposo de hace rato y el panel se abriría solo al volver al escritorio.
+                _reposoDeBordes.Olvidar();
+                Log.Info(tuyo
+                    ? "el ratón vuelve a ser tuyo: los gestos de borde se encienden"
+                    : $"el ratón lo lleva otro ({(acotado ? "acotado" : "escondido a pantalla completa")}): " +
+                      "se apagan los gestos de borde");
+            }
+            if (!tuyo) return;
+
+            var util = UtilDeEstaPantalla();
+            var r = PuntoRaton();
+            var ahora = DateTime.Now;
+            foreach (var b in new[] { NubeHypr.Borde.Arriba, NubeHypr.Borde.Abajo,
+                                      NubeHypr.Borde.Izquierda, NubeHypr.Borde.Derecha })
+                _reposoDeBordes.Mirar(b, Dock.RatonCerca(util, b, r.X, r.Y), ahora);
+        }
+        catch (Exception ex) { Log.Error("muestrear los bordes de la pantalla", ex); }
+    }
+
+    // ¿Cuenta el filo `b` como gesto tuyo, ahora mismo y de verdad?
+    internal bool GestoEnElBorde(NubeHypr.Borde b) =>
+        _ratonEsTuyo && _reposoDeBordes.Quieto(b, DateTime.Now);
+
     void RefrescarLateralesAlBorde()
     {
         try
@@ -86,7 +142,10 @@ public partial class MainWindow
                     continue;
                 }
 
-                bool cerca = Dock.RatonCerca(util, borde, raton.X, raton.Y);
+                // El filo, pero con la guardia delante: el puntero tiene que ser tuyo y
+                // tiene que llevar ahí quieto sus 300 ms. Cruzarlo no abre nada, y dentro de
+                // una partida no abre nada tampoco.
+                bool cerca = Dock.RatonCerca(util, borde, raton.X, raton.Y) && GestoEnElBorde(borde);
                 bool abierto = LateralAbierto(lado);
                 bool mio = _lateralesDelBorde.Contains(lado);
                 bool debeVerse = Dock.SeVe(cuando, cerca, abierto && _ratonDentroDe.Contains(lado));

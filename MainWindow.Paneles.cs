@@ -112,7 +112,35 @@ public partial class MainWindow
     {
         _tarjetaAncla = ancla;
         _tarjetaAncho = ancho;
+        MarcarAncla(ancla, true);
         AplicarRecorteDelCajon();
+    }
+
+    // ---------- El icono que tiene el panel abierto ----------
+    //
+    // La maqueta: «el icono del que cuelgan se marca con fondo acento al 18 % mientras están
+    // abiertos». Es lo que contesta a «¿de dónde ha salido esto?» sin que haya que seguir la
+    // flecha con el ojo — y lo que hace que cerrar el panel se sienta como apagar ese botón y
+    // no como que algo desaparece.
+    //
+    // Se guarda el fondo que tenía para devolvérselo: los glifos de la isla se pintan solos al
+    // pasar el ratón, y dejarles el fondo del acento puesto sería un botón encendido para
+    // siempre.
+    Brush? _fondoDelAncla;
+
+    void MarcarAncla(FrameworkElement? ancla, bool marcada)
+    {
+        if (ancla is not Border b) return;
+        if (marcada)
+        {
+            _fondoDelAncla = b.Background;
+            b.Background = _roles.Pincel("panel.icono.abierto");
+        }
+        else
+        {
+            b.Background = _fondoDelAncla;
+            _fondoDelAncla = null;
+        }
     }
 
     // ---------- El tamaño de los paneles según la pantalla ----------
@@ -181,6 +209,7 @@ public partial class MainWindow
             _tarjetaContenido.Width = double.NaN;
             _tarjetaContenido.HorizontalAlignment = HorizontalAlignment.Stretch;
         }
+        MarcarAncla(_tarjetaAncla, false);
         _tarjetaAncla = null;
         _tarjetaContenido = null;
         _tarjetaAncho = 0;

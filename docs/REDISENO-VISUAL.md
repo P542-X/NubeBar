@@ -480,6 +480,65 @@ Cada fase se publica como versión para probarla antes de seguir.
    movimiento y textos; vista previa, deshacer y medidor de consumo; automático; exportar e
    importar `.nubetema`.
 
+### Dónde va el rediseño
+
+| Fase | Qué | Estado |
+|---|---|---|
+| **0** | Cimientos: catálogo, cascada, los 9 temas, migración, fuera los 3 estilos | ✅ |
+| **1** | Tema Profesional: panel y tarjeta separados, títulos de sección, la letra del tema | ✅ |
+| **2** | La isla: halo (en `Aura`, sin recorte), destello del filo, reloj con brillo, insignia con latido | ✅ |
+| **3** | El menú Inicio: franja del buscador, brillo del progreso, escalonado 50 ms / 10 px | ✅ |
+| **4** | Paneles de la isla: ancla marcada, batería que se llena, bandeja con rebote, buscar que gira | ✅ |
+| **5** | Laterales y dock: entrada desde el borde, secciones escalonadas, lupa con vecinos | ✅ |
+| **6** | Temas Anime: partículas, marca de agua, las seis letras incrustadas, la mascota con accesorios | ✅ |
+| **7** | Oficina, Videojuegos, Invierno, Cyberpunk: chaflán, modo RGB, glitch, barrido | ✅ |
+| **8** | Selector de temas por familias | ✅ (vino con la fase 0) |
+| **9** | El Estudio de temas | ◐ el esqueleto: guardar, listar, ponerse y borrar temas tuyos |
+
+**La mascota lleva accesorios.** `Accesorios.cs` dibuja los siete que los temas nombran
+—hachimaki, bufanda, gorro, auriculares, visor, coloretes y la lágrima— en una caja de 100×100
+que un `Viewbox` escala al tamaño que haga falta. Una sola nube con disfraces, no siete nubes:
+siete siluetas serían seis que se quedan sin actualizar el día que la nube cambie. Un accesorio
+que esta versión no sepa dibujar (un `.nubetema` de la comunidad pidiendo `mascota:sombrero`)
+no pinta nada y sigue, que es lo correcto: no se inventa un sombrero.
+
+**Y de la fase 9 está el esqueleto, no el Estudio.** Lo que hay: ponerle nombre a lo que has
+afinado, que salga en una lista con su tira de colores y de qué tema de serie sale, ponértelo
+y borrarlo (con dos pulsaciones, dentro de la página, sin un `MessageBox` que este programa no
+tiene en ciento cincuenta ficheros). Un tema tuyo guarda el **id del tema de partida** más lo
+que le cambiaste —colores, radios y letras—, no los ~130 colores resueltos: así el día que
+Sakura mejore su rosa, tu tema mejora contigo, y el fichero se lee de un vistazo.
+
+Lo que NO está, y conviene no dar por hecho: la vista previa en vivo, deshacer y rehacer, la
+simulación de daltonismo, el medidor de consumo y el `.nubetema` empaquetado con las fuentes y
+las imágenes dentro. Eso es el Estudio de verdad y sigue pendiente.
+
+**Los gestos de borde ya no se disparan dentro de un juego.** No es del plan, es un fallo que
+salió jugando: a pantalla completa, girar rápido la cámara abría los paneles laterales y hacía
+asomar la isla. La cuenta del borde estaba bien; la pregunta no. Ahora, antes de mirar si el
+puntero está en el filo, se mira **de quién es el puntero** (`GestosDeBorde.cs`): acotado con
+`ClipCursor` significa que lo lleva otro, y escondido **más** algo a pantalla completa, también.
+Y además se le pide reposo: cruzar un filo ya no abre nada, hay que dejar el puntero ahí 300 ms,
+lo mismo que la isla pedía desde siempre.
+
+**Las letras ya viajan dentro.** Las seis OFL están en `Fuentes/` con sus licencias y
+declaradas como `Resource` en el csproj; `MainWindow.LetraDe` las busca en el programa ANTES
+que en el sistema, a propósito: si alguien tiene instalada otra versión de Rajdhani, el tema
+tiene que verse como se diseñó y no como lo tenga esa máquina.
+
+**Y pesan 2,9 MB en vez de 38,8.** Las tres japonesas —M PLUS Rounded 1c, Zen Maru Gothic y
+Shippori Mincho— traían el juego CJK entero: miles de kanji que NubeBar no escribe nunca. Van
+recortadas con `fonttools` al latín, la puntuación, los símbolos que la interfaz usa y los
+pocos kanji que nombran los temas. Shippori Mincho sola bajó de 8,5 MB a 327 KB. Si algún día
+un tema necesita más kanji, el recorte está en el guion y se vuelve a pasar.
+
+**Cómo se comprueba una decoración:** `NubeBar.exe --capturas <carpeta>` fotografía el panel
+lateral **y el menú Inicio** en los nueve temas (`35-tema-*.png` y `36-inicio-*.png`). Las
+decoraciones viven en el Inicio, no en el lateral: sin esas fotos, las fases 6 y 7 se
+comprueban mirando el tema equivocado. Las tres veces que las partículas estuvieron mal
+—sin arrancar, invisibles en Invierno, amontonadas en una franja— salieron ahí y en ningún
+otro sitio.
+
 ### Fase 0: lo que ya está en pie
 
 Construido y con las pruebas en verde (`NubeBar.exe --pruebas`: 10 583 comprobaciones, 0 mal):

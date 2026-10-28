@@ -6,6 +6,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Shapes;
 
 namespace NubeBar;
@@ -96,12 +97,21 @@ public partial class MainWindow
 
         // Todo el panel va marcado: la red de seguridad por si una pieza nueva se olvida
         // de marcarse. Un panel es, por definición, una superficie con la que se interactúa.
+        // ---------- La concha pide SU clave, no la de las tarjetas ----------
+        //
+        // Las dos pedían `SuperficieSolida`, o sea el fondo de TARJETA, así que el panel y sus
+        // tarjetas salían del mismo tono y la jerarquía se perdía: seis bloques flotando sobre
+        // un fondo de su mismo color. La maqueta los separa —`panel-fondo` y `tarjeta` son dos
+        // valores distintos en los nueve temas— y ahora el código también.
+        //
+        // Opaco de verdad: un panel de controles con el escritorio transparentándose detrás
+        // hace ilegible cualquier texto pequeño. Es la regla de C5, y por eso `OpacoDe`.
         var b = SinArrastre(new Border
         {
-            Background = PincelSolido(_roles.SuperficieSolida),
+            Background = PincelSolido(_roles.OpacoDe("panel.fondo")),
             // Filo discreto SIEMPRE. Antes aquí y en `Card` se miraba `FiloDeAcento`, y por
             // eso el panel y sus seis tarjetas salían todos con el mismo contorno azul.
-            BorderBrush = PincelSolido(_roles.Borde),
+            BorderBrush = _roles.Pincel("panel.filo"),
             BorderThickness = new Thickness(e.GrosorFilo),
             CornerRadius = new CornerRadius(e.RadioShell),
             Padding = new Thickness(margen),
@@ -111,6 +121,7 @@ public partial class MainWindow
         // lo que hace que el panel parezca despegado del fondo de pantalla sin dibujarle un
         // marco alrededor.
         PonerResplandor(b, e, Realce.Ambiente);
+        ChaflanSiToca(b);
         return b;
     }
 
@@ -129,20 +140,21 @@ public partial class MainWindow
         var e = EstiloDeAhora;
         var b = new Border
         {
-            Background = PincelSolido(alta ? _roles.SuperficieAltaSolida : _roles.SuperficieSolida),
+            Background = PincelSolido(_roles.OpacoDe(alta ? "tarjeta.fondo.raton" : "tarjeta.fondo")),
             // ---------- Filo oscuro, no de acento ----------
             //
             // Aquí estaba el «borde azul fijo alrededor de todas las tarjetas». El acento en
             // el filo se reserva a lo que está activo: si lo lleva todo, no distingue nada.
-            BorderBrush = PincelSolido(realce == Realce.Reposo || realce == Realce.Ambiente
-                ? _roles.Borde
-                : _roles.Acento),
+            BorderBrush = realce == Realce.Reposo || realce == Realce.Ambiente
+                ? _roles.Pincel("tarjeta.filo")
+                : _roles.Pincel(ClavesBase.Acento),
             BorderThickness = new Thickness(e.GrosorFilo),
             CornerRadius = new CornerRadius(e.RadioCard),
             Padding = new Thickness(double.IsNaN(dentro) ? e.Dentro : dentro),
             Margin = new Thickness(0, 0, 0, e.Hueco),
-            Child = contenido,
+            Child = BajoElBarrido(contenido),
         };
+        ChaflanSiToca(b);
         PonerResplandor(b, e, realce);
         return b;
     }
@@ -250,7 +262,8 @@ public partial class MainWindow
     {
         var f = Glifo(char.ConvertFromUtf32(0xE76C));   // ChevronRight
         f.FontSize = 12;
-        f.Opacity = alPulsar == null ? 0.3 : 0.6;
+        f.Foreground = _roles.Pincel("seccion.flecha");
+        f.Opacity = alPulsar == null ? 0.45 : 0.9;
         f.VerticalAlignment = VerticalAlignment.Center;
 
         if (alPulsar == null) return f;
@@ -259,6 +272,470 @@ public partial class MainWindow
         b.Padding = new Thickness(4, 0, 2, 0);
         b.MinWidth = 0;
         return b;
+    }
+
+    // ================= El brillo que recorre un texto =================
+    //
+    // La maqueta, para el reloj: «degradado lineal de texto (texto → blanco → texto) cuyo
+    // desplazamiento se anima en 7 s: un brillo que lo recorre».
+    //
+    // ---------- Por qué un TranslateTransform y no mover las paradas ----------
+    //
+    // Animar las `GradientStop` una a una son tres animaciones sincronizadas que WPF recalcula
+    // por fotograma. Un `TranslateTransform` en el `RelativeTransform` del pincel es UNA, y
+    // además la hace la composición: el pincel no se vuelve a construir, solo se mapea en otro
+    // sitio. Es la misma idea que el giro del filo de la isla.
+    //
+    // ---------- Y por qué solo el reloj ----------
+    //
+    // Es el único texto de la barra que está SIEMPRE y que nadie lee entero: se mira de reojo.
+    // Un brillo recorriendo la fecha, el título del wallpaper o el nombre de una app sería
+    // movimiento encima de algo que sí se lee, y eso cansa. La maqueta lo pide solo aquí.
+    //
+    // Respeta el nivel de animación: sin adorno, el texto se queda del color de siempre.
+    internal void PonerBrilloDeTexto(TextBlock tb)
+    {
+        if (!Animacion.Adorno) return;
+
+        // ---------- O el glitch, si el tema lo pide ----------
+        //
+        // Cyberpunk cambia el brillo por un tropiezo: el reloj se desplaza un par de píxeles y
+        // se tiñe de cian o magenta durante un fotograma, cada pocos segundos.
+        //
+        // Con keyframes DISCRETOS, no interpolados: un glitch que se desvanece suavemente no
+        // es un glitch, es un fundido. Lo que lo hace leerse como un fallo de señal es que
+        // aparezca y desaparezca de golpe.
+        if (_roles.Pintura.Tema.Lleva(Decoraciones.RelojGlitch)) { PonerGlitch(tb); return; }
+
+        try
+        {
+            var tinta = _roles.Texto;
+            var luz = _roles.ColorDe("reloj.brillo");
+
+            var g = new LinearGradientBrush
+            {
+                StartPoint = new Point(0, 0.5),
+                EndPoint = new Point(1, 0.5),
+                MappingMode = BrushMappingMode.RelativeToBoundingBox,
+            };
+            // La franja de luz, estrecha y en medio del recorrido.
+            g.GradientStops.Add(new GradientStop(tinta, 0.00));
+            g.GradientStops.Add(new GradientStop(tinta, 0.38));
+            g.GradientStops.Add(new GradientStop(luz, 0.50));
+            g.GradientStops.Add(new GradientStop(tinta, 0.62));
+            g.GradientStops.Add(new GradientStop(tinta, 1.00));
+
+            // De un lado a otro: el pincel mide lo que el texto, así que desplazarlo una
+            // vez y media lo saca por completo por los dos extremos.
+            var mueve = new TranslateTransform(-1.4, 0);
+            g.RelativeTransform = mueve;
+            tb.Foreground = g;
+
+            var a = new DoubleAnimation(-1.4, 1.4, TimeSpan.FromSeconds(7))
+            {
+                RepeatBehavior = RepeatBehavior.Forever,
+            };
+            a.Freeze();
+            mueve.BeginAnimation(TranslateTransform.XProperty, a);
+        }
+        catch (Exception ex) { Log.Error("poner el brillo del reloj", ex); }
+    }
+
+    // ---------- El glitch del reloj ----------
+    //
+    // Tres canales desplazados sería lo fiel a un monitor roto, y son tres `TextBlock`
+    // superpuestos que hay que mantener sincronizados con la hora. Aquí se consigue lo mismo
+    // con uno: el desplazamiento y el color saltan a la vez en keyframes discretos, y a la
+    // velocidad a la que ocurre el ojo lo lee igual.
+    void PonerGlitch(TextBlock tb)
+    {
+        try
+        {
+            var tinta = _roles.Texto;
+            var cian = _roles.ColorDe(ClavesBase.Sec2);
+            var magenta = _roles.ColorDe(ClavesBase.Halo);
+
+            var pincel = new SolidColorBrush(tinta);
+            tb.Foreground = pincel;
+            var mueve = new TranslateTransform();
+            tb.RenderTransform = mueve;
+
+            var ciclo = TimeSpan.FromMilliseconds(2800);
+
+            var salto = new DoubleAnimationUsingKeyFrames { Duration = ciclo, RepeatBehavior = RepeatBehavior.Forever };
+            void Salto(double x, double ms) =>
+                salto.KeyFrames.Add(new DiscreteDoubleKeyFrame(x, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(ms))));
+            Salto(0, 0); Salto(-2, 2400); Salto(2, 2460); Salto(-1, 2520); Salto(0, 2580);
+
+            var tinte = new ColorAnimationUsingKeyFrames { Duration = ciclo, RepeatBehavior = RepeatBehavior.Forever };
+            void Tinte(Color c, double ms) =>
+                tinte.KeyFrames.Add(new DiscreteColorKeyFrame(c, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(ms))));
+            Tinte(tinta, 0); Tinte(cian, 2400); Tinte(magenta, 2460); Tinte(cian, 2520); Tinte(tinta, 2580);
+
+            salto.Freeze(); tinte.Freeze();
+            mueve.BeginAnimation(TranslateTransform.XProperty, salto);
+            pincel.BeginAnimation(SolidColorBrush.ColorProperty, tinte);
+        }
+        catch (Exception ex) { Log.Error("poner el glitch del reloj", ex); }
+    }
+
+    // ================= Las líneas de barrido =================
+    //
+    // La trama de monitor CRT que Cyberpunk pone sobre sus paneles. Un `DrawingBrush` teselado
+    // de 3 px: se repite en GPU, así que cuesta lo mismo cubrir una tarjeta que la pantalla.
+    //
+    // Va en una capa POR ENCIMA del contenido y sin recibir el ratón. Debajo no valdría: lo
+    // que hace que se lea como un monitor es que las líneas pasen por encima del texto, no que
+    // asomen por los huecos.
+    //
+    // El alfa es bajísimo (0,07) y no es tacañería: a 3 px de paso, cualquier cosa más fuerte
+    // deja el texto pequeño ilegible — y una decoración no puede cobrarse la lectura.
+    UIElement BajoElBarrido(UIElement contenido)
+    {
+        if (!_roles.Pintura.Tema.Lleva(Decoraciones.LineasDeBarrido)) return contenido;
+
+        var c = _roles.ColorDe(ClavesBase.Sec2);
+        var raya = new GeometryDrawing(
+            new SolidColorBrush(Color.FromArgb(0x12, c.R, c.G, c.B)),
+            null,
+            new RectangleGeometry(new Rect(0, 0, 3, 1)));
+
+        var trama = new DrawingBrush(raya)
+        {
+            TileMode = TileMode.Tile,
+            Viewport = new Rect(0, 0, 3, 3),
+            ViewportUnits = BrushMappingMode.Absolute,
+            Stretch = Stretch.None,
+        };
+        trama.Freeze();
+
+        var capa = new Grid();
+        capa.Children.Add(contenido);
+        capa.Children.Add(new Border { Background = trama, IsHitTestVisible = false });
+        return capa;
+    }
+
+    // ================= El chaflán =================
+    //
+    // Videojuegos y Cyberpunk declaran `esquinas: chaflan`: la esquina CORTADA en diagonal,
+    // no la esquina recta. Hasta ahora se aproximaba poniéndoles radio 0, que es otra cosa —
+    // un rectángulo a secas es lo que hace cualquier programa que no ha decidido nada, y el
+    // chaflán es una decisión que se ve.
+    //
+    // ---------- Por qué un Clip y no un Border con forma ----------
+    //
+    // `Border` solo sabe redondear (`CornerRadius`). Para cortar hace falta una geometría, y
+    // ponerla como `Clip` recorta ADEMÁS el fondo, el filo y todo lo que haya dentro, que es
+    // justo lo que se quiere: la tarjeta entera con la esquina cortada, no un marco cortado
+    // con un fondo rectangular asomando por debajo.
+    //
+    // Se recalcula en `SizeChanged` porque la geometría va en píxeles y la tarjeta cambia de
+    // tamaño: una tarjeta que crece con el chaflán de cuando medía otra cosa se corta por
+    // donde no es.
+    //
+    // Dos cortes y no cuatro, en diagonal opuesta: es lo que la maqueta dibuja y lo que hace
+    // que la forma tenga dirección en vez de parecer un octógono.
+    internal static Geometry FormaDeChaflan(double w, double h, double corte)
+    {
+        corte = Math.Max(2, Math.Min(corte, Math.Min(w, h) / 2));
+        var f = new PathFigure { StartPoint = new Point(corte, 0), IsClosed = true, IsFilled = true };
+        f.Segments.Add(new LineSegment(new Point(w, 0), true));
+        f.Segments.Add(new LineSegment(new Point(w, h - corte), true));
+        f.Segments.Add(new LineSegment(new Point(w - corte, h), true));
+        f.Segments.Add(new LineSegment(new Point(0, h), true));
+        f.Segments.Add(new LineSegment(new Point(0, corte), true));
+        var g = new PathGeometry();
+        g.Figures.Add(f);
+        g.Freeze();
+        return g;
+    }
+
+    // Le pone el chaflán a una superficie si el tema lo pide, y si no la deja como está.
+    // El corte sale del tamaño: un chaflán fijo de 10 px se come media tarjeta pequeña y no se
+    // nota en un panel grande.
+    internal void ChaflanSiToca(Border b)
+    {
+        if (_roles.Pintura.Tema.Esquinas != Esquinas.Chaflan) return;
+        b.CornerRadius = new CornerRadius(0);
+        void Recortar()
+        {
+            if (b.ActualWidth < 6 || b.ActualHeight < 6) return;
+            b.Clip = FormaDeChaflan(b.ActualWidth, b.ActualHeight,
+                                    Math.Clamp(Math.Min(b.ActualWidth, b.ActualHeight) * 0.22, 5, 14));
+        }
+        b.SizeChanged += (_, _) => Recortar();
+        Recortar();
+    }
+
+    // ================= El filo de la isla, y la luz que lo recorre =================
+    //
+    // La maqueta lo describe así: «detrás del filo, un Border con un LinearGradientBrush
+    // (transparente → plata 60 % → acento → transparente, en una franja estrecha) y un
+    // RotateTransform en su RelativeTransform animado 0→360° en 9 s, lineal, infinito».
+    //
+    // Aquí no hace falta un Border detrás: el propio `BorderBrush` de la isla puede ser ese
+    // degradado, y así la luz sigue las esquinas redondeadas sin recortar nada. El filo mide
+    // 1 px y el degradado se mapea sobre la caja del borde, que es justo lo que hace que la
+    // franja parezca dar la vuelta.
+    //
+    // Se para solo cuando no toca: sin la decoración puesta, sin nivel de adorno, o con la
+    // isla escondida — `Animacion.Adorno` ya lo decide, y una animación infinita corriendo
+    // detrás de una barra que no se ve es gasto puro.
+    internal void PonerFiloDeLaIsla(Pintura pintura, bool bordeAcento)
+    {
+        Isla.BorderThickness = new Thickness(bordeAcento ? pintura.Tema.Medida(Medidas.GrosorFilo, 1) : 0);
+        if (!bordeAcento) { Isla.BorderBrush = null; return; }
+
+        var filo = pintura.R("isla.filo");
+        bool destella = pintura.Tema.Lleva(Decoraciones.DestelloFilo)
+                        && !pintura.R("isla.destello").EsInvisible
+                        && Animacion.Adorno;
+
+        if (!destella) { Isla.BorderBrush = filo.Pincel(); return; }
+
+        Isla.BorderBrush = pintura.Tema.Lleva(Decoraciones.ModoRgb)
+            ? FiloRgb(9)
+            : FiloQueRecorre(filo.Color, pintura.Color("isla.destello"),
+                             pintura.Color(ClavesBase.Acento), 9);
+    }
+
+    // ---------- Una franja de luz dando la vuelta a un filo ----------
+    //
+    // La usa la isla (9 s) y el buscador del Inicio (4 s). Está aquí y no copiada en los dos
+    // porque dos degradados animados escritos aparte acaban discrepando en el ancho de la
+    // franja, y entonces la barra tiene dos luces que se parecen pero no son la misma.
+    //
+    // La franja va estrecha a propósito: ancha deja de leerse como una luz que pasa y se lee
+    // como un degradado de dos colores, que es otra cosa.
+    // ---------- El modo RGB ----------
+    //
+    // Lo que pide Videojuegos: «filo en modo RGB que rota de color». No es el mismo degradado
+    // con otros colores — es una rueda de tono entera dando vueltas, que es lo que hace que se
+    // lea como el led de una torre y no como un borde bonito.
+    //
+    // Los seis tonos van a saturación y brillo fijos y no salen del tema a propósito: el RGB
+    // ES el efecto. Un «modo RGB» en los colores del tema sería un degradado, y eso ya existe
+    // tres líneas más abajo.
+    internal static Brush FiloRgb(double segundos)
+    {
+        var g = new LinearGradientBrush
+        {
+            StartPoint = new Point(0, 0.5),
+            EndPoint = new Point(1, 0.5),
+            MappingMode = BrushMappingMode.RelativeToBoundingBox,
+        };
+        for (int i = 0; i <= 6; i++)
+            g.GradientStops.Add(new GradientStop(
+                SelectorColor.DesdeHsv(i * 60 % 360, 0.95, 1.0, 0xFF), i / 6.0));
+
+        var giro = new RotateTransform(0, 0.5, 0.5);
+        g.RelativeTransform = giro;
+        var a = new DoubleAnimation(0, 360, TimeSpan.FromSeconds(segundos))
+        {
+            RepeatBehavior = RepeatBehavior.Forever,
+        };
+        a.Freeze();
+        giro.BeginAnimation(RotateTransform.AngleProperty, a);
+        return g;
+    }
+
+    internal static Brush FiloQueRecorre(Color baseFilo, Color luz, Color acento, double segundos)
+    {
+        var g = new LinearGradientBrush
+        {
+            StartPoint = new Point(0, 0.5),
+            EndPoint = new Point(1, 0.5),
+            MappingMode = BrushMappingMode.RelativeToBoundingBox,
+        };
+        g.GradientStops.Add(new GradientStop(baseFilo, 0.00));
+        g.GradientStops.Add(new GradientStop(baseFilo, 0.40));
+        g.GradientStops.Add(new GradientStop(Color.FromArgb(0x99, luz.R, luz.G, luz.B), 0.47));
+        g.GradientStops.Add(new GradientStop(acento, 0.50));
+        g.GradientStops.Add(new GradientStop(Color.FromArgb(0x99, luz.R, luz.G, luz.B), 0.53));
+        g.GradientStops.Add(new GradientStop(baseFilo, 0.60));
+        g.GradientStops.Add(new GradientStop(baseFilo, 1.00));
+
+        var giro = new RotateTransform(0, 0.5, 0.5);
+        g.RelativeTransform = giro;
+
+        var a = new DoubleAnimation(0, 360, TimeSpan.FromSeconds(segundos))
+        {
+            RepeatBehavior = RepeatBehavior.Forever,
+        };
+        a.Freeze();
+        giro.BeginAnimation(RotateTransform.AngleProperty, a);
+        return g;
+    }
+
+    // ================= El aura: el halo que respira =================
+    //
+    // Va en la envoltura `Aura` y no en la isla. El motivo, con su medida, está en el XAML:
+    // un efecto sobre un elemento con `ClipToBounds` se recorta al rectángulo, y salía un halo
+    // cuadrado asomando por las puntas redondas.
+    //
+    // Los números son los de la maqueta: color de acento, `ShadowDepth 0`, radio ~26, y la
+    // opacidad respirando entre 0,08 y 0,2 en 6 s. Los mandos del usuario (`Neon.Limpia`)
+    // siguen mandando sobre la intensidad, el radio y el ciclo.
+    internal void PonerAuraDeLaIsla(Pintura pintura)
+    {
+        bool hay = pintura.Tema.Lleva(Decoraciones.Halo) && !pintura.R("isla.halo").EsInvisible;
+        if (!hay) { Aura.Effect = null; return; }
+
+        var n = Neon.Limpia(_cfg.Neon);
+        var efecto = new System.Windows.Media.Effects.DropShadowEffect
+        {
+            Color = pintura.Color("isla.halo"),
+            ShadowDepth = 0,
+            BlurRadius = n.Radio,
+            Opacity = 0.14 * n.Intensidad,
+        };
+        Aura.Effect = efecto;
+
+        // Sin adorno, el halo se queda quieto y visible. Es la regla de `Animacion.Adorno`:
+        // en «reducido» no se mueve nada que no haga falta, pero tampoco se apaga lo que
+        // informa de que la barra está ahí.
+        if (!n.Respira || !Animacion.Adorno) return;
+
+        var a = new DoubleAnimation(0.08 * n.Intensidad, 0.20 * n.Intensidad,
+                                    TimeSpan.FromMilliseconds(n.Velocidad))
+        {
+            AutoReverse = true,
+            RepeatBehavior = RepeatBehavior.Forever,
+            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
+        };
+        efecto.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty, a);
+    }
+
+    // ---------- De un nombre de letra a una letra que existe ----------
+    //
+    // ---------- Lo primero: «Segoe UI Variable» NO es una familia ----------
+    //
+    // Windows 11 la reparte en tres —`Segoe UI Variable Small`, `… Text` y `… Display`— y la
+    // familia a secas no existe. Buscándola por nombre exacto no aparece, así que Profesional
+    // y Oficina caían a Segoe UI y la letra del tema seguía sin aplicarse: el fallo que esta
+    // fase venía a arreglar, arreglado a medias. Medido en esta máquina, con las tres
+    // variantes instaladas y la familia base ausente.
+    //
+    // Por eso, si el nombre exacto no está, se busca una variante que empiece por él y se
+    // elige por PAPEL: `Display` para títulos y relojes, `Text` para el cuerpo. Es lo que la
+    // propia Microsoft recomienda para Segoe UI Variable, y de paso vale para cualquier otra
+    // familia que venga partida.
+    //
+    // ---------- Y lo segundo: seis de los nueve temas piden letras que no están ----------
+    //
+    // Rajdhani, Orbitron, M PLUS Rounded 1c, Zen Maru Gothic, Shippori Mincho y Nunito. El
+    // plan las incrusta en el exe como recurso en las fases 6 y 7; hasta entonces, pedirlas
+    // devuelve la del sistema. Lo que no puede pasar es que lo haga EN SILENCIO: un tema que
+    // se ve con otra letra y un registro mudo es el fallo que cuesta media tarde encontrar.
+    // Se apunta una vez por nombre, no en cada repintado.
+    static readonly Dictionary<string, FontFamily> _letrasResueltas = new(StringComparer.OrdinalIgnoreCase);
+
+    // ---------- Primero las que viajan dentro del programa ----------
+    //
+    // Seis de los nueve temas piden letras que no están en Windows. Viajan en el exe como
+    // recurso (`Fuentes\*.ttf`) y WPF las carga con un `pack://application:,,,/Fuentes/#` más
+    // el nombre de la FAMILIA — no el del fichero.
+    //
+    // Se prueba esto ANTES que las del sistema a propósito: si alguien tiene instalada una
+    // versión distinta de Rajdhani, el tema tiene que verse como lo diseñamos y no como lo
+    // tenga esa máquina. Un tema que cambia de aspecto según el equipo no es un tema.
+    static readonly string[] Propias =
+    {
+        "Rajdhani", "Orbitron", "Nunito",
+        "M PLUS Rounded 1c", "Zen Maru Gothic", "Shippori Mincho",
+    };
+
+    internal static FontFamily LetraDe(string nombre, string papel = "texto")
+    {
+        if (string.IsNullOrWhiteSpace(nombre)) return new FontFamily("Segoe UI");
+
+        var cache = nombre + "|" + papel;
+        if (_letrasResueltas.TryGetValue(cache, out var ya)) return ya;
+
+        FontFamily elegida;
+        try
+        {
+            if (Propias.Any(n => n.Equals(nombre, StringComparison.OrdinalIgnoreCase)))
+            {
+                var f = new FontFamily(new Uri("pack://application:,,,/"), "./Fuentes/#" + nombre);
+                // `FontFamily` no se queja si no encuentra nada: devuelve un objeto que pinta
+                // con la letra por defecto. La única forma de saber si de verdad está es
+                // pedirle sus tipos — una familia que no existe no tiene ninguno.
+                if (f.GetTypefaces().Count > 0)
+                {
+                    _letrasResueltas[cache] = f;
+                    return f;
+                }
+                Log.Info($"la letra «{nombre}» viaja en el programa pero no se pudo cargar; " +
+                         "se busca en el sistema");
+            }
+
+            var todas = Fonts.SystemFontFamilies.Select(n => n.Source).ToList();
+            var exacta = todas.FirstOrDefault(n => n.Equals(nombre, StringComparison.OrdinalIgnoreCase));
+            if (exacta != null) elegida = new FontFamily(exacta);
+            else
+            {
+                // ---------- «Segoe UI Variable» NO es una familia ----------
+                //
+                // Windows 11 la reparte en tres —`… Small`, `… Text` y `… Display`— y la
+                // familia a secas no existe. Buscándola por nombre exacto no aparece, así que
+                // Profesional y Oficina caían a Segoe UI y la letra del tema seguía sin
+                // aplicarse. Si el nombre exacto no está, se busca una variante que empiece
+                // por él y se elige por PAPEL: `Display` para títulos, `Text` para el cuerpo.
+                var variantes = todas
+                    .Where(n => n.StartsWith(nombre + " ", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                string? quiero = papel.Equals(Letras.Titulos, StringComparison.OrdinalIgnoreCase)
+                    ? variantes.FirstOrDefault(n => n.EndsWith(" Display", StringComparison.OrdinalIgnoreCase))
+                    : variantes.FirstOrDefault(n => n.EndsWith(" Text", StringComparison.OrdinalIgnoreCase));
+                var cual = quiero ?? variantes.FirstOrDefault() ?? "Segoe UI";
+                elegida = new FontFamily(cual);
+
+                Log.Info(variantes.Count > 0
+                    ? $"la letra «{nombre}» viene partida en variantes: para {papel} se usa «{cual}»"
+                    : $"la letra «{nombre}» no está ni en el programa ni en el sistema: se usa «{cual}»");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"resolver la letra «{nombre}»", ex);
+            elegida = new FontFamily("Segoe UI");
+        }
+
+        _letrasResueltas[cache] = elegida;
+        return elegida;
+    }
+
+    // ---------- Un rótulo de sección ----------
+    //
+    // Mayúsculas, 11,5 px, seminegrita, tenue y con 0,06 em de aire entre letras.
+    //
+    // ---------- El espaciado, que WPF no tiene ----------
+    //
+    // No hay `LetterSpacing` en `TextBlock`: ni propiedad, ni `Typography`, ni nada
+    // equivalente. Lo que sí hay es meter un espacio fino (U+2009) entre caracteres, que a
+    // 11,5 px da del orden de los 0,7 px que pide la maqueta.
+    //
+    // Y eso rompería al lector de pantalla, que leería «A C C I O N E S» letra por letra. Por
+    // eso el texto VISIBLE va espaciado y el nombre de accesibilidad va limpio: los ojos leen
+    // uno y NVDA lee el otro. Lo mismo que ya se hace con los botones del dock.
+    //
+    // `ToUpperInvariant` va DESPUÉS de traducir: `Textos.T` busca por la cadena en español
+    // tal cual está escrita, y en mayúsculas no la encontraría.
+    internal TextBlock Rotulito(string texto, Brush color)
+    {
+        var limpio = texto.ToUpperInvariant();
+        var t = new TextBlock
+        {
+            Text = string.Join("\u2009", limpio.ToCharArray()),
+            FontFamily = LetraDe(_roles.Pintura.Fuente(Letras.Titulos), Letras.Titulos),
+            FontSize = 11.5,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = color,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        System.Windows.Automation.AutomationProperties.SetName(t, texto);
+        return t;
     }
 
     internal UIElement SectionHeader(int icono, string titulo, UIElement? derecha = null)
@@ -272,7 +749,7 @@ public partial class MainWindow
 
         var ic = Glifo(char.ConvertFromUtf32(icono));
         ic.FontSize = 13;
-        ic.Foreground = _acentoLegible;
+        ic.Foreground = _roles.Pincel("seccion.icono");
         ic.VerticalAlignment = VerticalAlignment.Center;
         ic.Margin = new Thickness(0, 0, 8, 0);
         Grid.SetColumn(ic, 0);
@@ -294,14 +771,18 @@ public partial class MainWindow
         // ilegible.
         if (est.TintaDeAcento) PonerResplandor(ic, est, late: false);
 
-        var t = new TextBlock
-        {
-            Text = Textos.T(titulo),
-            FontSize = 12.5,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = est.TintaDeAcento ? _acentoLegible : _texto,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
+        // ---------- Mayúsculas pequeñas, y por qué ----------
+        //
+        // La maqueta lo fija: «títulos de sección en mayúsculas pequeñas, 11,5 px, espaciado
+        // 0,06 em, color tenue». Iban en 12,5 seminegrita y del color del texto normal, o sea
+        // compitiendo con el contenido de la tarjeta.
+        //
+        // Lo que gana el cambio no es gusto: un título que pesa lo mismo que su contenido
+        // obliga a leer dos veces para saber cuál es cuál. Bajándolo a tenue, a mayúsculas y
+        // con aire entre letras, el ojo lo lee como etiqueta y salta al dato, que es a lo que
+        // viene.
+        var t = Rotulito(Textos.T(titulo),
+                         est.TintaDeAcento ? _acentoLegible : _roles.Pincel("seccion.titulo"));
         Grid.SetColumn(t, 1);
         g.Children.Add(t);
 
@@ -1112,16 +1593,58 @@ public partial class MainWindow
         // El progreso: una tira, no un control. Solo informa.
         var pista = new Border
         {
-            Height = 3, CornerRadius = new CornerRadius(2),
-            Background = PincelSolido(_roles.SuperficieAltaSolida),
+            Height = 4, CornerRadius = new CornerRadius(2),
+            Background = _roles.Pincel("musica.progreso.pista"),
             Margin = new Thickness(0, 7, 0, 0),
         };
         var lleno = new Border
         {
-            Height = 3, CornerRadius = new CornerRadius(2),
-            Background = PincelSolido(_roles.Acento),
+            Height = 4, CornerRadius = new CornerRadius(2),
+            Background = _roles.Pincel("musica.progreso"),
             HorizontalAlignment = HorizontalAlignment.Left,
+            ClipToBounds = true,
         };
+
+        // ---------- El brillo que recorre lo ya reproducido ----------
+        //
+        // La maqueta: «un brillo blanco que la recorre (2,8 s)». Va DENTRO de la parte llena
+        // y recortado por ella, así que el brillo no se sale por delante del avance — si se
+        // saliera, estaría diciendo que la canción va por donde no va.
+        //
+        // Solo mientras suena. Un brillo corriendo en una canción en pausa es movimiento que
+        // informa de algo que no está pasando.
+        if (sonando && Animacion.Adorno)
+        {
+            var chispa = new Border
+            {
+                Width = 34,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Background = new LinearGradientBrush(
+                    new GradientStopCollection
+                    {
+                        new GradientStop(Colors.Transparent, 0),
+                        new GradientStop(_roles.ColorDe("musica.progreso.brillo"), 0.5),
+                        new GradientStop(Colors.Transparent, 1),
+                    }, 0),
+                IsHitTestVisible = false,
+            };
+            var corre = new TranslateTransform();
+            chispa.RenderTransform = corre;
+            lleno.Child = chispa;
+            lleno.SizeChanged += (_, _) =>
+            {
+                corre.BeginAnimation(TranslateTransform.XProperty, null);
+                double w = lleno.ActualWidth;
+                if (w < 10) return;
+                var a = new DoubleAnimation(-34, w, TimeSpan.FromMilliseconds(2800))
+                {
+                    RepeatBehavior = RepeatBehavior.Forever,
+                };
+                a.Freeze();
+                corre.BeginAnimation(TranslateTransform.XProperty, a);
+            };
+        }
+
         var pilaProg = new Grid();
         pilaProg.Children.Add(pista);
         pilaProg.Children.Add(lleno);

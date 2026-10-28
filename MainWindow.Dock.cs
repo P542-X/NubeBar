@@ -75,8 +75,11 @@ public partial class MainWindow
             // Un dock vacío no se enseña: sería una pastilla negra con nada dentro.
             if (elementos.Count == 0) { QuitarDock(); return; }
 
+            // La misma guardia que los laterales: ver `MuestrearBordes`. Un juego a pantalla
+            // completa que te clava el puntero contra el filo de abajo no saca el dock.
             bool cerca = Dock.RatonCerca(UtilDeEstaPantalla(), BordeDelDock,
-                                         PuntoRaton().X, PuntoRaton().Y);
+                                         PuntoRaton().X, PuntoRaton().Y)
+                      && GestoEnElBorde(BordeDelDock);
             if (!Dock.SeVe(cuando, cerca, _ratonEnElDock)) { QuitarDock(); return; }
 
             // ---------- La huella ----------
@@ -171,7 +174,7 @@ public partial class MainWindow
         // Que el dock sepa si tiene el ratón encima es lo que impide que se esconda justo
         // cuando vas a pulsar un icono, en el modo «al acercarse».
         v.MouseEnter += (_, _) => _ratonEnElDock = true;
-        v.MouseLeave += (_, _) => _ratonEnElDock = false;
+        v.MouseLeave += (_, _) => { _ratonEnElDock = false; SinLupa(); };
 
         // El dock se apunta en el tablero de E0 como la superficie que es. No reserva área de
         // trabajo: flota por encima, que es lo que deja el escritorio amplio.
@@ -275,8 +278,79 @@ public partial class MainWindow
             : new Thickness(h, 0, h, 0);
         System.Windows.Automation.AutomationProperties.SetName(boton, e.ParaLeer);
 
+        // ---------- La lupa ----------
+        //
+        // El origen de la escala va en el borde por el que está pegado el dock: creciendo
+        // desde el centro, el icono se saldría por fuera de la tarjeta tanto como crece.
+        boton.RenderTransformOrigin = Dock.EsVertical(BordeDelDock)
+            ? new Point(BordeDelDock == NubeHypr.Borde.Izquierda ? 0 : 1, 0.5)
+            : new Point(0.5, BordeDelDock == NubeHypr.Borde.Arriba ? 0 : 1);
+        boton.MouseEnter += (_, _) => Lupa(boton);
+
         boton.MouseRightButtonUp += (_, args) => { args.Handled = true; MenuDelDock(e); };
         return boton;
+    }
+
+    // ================= La lupa del dock =================
+    //
+    // La maqueta: «el icono bajo el ratón escala 1,32 y sube 6 px; SUS DOS VECINOS escalan
+    // 1,12 y suben 2 px. Con muelle».
+    //
+    // Los vecinos son la mitad del efecto, y la que más cuesta de entender hasta que se ve:
+    // sin ellos el icono de debajo del ratón pega un salto y el resto se queda quieto, que se
+    // lee como un fallo. Con ellos la fila se comba, y eso se lee como una superficie que
+    // responde al dedo.
+    //
+    // Se mira la POSICIÓN en la fila y no el elemento: los separadores también ocupan sitio y
+    // no tienen que crecer, pero sí cuentan para saber quién es el vecino.
+    void Lupa(FrameworkElement bajoElRaton)
+    {
+        if (_dockFila == null || !Animacion.Adorno) return;
+
+        var hijos = _dockFila.Children.OfType<FrameworkElement>().ToList();
+        int centro = hijos.IndexOf(bajoElRaton);
+        if (centro < 0) return;
+
+        for (int i = 0; i < hijos.Count; i++)
+        {
+            int d = Math.Abs(i - centro);
+            CrecerEnElDock(hijos[i], d == 0 ? 1.32 : d == 1 ? 1.12 : 1.0,
+                                     d == 0 ? 6 : d == 1 ? 2 : 0);
+        }
+    }
+
+    // Al salir del dock, todos a su sitio. Va en el `MouseLeave` de la ventana entera y no en
+    // el de cada icono: saliendo de uno para entrar en el de al lado, el `MouseLeave` del
+    // primero llega DESPUÉS del `MouseEnter` del segundo, y la fila se quedaría plana justo
+    // mientras pasas el ratón por encima.
+    void SinLupa()
+    {
+        if (_dockFila == null) return;
+        foreach (var h in _dockFila.Children.OfType<FrameworkElement>())
+            CrecerEnElDock(h, 1.0, 0);
+    }
+
+    void CrecerEnElDock(FrameworkElement el, double escala, double sube)
+    {
+        if (el.RenderTransform is not TransformGroup g)
+        {
+            g = new TransformGroup();
+            g.Children.Add(new ScaleTransform(1, 1));
+            g.Children.Add(new TranslateTransform());
+            el.RenderTransform = g;
+        }
+        var s = (ScaleTransform)g.Children[0];
+        var t = (TranslateTransform)g.Children[1];
+
+        // Hacia dónde es «subir» depende del borde: en el dock de arriba, subir es bajar.
+        bool vert = Dock.EsVertical(BordeDelDock);
+        double dx = vert ? (BordeDelDock == NubeHypr.Borde.Izquierda ? sube : -sube) : 0;
+        double dy = vert ? 0 : (BordeDelDock == NubeHypr.Borde.Arriba ? sube : -sube);
+
+        s.BeginAnimation(ScaleTransform.ScaleXProperty, Kf(s.ScaleX, escala, 220, 0, Muelle));
+        s.BeginAnimation(ScaleTransform.ScaleYProperty, Kf(s.ScaleY, escala, 220, 0, Muelle));
+        t.BeginAnimation(TranslateTransform.XProperty, Kf(t.X, dx, 220, 0, Muelle));
+        t.BeginAnimation(TranslateTransform.YProperty, Kf(t.Y, dy, 220, 0, Muelle));
     }
 
     FrameworkElement SeparadorDelDock()

@@ -456,7 +456,7 @@ public partial class MainWindow : Window
         // claves del config; ahora esas tres son solo dos entradas más de la cascada, y la
         // migración v4→v5 ya las movió ahí.
         var tema = TemasDeSerie.De(t.Id);
-        var pintura = new Pintura(tema, t.Colores, t.Radios);
+        var pintura = new Pintura(tema, t.Colores, t.Radios, t.Letras);
 
         Color fondo = pintura.Color(ClavesBase.Superficie),
               texto = pintura.Color(ClavesBase.Tinta),
@@ -528,7 +528,7 @@ public partial class MainWindow : Window
                 [ClavesBase.Tinta] = Relleno.Hex(texto),
                 [ClavesBase.Acento] = Relleno.Hex(acento),
             };
-            pintura = new Pintura(tema, deLaSesion, t.Radios);
+            pintura = new Pintura(tema, deLaSesion, t.Radios, t.Letras);
         }
 
         _roles = Roles.Desde(pintura);
@@ -566,13 +566,27 @@ public partial class MainWindow : Window
         // suelta del config: es lo que permite que Videojuegos y Cyberpunk vayan a radio 0 y
         // que Sakura vaya a 25.
         Isla.CornerRadius = new CornerRadius(pintura.Radio(Piezas.Isla));
-        FontFamily = new FontFamily(t.Fuente);
+        // ---------- La letra sale del tema ----------
+        //
+        // Leía `Tema.Fuente` del config, o sea una sola letra para todo y elegida aparte. Pero
+        // la letra ES del tema —Cyberpunk pide Orbitron en los títulos y Rajdhani en el resto,
+        // Sakura una redondeada, Samurái una de pincel— y hasta ahora el tema la declaraba, se
+        // guardaba, se probaba y no la usaba nadie.
+        FontFamily = LetraDe(pintura.Fuente(Letras.Texto));
         FontSize = t.TamanoFuente;
 
-        // Filo y brillo de acento: es lo que hace que el color del wallpaper se note,
-        // porque si no el acento solo pinta la rayita de 3 px bajo la app activa
-        Isla.BorderBrush = _acento;
-        Isla.BorderThickness = new Thickness(t.BordeAcento ? 1 : 0);
+        // ---------- El filo de la isla, y la luz que lo recorre ----------
+        //
+        // El filo ya no es «el acento si BordeAcento está puesto»: es la clave `isla.filo` del
+        // tema, que es lo que la maqueta fija (1 px, blanco al 9 % en Profesional).
+        //
+        // Y encima, si el tema lleva la decoración `destello-filo`, ese filo pasa a ser un
+        // degradado con una franja estrecha de luz que da la vuelta al contorno. `BordeAcento`
+        // se queda como el interruptor de quien no lo quiera.
+        PonerFiloDeLaIsla(pintura, t.BordeAcento);
+
+        // ---------- Y el halo, en la envoltura ----------
+        PonerAuraDeLaIsla(pintura);
         AjustarBrillo(t.BordeAcento, acento);
 
         // ---------- Y el halo del neón, también en la BARRA ----------
@@ -1339,7 +1353,7 @@ public partial class MainWindow : Window
     // dónde se parte un texto depende de lo que significa, y adivinarlo en un sitio
     // común (¿por el espacio?, ¿por los dos puntos?) sale mal al primer caso raro.
     TextBlock Etiqueta(Func<string> valor, bool animar = false, string? muestra = null,
-                       Func<string>? vertical = null)
+                       Func<string>? vertical = null, bool brillo = false)
     {
         bool v = Vertical;
         var tb = new TextBlock
@@ -1382,6 +1396,9 @@ public partial class MainWindow : Window
         }
         Act();
         _actualizadores.Add(Act);
+        // El brillo va DESPUÉS de que `Act()` haya puesto el texto: el pincel se mapea sobre
+        // la caja del TextBlock, y con la caja vacía el degradado no tendría dónde recorrer.
+        if (brillo) PonerBrilloDeTexto(tb);
         return tb;
     }
 

@@ -130,8 +130,10 @@ public partial class MainWindow
                 // E6: la duración sale del catálogo de transiciones, no de un número
                 // escrito aquí. Dos sitios con dos números es como se acaba con un panel
                 // que entra más despacio que el dock sin que nadie lo haya decidido.
-                v.Tarjeta.BeginAnimation(OpacityProperty,
-                    Kf(0, 1, Transiciones.Duracion(Transiciones.Que.PanelEntra).TotalMilliseconds));
+                double ms = Transiciones.Duracion(Transiciones.Que.PanelEntra).TotalMilliseconds;
+                v.Tarjeta.BeginAnimation(OpacityProperty, Kf(0, 1, ms));
+                EntrarDesdeElBorde(v, l, ms);
+                EscalonarSecciones(l, ms);
             }
             v.Elevar();
 
@@ -202,6 +204,56 @@ public partial class MainWindow
         mandos.Clear();
     }
 
+    // ================= Cómo entra un panel lateral =================
+    //
+    // La maqueta: «deslizan 24 px desde su borde y aparecen, y sus secciones escalonadas».
+    //
+    // ---------- Por qué DESDE SU BORDE y no desde cualquier sitio ----------
+    //
+    // Un panel que aparece deslizándose desde el borde por el que está pegado dice de dónde
+    // ha salido y, al cerrarse, a dónde se va. Entrando desde arriba o desde el centro sería
+    // una cosa que aparece — y entonces el usuario tiene que acordarse de dónde estaba en vez
+    // de verlo.
+    //
+    // Va en la TARJETA y no en la ventana: mover la ventana son 24 px de recolocación por
+    // fotograma pedidos a Windows, y `ColocarLateral` acaba de medir dónde tiene que estar.
+    void EntrarDesdeElBorde(VentanaSuperpuesta v, Lateral.Lado l, double ms)
+    {
+        if (!Animacion.Adorno) return;
+        double desde = l == Lateral.Lado.Izquierda ? -24 : 24;
+        var mueve = new TranslateTransform(desde, 0);
+        v.Tarjeta.RenderTransform = mueve;
+        mueve.BeginAnimation(TranslateTransform.XProperty, Kf(desde, 0, ms, 0, Suave));
+        mueve.X = 0;
+    }
+
+    // ---------- Y sus secciones, una detrás de otra ----------
+    //
+    // Mismo escalonado que el menú Inicio: 50 ms entre tarjetas y 10 px de subida. Un panel
+    // con seis tarjetas que aparece entero de golpe se lee como una imagen; entrando en orden
+    // se lee como una lista, y el ojo la recorre por donde está puesta.
+    //
+    // Solo al ABRIR, nunca al refrescar. `Rellenar` se llama cada vez que cambia un dato —el
+    // volumen, la CPU, una carpeta— y animar ahí dejaría el panel temblando mientras lo miras.
+    void EscalonarSecciones(Lateral.Lado l, double ms)
+    {
+        if (!Animacion.Adorno) return;
+        if (!_laterales.TryGetValue(l, out var v)) return;
+        if (v.Cajon.Content is not Panel cuerpo) return;
+
+        int i = 0;
+        foreach (var hijo in cuerpo.Children.OfType<FrameworkElement>())
+        {
+            double retardo = i * 50;
+            var mover = new TranslateTransform { Y = 10 };
+            hijo.RenderTransform = mover;
+            hijo.BeginAnimation(OpacityProperty, Kf(0, 1, ms * 0.6, retardo));
+            mover.BeginAnimation(TranslateTransform.YProperty, Kf(10, 0, ms, retardo, Muelle));
+            mover.Y = 0;
+            i++;
+        }
+    }
+
     // ---------- El color y la forma de la concha de un panel lateral ----------
     //
     // En un solo sitio porque se pide desde tres: al crear la ventana, al abrirla y al
@@ -225,6 +277,7 @@ public partial class MainWindow
         v.Tarjeta.BorderThickness = new Thickness(est.GrosorFilo);
         v.Tarjeta.CornerRadius = new CornerRadius(est.RadioShell);
         PonerResplandor(v.Tarjeta, est, Realce.Ambiente);
+        ChaflanSiToca(v.Tarjeta);
     }
 
     // ================= La ventana =================

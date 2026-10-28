@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using System.Collections.Generic;
@@ -65,6 +66,56 @@ public partial class MainWindow : Window
     readonly Dictionary<RedEstado.Accion, Button> _redBotones = new();
 
     bool _redMidiendo;
+    FrameworkElement? _redBotonBuscar;
+
+    // ---------- Buscar redes, por una sola puerta ----------
+    //
+    // Lo hacían dos sitios con el mismo código copiado: el botón de la cabecera y la acción
+    // «Actualizar» de la rejilla. Dos caminos para lo mismo es como uno se queda con las
+    // reglas viejas el día que el otro cambie — y además el giro habría que acordarse de
+    // ponerlo en los dos.
+    //
+    // ---------- Y el giro ----------
+    //
+    // La maqueta: «el botón de volver a buscar GIRA mientras busca». No es decoración: wlanapi
+    // tarda unos cuatro segundos en tener la lista nueva, y cuatro segundos sin que pase nada
+    // es tiempo de sobra para pensar que el botón no ha funcionado y volver a pulsarlo.
+    void EscanearRedes()
+    {
+        Red.Escanear();
+        if (_redEstado != null)
+        {
+            _redEstado.Text = "Buscando redes…";
+            _redEstado.Visibility = Visibility.Visible;
+        }
+
+        RotateTransform? giro = null;
+        if (_redBotonBuscar is { } b && Animacion.Adorno)
+        {
+            b.RenderTransformOrigin = new Point(0.5, 0.5);
+            giro = new RotateTransform();
+            b.RenderTransform = giro;
+            var a = new DoubleAnimation(0, 360, TimeSpan.FromMilliseconds(900))
+            {
+                RepeatBehavior = RepeatBehavior.Forever,
+            };
+            a.Freeze();
+            giro.BeginAnimation(RotateTransform.AngleProperty, a);
+        }
+
+        // wlanapi necesita unos 4 s para tener la lista nueva tras un escaneo
+        Dispatcher.InvokeAsync(async () =>
+        {
+            try { await Task.Delay(4000); await RellenarRed(); }
+            finally
+            {
+                // El giro se para pase lo que pase: un botón girando para siempre porque el
+                // escaneo falló diría que sigue buscando cuando ya no busca nadie.
+                giro?.BeginAnimation(RotateTransform.AngleProperty, null);
+                if (_redBotonBuscar != null) _redBotonBuscar.RenderTransform = Transform.Identity;
+            }
+        });
+    }
     Red.Wifi? _redElegida;
 
     // Cifras del test de velocidad del panel abierto
@@ -119,17 +170,7 @@ public partial class MainWindow : Window
         // adaptadores— en los que no tiene sentido enseñarla, y entonces se colapsa de una
         // pieza en vez de quedarse como una cabecera con un hueco debajo.
         var colWifi = _redSeccionWifi = new StackPanel();
-        var buscar = BotonIcono(0xE72C, "Volver a buscar redes", () =>
-        {
-            Red.Escanear();
-            if (_redEstado != null)
-            {
-                _redEstado.Text = "Buscando redes…";
-                _redEstado.Visibility = Visibility.Visible;
-            }
-            // wlanapi necesita unos 4 s para tener la lista nueva tras un escaneo
-            Dispatcher.InvokeAsync(async () => { await Task.Delay(4000); await RellenarRed(); });
-        });
+        var buscar = _redBotonBuscar = BotonIcono(0xE72C, "Volver a buscar redes", () => EscanearRedes());
         _redTitulo = Titulito("Redes wifi");
         colWifi.Children.Add(SectionHeader(0xE701, "Redes Wi-Fi", buscar));
 
@@ -251,13 +292,7 @@ public partial class MainWindow : Window
         switch (a)
         {
             case RedEstado.Accion.Actualizar:
-                Red.Escanear();
-                if (_redEstado != null)
-                {
-                    _redEstado.Text = "Buscando redes…";
-                    _redEstado.Visibility = Visibility.Visible;
-                }
-                Dispatcher.InvokeAsync(async () => { await Task.Delay(4000); await RellenarRed(); });
+                EscanearRedes();
                 break;
 
             case RedEstado.Accion.Conectar:
