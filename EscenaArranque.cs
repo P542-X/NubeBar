@@ -474,6 +474,27 @@ public sealed class EscenaArranque : Window
         double escalaMini = Math.Max(80, Math.Min(260, Math.Min(w, h) * 0.17));
         double escalaLlena = EscalaQueTapa(perfil, w, h);
         double escalaTope = escalaLlena * 1.06;     // un pelo más, para que no se vea el filo
+
+        // ---------- Cuánto sigue siendo una FIGURA ----------
+        //
+        // El usuario lo dijo mirándolo: «cuando pones una animación, la nube se ve como
+        // rectangular; es una animación absurda». Y tenía razón, con una explicación
+        // geométrica: el filo y el halo se pintaban a opacidad plena durante toda la
+        // expansión, y una nube escalada a 2700 px tiene unas curvas tan grandes que el
+        // trozo que cae dentro de la pantalla es casi una recta. O sea que lo que se veía
+        // barrer el escritorio no era una nube: eran cuatro líneas, un marco rectangular.
+        //
+        // La intención ya estaba escrita arriba —«un pelo más, para que no se vea el filo»—
+        // pero solo valía para el instante final. Esto la extiende a todo el tramo: el
+        // contorno existe mientras la nube se lee como una figura, y se apaga a medida que
+        // deja de serlo. A partir de ahí la nube no es algo que se dibuja encima del
+        // escritorio, es por donde se ve — y un agujero no necesita contorno.
+        //
+        // Se mide por el TAMAÑO y no por el tiempo, como ya hacen `opTapa` y `opCara`: así
+        // vale para las dos direcciones —creciendo y recogiéndose— sin tener que acordarse
+        // de encenderlo otra vez al volver.
+        double Figura(double e) =>
+            1 - Math.Clamp((e - escalaLlena * 0.55) / (escalaLlena * 0.40), 0, 1);
         double franja = Math.Min(barra.Franja, (barra.Borde is "arriba" or "abajo" ? h : w) * 0.33);
         double escalaIcono = Math.Clamp(franja * 0.58, 20, 90);
 
@@ -544,8 +565,20 @@ public sealed class EscenaArranque : Window
         var suave = new CubicEase { EasingMode = EasingMode.EaseInOut };
         var frena = new CubicEase { EasingMode = EasingMode.EaseOut };
 
+        // ---------- Y lo que no se ve, no se pinta ----------
+        //
+        // Con `Opacity = 0` WPF sigue rasterizando el elemento: la geometría entra en la
+        // escena igual y solo se compone con alfa cero. En esta escena eso se paga caro,
+        // porque las dos piezas que se apagan son justo las más gordas — el halo es un trazo
+        // de hasta 56 px sobre una silueta escalada a miles de píxeles.
+        //
+        // `Collapsed` sí lo saca del pase de render. Medido en el registro de la propia
+        // escena (`fotogramas … con tirón N%`), que es el sitio donde esto se nota.
         static void Opaco(UIElement e, double v)
         {
+            var quiere = v <= 0.003 ? Visibility.Collapsed : Visibility.Visible;
+            if (e.Visibility != quiere) e.Visibility = quiere;
+            if (quiere == Visibility.Collapsed) return;
             if (Math.Abs(e.Opacity - v) > 0.003) e.Opacity = v;
         }
 
@@ -615,8 +648,8 @@ public sealed class EscenaArranque : Window
                 double desde = escalaMini * 1.11;
                 escala = Math.Sqrt(desde * desde + (escalaTope * escalaTope - desde * desde) * e);
                 opRelleno = 1 - Math.Clamp(k / 0.16, 0, 1);
-                opFilo = 1;
-                opHalo = 0.90;
+                opFilo = Figura(escala);
+                opHalo = 0.90 * Figura(escala);
                 opNucleo = Math.Max(0, 0.15 - k * 0.6);
 
                 // La capa negra solo empieza a irse cuando la nube YA tapa la pantalla
@@ -655,8 +688,8 @@ public sealed class EscenaArranque : Window
                 // acababa de destapar. Medido: al 25 % de esta etapa el escritorio se
                 // iba del 100 % al 26 %.
                 opRelleno = Math.Clamp((escalaMini * 2.4 - escala) / (escalaMini * 1.6), 0, 1);
-                opFilo = 1;
-                opHalo = 0.45 + 0.30 * Math.Sin(Math.PI * l);
+                opFilo = Figura(escala);
+                opHalo = (0.45 + 0.30 * Math.Sin(Math.PI * l)) * Figura(escala);
                 opNucleo = 0.65 * Math.Sin(Math.PI * Math.Clamp((l - 0.72) / 0.28, 0, 1));
 
                 // Y el último tramo, ya parada encima de la barra, se funde con ella
