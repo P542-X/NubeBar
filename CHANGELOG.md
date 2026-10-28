@@ -6,6 +6,24 @@ construidos por el workflow de Release a partir de la etiqueta.
 
 ---
 
+## v1.0.2
+
+### Cambiado
+
+- **Menú Inicio (tecla Windows), solo lo que se usa:** el saludo con la fecha y la hora, el
+  buscador, la música, el idioma del teclado y la energía (bloquear, suspender, reiniciar,
+  apagar). Fuera las acciones rápidas, CPU/RAM, el fondo, la conectividad y las fijadas.
+
+### Arreglado
+
+- **Inicio cortado por la derecha:** con el ancla pegada al filo de la isla, el contenido
+  no podía correrse a la izquierda y sus últimos 8 px quedaban fuera de la tarjeta. Vale
+  para cualquier panel colgado de un icono del borde.
+- **Hueco vacío al final del Inicio:** reservaba alto para 9 resultados y el buscador solo
+  enseña 6. Ahora mide lo que pide su contenido.
+
+---
+
 ## v1.0.1
 
 ### Arreglado

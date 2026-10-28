@@ -255,7 +255,14 @@ public partial class MainWindow
             if (_tarjetaContenido != null)
             {
                 var m = _tarjetaContenido.Margin;
-                double izq = Math.Max(0, x - Isla.Padding.Left - Isla.BorderThickness.Left);
+                // Sin `Math.Max(0, …)`: con el ancla en el filo izquierdo —el botón Inicio— la
+                // tarjeta empieza en x=2, antes del relleno de la isla (10), y el margen tiene
+                // que ser NEGATIVO para que el contenido empiece donde la tarjeta. Topado a
+                // cero, el contenido se quedaba 8 px a la derecha y esos 8 px se cortaban por
+                // el otro lado: las tarjetas del Inicio sin su borde derecho. Lo contó el
+                // usuario —«en la zona de la derecha del inicio salen los paneles cortados»—
+                // y lo midió `ApuntarSiSeSaleDeLado`: contenido 10..580, tarjeta 2..572.
+                double izq = x - Isla.Padding.Left - Isla.BorderThickness.Left;
                 if (Math.Abs(m.Left - izq) > 0.5)
                     _tarjetaContenido.Margin = new Thickness(izq, m.Top, m.Right, m.Bottom);
 
@@ -381,11 +388,33 @@ public partial class MainWindow
             cuando.Tick += (s, _) =>
             {
                 cuando.Stop();
-                if (_panelAbierto == nombre) ApuntarSiAlgoSeSale(nombre, raiz);
+                if (_panelAbierto != nombre) return;
+                ApuntarSiAlgoSeSale(nombre, raiz);
+                ApuntarSiSeSaleDeLado(nombre);
             };
             cuando.Start();
         }
         catch (Exception ex) { Log.Error("apuntar el flujo del panel", ex); }
+    }
+
+    // ---------- ¿Y de lado? ----------
+    //
+    // La tarjeta recorta el cajón a [x, x + ancho]. Si el contenido acaba más a la derecha,
+    // lo que sobra no se ve: es lo que dejaba las tarjetas del Inicio sin su borde derecho.
+    // Se mide dónde acaba DE VERDAD el contenido (con su escala) en coordenadas de la isla.
+    void ApuntarSiSeSaleDeLado(string nombre)
+    {
+        try
+        {
+            if (_tarjetaAncla == null || _tarjetaContenido is not { } c) return;
+            var caja = c.TransformToAncestor(Isla).TransformBounds(new Rect(c.RenderSize));
+            double x = XdeTarjeta(), w = Math.Min(_tarjetaAncho, Isla.ActualWidth);
+            Log.Info($"panel {nombre} de lado: contenido {caja.Left:0.0}..{caja.Right:0.0} · " +
+                     $"tarjeta {x:0.0}..{x + w:0.0} · escala {EscalaDe(c):0.000} · " +
+                     $"ancho puesto {c.Width:0.0} · real {c.ActualWidth:0.0} · margen {c.Margin.Left:0.0}" +
+                     (caja.Right > x + w + 0.5 ? $" · SE SALE {caja.Right - (x + w):0.0} por la derecha" : " · dentro"));
+        }
+        catch (Exception ex) { Log.Error("medir el panel de lado", ex); }
     }
 
     // ---------- ¿Se sale algo por abajo? ----------

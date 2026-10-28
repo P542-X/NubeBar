@@ -3557,9 +3557,9 @@ public static partial class Pruebas
 
     // ================= C5.8: la superficie de Inicio =================
     //
-    // Lo que esto protege: hay UNA superficie —saludo, multimedia, acciones rápidas,
-    // CPU/RAM, fondo, conectividad, fijadas, energía, sistema y el buscador con su lista—
-    // y se abre desde UN sitio: el botón Inicio de la isla. Hubo un rato en que las
+    // Lo que esto protege: hay UNA superficie —el buscador con su lista, y debajo la
+    // música, el idioma del teclado y la energía— y se abre desde UN sitio: el botón
+    // Inicio de la isla. Hubo un rato en que las
     // tarjetas vivían además en un panel "control" con su propio botón, y eran dos
     // pantallas con lo mismo.
 

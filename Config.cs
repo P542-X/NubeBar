@@ -461,7 +461,7 @@ public class Inicio
     public bool TeclaWindows { get; set; } = true;                  // la tecla Windows sola abre este menú (fase 6)
     public bool BuscarArchivos { get; set; } = true;                // usar el índice de Windows Search
     public string BuscadorWeb { get; set; } = "https://www.google.com/search?q=";
-    public bool Saludo { get; set; } = true;                        // cabecera con "Buenas tardes, ..."
+    public bool Saludo { get; set; } = true;                        // cabecera con "Buenas tardes, ...", la fecha y la hora
 }
 
 

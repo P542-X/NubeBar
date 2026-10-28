@@ -20,7 +20,10 @@ namespace NubeBar;
 public partial class MainWindow
 {
     internal const string PanelInicio = "inicio";
-    const double AnchoMenu = 660, AltoFila = 44, FilasVisibles = 9;
+    // Seis filas visibles, las mismas que `MaxFilas`: el alto reservaba nueve y el buscador
+    // nunca enseña más de seis, así que sobraban tres filas vacías debajo de la portada. Si
+    // la portada pide más, `AbrirPanel` le da lo que mide.
+    const double AnchoMenu = 660, AltoFila = 44, FilasVisibles = 6;
     // El mismo número, visible para las pruebas: el ancho de la superficie de Inicio.
     internal const double AnchoDeInicio = AnchoMenu;
     // Seis y se acabó. Veinte filas era una lista para recorrer con la rueda, y un
@@ -656,8 +659,8 @@ public partial class MainWindow
         Grid.SetRow(_scroll, 2);
         raiz.Children.Add(_scroll);
 
-        // Sin nada escrito no se ven resultados, sino el panel de siempre: lo que
-        // suena, los accesos rápidos, las gráficas, el wallpaper y las fijadas
+        // Sin nada escrito no se ven resultados, sino la portada: lo que suena, el
+        // idioma del teclado y la energía
         _portada = CrearPortada();
         Grid.SetRow(_portada, 2);
         raiz.Children.Add(_portada);
@@ -736,18 +739,30 @@ public partial class MainWindow
         // justo debajo de la fila de energía. Lo contó el usuario: «en el botón de inicio
         // está duplicado lo de apagar, reiniciar, suspender». Se queda la fila de energía,
         // que pide confirmación para reiniciar y apagar; la tarjeta reiniciaba sin preguntar.
-        var piezas = new UIElement[]
-        {
-            CardMultimedia(),
-            CardAccionesRapidas(),
-            CardMetricas(),
-            CardFondo(),
-            CardConectividad(),
-            CrearFijadas(),
-            CrearEnergia(),
-        };
+        //
+        // ---------- Y solo lo que se usa ----------
+        //
+        // La portada llegó a llevar ocho tarjetas: multimedia, acciones rápidas, CPU/RAM,
+        // fondo, conectividad, fijadas, energía… El usuario lo dejó claro: «solo me interesa
+        // que se vea la música sonando, el buscador, apagar y encender, y el idioma del
+        // teclado; lo demás fuera». Esas tarjetas siguen existiendo —los laterales usan las
+        // suyas— pero aquí ya no se montan.
+        var piezas = new List<UIElement> { CardMultimedia() };
 
-        for (int i = 0; i < piezas.Length; i++)
+        // El idioma del teclado solo sale si tienes más de una distribución: la propia tarjeta
+        // lo decide y se añade a una pila. Se recoge de ahí para que entre en su sitio y con
+        // la misma animación que el resto.
+        var teclado = new StackPanel();
+        CardTeclado(teclado);
+        foreach (UIElement t in teclado.Children.OfType<UIElement>().ToList())
+        {
+            teclado.Children.Remove(t);
+            piezas.Add(t);
+        }
+
+        piezas.Add(CrearEnergia());
+
+        for (int i = 0; i < piezas.Count; i++)
         {
             pila.Children.Add(piezas[i]);
             if (piezas[i] is not FrameworkElement fe) continue;
@@ -758,10 +773,6 @@ public partial class MainWindow
             mover.BeginAnimation(TranslateTransform.YProperty, Kf(14, 0, 420, retardo, Muelle));
             mover.Y = 0;
         }
-        // El idioma del teclado solo sale si tienes más de una distribución puesta: la
-        // propia tarjeta lo decide, y por eso se añade aparte del bucle de entrada.
-        CardTeclado(pila);
-
 
         return new ScrollViewer
         {

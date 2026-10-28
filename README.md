@@ -338,7 +338,7 @@ Si prefieres la isla pequeña en reposo, muévelos a la izquierda en Ajustes > M
 | `Inicio.TeclaWindows` | `true` | La tecla Windows abre este menú en vez del de Windows |
 | `Inicio.BuscarArchivos` | `true` | Busca también archivos con el índice de Windows Search |
 | `Inicio.BuscadorWeb` | Google | Prefijo de la búsqueda web |
-| `Inicio.Saludo` | `true` | Cabecera con «Buenas tardes, …» |
+| `Inicio.Saludo` | `true` | Cabecera con «Buenas tardes, …», la fecha y la hora |
 
 ### Wallpaper
 
