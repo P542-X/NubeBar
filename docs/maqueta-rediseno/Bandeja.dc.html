@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>NubeBar · Bandeja</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#8DA9E8}a:hover{color:#B8C7EC}
+.nb{--plata:#C9D2E6;--coral:#D9826E;--texto:#E6E9F2;--tenue:#9AA3B8;--filo:rgba(255,255,255,.09);--panel:rgba(12,14,20,.94);font-family:"Segoe UI Variable","Segoe UI",system-ui,sans-serif;color:var(--texto)}
+.nb *{box-sizing:border-box}
+.nb button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
+.nb button:focus-visible{outline:2px solid var(--acento);outline-offset:3px}
+@keyframes girar{to{transform:rotate(360deg)}}
+@keyframes fluir{to{background-position:-250% center}}
+@keyframes entrar{from{opacity:0;transform:scaleY(.6)}to{opacity:1;transform:none}}
+@keyframes aparecer{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
+
+.isla-borde{position:absolute;top:10px;right:20px;width:760px;border-radius:23px;padding:1px;overflow:hidden;isolation:isolate;background:var(--filo);z-index:2}
+.isla-borde::before{content:"";position:absolute;left:50%;top:50%;width:900px;height:900px;margin:-450px 0 0 -450px;background:linear-gradient(90deg,transparent 40%,rgba(201,210,230,.6) 49%,var(--acento) 51%,transparent 60%);animation:girar 9s linear infinite;z-index:-1}
+.isla{display:flex;align-items:center;justify-content:flex-end;gap:6px;height:46px;padding:0 12px;border-radius:22px;background:var(--panel)}
+.isla img{width:22px;height:22px;display:block}
+.isla .oscuro{filter:drop-shadow(0 0 3px rgba(255,255,255,.85))}
+.sep{width:1px;height:20px;background:rgba(255,255,255,.1);margin:0 5px}
+.ic{width:28px;height:28px;display:grid;place-items:center;border-radius:8px;color:var(--plata)}
+.ic.abierto{background:rgba(141,169,232,.18);color:#fff}
+.chip-es{font-size:12px;font-weight:600;padding:3px 7px;border-radius:6px;background:rgba(255,255,255,.06);color:var(--plata)}
+.reloj{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;background:linear-gradient(90deg,var(--texto) 40%,#fff 50%,var(--texto) 60%);background-size:250% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:fluir 7s linear infinite}
+.fecha{font-size:13px;color:var(--plata);padding:0 4px}
+.insignia{position:absolute;top:2px;right:1px;min-width:14px;height:14px;padding:0 3px;border-radius:7px;background:var(--coral);color:#1a0f0c;font-size:9.5px;font-weight:700;display:grid;place-items:center}
+
+.panel{position:absolute;top:55px;z-index:1;border-radius:0 0 20px 20px;padding:0 1px 1px;background:linear-gradient(180deg,var(--filo),rgba(201,210,230,.18));box-shadow:0 30px 60px -22px rgba(0,0,0,.9);transform-origin:top;animation:entrar .45s cubic-bezier(.22,1.1,.36,1) both}
+.panel-dentro{border-radius:0 0 19px 19px;background:var(--panel);padding:12px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
+.icono-bandeja{position:relative;height:44px;border-radius:11px;display:grid;place-items:center;color:var(--plata);transition:transform .3s cubic-bezier(.34,1.4,.64,1),background .2s;animation:aparecer .4s cubic-bezier(.34,1.4,.64,1) both}
+.icono-bandeja img{width:20px;height:20px;display:block}
+.icono-bandeja.oscuro img{filter:drop-shadow(0 0 3px rgba(255,255,255,.85))}
+.icono-bandeja:hover{transform:scale(1.12);background:rgba(255,255,255,.08)}
+.icono-bandeja::after{content:attr(data-nombre);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%) translateY(4px);white-space:nowrap;font-size:11.5px;padding:4px 8px;border-radius:7px;background:#1c2130;border:1px solid var(--filo);color:var(--texto);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:3}
+.icono-bandeja:hover::after,.icono-bandeja:focus-visible::after{opacity:1;transform:translateX(-50%)}
+
+@media (prefers-reduced-motion:reduce){.nb *{animation:none!important}}
+</style>
+</helmet>
+<div class="nb" style="--acento: {{accent}}; position: relative; width: 720px; height: 260px; overflow: hidden; background: linear-gradient(160deg, #1b2130 0%, #10141d 45%, #0a0c12 100%);">
+
+  <div class="isla-borde">
+    <div class="isla">
+      <img src="/_blob/6d5b0ce4dc72fddea414eeb915593619" alt="">
+      <img src="/_blob/07e3c1f6fdbbb26062f6f6eddc01e70f" alt="">
+      <img src="/_blob/be47ad89d05d24e5d04398b75ed6b736" alt="">
+      <img class="oscuro" src="/_blob/b82066d331d454bdae2321d5e0545c8d" alt="">
+      <img src="/_blob/c55c03934836160ba79f8a368fa26df2" alt="">
+      <div class="sep" aria-hidden="true"></div>
+      <span class="chip-es">ES</span>
+      <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"></path><circle cx="12" cy="19" r="1" fill="currentColor"></circle></svg></span>
+      <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7"></path></svg></span>
+      <span class="ic"><svg width="20" height="16" viewBox="0 0 28 16" aria-hidden="true"><rect x="1" y="2" width="22" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"></rect><rect x="3" y="4" width="18" height="8" rx="1.5" fill="currentColor"></rect></svg></span>
+      <div class="sep" aria-hidden="true"></div>
+      <span class="reloj">{{hora}}</span>
+      <div class="sep" aria-hidden="true"></div>
+      <span class="ic" style="position: relative;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14v10H10l-5 4z"></path></svg><span class="insignia">3</span></span>
+      <span class="ic abierto" aria-label="Iconos ocultos (abierto)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg></span>
+      <span class="fecha">{{fecha}}</span>
+    </div>
+  </div>
+
+  <div class="panel" style="width: 270px; right: 20px;">
+    <div class="panel-dentro">
+      <sc-for list="{{iconos}}" as="i" hint-placeholder-count="10">
+        <button class="icono-bandeja {{i.clase}}" data-nombre="{{i.nombre}}" aria-label="{{i.nombre}}" style="animation-delay: {{i.retraso}};">
+          <sc-if value="{{i.tieneImagen}}" hint-placeholder-val="{{true}}"><img src="{{i.imagen}}" alt=""></sc-if>
+          <sc-if value="{{i.tieneGlifo}}" hint-placeholder-val="{{false}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{i.color}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{i.glifo}}"></path></svg></sc-if>
+        </button>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#8DA9E8","options":["#8DA9E8","#9FB4C7","#7FA8B8","#A9A3D0"]},"$preview":{"width":720,"height":260}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { ahora: new Date() }; }
+  componentDidMount() { this.reloj = setInterval(() => this.setState({ ahora: new Date() }), 1000); }
+  componentWillUnmount() { clearInterval(this.reloj); }
+  renderVals() {
+    const a = this.state.ahora, dos = (n) => String(n).padStart(2, '0');
+    const dias = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'], meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    const lista = [
+      ['VMware: máquinas en marcha', '/_blob/e0984066416df1568fbdf0261ebae845', null, null, ''],
+      ['OneDrive', null, 'M7 18h10.5a4 4 0 0 0 .6-7.96A5.5 5.5 0 0 0 7.4 8.6 4.7 4.7 0 0 0 7 18z', '#9FC0EE', ''],
+      ['Altavoces: silenciado', null, 'M4 9h4l5-4v14l-5-4H4zM16 9l5 6M21 9l-5 6', '#C9D2E6', ''],
+      ['Dispositivos Bluetooth', null, 'M7 7l10 10-5 4V3l5 4L7 17', '#8DA9E8', ''],
+      ['Expulsar USB', null, 'M9 2h6v6H9zM7 8h10v6a5 5 0 0 1-10 0zM12 19v3', '#C9D2E6', ''],
+      ['ChatGPT', '/_blob/b82066d331d454bdae2321d5e0545c8d', null, null, 'oscuro'],
+      ['Claude', '/_blob/c55c03934836160ba79f8a368fa26df2', null, null, ''],
+      ['Microsoft Teams', '/_blob/67916f7f95e500bcb4299ab3b2b5d482', null, null, ''],
+      ['Configuración', '/_blob/d7763cb750fcf2e53811051011cc2432', null, null, ''],
+      ['Seguridad de Windows', null, 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z', '#8FC1A0', ''],
+    ];
+    const iconos = lista.map(([nombre, imagen, glifo, color, clase], i) => ({
+      nombre, imagen: imagen ?? '', glifo: glifo ?? '', color: color ?? '#C9D2E6', clase,
+      tieneImagen: !!imagen, tieneGlifo: !imagen, retraso: (40 + i * 30) + 'ms',
+    }));
+    return {
+      accent: this.props.accent ?? '#8DA9E8',
+      hora: dos(a.getHours()) + ':' + dos(a.getMinutes()),
+      fecha: dias[a.getDay()] + ' ' + a.getDate() + ' ' + meses[a.getMonth()],
+      iconos,
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -4,11 +4,35 @@ Plan para llevar a la app el aspecto de la maqueta aprobada el 28/10/2026. Está
 para que una sesión nueva pueda empezar por aquí sin más contexto: qué se quiere, qué se
 puede y qué no, dónde tocar, en qué orden y cómo comprobarlo.
 
+> **Estado: cerrado y aprobado (28/10/2026).** El diseño está decidido; lo que queda es
+> construirlo. **Para empezar una sesión nueva:** «Lee `docs/REDISENO-VISUAL.md` y empieza
+> por la fase 0». Cada fase se publica como versión antes de pasar a la siguiente.
+>
+> Decisiones tomadas, por orden de importancia:
+>
+> 1. **Todos los colores de todo, editables** por el usuario (decisión B).
+> 2. **Fuera Normal, Nube y Neón**; en su lugar, **9 temas de serie** completos (decisión A):
+>    Profesional, Oficina, Videojuegos, Invierno, Cyberpunk, Sakura, Samurái, Otoño y Sad.
+> 3. El tema pinta **toda la app**, y nunca puede dejar Ajustes ilegible («Alcance»).
+> 4. El usuario **crea sus propios temas** en el Estudio de temas, con muchísimas
+>    herramientas (decisión C).
+> 5. **Nada que la app no pueda hacer de verdad** («La regla que manda»).
+
 **La maqueta:** <https://claude.ai/artifact/EPD2FVAWaDM8eeFbzKRcEF> (privada: solo la abre el
-dueño de la cuenta). Diez pantallas: «Isla e Inicio», «Laterales y dock»; debajo, los
-paneles que cuelgan de la isla (red, audio, batería, notificaciones y bandeja); debajo,
-«Temas anime»; y debajo, «Más temas» (Oficina, Videojuegos, Invierno, Cyberpunk) y el
-«Estudio de temas».
+dueño de la cuenta). Once pantallas, por filas:
+
+1. «Isla e Inicio» y «Laterales y dock», en Profesional.
+2. «Paneles que cuelgan de la isla»: red, audio, batería, notificaciones y bandeja, en
+   Profesional.
+3. «Temas anime»: Sakura, Samurái, Otoño y Sad, con su selector.
+4. «Más temas»: Oficina, Videojuegos, Invierno y Cyberpunk, con su selector; y el «Estudio
+   de temas», funcional.
+5. «Paneles en cada tema»: el lateral izquierdo y todos los paneles a la vez en cualquiera de
+   los 9 temas, para ver que cada superficie cambia entera con el tema.
+
+**Copia en el repositorio:** `docs/maqueta-rediseno/` guarda el código de las once pantallas
+y **`temas.json` con los valores exactos de los 9 temas** (colores, radios, esquinas, letras
+y decoraciones). Si la maqueta no se puede abrir, todo lo necesario está ahí.
 
 ---
 
@@ -49,9 +73,10 @@ gusta en Ajustes, con una vista previa de cada uno.
 | **Cyberpunk** | Negro violáceo con amarillo neón `#FCEE0A`, cian `#00F0FF` y magenta `#FF2A6D`; esquinas en chaflán; Orbitron en títulos y Rajdhani en el resto; **reloj con efecto glitch** (capas de color desplazadas que parpadean); **líneas de barrido** sobre los paneles; lluvia de neón; Nubecita con visor; fondo de ciudad con letreros de neón | Maqueta: «Más temas» |
 
 **Se entregan exactamente estos 9 temas construidos** (Profesional, Oficina, Videojuegos,
-Invierno, Cyberpunk y los cuatro Anime). Los valores exactos de Oficina, Videojuegos,
-Invierno y Cyberpunk están en el código de la maqueta (`project/Temas.dc.html`, objeto
-`TEMAS`). Todo lo demás lo crea el usuario con el Estudio de temas
+Invierno, Cyberpunk y los cuatro Anime). **Los valores exactos de los 9** están en
+`docs/maqueta-rediseno/temas.json`: 19 colores por tema con su papel, letra y letra de
+títulos, radios, tipo de esquina y la lista de decoraciones que lleva encendidas. Es el
+fichero del que salen los temas de serie en la fase 0. Todo lo demás lo crea el usuario con el Estudio de temas
 (decisión C). Muchos más temas de serie no aportan: cuesta mantenerlos y el usuario ya
 puede hacerse los que quiera.
 
@@ -145,7 +170,7 @@ cambiarlo todo, puede hacer un tema en el que no se lea nada. Por eso:
 
 ### C. El Estudio de temas: el usuario crea los suyos, con muchísimas herramientas
 
-Maqueta funcional: pantalla «Estudio de temas» (`project/Estudio.dc.html`), con los 10
+Maqueta funcional: pantalla «Estudio de temas» (`docs/maqueta-rediseno/Estudio.dc.html`), con los 10
 apartados, la vista previa en vivo, el contraste calculado, la simulación de daltonismo,
 antes/después, deshacer y rehacer y el medidor de consumo.
 
@@ -273,7 +298,8 @@ entre Sakura, Samurái, Otoño y Sad en vivo, que es justo como debe sentirse el
 temas en Ajustes. Las cuatro variantes usan **las mismas piezas**; cambian sus valores
 (colores, letra, radios), la mascota (accesorio y cara), la partícula que cae en el Inicio
 (pétalo, hoja o gota) y el fondo de escritorio. Los valores exactos de cada una están en el
-código de la maqueta (`project/Anime.dc.html`, objeto `TEMAS`).
+código de la maqueta (`docs/maqueta-rediseno/Anime.dc.html`, objeto `TEMAS`) y, en limpio,
+en `docs/maqueta-rediseno/temas.json`.
 
 Letras de las variantes, todas con licencia OFL e incrustables: M PLUS Rounded 1c (Sakura),
 Shippori Mincho para títulos y Zen Maru Gothic para el resto (Samurái), Zen Maru Gothic

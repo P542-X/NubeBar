@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>NubeBar · Paneles en cada tema</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&amp;family=Shippori+Mincho:wght@700;800&amp;family=Zen+Maru+Gothic:wght@500;700&amp;family=Rajdhani:wght@600;700&amp;family=Nunito:wght@600;800&amp;family=Orbitron:wght@700;900&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+/* Las mismas piezas, pintadas con el tema elegido abajo. Todos los paneles a la vez para
+   compararlos de un vistazo (en la app se abre uno cada vez). */
+.pt{--acento-suave:color-mix(in srgb,var(--acento) 16%,transparent);--sec1-suave:color-mix(in srgb,var(--sec1) 18%,transparent);--sec1-medio:color-mix(in srgb,var(--sec1) 40%,transparent);font-family:var(--fuente),system-ui,sans-serif;color:var(--tinta)}
+.pt *{box-sizing:border-box}
+.pt button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
+.pt button:focus-visible,.pt input:focus-visible{outline:2px solid var(--acento-tinta);outline-offset:3px}
+.titulos{font-family:var(--fuente-titulos),var(--fuente),sans-serif}
+@keyframes girar{to{transform:rotate(360deg)}}
+@keyframes rgb{to{filter:hue-rotate(360deg)}}
+@keyframes respirar{0%,100%{opacity:.25}50%{opacity:.5}}
+@keyframes entrar{from{opacity:0;transform:translateY(-10px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes llenar{from{width:0}}
+
+.chaflan .panel,.chaflan .panel-dentro,.chaflan .seccion,.chaflan .boton,.chaflan .accion,.chaflan .ficha,.chaflan .modo,.chaflan .modos,.chaflan .icono-bandeja,.chaflan .aviso{border-radius:0!important;clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px)}
+.chaflan .borde,.chaflan .isla{border-radius:0!important;clip-path:polygon(16px 0,100% 0,100% calc(100% - 16px),calc(100% - 16px) 100%,0 100%,0 16px)}
+
+/* Isla */
+.isla-sitio{position:absolute;top:16px;left:50%;width:1200px;margin-left:-600px;z-index:5}
+.halo{position:absolute;inset:-2px;border-radius:var(--radio-isla);box-shadow:0 6px 28px 3px var(--halo);animation:respirar 5s ease-in-out infinite}
+.borde{position:relative;border-radius:var(--radio-isla);padding:1.5px;overflow:hidden;isolation:isolate;background:var(--filo-isla)}
+.borde::before{content:"";position:absolute;left:50%;top:50%;width:1400px;height:1400px;margin:-700px 0 0 -700px;background:linear-gradient(90deg,transparent 42%,var(--destello) 50%,transparent 58%);animation:girar 9s linear infinite;z-index:-1}
+.modo-rgb .borde{background:linear-gradient(90deg,#FF3D3D,#FFD23D,#3DFF7A,#3DC4FF,#B03DFF,#FF3D3D);animation:rgb 6s linear infinite}
+.isla{display:flex;align-items:center;gap:7px;height:48px;padding:0 14px;border-radius:calc(var(--radio-isla) - 1px);background:var(--superficie)}
+.isla img{width:22px;height:22px;display:block}
+.sep{width:1.5px;height:16px;background:var(--sec1-medio);margin:0 5px}
+.ic{width:30px;height:30px;display:grid;place-items:center;border-radius:9px;color:var(--tenue)}
+.ic.abierto{background:var(--acento-suave);color:var(--acento-tinta)}
+.chip{font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--sec1-suave)}
+
+/* Paneles */
+.fila{position:absolute;top:96px;left:40px;right:40px;display:flex;gap:28px;align-items:flex-start}
+.columna{display:flex;flex-direction:column;gap:22px}
+.etiqueta{font-family:"Segoe UI Variable","Segoe UI",system-ui,sans-serif;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--etiqueta);margin:0 0 8px 4px}
+.panel{border-radius:var(--radio-panel);padding:1.5px;background:var(--filo-panel);box-shadow:0 26px 56px -24px var(--sombra);animation:entrar .5s cubic-bezier(.22,1.2,.36,1) both}
+.panel-dentro{position:relative;overflow:hidden;border-radius:calc(var(--radio-panel) - 1px);background:var(--panel-fondo);padding:12px;display:flex;flex-direction:column;gap:10px}
+.barrido{position:absolute;inset:0;pointer-events:none;z-index:3;background:repeating-linear-gradient(180deg,rgba(255,255,255,.035) 0 1px,transparent 1px 3px)}
+.seccion{border-radius:var(--radio-tarjeta);background:var(--tarjeta);border:1px solid var(--filo);padding:12px;display:flex;flex-direction:column;gap:9px}
+.cab{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700}
+.cab .icono{color:var(--acento-tinta);display:grid}
+.estado{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--sec1-suave);margin-left:auto}
+.estado i{width:7px;height:7px;border-radius:50%;background:var(--ok);display:block}
+.tenue{color:var(--tenue);font-size:12px}
+.boton{font-size:12px;font-weight:700;padding:6px 11px;border-radius:var(--radio-boton);background:var(--sec1-suave);border:1px solid var(--filo)}
+.ficha{width:32px;height:32px;flex:none;border-radius:var(--radio-boton);display:grid;place-items:center;background:var(--sec1-suave);color:var(--tinta)}
+.rapidas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.rapida{display:flex;gap:8px;align-items:center;padding:9px;border-radius:var(--radio-boton);background:var(--sec1-suave);border:1px solid var(--filo);font-size:12px;font-weight:700;text-align:left}
+.rapida.encendida{background:var(--acento-suave);border-color:var(--acento)}
+.rapida .ic2{color:var(--acento-tinta);display:grid}
+.mando{display:grid;grid-template-columns:20px minmax(0,1fr) 40px;align-items:center;gap:9px;color:var(--tenue);font-size:12px}
+.pista{height:5px;border-radius:3px;background:color-mix(in srgb,var(--tenue) 22%,transparent);position:relative}
+.pista span{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--acento)}
+.pista b{position:absolute;top:50%;width:13px;height:13px;margin:-6.5px 0 0 -6.5px;border-radius:50%;background:#fff;box-shadow:0 0 0 3px var(--acento-suave)}
+.fila-red{display:grid;grid-template-columns:20px minmax(0,1fr) 14px 34px;align-items:center;gap:9px;padding:7px 6px;border-radius:var(--radio-boton);font-size:12.5px}
+.fila-red.elegida{background:var(--acento-suave);box-shadow:inset 0 0 0 1px var(--acento)}
+.cifras{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.cifras div{display:flex;flex-direction:column;font-size:11px;color:var(--tenue)}
+.cifras b{font-size:18px;color:var(--tinta)}
+.acciones{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.accion{height:54px;border-radius:var(--radio-boton);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:11px;color:var(--tinta);background:var(--sec1-suave);border:1px solid var(--filo)}
+.accion.peligro{color:var(--peligro)}
+.metricas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.metrica{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 2px;border-radius:var(--radio-boton);background:var(--sec1-suave);font-size:11px;color:var(--tenue)}
+.metrica b{font-size:12.5px;color:var(--tinta)}
+.salida{display:flex;align-items:center;gap:9px;padding:8px;border-radius:var(--radio-boton);background:var(--acento-suave);box-shadow:inset 0 0 0 1px var(--acento);font-size:12.5px}
+.nivel{height:6px;border-radius:3px;background:color-mix(in srgb,var(--tenue) 22%,transparent);overflow:hidden}
+.nivel span{display:block;height:100%;border-radius:3px;background:var(--acento);animation:llenar 1s cubic-bezier(.22,1,.36,1) both}
+.modos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;padding:3px;border-radius:var(--radio-boton);background:var(--sec1-suave)}
+.modo{height:32px;border-radius:calc(var(--radio-boton) - 2px);display:grid;place-items:center;font-size:12px;font-weight:700;color:var(--tenue)}
+.modo.activo{background:var(--acento);color:var(--sobre-acento)}
+.rejilla-bandeja{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
+.icono-bandeja{height:40px;border-radius:var(--radio-boton);display:grid;place-items:center;color:var(--tinta)}
+.icono-bandeja:hover{background:var(--sec1-suave)}
+.icono-bandeja img{width:20px;height:20px;display:block}
+.aviso{display:flex;gap:10px;padding:10px;border-radius:var(--radio-tarjeta);background:var(--tarjeta);border:1px solid var(--filo)}
+.grupo-app{font-size:12px;font-weight:700;color:var(--acento-tinta);margin:2px 2px -4px}
+
+/* Selector */
+.selector{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:8;display:flex;align-items:center;gap:4px;padding:6px;border-radius:999px;background:rgba(14,16,22,.92);border:1px solid rgba(255,255,255,.12);box-shadow:0 14px 34px -12px rgba(0,0,0,.7);font-family:"Segoe UI Variable","Segoe UI",system-ui,sans-serif}
+.selector>span{font-size:12.5px;color:#C9D2E6;padding:0 6px 0 10px}
+.opcion{display:flex;align-items:center;gap:7px;height:34px;padding:0 12px 0 7px;border-radius:999px;font-size:12.5px;font-weight:600;color:#E6E9F2 !important}
+.opcion:hover{background:rgba(255,255,255,.08)}
+.opcion.elegida{background:rgba(255,255,255,.16);box-shadow:inset 0 0 0 1px rgba(255,255,255,.3)}
+.muestra{width:20px;height:20px;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(255,255,255,.25)}
+@media (prefers-reduced-motion:reduce){.pt *{animation:none!important}}
+</style>
+</helmet>
+<div class="pt {{clases}}" style="{{estiloRaiz}}">
+
+  <div class="isla-sitio">
+    <div class="halo" aria-hidden="true"></div>
+    <div class="borde">
+      <div class="isla">
+        <span class="ic"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="0" y="0" width="7" height="7" rx="1.5"></rect><rect x="9" y="0" width="7" height="7" rx="1.5"></rect><rect x="0" y="9" width="7" height="7" rx="1.5"></rect><rect x="9" y="9" width="7" height="7" rx="1.5"></rect></svg></span>
+        <div class="sep" aria-hidden="true"></div>
+        <img src="/_blob/4e8306afd2f9c384ca64728e2577f274" alt="">
+        <img src="/_blob/e0984066416df1568fbdf0261ebae845" alt="">
+        <img src="/_blob/6d5b0ce4dc72fddea414eeb915593619" alt="">
+        <img src="/_blob/07e3c1f6fdbbb26062f6f6eddc01e70f" alt="">
+        <img src="/_blob/be47ad89d05d24e5d04398b75ed6b736" alt="">
+        <img src="/_blob/c55c03934836160ba79f8a368fa26df2" alt="">
+        <img src="/_blob/67916f7f95e500bcb4299ab3b2b5d482" alt="">
+        <div style="flex: 1;"></div>
+        <span class="chip">ES</span>
+        <span class="ic abierto" aria-label="Red"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"></path></svg></span>
+        <span class="ic abierto" aria-label="Volumen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7"></path></svg></span>
+        <span class="ic abierto" aria-label="Batería"><svg width="20" height="16" viewBox="0 0 28 16" aria-hidden="true"><rect x="1" y="2" width="22" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"></rect><rect x="3.5" y="4.5" width="17" height="7" rx="1.5" fill="currentColor"></rect></svg></span>
+        <div class="sep" aria-hidden="true"></div>
+        <span class="titulos" style="font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums;">{{hora}}</span>
+        <div class="sep" aria-hidden="true"></div>
+        <span class="ic abierto" aria-label="Notificaciones"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14v10H10l-5 4z"></path></svg></span>
+        <span class="ic abierto" aria-label="Bandeja"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="fila">
+
+    <!-- Lateral izquierdo -->
+    <div style="width: 300px;">
+      <div class="etiqueta">Lateral izquierdo</div>
+      <div class="panel"><div class="panel-dentro">
+        <sc-if value="{{barrido}}" hint-placeholder-val="{{false}}"><div class="barrido" aria-hidden="true"></div></sc-if>
+        <div class="seccion" style="flex-direction: row; align-items: center; gap: 12px;">
+          <svg width="46" height="34" viewBox="0 0 24 18" aria-hidden="true"><path d="M6 16h11.5a4 4 0 0 0 .6-7.96A5.5 5.5 0 0 0 7.4 6.6 4.7 4.7 0 0 0 6 16z" fill="var(--acento)"></path></svg>
+          <div style="display: flex; flex-direction: column; gap: 2px;"><span class="titulos" style="font-size: 18px; font-weight: 800;">Nube</span><span class="tenue">Tu entorno, en calma</span></div>
+        </div>
+        <div class="seccion">
+          <div class="cab titulos"><span class="icono"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"></path></svg></span>Acciones rápidas</div>
+          <div class="rapidas">
+            <div class="rapida encendida"><span class="ic2"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"></path></svg></span>No molestar</div>
+            <div class="rapida"><span class="ic2"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M2 12h2M20 12h2"></path></svg></span>Modo nocturno</div>
+            <div class="rapida"><span class="ic2"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M12 4v16"></path></svg></span>Tema claro</div>
+            <div class="rapida"><span class="ic2"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v14H4zM4 15l5-5 5 5 3-3 3 3"></path></svg></span>Fondo</div>
+          </div>
+        </div>
+        <div class="seccion">
+          <div class="cab titulos"><span class="icono"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"></path></svg></span>Audio y brillo</div>
+          <div class="mando"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"></path></svg><div class="pista"><span style="width: 22%;"></span><b style="left: 22%;"></b></div><span>22 %</span></div>
+          <div class="mando"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle></svg><div class="pista"><span style="width: 100%;"></span><b style="left: 100%;"></b></div><span>100 %</span></div>
+        </div>
+        <div class="seccion">
+          <div class="cab titulos"><span class="icono"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"></rect></svg></span>Sistema</div>
+          <div class="metricas">
+            <sc-for list="{{metricas}}" as="m" hint-placeholder-count="3">
+              <div class="metrica"><svg width="40" height="40" viewBox="0 0 46 46" role="img" aria-label="{{m.nombre}} {{m.valor}}"><circle cx="23" cy="23" r="18" fill="none" stroke="color-mix(in srgb, var(--tenue) 22%, transparent)" stroke-width="4"></circle><circle cx="23" cy="23" r="18" fill="none" stroke="var(--acento)" stroke-width="4" stroke-linecap="round" stroke-dasharray="{{m.trazo}}" transform="rotate(-90 23 23)"></circle></svg><b>{{m.valor}}</b>{{m.nombre}}</div>
+            </sc-for>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- Red -->
+    <div style="width: 370px;">
+      <div class="etiqueta">Red</div>
+      <div class="panel" style="animation-delay: 60ms;"><div class="panel-dentro">
+        <sc-if value="{{barrido}}" hint-placeholder-val="{{false}}"><div class="barrido" aria-hidden="true"></div></sc-if>
+        <div class="seccion">
+          <div class="cab titulos"><span class="icono"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"></rect></svg></span>Red e Internet<span class="estado"><i></i>Conectado</span></div>
+          <div style="display: flex; align-items: center; gap: 10px;"><span class="ficha"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"></path></svg></span><div style="flex: 1; display: flex; flex-direction: column;"><b style="font-size: 13px;">[Tu red] · 89 %</b><span class="tenue">400 Mb/s · Wi-Fi 6E</span></div><span class="boton">Desconectar</span></div>
+        </div>
+        <div class="seccion" style="gap: 2px;">
+          <div class="cab titulos" style="margin-bottom: 6px;"><span class="icono"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0"></path></svg></span>Redes Wi-Fi</div>
+          <sc-for list="{{redes}}" as="r" hint-placeholder-count="4">
+            <div class="fila-red {{r.clase}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"></path></svg><span>{{r.nombre}}</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--tenue)" stroke-width="2.2" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg><span class="tenue" style="text-align: right;">{{r.senal}}</span></div>
+          </sc-for>
+        </div>
+        <div class="seccion">
+          <div class="cab titulos"><span class="icono"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4"></path></svg></span>Velocidad<span class="boton" style="margin-left: auto;">Medir</span></div>
+          <div class="cifras"><div>Ping<b>—</b></div><div>Bajada<b>—</b></div><div>Subida<b>—</b></div></div>
+        </div>
+        <div class="acciones">
+          <div class="accion"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6"></path><path d="M20 4v5h-5"></path></svg>Actualizar</div>
+          <div class="accion peligro"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>Desconectar</div>
+          <div class="accion"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>Ajustes</div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- Audio -->
+    <div style="width: 340px;">
+      <div class="etiqueta">Audio</div>
+      <div class="panel" style="animation-delay: 120ms;"><div class="panel-dentro">
+        <sc-if value="{{barrido}}" hint-placeholder-val="{{false}}"><div class="barrido" aria-hidden="true"></div></sc-if>
+        <div class="seccion">
+          <div class="cab titulos"><span class="icono"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"></path></svg></span>Sonido</div>
+          <span class="tenue" style="margin-top: -4px;">Altavoces (Realtek(R) Audio)</span>
+          <div style="display: grid; grid-template-columns: 30px minmax(0,1fr) 30px 36px; align-items: center; gap: 8px;">
+            <span class="ficha" style="width: 30px; height: 30px;">−</span>
+            <div class="pista"><span style="width: 22%;"></span><b style="left: 22%;"></b></div>
+            <span class="ficha" style="width: 30px; height: 30px;">+</span>
+            <b style="font-size: 12.5px; text-align: right;">22%</b>
+          </div>
+        </div>
+        <div class="seccion">
+          <div class="cab titulos"><span class="icono"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"></rect><circle cx="12" cy="14" r="3"></circle></svg></span>Salida de audio</div>
+          <div class="salida"><span style="flex: 1;">Altavoces (Realtek(R) Audio)</span><span class="estado" style="margin-left: 0;"><i></i>Activa</span></div>
+        </div>
+        <div class="seccion" style="gap: 12px;">
+          <div class="cab titulos"><span class="icono"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="2"></rect><rect x="13" y="3" width="8" height="8" rx="2"></rect><rect x="3" y="13" width="8" height="8" rx="2"></rect></svg></span>Por aplicación</div>
+          <sc-for list="{{sesiones}}" as="s" hint-placeholder-count="2">
+            <div style="display: grid; grid-template-columns: 28px minmax(0,1fr); align-items: center; gap: 10px;">
+              <span class="ficha" style="width: 28px; height: 28px;"><img src="{{s.icono}}" alt="" style="width: 18px; height: 18px;"></span>
+              <div style="display: flex; flex-direction: column; gap: 6px;"><div style="display: flex; justify-content: space-between; font-size: 12px;">{{s.nombre}}<span class="tenue">{{s.valor}}</span></div><div class="pista"><span style="width: {{s.valor}};"></span><b style="left: {{s.valor}};"></b></div></div>
+            </div>
+          </sc-for>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- Batería y bandeja -->
+    <div class="columna" style="width: 320px;">
+      <div>
+        <div class="etiqueta">Batería</div>
+        <div class="panel" style="animation-delay: 180ms;"><div class="panel-dentro" style="padding: 14px; gap: 12px;">
+          <sc-if value="{{barrido}}" hint-placeholder-val="{{false}}"><div class="barrido" aria-hidden="true"></div></sc-if>
+          <div style="display: flex; align-items: center; gap: 12px;"><svg width="36" height="22" viewBox="0 0 28 16" aria-hidden="true"><rect x="1" y="2" width="22" height="12" rx="3" fill="none" stroke="var(--acento)" stroke-width="1.8"></rect><rect x="3.5" y="4.5" width="17" height="7" rx="1.5" fill="var(--acento)"></rect></svg><div style="display: flex; flex-direction: column;"><b class="titulos" style="font-size: 24px; line-height: 1;">100 %</b><span class="tenue">Enchufado · cargada</span></div></div>
+          <div class="nivel"><span style="width: 100%;"></span></div>
+          <div class="modos"><span class="modo">Eficiencia</span><span class="modo">Equilibrado</span><span class="modo activo">Rendimiento</span></div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px;"><span class="tenue">Ahorro: desactivado</span><b style="color: var(--acento-tinta);">Energía y batería ›</b></div>
+        </div></div>
+      </div>
+      <div>
+        <div class="etiqueta">Bandeja</div>
+        <div class="panel" style="animation-delay: 240ms;"><div class="panel-dentro">
+          <div class="rejilla-bandeja">
+            <span class="icono-bandeja"><img src="/_blob/e0984066416df1568fbdf0261ebae845" alt="VMware"></span>
+            <span class="icono-bandeja"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M7 18h10.5a4 4 0 0 0 .6-7.96A5.5 5.5 0 0 0 7.4 8.6 4.7 4.7 0 0 0 7 18z"></path></svg></span>
+            <span class="icono-bandeja"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7l10 10-5 4V3l5 4L7 17"></path></svg></span>
+            <span class="icono-bandeja"><img src="/_blob/b82066d331d454bdae2321d5e0545c8d" alt="ChatGPT" style="filter: var(--filtro-oscuro);"></span>
+            <span class="icono-bandeja"><img src="/_blob/c55c03934836160ba79f8a368fa26df2" alt="Claude"></span>
+            <span class="icono-bandeja"><img src="/_blob/67916f7f95e500bcb4299ab3b2b5d482" alt="Teams"></span>
+            <span class="icono-bandeja"><img src="/_blob/d7763cb750fcf2e53811051011cc2432" alt="Configuración"></span>
+            <span class="icono-bandeja"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"></path></svg></span>
+            <span class="icono-bandeja"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"></path></svg></span>
+            <span class="icono-bandeja"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 2h6v6H9zM7 8h10v6a5 5 0 0 1-10 0z"></path></svg></span>
+          </div>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- Notificaciones -->
+    <div style="width: 380px;">
+      <div class="etiqueta">Notificaciones</div>
+      <div class="panel" style="animation-delay: 300ms;"><div class="panel-dentro">
+        <sc-if value="{{barrido}}" hint-placeholder-val="{{false}}"><div class="barrido" aria-hidden="true"></div></sc-if>
+        <div class="cab titulos" style="font-size: 14.5px;">Notificaciones<b style="margin-left: auto; font-size: 12.5px; color: var(--acento-tinta);">Borrar todo</b></div>
+        <div class="grupo-app">Seguridad de Windows</div>
+        <div class="aviso"><span class="ficha" style="color: var(--acento-tinta);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"></path></svg></span><div style="display: flex; flex-direction: column; gap: 2px;"><div style="display: flex; justify-content: space-between; gap: 8px;"><b style="font-size: 13px;">Actualizar protección antivirus</b><span class="tenue">10:32</span></div><span class="tenue">La protección antivirus no está actualizada.</span></div></div>
+        <div class="grupo-app">Microsoft Teams</div>
+        <div class="aviso"><span class="ficha"><img src="/_blob/67916f7f95e500bcb4299ab3b2b5d482" alt="" style="width: 20px; height: 20px;"></span><div style="display: flex; flex-direction: column; gap: 2px; flex: 1;"><div style="display: flex; justify-content: space-between; gap: 8px;"><b style="font-size: 13px;">[Remitente]</b><span class="tenue">14:05</span></div><span class="tenue">[Vista previa del mensaje]</span></div></div>
+      </div></div>
+    </div>
+
+  </div>
+
+  <div class="selector" role="radiogroup" aria-label="Tema">
+    <span>Tema</span>
+    <sc-for list="{{opciones}}" as="o" hint-placeholder-count="9">
+      <button class="opcion {{o.clase}}" role="radio" aria-checked="{{o.marcado}}" onClick="{{o.elegir}}"><span class="muestra" style="background: {{o.muestra}};"></span>{{o.nombre}}</button>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"variante":{"editor":"enum","options":["profesional","oficina","videojuegos","invierno","cyberpunk","sakura","samurai","otono","sad"],"default":"profesional","section":"Tema"},"$preview":{"width":1920,"height":1040}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { ahora: new Date(), variante: null }; }
+  componentDidMount() { this.reloj = setInterval(() => this.setState({ ahora: new Date() }), 1000); }
+  componentWillUnmount() { clearInterval(this.reloj); }
+  renderVals() {
+    const OSC = 'drop-shadow(0 0 3px rgba(255,255,255,.85))';
+    // Cada tema: [nombre, muestra, clases, fondo, valores]
+    const T = {
+      profesional: ['Profesional', 'linear-gradient(135deg,#1B2130,#8DA9E8)', '', 'linear-gradient(160deg,#1b2130 0%,#10141d 45%,#0a0c12 100%)',
+        { acento: '#8DA9E8', 'acento-tinta': '#A9BEEE', 'sobre-acento': '#0C0E14', sec1: '#5E6E8F', tinta: '#E6E9F2', tenue: '#9AA3B8', superficie: 'rgba(12,14,20,.94)', tarjeta: 'rgba(255,255,255,.035)', 'panel-fondo': 'rgba(12,14,20,.96)', filo: 'rgba(255,255,255,.09)', 'filo-isla': 'rgba(255,255,255,.09)', 'filo-panel': 'linear-gradient(180deg,rgba(201,210,230,.25),rgba(255,255,255,.06))', sombra: 'rgba(0,0,0,.85)', halo: 'rgba(141,169,232,.5)', destello: 'rgba(201,210,230,.6)', ok: '#8FC1A0', peligro: '#E3A08F', fuente: '"Segoe UI Variable","Segoe UI"', 'fuente-titulos': '"Segoe UI Variable","Segoe UI"', 'radio-isla': '23px', 'radio-panel': '20px', 'radio-tarjeta': '14px', 'radio-boton': '10px', etiqueta: '#9AA3B8', 'filtro-oscuro': OSC }],
+      oficina: ['Oficina', 'linear-gradient(135deg,#FFFFFF,#2F6FDB)', '', 'linear-gradient(180deg,#EEF2F7,#DDE4EE)',
+        { acento: '#2F6FDB', 'acento-tinta': '#1F55B3', 'sobre-acento': '#FFFFFF', sec1: '#9AA6B8', tinta: '#1F2733', tenue: '#5A6577', superficie: 'rgba(255,255,255,.97)', tarjeta: '#FFFFFF', 'panel-fondo': '#F6F8FB', filo: '#E1E6EE', 'filo-isla': '#D5DCE6', 'filo-panel': '#D5DCE6', sombra: 'rgba(31,39,51,.2)', halo: 'transparent', destello: 'transparent', ok: '#3BB273', peligro: '#C93C3C', fuente: '"Segoe UI Variable","Segoe UI"', 'fuente-titulos': '"Segoe UI Variable","Segoe UI"', 'radio-isla': '12px', 'radio-panel': '12px', 'radio-tarjeta': '8px', 'radio-boton': '6px', etiqueta: '#5A6577', 'filtro-oscuro': 'none' }],
+      videojuegos: ['Videojuegos', 'linear-gradient(135deg,#39FF88,#0B0B10 55%,#FF3DCB)', 'chaflan modo-rgb', 'linear-gradient(180deg,#0B0B14,#12091A 55%,#05050A)',
+        { acento: '#39FF88', 'acento-tinta': '#5CFFA0', 'sobre-acento': '#05140B', sec1: '#5B6075', tinta: '#ECEFF6', tenue: '#A3A9BC', superficie: 'rgba(10,10,15,.95)', tarjeta: '#13141C', 'panel-fondo': '#0D0E15', filo: 'rgba(57,255,136,.18)', 'filo-isla': '#39FF88', 'filo-panel': 'linear-gradient(180deg,#39FF88,#FF3DCB)', sombra: 'rgba(0,0,0,.85)', halo: '#39FF88', destello: '#FFFFFF', ok: '#39FF88', peligro: '#FF4D6A', fuente: '"Rajdhani"', 'fuente-titulos': '"Rajdhani"', 'radio-isla': '0px', 'radio-panel': '0px', 'radio-tarjeta': '0px', 'radio-boton': '0px', etiqueta: '#A3A9BC', 'filtro-oscuro': OSC }],
+      invierno: ['Invierno', 'linear-gradient(135deg,#FFFFFF,#8EC5EC 55%,#3E6E8E)', '', 'linear-gradient(180deg,#CFE6F7,#E6F2FB 55%,#F7FBFE)',
+        { acento: '#3A8FD6', 'acento-tinta': '#236AA8', 'sobre-acento': '#FFFFFF', sec1: '#A8CFEA', tinta: '#1E3446', tenue: '#4F6A80', superficie: 'rgba(250,253,255,.96)', tarjeta: '#FFFFFF', 'panel-fondo': '#F2F8FD', filo: 'rgba(58,143,214,.16)', 'filo-isla': 'linear-gradient(90deg,#A8CFEA,#FFFFFF,#A8CFEA)', 'filo-panel': 'linear-gradient(180deg,#FFFFFF,#A8CFEA)', sombra: 'rgba(35,106,168,.25)', halo: '#A8CFEA', destello: '#FFFFFF', ok: '#3BB273', peligro: '#C9303E', fuente: '"Nunito"', 'fuente-titulos': '"Nunito"', 'radio-isla': '24px', 'radio-panel': '22px', 'radio-tarjeta': '16px', 'radio-boton': '12px', etiqueta: '#4F6A80', 'filtro-oscuro': 'none' }],
+      cyberpunk: ['Cyberpunk', 'linear-gradient(135deg,#FCEE0A,#FF2A6D 50%,#00F0FF)', 'chaflan', 'linear-gradient(180deg,#1A0B2E,#2A0E33 50%,#07040D)',
+        { acento: '#FCEE0A', 'acento-tinta': '#FCEE0A', 'sobre-acento': '#0A0614', sec1: '#5E4A7A', tinta: '#EDE6FF', tenue: '#A99BC8', superficie: 'rgba(10,6,20,.95)', tarjeta: '#140C24', 'panel-fondo': '#0E0819', filo: 'rgba(0,240,255,.22)', 'filo-isla': 'linear-gradient(90deg,#FF2A6D,#FCEE0A,#00F0FF)', 'filo-panel': 'linear-gradient(180deg,#00F0FF,#FF2A6D)', sombra: 'rgba(255,42,109,.35)', halo: '#FF2A6D', destello: '#FCEE0A', ok: '#00F0FF', peligro: '#FF2A6D', fuente: '"Rajdhani"', 'fuente-titulos': '"Orbitron"', 'radio-isla': '0px', 'radio-panel': '0px', 'radio-tarjeta': '0px', 'radio-boton': '0px', etiqueta: '#A99BC8', 'filtro-oscuro': OSC }],
+      sakura: ['Sakura', 'linear-gradient(135deg,#FF8FB8,#B8A4F4)', '', 'linear-gradient(165deg,#FFE4EF,#F1E6FF 48%,#DCEEFF)',
+        { acento: '#FF8FB8', 'acento-tinta': '#C2477A', 'sobre-acento': '#FFFFFF', sec1: '#B8A4F4', tinta: '#4A3B5C', tenue: '#75628C', superficie: 'rgba(255,251,253,.96)', tarjeta: '#FFFFFF', 'panel-fondo': '#FFF7FB', filo: 'rgba(194,71,122,.14)', 'filo-isla': 'linear-gradient(90deg,#FF8FB8,#B8A4F4)', 'filo-panel': 'linear-gradient(180deg,#FF8FB8,#B8A4F4)', sombra: 'rgba(194,71,122,.3)', halo: '#FF8FB8', destello: '#FFFFFF', ok: '#7FD8B5', peligro: '#C2477A', fuente: '"M PLUS Rounded 1c"', 'fuente-titulos': '"M PLUS Rounded 1c"', 'radio-isla': '25px', 'radio-panel': '24px', 'radio-tarjeta': '18px', 'radio-boton': '14px', etiqueta: '#75628C', 'filtro-oscuro': 'none' }],
+      samurai: ['Samurái', 'linear-gradient(135deg,#D7263D,#1B181D 70%)', '', 'linear-gradient(180deg,#1C1424,#2C1820 58%,#0E0A0D)',
+        { acento: '#D7263D', 'acento-tinta': '#F06A76', 'sobre-acento': '#FFFFFF', sec1: '#C9A55C', tinta: '#F1E9DA', tenue: '#B9AE98', superficie: 'rgba(16,14,18,.95)', tarjeta: '#1B181D', 'panel-fondo': '#130F14', filo: 'rgba(201,165,92,.28)', 'filo-isla': 'linear-gradient(90deg,#D7263D,#C9A55C)', 'filo-panel': 'linear-gradient(180deg,#C9A55C,#D7263D)', sombra: 'rgba(0,0,0,.8)', halo: '#D7263D', destello: '#E8DCC4', ok: '#C9A55C', peligro: '#E8505F', fuente: '"Zen Maru Gothic"', 'fuente-titulos': '"Shippori Mincho"', 'radio-isla': '14px', 'radio-panel': '12px', 'radio-tarjeta': '8px', 'radio-boton': '6px', etiqueta: '#B9AE98', 'filtro-oscuro': OSC }],
+      otono: ['Otoño', 'linear-gradient(135deg,#F2A541,#E8743B 50%,#8E3B46)', '', 'linear-gradient(170deg,#FFD9B3,#F4A97A 45%,#9C5A6E)',
+        { acento: '#E8743B', 'acento-tinta': '#A9461A', 'sobre-acento': '#FFFFFF', sec1: '#F2A541', tinta: '#4A2E24', tenue: '#7A5646', superficie: 'rgba(255,248,238,.96)', tarjeta: '#FFFDF8', 'panel-fondo': '#FFF4E8', filo: 'rgba(169,70,26,.16)', 'filo-isla': 'linear-gradient(90deg,#E8743B,#F2A541)', 'filo-panel': 'linear-gradient(180deg,#F2A541,#8E3B46)', sombra: 'rgba(169,70,26,.32)', halo: '#E8743B', destello: '#FFF2D6', ok: '#9CA25A', peligro: '#B5481B', fuente: '"Zen Maru Gothic"', 'fuente-titulos': '"Zen Maru Gothic"', 'radio-isla': '22px', 'radio-panel': '20px', 'radio-tarjeta': '16px', 'radio-boton': '12px', etiqueta: '#4A2E24', 'filtro-oscuro': 'none' }],
+      sad: ['Sad', 'linear-gradient(135deg,#8FA8D8,#2A3142)', '', 'linear-gradient(180deg,#2A3142,#1B2030 60%,#121520)',
+        { acento: '#8FA8D8', 'acento-tinta': '#B4C6EA', 'sobre-acento': '#151926', sec1: '#6C7A99', tinta: '#DCE2EE', tenue: '#A0AABD', superficie: 'rgba(24,28,38,.95)', tarjeta: '#1F2432', 'panel-fondo': '#191D29', filo: 'rgba(143,168,216,.18)', 'filo-isla': 'linear-gradient(90deg,#8FA8D8,#6C7A99)', 'filo-panel': 'linear-gradient(180deg,#8FA8D8,#6C7A99)', sombra: 'rgba(0,0,0,.7)', halo: '#8FA8D8', destello: '#C8D3EA', ok: '#7E8DA8', peligro: '#D99AA0', fuente: '"Zen Maru Gothic"', 'fuente-titulos': '"Zen Maru Gothic"', 'radio-isla': '22px', 'radio-panel': '20px', 'radio-tarjeta': '16px', 'radio-boton': '12px', etiqueta: '#A0AABD', 'filtro-oscuro': OSC }],
+    };
+    const clave = this.state.variante ?? (this.props.variante ?? 'profesional');
+    const [, , clases, fondo, v] = T[clave] ?? T.profesional;
+    const estiloRaiz = Object.entries(v).map(([k, x]) => '--' + k + ': ' + x).join('; ') +
+      '; position: relative; width: 1920px; height: 1040px; overflow: hidden; background: ' + fondo + ';';
+    const a = this.state.ahora, dos = (n) => String(n).padStart(2, '0');
+    const circ = 2 * Math.PI * 18;
+    return {
+      estiloRaiz, clases, barrido: clave === 'cyberpunk',
+      hora: dos(a.getHours()) + ':' + dos(a.getMinutes()),
+      metricas: [['CPU', 3], ['RAM', 49], ['Disco', 77]].map(([nombre, x]) => ({ nombre, valor: x + ' %', trazo: (circ * x / 100).toFixed(1) + ' ' + circ.toFixed(1) })),
+      redes: [87, 85, 67, 60].map((s, i) => ({ nombre: '[Red cercana ' + (i + 1) + ']', senal: s + '%', clase: i === 0 ? 'elegida' : '' })),
+      sesiones: [['VMware Workstation', '/_blob/e0984066416df1568fbdf0261ebae845', '80%'], ['Microsoft Teams', '/_blob/67916f7f95e500bcb4299ab3b2b5d482', '65%']].map(([nombre, icono, valor]) => ({ nombre, icono, valor })),
+      opciones: Object.entries(T).map(([k, t]) => ({ nombre: t[0], muestra: t[1], clase: k === clave ? 'elegida' : '', marcado: k === clave ? 'true' : 'false', elegir: () => this.setState({ variante: k }) })),
+    };
+  }
+}
+</script>
+</body>
+</html>
