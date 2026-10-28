@@ -43,7 +43,13 @@ gusta en Ajustes, con una vista previa de cada uno.
 | **Anime · Otoño** | Crema cálido, naranja arce `#E8743B`, ámbar y granate; hojas de arce cayendo; Nubecita con bufanda; fondo de atardecer con colinas | Maqueta: «Temas anime» |
 | **Anime · Sad** | Noche lluviosa azul grisácea, acento `#8FA8D8`; lluvia cayendo en el Inicio; Nubecita gris con lágrima y boca triste; saludo con puntos suspensivos; fondo de ciudad con ventanas encendidas | Maqueta: «Temas anime» |
 | **Oficina** | Claro y neutro tipo Fluent: blanco, grises, azul `#2F6FDB`. Sin adornos | Falta maqueta |
-| **Videojuegos** | Oscuro casi negro con un acento neón (`#39FF88` o `#FF3DCB`), esquinas más rectas, brillos marcados | Falta maqueta |
+| **Videojuegos** | Oscuro casi negro con un acento neón (`#39FF88` o `#FF3DCB`), esquinas en chaflán, brillos marcados y un modo «RGB» con colores que rotan | Falta maqueta |
+| **Invierno** | Azul hielo y blanco, nieve cayendo, Nubecita con gorro | Falta maqueta |
+
+**Se entregan exactamente estos 8 temas construidos** (Profesional, Oficina, Videojuegos,
+Invierno y los cuatro Anime). Todo lo demás lo crea el usuario con el Estudio de temas
+(decisión C). Muchos más temas de serie no aportan: cuesta mantenerlos y el usuario ya
+puede hacerse los que quiera.
 
 Reglas de los temas:
 
@@ -100,6 +106,96 @@ Cómo se hace:
    selector. Se avisa, no se impide: manda el usuario.
 7. **Exportar e importar** un tema personalizado como fichero (los colores, las medidas y
    las decoraciones encendidas), para poder compartirlo.
+
+### C. El Estudio de temas: el usuario crea los suyos, con muchísimas herramientas
+
+Una ventana propia, **Estudio de temas**, donde el usuario parte de cualquiera de los 8
+temas (o de cero), lo cambia todo y lo guarda como suyo. Tiene que dar **muchísimas**
+herramientas, sin que haga falta saber de diseño. Todas son posibles en WPF. Va por
+apartados:
+
+**1. Punto de partida**
+- Duplicar cualquier tema (de serie o propio) o empezar de cero; nombre, autor, familia
+  (Sobrios, Anime, Estaciones, Fiestas, Mis temas…), claro u oscuro.
+- **Generador rápido**: eliges 1 a 3 colores y propone el tema entero derivado (decisión B).
+- **Desde una imagen o el fondo de escritorio**: saca la paleta de una foto
+  (reutilizar `Paleta.cs` y el modo «Desde wallpaper» que ya existen).
+- **Armonías**: complementaria, análoga, tríada, monocromática… a partir del acento.
+- **«Sorpréndeme»**: un tema aleatorio coherente (que pase el contraste), y otra vez.
+
+**2. Colores** (la decisión B entera)
+- Todas las claves del catálogo, por zona, con buscador.
+- **Cuentagotas en pantalla**: coge el color de cualquier punto del escritorio.
+- **«Elegir en pantalla»**: pulsas un elemento de la barra y se abre su color.
+- Cada relleno puede ser **color liso o degradado lineal** (paradas, ángulo, opacidad).
+- Opacidad por color; paletas guardadas; colores recientes; copiar y pegar hexadecimal.
+- **Contraste en vivo** (aviso por debajo de 4,5:1 en texto, 3:1 en iconos) y **simulación
+  de daltonismo** (protanopia, deuteranopia, tritanopia) sobre la vista previa.
+
+**3. Forma**
+- Radios por pieza (isla, paneles, tarjetas, botones, deslizadores) y tipo de esquina
+  (redonda o en chaflán).
+- Grosor y estilo del filo (liso o degradado), separaciones, relleno de las tarjetas, alto de
+  la isla, tamaño de iconos.
+- Sombras: color, difuminado, desplazamiento y opacidad.
+- Transparencia de cada superficie.
+
+**4. Letra**
+- Elegir entre las fuentes instaladas o **importar** un `.ttf` u `.otf` (viaja con el tema).
+- Letra distinta para títulos y para el resto; tamaño base y escala; peso; mayúsculas y
+  espaciado de los títulos de sección; cifras tabulares en relojes.
+
+**5. Decoraciones**, un catálogo de piezas con sus parámetros, combinables
+- **Partículas**: forma (pétalo, hoja, gota, copo, estrella, burbuja, corazón, confeti… o una
+  **forma propia** desde un trazado SVG o una imagen PNG), cantidad, tamaño, colores,
+  velocidad, dirección (caer, subir, de lado), giro y vaivén, y **dónde** (Inicio,
+  laterales, paneles; nunca sobre el escritorio).
+- **Destellos**: dónde (junto a la hora, en las tarjetas…), cuántos, color y ritmo.
+- **Halo** de la isla: color, tamaño y respiración.
+- **Destello del filo**: colores, anchura y velocidad, o apagado; y el modo **RGB** con
+  colores que rotan.
+- **Mascota Nubecita** (`Nubecita.cs`): cara (alegre, seria, triste, dormida, guiño…),
+  accesorios (*hachimaki*, bufanda, gorro, gafas de sol, auriculares…), colores, dónde sale,
+  o **sustituirla por una imagen propia**.
+- **Marca de agua**: un texto, un kanji o una imagen tras las tarjetas, con opacidad y sitio.
+- **Fondo de escritorio del tema** (opcional): color, degradado, imagen o pase de fotos
+  (`GestorFondos`).
+
+**6. Movimiento**
+- Velocidad general y tipo de curva (con rebote o suave); cómo entran los paneles (escala,
+  deslizar o fundido) y el escalonado; cuánto se levantan los iconos; la lupa del dock.
+- Siempre por debajo del nivel de animaciones del sistema: si está en «reducido», manda.
+
+**7. Textos y detalles**
+- Saludo con plantilla (`{saludo}`, `{nombre}`, `{hora}`…), la pista del buscador, el formato
+  de fecha y hora.
+- Iconos de sistema: contorno o relleno, color y tamaño; halo para iconos oscuros sí o no.
+
+**8. Vista previa y prueba**
+- Vista previa en vivo de **todas** las superficies (isla, Inicio, cada panel, laterales,
+  dock, avisos) con datos de ejemplo; **antes y después**; probar el tema en la barra real
+  con un botón de **volver** que deshace en un clic.
+- **Deshacer y rehacer** ilimitado, e historial de versiones del tema.
+- **Medidor de consumo** del tema: estima el coste de sus decoraciones (partículas,
+  brillos) y avisa si va a gastar batería; con un tope de partículas que no se puede
+  saltar.
+
+**9. Automático**
+- Tema distinto según la hora (claro de día, oscuro de noche), según la fecha (fiestas),
+  según el escritorio virtual o según el monitor.
+
+**10. Compartir**
+- Exportar e importar como un único fichero `.nubetema` (un zip con el JSON de valores, las
+  fuentes y las imágenes). **Solo datos, nunca código**: al importarlo se valida todo, lo que
+  no se entiende se ignora y se avisa, y un tema roto no puede tumbar la barra (vuelve al
+  último tema bueno y lo apunta en el log).
+- Más adelante, una galería de temas de la comunidad.
+
+Encaje en el código: el Estudio es otra ventana como `VentanaAjustes` (reutiliza
+`SelectorColor.cs` y los controles de Ajustes); los temas de serie y los del usuario usan
+**el mismo formato** de fichero, así que «duplicar un tema de serie» es copiar su fichero.
+Las pruebas exigen que los 8 de serie pasen el contraste y que un `.nubetema` mal formado se
+rechace sin romper nada.
 
 ---
 
@@ -309,13 +405,17 @@ Cada fase se publica como versión para probarla antes de seguir.
    progreso, ecualizador por pico), teclado y energía.
 4. **Paneles de la isla**: red, audio, batería, notificaciones y bandeja.
 5. **Laterales y dock**: entradas, secciones, deslizadores, anillos y lupa del dock.
-6. **Tema Anime**: sus valores, la fuente incrustada y sus decoraciones (Nubecita, pétalos,
-   destellos).
-7. **Temas Oficina y Videojuegos**: primero su maqueta, después sus valores.
-8. **Selector de temas** en Ajustes con vista previa de cada uno, exportar e importar.
+6. **Temas Anime** (Sakura, Samurái, Otoño, Sad): sus valores, las fuentes incrustadas y las
+   decoraciones que estrenan (partículas, destellos, mascota con accesorios, marca de agua).
+7. **Temas Oficina, Videojuegos e Invierno**: primero su maqueta, después sus valores.
+8. **Selector de temas** en Ajustes, agrupado por familias y con vista previa de cada uno.
+9. **Estudio de temas** (decisión C), por orden: colores y forma; letra; decoraciones;
+   movimiento y textos; vista previa, deshacer y medidor de consumo; automático; exportar e
+   importar `.nubetema`.
 
-Todo lo que se construya en las fases 1 a 7 toma sus colores **del catálogo**, nunca de un
-valor escrito en el código.
+Todo lo que se construya en las fases 1 a 8 toma sus colores, medidas y decoraciones **del
+tema**, nunca de un valor escrito en el código: es lo que hace posible que el Estudio pueda
+cambiarlo todo.
 
 Con todo lo decorativo:
 
