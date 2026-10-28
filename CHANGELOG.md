@@ -6,6 +6,22 @@ construidos por el workflow de Release a partir de la etiqueta.
 
 ---
 
+## v1.0.0
+
+**La numeración empieza de cero.** Esta 1.0.0 es el mismo NubeBar que se publicó como
+1.4.2 el 28/10/2026: todo lo que cuentan las notas de abajo está dentro. Las Releases y
+etiquetas de la numeración anterior (de la v1.0.0 a la v1.4.2) se retiraron de GitHub; sus
+notas se quedan aquí como historial.
+
+---
+
+# Historial — numeración anterior
+
+Las versiones de aquí abajo ya no están publicadas como Release. Se conservan las notas para
+saber de dónde viene cada cosa.
+
+---
+
 ## v1.4.2
 
 ### Nuevo
