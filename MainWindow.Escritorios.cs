@@ -145,20 +145,22 @@ public partial class MainWindow : Window
     // binario es de lo que hace que una barra parezca recargada sin que uno sepa señalar por
     // qué. El relleno lo dice entero y de un vistazo, así que la rayita sobra.
     //
-    // El azul no es el acento del tema: en NubeHypr el azul significa «aquí estás» en los
-    // siete temas, y si fuera el acento, en el tema Nube «aquí estás» saldría coral — que es
-    // el color de los avisos. Ver `HyprPinta`.
+    // El color sale del catálogo (`escritorio.actual.fondo`), no de un cian escrito a mano.
+    // La regla de antes —«aquí estás» no puede salir del mismo tono que «cuidado»— se conserva
+    // entera, pero vive ahora en la derivación de esa clave: manda el acento del tema, y solo
+    // si el acento se confunde con el de peligro manda el secundario. Así el indicador es del
+    // tema que tengas puesto en vez de un cian que no es de ninguno.
     //
-    // El número de encima NO se pinta de un color fijo. Un blanco a pelo sobre un azul claro
-    // —y hay temas claros— se lee mal; `Contraste.Legible` da la versión del color de texto
-    // que de verdad contrasta sobre ese azul, que es exactamente para lo que existe.
+    // El número de encima tampoco se pinta de un color fijo. Un blanco a pelo sobre un relleno
+    // claro —y hay cuatro temas claros— se lee mal; la clave `escritorio.actual.texto` da la
+    // versión del color de texto que de verdad contrasta encima, que es para lo que existe.
     //
     // Y el puntito de estado sigue yendo por TAMAÑO, no por color: el color ya lo ocupa
     // «cuál es el actual», y dos informaciones en el mismo canal no se distinguen.
     UIElement NumeroEscritorio(Escritorios.Info d, HyprIndicador.Ficha f)
     {
-        var azul = HyprPinta.Azul(_roles);
-        var tintaEncima = Contraste.Legible(_roles.Texto, azul);
+        var relleno = _roles.Pincel("escritorio.actual.fondo");
+        var tintaEncima = _roles.Pincel("escritorio.actual.texto");
 
         var fila = new Grid { HorizontalAlignment = HorizontalAlignment.Center };
 
@@ -169,13 +171,13 @@ public partial class MainWindow : Window
         {
             Width = 20, Height = 20,
             CornerRadius = new CornerRadius(6),
-            Background = d.EsElActual ? new SolidColorBrush(azul) : Brushes.Transparent,
+            Background = d.EsElActual ? relleno : Brushes.Transparent,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             Child = new TextBlock
             {
                 Text = d.Numero.ToString(),
-                Foreground = d.EsElActual ? new SolidColorBrush(tintaEncima) : _texto,
+                Foreground = d.EsElActual ? tintaEncima : _roles.Pincel("escritorio.numero"),
                 Opacity = d.EsElActual ? 1 : 0.45,
                 FontSize = 12,
                 FontWeight = d.EsElActual ? FontWeights.SemiBold : FontWeights.Normal,
@@ -193,7 +195,7 @@ public partial class MainWindow : Window
                 // Sobre el relleno azul el punto va de la tinta legible, no del azul: con el
                 // dibujo de antes el punto del escritorio ACTUAL habría quedado azul sobre
                 // azul, invisible justo en el único donde importa.
-                Background = new SolidColorBrush(d.EsElActual ? tintaEncima : _roles.Texto),
+                Background = d.EsElActual ? tintaEncima : _texto,
                 Opacity = d.EsElActual ? 0.95 : 0.40,
                 HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Top,

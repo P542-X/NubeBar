@@ -342,6 +342,22 @@ public partial class VentanaAjustes
         c.Rotulo.Contains(filtro, StringComparison.OrdinalIgnoreCase) ||
         Textos.T(c.Rotulo).Contains(filtro, StringComparison.OrdinalIgnoreCase);
 
+    // El cajón de color que está abierto ahora mismo, para cerrarlo al abrir otro. Uno cada
+    // vez: con dos abiertos ya no se ve la lista, que es lo que se vino a mirar.
+    Border? _colorAbierto;
+
+    // ---------- Una fila ----------
+    //
+    // ---------- El error que esto corrige ----------
+    //
+    // La primera versión ponía un `SelectorColor` **montado** en cada fila. `SelectorColor` no
+    // es una muestra: es un panel de 120 px de alto con su cuadrado de saturación, su barra de
+    // tono, su barra de opacidad y su campo hexadecimal. Ciento treinta de esos, uno debajo de
+    // otro, no es una lista de colores: es un muro. El usuario lo vio y lo dijo con una
+    // palabra — «devastador» —, y tenía toda la razón.
+    //
+    // Una fila es **una línea**: qué es, de qué color está y si lo has tocado. El selector
+    // aparece debajo cuando pulsas la muestra, y solo uno a la vez.
     UIElement FilaDeColor(ClaveColor c)
     {
         var mios = _arbol.Colores("Tema");
@@ -353,37 +369,46 @@ public partial class VentanaAjustes
         izquierda.Children.Add(new TextBlock
         {
             Text = Textos.T(c.Rotulo), Foreground = _texto, FontSize = 12.5,
+            TextTrimming = TextTrimming.CharacterEllipsis,
         });
 
-        var detalle = new TextBlock
+        var bajo = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 1, 0, 0) };
+        bajo.Children.Add(new TextBlock
         {
             Text = c.Clave, Foreground = _textoAtenuado, FontSize = 10.5,
-            Margin = new Thickness(0, 1, 0, 0),
-        };
-        izquierda.Children.Add(detalle);
+            VerticalAlignment = VerticalAlignment.Center,
+        });
+
+        if (personalizado)
+            bajo.Children.Add(new TextBlock
+            {
+                Text = "· " + Textos.T("cambiado por ti"), Foreground = _acentoLegible,
+                FontSize = 10.5, Margin = new Thickness(6, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+            });
 
         // ---------- El contraste, cuando a esa clave se le mide ----------
         //
-        // «Se avisa, no se impide: manda el usuario». Así que esto es un número y una frase,
-        // no un candado.
+        // «Se avisa, no se impide: manda el usuario». Así que esto es un número y, cuando no
+        // llega, una frase. No un candado.
         if (c.SeMide)
         {
             double r = _roles.Pintura.ContrasteDe(c.Clave);
             bool vale = r >= c.MinimoContraste;
-            izquierda.Children.Add(new TextBlock
+            bajo.Children.Add(new TextBlock
             {
                 Text = vale
-                    ? string.Format(Textos.T("contraste {0}:1"), r.ToString("0.0"))
-                    : string.Format(Textos.T("contraste {0}:1 — no se lee sobre «{1}» (hace falta {2}:1)"),
+                    ? string.Format(Textos.T("· {0}:1"), r.ToString("0.0"))
+                    : string.Format(Textos.T("· {0}:1 — no se lee sobre «{1}» (hace falta {2}:1)"),
                                     r.ToString("0.0"), c.Sobre, c.MinimoContraste.ToString("0.0")),
                 Foreground = vale ? _textoAtenuado : _roles.Pincel("ajustes.aviso.mal"),
-                FontSize = 10.5,
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 2, 0, 0),
+                FontSize = 10.5, Margin = new Thickness(6, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
             });
         }
+        izquierda.Children.Add(bajo);
 
-        // ---------- La derecha: el color ----------
+        // ---------- La derecha: la muestra, que es el botón ----------
         var derecha = new StackPanel
         {
             Orientation = Orientation.Horizontal,
@@ -391,46 +416,122 @@ public partial class VentanaAjustes
             HorizontalAlignment = HorizontalAlignment.Right,
         };
 
-        if (relleno.EsDegradado)
+        var cajon = new Border
         {
-            // Un degradado se ve y se puede quitar, pero no se afina aquí: ver la nota de
-            // arriba del fichero.
-            derecha.Children.Add(new Border
+            Visibility = Visibility.Collapsed,
+            Background = _superficie,
+            BorderBrush = new SolidColorBrush(_roles.Borde),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(10, 8, 10, 10),
+            Margin = new Thickness(0, 4, 0, 6),
+        };
+
+        var muestra = new Border
+        {
+            Width = 38, Height = 22,
+            Background = relleno.Pincel(),
+            BorderBrush = new SolidColorBrush(_roles.Borde),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(5),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+
+        var dentroDelBoton = new StackPanel { Orientation = Orientation.Horizontal };
+        dentroDelBoton.Children.Add(muestra);
+        dentroDelBoton.Children.Add(new TextBlock
+        {
+            Text = relleno.EsDegradado ? Textos.T("degradado") : Relleno.Hex(relleno.Color),
+            Foreground = _textoAtenuado, FontSize = 10.5,
+            Margin = new Thickness(7, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+        });
+
+        var abrir = new Button
+        {
+            Content = dentroDelBoton,
+            Background = Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            Padding = new Thickness(4, 2, 4, 2),
+            Cursor = Cursors.Hand,
+            // Un degradado se ve y se puede restablecer, pero no se afina aquí: `SelectorColor`
+            // da un color, y un degradado son paradas, ángulo y opacidad. Es el apartado 3 del
+            // Estudio de temas (fase 9).
+            IsEnabled = !relleno.EsDegradado,
+            ToolTip = relleno.EsDegradado
+                ? Textos.T("Un degradado. Se edita en el Estudio de temas.")
+                : string.Format(Textos.T("Cambiar «{0}»"), Textos.T(c.Rotulo)),
+        };
+        System.Windows.Automation.AutomationProperties.SetName(
+            abrir, string.Format(Textos.T("Color de {0}"), Textos.T(c.Rotulo)));
+
+        abrir.Click += (_, _) =>
+        {
+            if (cajon.Visibility == Visibility.Visible) { Cerrar(); return; }
+
+            // Uno cada vez.
+            if (_colorAbierto is { } otro) otro.Visibility = Visibility.Collapsed;
+            _colorAbierto = cajon;
+
+            // El selector se monta la PRIMERA vez que se abre esta fila, no al construir la
+            // lista: es justo lo que hacía que la página pesara ciento treinta veces de más.
+            if (cajon.Child == null)
             {
-                Width = 56, Height = 22, Background = relleno.Pincel(),
-                BorderBrush = new SolidColorBrush(_roles.Borde), BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(4), VerticalAlignment = VerticalAlignment.Center,
-                ToolTip = Textos.T("Un degradado. Se edita en el Estudio de temas."),
-            });
-        }
-        else
-        {
-            // Opacidad sí, salvo en lo que hace de texto: una letra a medio alfa no es una
-            // decisión, es un texto que no se lee, y para eso ya está el color.
-            var sel = new SelectorColor { ConOpacidad = c.Papel != Papel.Texto }.Montar();
-            sel.Valor = relleno.Color;
-            sel.Cambiado += v => EscribirColor(c, Relleno.Liso(v));
-            sel.VerticalAlignment = VerticalAlignment.Center;
-            derecha.Children.Add(sel);
-        }
+                // Opacidad sí, salvo en lo que hace de texto: una letra a medio alfa no es una
+                // decisión, es un texto que no se lee, y para eso ya está el color.
+                var sel = new SelectorColor { ConOpacidad = c.Papel != Papel.Texto }.Montar();
+                sel.Valor = relleno.Color;
+                sel.Cambiado += v =>
+                {
+                    muestra.Background = new SolidColorBrush(v);
+                    EscribirColor(c, Relleno.Liso(v));
+                };
+                cajon.Child = sel;
+            }
+            cajon.Visibility = Visibility.Visible;
+
+            void Cerrar()
+            {
+                cajon.Visibility = Visibility.Collapsed;
+                if (ReferenceEquals(_colorAbierto, cajon)) _colorAbierto = null;
+            }
+        };
+
+        derecha.Children.Add(abrir);
 
         if (personalizado)
         {
-            izquierda.Children.Insert(1, new TextBlock
+            var quitar = new Button
             {
-                Text = Textos.T("cambiado por ti"), Foreground = _acentoLegible, FontSize = 10.5,
-            });
-            derecha.Children.Add(BotonPlano("Restablecer", () => RestablecerColor(c), false));
+                Content = "⟲",
+                FontSize = 13,
+                Width = 26, Height = 22,
+                Foreground = _textoAtenuado,
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Cursor = Cursors.Hand,
+                Margin = new Thickness(4, 0, 0, 0),
+                ToolTip = Textos.T("Devolverle este color al tema"),
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            System.Windows.Automation.AutomationProperties.SetName(
+                quitar, string.Format(Textos.T("Restablecer {0}"), Textos.T(c.Rotulo)));
+            quitar.Click += (_, _) => RestablecerColor(c);
+            derecha.Children.Add(quitar);
         }
 
-        var rejilla = new Grid { Margin = new Thickness(0, 7, 0, 7) };
+        var rejilla = new Grid { Margin = new Thickness(0, 3, 0, 3) };
         rejilla.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         rejilla.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         Grid.SetColumn(izquierda, 0);
         Grid.SetColumn(derecha, 1);
         rejilla.Children.Add(izquierda);
         rejilla.Children.Add(derecha);
-        return rejilla;
+
+        var pila = new StackPanel();
+        pila.Children.Add(rejilla);
+        pila.Children.Add(cajon);
+        return pila;
     }
 
     void EscribirColor(ClaveColor c, Relleno valor)

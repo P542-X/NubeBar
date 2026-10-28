@@ -153,6 +153,18 @@ public static class Catalogo
             return Relleno.Liso(Contraste.Legible(Contraste.Mezclar(p.Color(otra), fondo, k), fondo, minimo));
         };
 
+    // Dos colores que dirían lo mismo. «Aquí estás» y «cuidado» no pueden salir del mismo
+    // tono: si salen, el color deja de informar y queda de adorno. Se mide por TONO y solo
+    // cuenta si los dos están saturados — dos grises no se confunden, se parecen.
+    const double TonosQueSeTocan = 32;
+
+    internal static bool SeConfunden(Color a, Color b)
+    {
+        if (Contraste.Saturacion(a) < 0.25 || Contraste.Saturacion(b) < 0.25) return false;
+        double d = Math.Abs(Contraste.Tono(a) - Contraste.Tono(b));
+        return Math.Min(d, 360 - d) < TonosQueSeTocan;
+    }
+
     // ================= La tabla =================
 
     static ClaveColor[] Montar() => Comunes()
@@ -290,6 +302,32 @@ public static class Catalogo
         // El halo claro que se le pone detrás a un icono oscuro para que no desaparezca
         // sobre la isla (`Legible`, `Iconos.EsOscuro`). Es un efecto, no un color de marca,
         // pero tiene que poder cambiarse: en un tema CLARO el halo útil es oscuro.
+        // ---------- El escritorio actual ----------
+        //
+        // Era un cian fijo (`HyprPinta.AzulNube`) con este motivo escrito al lado: «el azul no
+        // es el acento del tema; si lo fuera, en el tema Nube "aquí estás" saldría coral, que
+        // es el color de los avisos».
+        //
+        // El motivo es bueno y se conserva; lo que no se puede conservar es el color escrito a
+        // mano. Con los nueve temas ese cian no es de ninguno: el usuario lo vio en Profesional
+        // y lo dijo — «sobresale un rectángulo, queda feísimo». Así que la regla pasa a ser la
+        // DERIVACIÓN: manda el acento, y solo si el acento se confunde con el color de peligro
+        // —que es lo que pasa en Samurái, Sakura y Otoño— manda el secundario. Un tema puede
+        // declarar el suyo y el usuario cambiarlo, como cualquier otra clave.
+        C("escritorio.actual.fondo", ZonaColor.Isla, "Escritorio actual",
+          p => Relleno.Liso(SeConfunden(p.Color(ClavesBase.Acento), p.Color(ClavesBase.Peligro))
+                                ? p.Color(ClavesBase.Sec2)
+                                : p.Color(ClavesBase.Acento))),
+        // Blanco o negro, el que más se lea. No vale aclarar la tinta del tema hacia el
+        // relleno: partiendo de un texto casi blanco, `Legible` no tiene a dónde ir sobre un
+        // acento de tono medio y se queda en 2,3:1 — lo midieron las pruebas en los nueve.
+        // Es la misma cuenta que `sobre-acento`, y por el mismo motivo.
+        C("escritorio.actual.texto", ZonaColor.Isla, "Número del escritorio actual",
+          p => Relleno.Liso(Contraste.TintaSobre(p.ColorOpaco("escritorio.actual.fondo"))),
+          Papel.Texto, "escritorio.actual.fondo"),
+        C("escritorio.numero", ZonaColor.Isla, "Números de los demás escritorios",
+          TintaDe(ClavesBase.Tenue, ClavesBase.Superficie, 3.0), Papel.Icono, "isla.fondo"),
+
         C("icono.halo", ZonaColor.Isla, "Halo de los iconos oscuros",
           p => Relleno.Liso(p.Tema.Claro ? Colors.Black : Colors.White), Papel.Efecto),
 
