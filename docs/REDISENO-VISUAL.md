@@ -5,8 +5,9 @@ para que una sesión nueva pueda empezar por aquí sin más contexto: qué se qu
 puede y qué no, dónde tocar, en qué orden y cómo comprobarlo.
 
 **La maqueta:** <https://claude.ai/artifact/EPD2FVAWaDM8eeFbzKRcEF> (privada: solo la abre el
-dueño de la cuenta). Siete pantallas: «Isla e Inicio», «Laterales y dock» y, debajo, los
-paneles que cuelgan de la isla: red, audio, batería, notificaciones y bandeja.
+dueño de la cuenta). Ocho pantallas: «Isla e Inicio», «Laterales y dock»; debajo, los
+paneles que cuelgan de la isla (red, audio, batería, notificaciones y bandeja); y debajo,
+«Tema anime».
 
 ---
 
@@ -25,7 +26,81 @@ lo que se ve en ella es el objetivo literal. Lo que se descartó, y por qué:
 
 ---
 
-## Los colores
+## Dos decisiones que mandan sobre todo lo demás
+
+### A. Temas completos que elige el usuario (fuera Normal, Nube y Neón)
+
+Los estilos actuales —**Normal, Nube y Neón** (`EstiloVisual.cs`, `Neon.cs`, `Tema.Estilo`)—
+**se quitan**. En su lugar hay **temas completos**: cada uno trae colores, forma (radios,
+grosores), letra, decoraciones y animaciones propias, y el usuario elige el que más le
+gusta en Ajustes, con una vista previa de cada uno.
+
+| Tema | Idea | Estado |
+|---|---|---|
+| **Profesional** | Gris carbón, azul acero, plata. Sobrio | Maqueta: «Isla e Inicio», «Laterales y dock» y los paneles |
+| **Anime** | Pastel claro (sakura, lavanda, cielo, menta), letra redondeada, Nubecita, pétalos | Maqueta: «Tema anime» |
+| **Oficina** | Claro y neutro tipo Fluent: blanco, grises, azul `#2F6FDB`. Sin adornos | Falta maqueta |
+| **Videojuegos** | Oscuro casi negro con un acento neón (`#39FF88` o `#FF3DCB`), esquinas más rectas, brillos marcados | Falta maqueta |
+
+Reglas de los temas:
+
+- **Un tema es un paquete de valores, no código aparte.** Todos los temas pintan las mismas
+  piezas con los mismos componentes; lo que cambia son los valores de sus colores (B), sus
+  medidas (radio, grosor del filo, separaciones), su fuente y qué decoraciones lleva
+  encendidas (pétalos, destellos, halo, mascota…). Así un tema nuevo es un fichero de
+  valores y no una rama del código.
+- **Las decoraciones propias de un tema** (pétalos de Anime, destellos, Nubecita) son
+  piezas opcionales que cualquier tema puede encender, con su interruptor en Ajustes.
+- **Migración del config** (`Esquema.cs`, con su copia de seguridad): `Tema.Estilo`
+  desaparece. `normal` y `neon` pasan a Profesional; `nube` pasa a Anime si el usuario no
+  ha tocado colores, y si no, a Profesional conservando sus colores como personalizaciones
+  (B). La migración se prueba como las demás (`Pruebas`, grupo de migraciones).
+- **Al quitar los estilos**, `Pruebas.Confirmar.cs` (31 usos), `MainWindow.DiagNeon.cs` y la
+  parte de `VentanaAjustes.cs` que los elige se rehacen para los temas; nada de dejar código
+  muerto.
+
+### B. Todos los colores de todo, editables por el usuario
+
+**Cualquier color de cualquier elemento de la app se puede cambiar.** Sin excepciones: la
+isla, su filo y su destello, cada icono de sistema, los puntos de las apps, el reloj, la
+insignia, cada parte de cada panel, los deslizadores, los botones (en reposo, al pasar el
+ratón, pulsados, desactivados), las barras de desplazamiento, el dock, los laterales, los
+avisos, la ventana de Ajustes…
+
+Cómo se hace:
+
+1. **Un catálogo de colores con nombre** (ampliar `Roles.cs` hasta cubrir cada elemento).
+   Cada color de la interfaz tiene una clave estable y legible, agrupada por zona:
+   `isla.fondo`, `isla.filo`, `isla.destello`, `isla.halo`, `app.punto`,
+   `app.punto.activo`, `reloj.texto`, `insignia.fondo`, `panel.fondo`, `tarjeta.fondo`,
+   `tarjeta.filo`, `boton.fondo`, `boton.fondo.raton`, `boton.texto.desactivado`,
+   `deslizador.lleno`, `deslizador.pomo`, `scroll.pastilla`, `energia.apagar`…
+2. **Cascada**: el valor de una clave sale de (1) lo que haya puesto el usuario; si no, (2)
+   lo que diga el tema; si no, (3) se **deriva** de los colores básicos del tema (fondo,
+   texto, acento), como ya hace `Roles` con superficie o texto atenuado. Así un tema puede
+   definir solo cuatro colores y todo sale coherente, y el usuario puede afinar cualquiera.
+3. **Nada de colores escritos a mano en la interfaz.** Hoy hay **53** (`Color.FromRgb`,
+   `Brushes.Gold`, `Brushes.Tomato`… en `MainWindow*.cs`, `VentanaAjustes*.cs` y
+   `Biblioteca.cs`): cada uno pasa a ser una clave del catálogo. Una **prueba** lo vigila:
+   recorre el código y falla si aparece un color literal fuera del catálogo y de los temas.
+   Otra prueba exige que todas las claves tengan valor en todos los temas (o se deriven).
+4. **Guardado**: en `config.json`, `Tema.Colores` es un diccionario `clave → #AARRGGBB` solo
+   con lo que el usuario ha cambiado. Cambiar de tema conserva o descarta esas
+   personalizaciones, a elección del usuario (se pregunta).
+5. **Ajustes > Colores**: la lista de todas las claves agrupadas por zona (Isla, Inicio,
+   Paneles, Laterales, Dock, Avisos, Ajustes), cada una con su muestra, el selector propio
+   (`SelectorColor.cs`, con opacidad), **«Restablecer»** por color y **«Restablecer todo»**,
+   un buscador («reloj», «apagar»…) y un modo **«Elegir en pantalla»**: se pulsa cualquier
+   elemento de la barra y se abre su color. Los cambios se ven en vivo.
+6. **Contraste**: al elegir un color de texto o de icono, si no se lee sobre su fondo
+   (`Contraste.Entre` por debajo de 4,5:1 en texto, 3:1 en iconos), se avisa en el propio
+   selector. Se avisa, no se impide: manda el usuario.
+7. **Exportar e importar** un tema personalizado como fichero (los colores, las medidas y
+   las decoraciones encendidas), para poder compartirlo.
+
+---
+
+## Tema Profesional: los colores
 
 Una sola familia fría y sobria. El coral es **solo** una señal (aviso sin leer, «Apagar» al
 pasar el ratón), nunca decoración.
@@ -48,10 +123,41 @@ Acentos alternativos sobrios que la maqueta ofrece: `#9FB4C7`, `#7FA8B8`, `#A9A3
 Tipografía: **Segoe UI Variable** (la de Windows 11). Títulos de sección en mayúsculas
 pequeñas, 11,5 px, espaciado 0,06 em, color tenue.
 
-Encaje en el código: los colores salen de `Roles.Desde(...)` (`Roles.cs`) a partir de
-`Tema.Fondo/Texto/Acento`. Lo limpio es un **tema nuevo** en `Temas.cs` con estos valores, y
-que `Roles` derive superficie, tarjeta, filo y tenue como ya hace. Comprobar contraste con
+Encaje en el código: estos son los valores del tema Profesional dentro del catálogo de la
+decisión B; lo que no se fije aquí lo deriva `Roles` como ya hace. Comprobar contraste con
 `Contraste.Entre` (las pruebas de E8 ya miden texto sobre superficies).
+
+## Tema Anime: los colores y lo suyo
+
+Pantalla «Tema anime» de la maqueta. Es un tema **claro**.
+
+| Papel | Valor |
+|---|---|
+| Superficie de isla y paneles | `#FFFBFD` al 95 % (paneles con degradado `#FFF7FB → #FBF7FF`) |
+| Tarjeta | `#FFFFFF`, filo `#C2477A` al 14 %, sombra rosada suave |
+| Texto | `#4A3B5C` (ciruela) |
+| Texto tenue | `#75628C` (≥ 4,5:1 sobre blanco) |
+| Acento | sakura `#FF8FB8` (configurable) |
+| Acento para texto y enlaces | `#C2477A` |
+| Secundarios | lavanda `#B8A4F4`, cielo `#7EC8F5`, menta `#7FD8B5` |
+| Fondo de escritorio | degradado `#FFE4EF → #F1E6FF → #DCEEFF` con nubes blancas, quieto |
+
+Forma y letra: radios grandes (isla 25, tarjetas 20, botones redondos o en píldora), filo
+de la isla y de los paneles en **degradado sakura → lavanda** de 1,5 px, separadores como
+rayitas lavanda redondeadas. Letra **M PLUS Rounded 1c** (Google Fonts, licencia OFL),
+**incrustada** en el ejecutable como recurso de WPF.
+
+Decoraciones (cada una con su interruptor):
+
+- **Nubecita** (`Nubecita.cs`, ya existe con su cara y su parpadeo) en la cabecera del Inicio,
+  con coloretes y flotando arriba y abajo 4 px en 3,2 s; y en pequeño como botón Inicio.
+- **Pétalos de sakura** cayendo **solo dentro del menú Inicio**, nunca sobre el escritorio:
+  7 formas vectoriales en un `Canvas`, cada una con su caída, giro y vaivén (9–14 s),
+  semitransparentes y sin recibir el ratón. Se paran con el panel cerrado.
+- **Destellos** de cuatro puntas que titilan junto a la hora (2,6 s, desfasados).
+- Ecualizador con una barra de cada color pastel; play como círculo sakura relleno; el
+  teclado activo como píldora en degradado sakura → lavanda; «Apagar» rosa que al pasar el
+  ratón se rellena de sakura.
 
 ---
 
@@ -166,8 +272,10 @@ El icono del que cuelgan se marca con fondo acento al 18 % mientras están abier
 - La barra de desplazamiento propia (`BarraDeScroll.cs`).
 - El halo claro para iconos oscuros (`Legible`).
 - La escala de paneles según la pantalla (`EscalaDePaneles`, `Barra.EscalaPaneles`).
-- Los niveles de animación (`Animacion.Elegir`, `Animacion.Adorno`) y los estilos visuales
-  (`EstiloVisual`: Normal, Nube, Neón).
+- Los niveles de animación (`Animacion.Elegir`, `Animacion.Adorno`).
+- `Nubecita.cs` para la mascota del tema Anime, y `SelectorColor.cs` para Ajustes > Colores.
+- **No** se reutilizan los estilos Normal, Nube y Neón: se quitan (decisión A). Lo útil de
+  Neón (el halo con `DropShadowEffect` que respira) pasa a ser una decoración más.
 
 ---
 
@@ -175,14 +283,25 @@ El icono del que cuelgan se marca con fondo acento al 18 % mientras están abier
 
 Cada fase se publica como versión para probarla antes de seguir.
 
-1. **Tema nuevo**: colores, filos, tarjetas, tipografía, títulos de sección. Lo que más
-   cambia la imagen y lo menos arriesgado.
+0. **Los cimientos: catálogo de colores y temas** (decisiones A y B). El catálogo con todas
+   las claves y su cascada; los 53 colores escritos a mano pasados al catálogo; la prueba
+   que lo vigila; los temas como paquetes de valores; quitar Normal, Nube y Neón con su
+   migración del config; y Ajustes > Colores con todo editable. **Va primero**: si se pinta
+   la isla nueva antes de esto, habría que rehacerla para que sus colores fueran editables.
+1. **Tema Profesional**: sus valores, filos, tarjetas, tipografía, títulos de sección.
 2. **La isla**: destello del filo, halo, reloj con brillo, insignia con latido, puntos de
    las apps.
 3. **El menú Inicio**: entrada y escalonado, buscador con franja, música (carátula,
    progreso, ecualizador por pico), teclado y energía.
 4. **Paneles de la isla**: red, audio, batería, notificaciones y bandeja.
 5. **Laterales y dock**: entradas, secciones, deslizadores, anillos y lupa del dock.
+6. **Tema Anime**: sus valores, la fuente incrustada y sus decoraciones (Nubecita, pétalos,
+   destellos).
+7. **Temas Oficina y Videojuegos**: primero su maqueta, después sus valores.
+8. **Selector de temas** en Ajustes con vista previa de cada uno, exportar e importar.
+
+Todo lo que se construya en las fases 1 a 7 toma sus colores **del catálogo**, nunca de un
+valor escrito en el código.
 
 Con todo lo decorativo:
 
