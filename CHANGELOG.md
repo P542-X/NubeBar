@@ -6,6 +6,19 @@ construidos por el workflow de Release a partir de la etiqueta.
 
 ---
 
+## v1.0.1
+
+### Arreglado
+
+- **Cuelgue al cerrar y abrir la tapa del portátil.** Al volver de la suspensión, el hilo
+  de .NET que reparte los avisos del sistema esperaba a la interfaz, y la interfaz le
+  preguntaba el título a la ventana oculta de ese mismo hilo: cada uno esperando al otro,
+  la isla congelada hasta que Windows la cerraba. Ahora los títulos se leen sin preguntarle
+  nada a la ventana (`InternalGetWindowText`), como hacen las barras de tareas. Encontrado
+  con la foto del vigía de cuelgues y comprobado provocándolo a propósito.
+
+---
+
 ## v1.0.0
 
 **La numeración empieza de cero.** Esta 1.0.0 es el mismo NubeBar que se publicó como

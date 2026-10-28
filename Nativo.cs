@@ -16,8 +16,28 @@ public static class Nativo
     [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc cb, IntPtr l);
     [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
     [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
-    [DllImport("user32.dll")] static extern int GetWindowTextLength(IntPtr h);
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+    // ---------- El título, SIN preguntarle a la ventana ----------
+    //
+    // `GetWindowText` y `GetWindowTextLength` sobre una ventana de OTRO programa le mandan
+    // un mensaje (WM_GETTEXT) y esperan a que conteste, sin límite. Si esa ventana está
+    // colgada, nos colgamos con ella. Pasó dos veces el 28/10 —la segunda al cerrar la tapa
+    // del portátil y volver—, y la foto del vigía lo dejó escrito: el hilo de la interfaz
+    // parado en `GetWindowTextLength`, dentro de `Ficha`, dentro de `EnumWindows`, desde el
+    // `Tick`. La isla entera congelada hasta que Windows la mató.
+    //
+    // `InternalGetWindowText` lee el título que Windows ya tiene guardado y no le pregunta
+    // nada a la ventana. Es lo que usan las barras de tareas exactamente por esto.
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int InternalGetWindowText(IntPtr h, StringBuilder s, int n);
+
+    [ThreadStatic] static StringBuilder? _tituloSb;
+
+    static string TituloSinPreguntar(IntPtr h)
+    {
+        var sb = _tituloSb ??= new StringBuilder(512);
+        sb.Clear();
+        int n = InternalGetWindowText(h, sb, sb.Capacity);
+        return n > 0 ? sb.ToString(0, Math.Min(n, sb.Length)) : "";
+    }
     [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr h, uint cmd);
     [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr h, int idx);
     [DllImport("user32.dll")] static extern int SetWindowLong(IntPtr h, int idx, int val);
@@ -92,12 +112,7 @@ public static class Nativo
         return sb.ToString();
     }
 
-    public static string Titulo(IntPtr h)
-    {
-        var sb = new StringBuilder(GetWindowTextLength(h) + 1);
-        GetWindowText(h, sb, sb.Capacity);
-        return sb.ToString();
-    }
+    public static string Titulo(IntPtr h) => TituloSinPreguntar(h);
 
     public static ImageSource? Icono(IntPtr h)
     {
@@ -661,7 +676,7 @@ public static class Nativo
         return new FichaVentana(
             h,
             IsWindowVisible(h),
-            GetWindowTextLength(h),
+            TituloSinPreguntar(h).Length,
             GetWindow(h, 4) != IntPtr.Zero,          // GW_OWNER
             GetWindowLong(h, -20),                   // GWL_EXSTYLE
             GetWindowLong(h, -16),                   // GWL_STYLE
