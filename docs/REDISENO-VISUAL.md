@@ -5,9 +5,10 @@ para que una sesión nueva pueda empezar por aquí sin más contexto: qué se qu
 puede y qué no, dónde tocar, en qué orden y cómo comprobarlo.
 
 **La maqueta:** <https://claude.ai/artifact/EPD2FVAWaDM8eeFbzKRcEF> (privada: solo la abre el
-dueño de la cuenta). Ocho pantallas: «Isla e Inicio», «Laterales y dock»; debajo, los
-paneles que cuelgan de la isla (red, audio, batería, notificaciones y bandeja); y debajo,
-«Tema anime».
+dueño de la cuenta). Diez pantallas: «Isla e Inicio», «Laterales y dock»; debajo, los
+paneles que cuelgan de la isla (red, audio, batería, notificaciones y bandeja); debajo,
+«Temas anime»; y debajo, «Más temas» (Oficina, Videojuegos, Invierno, Cyberpunk) y el
+«Estudio de temas».
 
 ---
 
@@ -42,12 +43,15 @@ gusta en Ajustes, con una vista previa de cada uno.
 | **Anime · Samurái** | Noche de tinta: laca negra, bermellón `#D7263D` y oro `#C9A55C`; títulos con letra de pincel (Shippori Mincho), radios pequeños; Nubecita con *hachimaki*; pétalos rojo oscuro; fondo con sol rojo, montañas y el kanji 侍 | Maqueta: «Temas anime» |
 | **Anime · Otoño** | Crema cálido, naranja arce `#E8743B`, ámbar y granate; hojas de arce cayendo; Nubecita con bufanda; fondo de atardecer con colinas | Maqueta: «Temas anime» |
 | **Anime · Sad** | Noche lluviosa azul grisácea, acento `#8FA8D8`; lluvia cayendo en el Inicio; Nubecita gris con lágrima y boca triste; saludo con puntos suspensivos; fondo de ciudad con ventanas encendidas | Maqueta: «Temas anime» |
-| **Oficina** | Claro y neutro tipo Fluent: blanco, grises, azul `#2F6FDB`. Sin adornos | Falta maqueta |
-| **Videojuegos** | Oscuro casi negro con un acento neón (`#39FF88` o `#FF3DCB`), esquinas en chaflán, brillos marcados y un modo «RGB» con colores que rotan | Falta maqueta |
-| **Invierno** | Azul hielo y blanco, nieve cayendo, Nubecita con gorro | Falta maqueta |
+| **Oficina** | Claro y neutro tipo Fluent: blanco, grises, azul `#2F6FDB`, letra de Windows, radios pequeños. Sin mascota, sin partículas, sin halo | Maqueta: «Más temas» |
+| **Videojuegos** | Casi negro con verde neón `#39FF88` y magenta `#FF3DCB`, esquinas en chaflán, letra Rajdhani, filo en **modo RGB** que rota de color, píxeles que suben en el Inicio, Nubecita con auriculares, fondo con rejilla en perspectiva | Maqueta: «Más temas» |
+| **Invierno** | Azul hielo y blanco, letra Nunito, **nieve cayendo**, Nubecita con gorro rojo de lana, fondo de colinas nevadas con pinos | Maqueta: «Más temas» |
+| **Cyberpunk** | Negro violáceo con amarillo neón `#FCEE0A`, cian `#00F0FF` y magenta `#FF2A6D`; esquinas en chaflán; Orbitron en títulos y Rajdhani en el resto; **reloj con efecto glitch** (capas de color desplazadas que parpadean); **líneas de barrido** sobre los paneles; lluvia de neón; Nubecita con visor; fondo de ciudad con letreros de neón | Maqueta: «Más temas» |
 
-**Se entregan exactamente estos 8 temas construidos** (Profesional, Oficina, Videojuegos,
-Invierno y los cuatro Anime). Todo lo demás lo crea el usuario con el Estudio de temas
+**Se entregan exactamente estos 9 temas construidos** (Profesional, Oficina, Videojuegos,
+Invierno, Cyberpunk y los cuatro Anime). Los valores exactos de Oficina, Videojuegos,
+Invierno y Cyberpunk están en el código de la maqueta (`project/Temas.dc.html`, objeto
+`TEMAS`). Todo lo demás lo crea el usuario con el Estudio de temas
 (decisión C). Muchos más temas de serie no aportan: cuesta mantenerlos y el usuario ya
 puede hacerse los que quiera.
 
@@ -109,7 +113,11 @@ Cómo se hace:
 
 ### C. El Estudio de temas: el usuario crea los suyos, con muchísimas herramientas
 
-Una ventana propia, **Estudio de temas**, donde el usuario parte de cualquiera de los 8
+Maqueta funcional: pantalla «Estudio de temas» (`project/Estudio.dc.html`), con los 10
+apartados, la vista previa en vivo, el contraste calculado, la simulación de daltonismo,
+antes/después, deshacer y rehacer y el medidor de consumo.
+
+Una ventana propia, **Estudio de temas**, donde el usuario parte de cualquiera de los 9
 temas (o de cero), lo cambia todo y lo guarda como suyo. Tiene que dar **muchísimas**
 herramientas, sin que haga falta saber de diseño. Todas son posibles en WPF. Va por
 apartados:
@@ -194,7 +202,7 @@ apartados:
 Encaje en el código: el Estudio es otra ventana como `VentanaAjustes` (reutiliza
 `SelectorColor.cs` y los controles de Ajustes); los temas de serie y los del usuario usan
 **el mismo formato** de fichero, así que «duplicar un tema de serie» es copiar su fichero.
-Las pruebas exigen que los 8 de serie pasen el contraste y que un `.nubetema` mal formado se
+Las pruebas exigen que los 9 de serie pasen el contraste y que un `.nubetema` mal formado se
 rechace sin romper nada.
 
 ---
@@ -407,7 +415,8 @@ Cada fase se publica como versión para probarla antes de seguir.
 5. **Laterales y dock**: entradas, secciones, deslizadores, anillos y lupa del dock.
 6. **Temas Anime** (Sakura, Samurái, Otoño, Sad): sus valores, las fuentes incrustadas y las
    decoraciones que estrenan (partículas, destellos, mascota con accesorios, marca de agua).
-7. **Temas Oficina, Videojuegos e Invierno**: primero su maqueta, después sus valores.
+7. **Temas Oficina, Videojuegos, Invierno y Cyberpunk**: sus valores y lo que estrenan
+   (esquinas en chaflán, modo RGB, glitch, líneas de barrido, nieve, píxeles).
 8. **Selector de temas** en Ajustes, agrupado por familias y con vista previa de cada uno.
 9. **Estudio de temas** (decisión C), por orden: colores y forma; letra; decoraciones;
    movimiento y textos; vista previa, deshacer y medidor de consumo; automático; exportar e
