@@ -191,7 +191,7 @@ public partial class MainWindow
     {
         var pila = new Grid { Width = Dock.Lado, Height = Dock.Lado };
 
-        var icono = new Image
+        var icono = Legible(new Image
         {
             Source = IconoDeApp(e.Clave),
             Width = 28, Height = 28,
@@ -200,7 +200,7 @@ public partial class MainWindow
             // Una app cerrada se ve, pero apagada: está en el dock porque la anclaste, no
             // porque esté pasando algo con ella.
             Opacity = e.Abierta ? 1.0 : 0.45,
-        };
+        });
         pila.Children.Add(icono);
 
         // ---------- El indicador ----------

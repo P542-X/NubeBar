@@ -97,7 +97,10 @@ public partial class MainWindow
             // un panel que tapa lo que hay debajo es peor que un panel que no se abre. Se
             // dice en vez de abrirlo encima del otro.
             var otro = l == Lateral.Lado.Izquierda ? Lateral.Lado.Derecha : Lateral.Lado.Izquierda;
-            if (LateralAbierto(otro) && !Lateral.CabenLosDos(UtilDeEstaPantalla()))
+            double s = Math.Max(0.1, _monitor.Escala);
+            if (LateralAbierto(otro) &&
+                !Lateral.CabenLosDos(UtilDeEstaPantalla(), Lateral.Ancho * EscalaDePaneles() * s,
+                                     Lateral.DelFilo * s))
             {
                 Log.Info($"panel {IdDe(l)}: no cabe junto al otro en esta pantalla " +
                          $"({UtilDeEstaPantalla().Ancho:0} px); se cierra el otro");
@@ -111,6 +114,9 @@ public partial class MainWindow
             if (!v.IsVisible)
             {
                 v.Show();
+                // Y otra vez ya visible: enseñar la ventana puede devolverle lo que WPF
+                // tenía apuntado, y es el rectángulo en píxeles el que manda.
+                ColocarLateral(l);
                 v.Tarjeta.BeginAnimation(OpacityProperty, null);
                 v.Tarjeta.Opacity = 1;
                 // E6: la duración sale del catálogo de transiciones, no de un número
@@ -235,6 +241,15 @@ public partial class MainWindow
         v.MouseEnter += (_, _) => RatonEnLateral(l, true);
         v.MouseLeave += (_, _) => RatonEnLateral(l, false);
 
+        // Al pasar de un monitor a otro con distinto DPI, Windows le propone a la ventana
+        // otro tamaño y WPF lo aplica: el rectángulo que se había calculado en píxeles deja
+        // de ser el que hay. Se vuelve a colocar con la escala ya buena. Recolocar en el
+        // mismo monitor no cambia el DPI, así que esto no se repite en bucle.
+        v.DpiChanged += (_, _) => Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (v.IsVisible) ColocarLateral(l);
+        }), System.Windows.Threading.DispatcherPriority.Loaded);
+
         _laterales[l] = v;
         _cuerposLaterales[l] = cuerpo;
         _mandosDeLateral[l] = new List<MandoSlider>();
@@ -246,17 +261,35 @@ public partial class MainWindow
         if (!_laterales.TryGetValue(l, out var v)) return;
         if (!_cuerposLaterales.TryGetValue(l, out var cuerpo)) return;
 
+        // ---------- Unidades de WPF por dentro, píxeles por fuera ----------
+        //
+        // El hueco y `Colocar` van en píxeles de pantalla; el ancho del panel, lo que mide el
+        // contenido y las separaciones, en unidades de WPF. Se pasaban tal cual de unas a
+        // otras, y al 125 % la ventana salía un 20 % más baja y más estrecha que su
+        // contenido: el final quedaba cortado por abajo. Lo contó el usuario: «en los
+        // paneles laterales flotantes ahora se cortan por abajo». Ahora todo lo que es de
+        // WPF se convierte con la escala del monitor antes de colocar.
+        //
+        // Y el panel se compacta con la misma escala que el resto (`EscalaDePaneles`): en
+        // una pantalla pequeña salía igual de grande y alargado que en una de 1440.
+        double s = Math.Max(0.1, _monitor.Escala);
+        double f = EscalaDePaneles();
+        if (v.Cajon.Content is FrameworkElement dentro) Escalar(dentro, f);
+
         // Lo que pide de alto, medido de verdad y no a ojo: un panel con cuatro secciones y
         // uno con siete no miden lo mismo, y dejar un hueco fijo da una columna medio vacía.
         cuerpo.Measure(new Size(Lateral.Ancho - 28, double.PositiveInfinity));
-        double pide = cuerpo.DesiredSize.Height + 26;
+        double bordes = v.Tarjeta.BorderThickness.Top + v.Tarjeta.BorderThickness.Bottom;
+        double pide = ((cuerpo.DesiredSize.Height + 26) * f + bordes) * s;
+        double ancho = Lateral.Ancho * f * s;
 
         // Con los estorbos descontados, no con el área de trabajo cruda: ver
         // `EstorbosParaLosLaterales`. Antes el panel se centraba en la pantalla entera y se
         // metía debajo de la barra —12 px de margen contra 38 de isla— y, con el dock
         // encendido, también debajo del dock.
         var h = ZonasAjuste.AreaUtilCon(_monitor, EstorbosParaLosLaterales());
-        var r = Lateral.Sitio(new NubeHypr.Rect(h.X, h.Y, h.Ancho, h.Alto), l, pide);
+        var r = Lateral.Sitio(new NubeHypr.Rect(h.X, h.Y, h.Ancho, h.Alto), l, pide,
+                              ancho, Lateral.DelFilo * s, Lateral.DelOtroLado * s);
 
         // ---------- Sitio para el halo ----------
         //
@@ -282,10 +315,11 @@ public partial class MainWindow
         // Se pide el aire y se recorta contra ese hueco, lado por lado. Donde no cabe, el
         // halo se corta por ahí y ya está: mejor un halo cortado por un lado que un panel
         // fuera de la pantalla.
-        double quiero = EstiloDeAhora.Brilla ? Lateral.AireDelHalo : 0;
+        double quiero = EstiloDeAhora.Brilla ? Lateral.AireDelHalo * s : 0;
         var aire = Lateral.AireQueCabe(new NubeHypr.Rect(h.X, h.Y, h.Ancho, h.Alto), r, quiero);
 
-        v.Tarjeta.Margin = new Thickness(aire.Izq, aire.Arr, aire.Der, aire.Aba);
+        // El aire se ha contado en píxeles; el margen de la tarjeta va en unidades de WPF.
+        v.Tarjeta.Margin = new Thickness(aire.Izq / s, aire.Arr / s, aire.Der / s, aire.Aba / s);
         v.Colocar((int)(r.X - aire.Izq), (int)(r.Y - aire.Arr),
                   (int)(r.Ancho + aire.Izq + aire.Der),
                   (int)(r.Alto + aire.Arr + aire.Aba));

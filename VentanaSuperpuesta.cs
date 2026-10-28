@@ -113,6 +113,18 @@ public sealed class VentanaSuperpuesta : Window
     // ---------- Colocar, en píxeles de pantalla ----------
     public void Colocar(int x, int y, int ancho, int alto)
     {
+        // ---------- Los píxeles no son unidades de WPF ----------
+        //
+        // Sin hwnd todavía, esto ponía los PÍXELES en Left/Top/Width/Height, que van en
+        // unidades de WPF. Al 125 % todo salía multiplicado por 1,25: el lateral izquierdo
+        // más alto que la pantalla —«Ajustes», lo de abajo, cortado— y el derecho pasado al
+        // monitor de al lado. Lo contó el usuario: «el panel derecho se corta con la doble
+        // pantalla y sobresale por la otra». Se crea el hwnd aquí mismo, sin enseñar nada,
+        // y se coloca en píxeles como siempre.
+        if (_self == IntPtr.Zero)
+        {
+            try { new WindowInteropHelper(this).EnsureHandle(); } catch { }
+        }
         if (_self == IntPtr.Zero)
         {
             // Todavía no hay hwnd (no se ha mostrado): se deja en unidades de WPF y al

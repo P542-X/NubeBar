@@ -6,6 +6,33 @@ construidos por el workflow de Release a partir de la etiqueta.
 
 ---
 
+## v1.4.1
+
+Arreglos de paneles, pantallas pequeñas y dos monitores.
+
+### Arreglado
+
+- **Panel de batería:** ya no se estira a toda la isla («zoom») al pulsar un modo de
+  energía. Lo mismo para notificaciones, Inicio y la vista general al refrescarse.
+- **Salida de audio:** al elegir otra, el panel marca «Activa» en la nueva sin cerrarlo.
+- **Paneles y menús en pantallas pequeñas:** se escalan con el tamaño de la pantalla (alto
+  y ancho). En un 1920x1080 al 125 % salen al ~86 %; nunca por debajo del 80 %. Se puede
+  fijar a mano con `Barra.EscalaPaneles`.
+- **Paneles laterales:** ya no se cortan por abajo al 125 % ni se salen al otro monitor
+  con dos pantallas; también se compactan con la pantalla.
+- **Iconos de la nube:** ya no se cortan por arriba al levantarse con el ratón.
+- **Iconos oscuros** (ChatGPT y similares): llevan un halo claro para verse sobre la isla.
+- **Inicio:** los botones de bloquear, suspender, reiniciar y apagar salían dos veces.
+
+### Nuevo
+
+- Clic derecho en una app abierta de la nube → **«Abrir otra ventana de …»**.
+- **Vigía de cuelgues:** si la interfaz deja de responder 5 s, se apunta en el log y se
+  guarda una foto del proceso en `%APPDATA%\NubeBar\cuelgues\` para poder ver dónde se
+  quedó atascada.
+
+---
+
 ## v1.3.0 — sin publicar
 
 **Esta versión NO está publicada.** Está preparada: compilada, probada y empaquetada en

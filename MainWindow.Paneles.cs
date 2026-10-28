@@ -115,6 +115,62 @@ public partial class MainWindow
         AplicarRecorteDelCajon();
     }
 
+    // ---------- El tamaño de los paneles según la pantalla ----------
+    //
+    // Los paneles tienen medidas fijas —380 el de audio, 660 el Inicio, 1260 la vista
+    // general— pensadas en una pantalla de 2560x1440 al 100 %, que da 1440 de alto en
+    // unidades de WPF. En un 1920x1080 al 125 %, que es lo normal en un portátil, quedan
+    // 864: el panel de audio ocupaba dos tercios de la pantalla y la vista general casi
+    // todo el ancho. Lo contó el usuario: «la app no está preparada para 1920x1080, los
+    // menús se agrandan y son demasiado grandes».
+    //
+    // Así que el panel entero se escala —texto, márgenes y tarjetas a la vez, con un
+    // `LayoutTransform`, que es lo que hace que también MIDA menos— en proporción al alto
+    // de la pantalla, sin bajar de `EscalaMinima` para que el texto se siga leyendo.
+    // `Barra.EscalaPaneles` en el config.json lo fija a mano.
+    //
+    // Y mira también el ANCHO, no solo el alto: un monitor vertical de 1080 de ancho, o un
+    // portátil estrecho, se quedan cortos de lado aunque tengan alto de sobra.
+    internal const double AltoDeReferencia = 1000, AnchoDeReferencia = 1280, EscalaMinima = 0.8;
+
+    internal static double EscalaDePanelesPura(double altoPantallaDip, double anchoPantallaDip,
+                                               double forzada) =>
+        forzada > 0
+            ? Math.Clamp(forzada, 0.5, 1.5)
+            : Math.Clamp(Math.Min(altoPantallaDip / AltoDeReferencia,
+                                  anchoPantallaDip / AnchoDeReferencia), EscalaMinima, 1.0);
+
+    double EscalaDePaneles()
+    {
+        double s = Math.Max(0.1, _monitor.Escala);
+        return EscalaDePanelesPura(_monitor.Alto / s, _monitor.Ancho / s, _cfg.Barra.EscalaPaneles);
+    }
+
+    static void Escalar(FrameworkElement contenido, double f)
+    {
+        if (Math.Abs(EscalaDe(contenido) - f) < 0.001) return;
+        contenido.LayoutTransform = Math.Abs(f - 1) < 0.001 ? Transform.Identity : new ScaleTransform(f, f);
+    }
+
+    static double EscalaDe(FrameworkElement e) =>
+        e.LayoutTransform is ScaleTransform s && s.ScaleX > 0 ? s.ScaleX : 1.0;
+
+    // ---------- Cambiar lo que enseña un panel ya abierto ----------
+    //
+    // Varios paneles se repintan poniendo un contenido nuevo en el cajón sin cerrarlo. Si
+    // el panel cuelga de un icono, el ancho y el margen de la tarjeta se los pone
+    // `AplicarRecorteDelCajon` al contenido que ESTABA, y el nuevo llegaba sin ellos: se
+    // estiraba a la isla entera mientras el recorte seguía enseñando el trozo de la
+    // tarjeta. Visto desde fuera, el panel «se hacía zoom» al pulsar cualquier botón. Lo
+    // contó el usuario con el de batería al cambiar de modo de energía.
+    void CambiarContenidoDelPanel(FrameworkElement contenido)
+    {
+        Escalar(contenido, EscalaDePaneles());
+        if (PanelSuperpuestoAbierto && _superpuesta is { } v) { v.Cajon.Content = contenido; return; }
+        Cajon.Content = contenido;
+        if (_tarjetaAncla != null) { _tarjetaContenido = contenido; AplicarRecorteDelCajon(); }
+    }
+
     void SinRecorteDelCajon()
     {
         if (_tarjetaAncla == null) return;
@@ -204,8 +260,11 @@ public partial class MainWindow
                     _tarjetaContenido.Margin = new Thickness(izq, m.Top, m.Right, m.Bottom);
 
                 _tarjetaContenido.HorizontalAlignment = HorizontalAlignment.Left;
-                if (double.IsNaN(_tarjetaContenido.Width) || Math.Abs(_tarjetaContenido.Width - w) > 0.5)
-                    _tarjetaContenido.Width = w;
+                // `Width` va por DENTRO de la escala del panel y el margen por fuera: con el
+                // panel al 85 %, para ocupar `w` en pantalla el contenido mide w / 0,85.
+                double wDentro = w / EscalaDe(_tarjetaContenido);
+                if (double.IsNaN(_tarjetaContenido.Width) || Math.Abs(_tarjetaContenido.Width - wDentro) > 0.5)
+                    _tarjetaContenido.Width = wDentro;
             }
 
             // Lo que la tarjeta se mete en la barra. Nunca menos que su propio radio:
@@ -472,6 +531,14 @@ public partial class MainWindow
                     bool teclado = false, bool encoger = false, FrameworkElement? ancla = null,
                     bool scrollPropio = false, double? topeDuro = null)
     {
+        // Los tamaños que llegan son de diseño; a partir de aquí todo va en lo que de
+        // verdad ocupa el panel en esta pantalla (ver `EscalaDePaneles`).
+        double f = EscalaDePaneles();
+        Escalar(contenido, f);
+        ancho *= f;
+        alto *= f;
+        if (topeDuro is { } td) topeDuro = td * f;
+
         ApuntarFlujo(nombre, contenido, ancho, ancla);
         // En vertical el cajón no vale: la barra ya ocupa la pantalla de arriba abajo y
         // no tiene hacia dónde crecer. El panel sale flotando al lado (ver
@@ -827,9 +894,12 @@ public partial class MainWindow
             double arribaYAbajo = marco.Padding.Top + marco.Padding.Bottom
                                 + marco.BorderThickness.Top + marco.BorderThickness.Bottom;
 
+            // El hijo se mide por dentro de la escala del panel: se le da el ancho de
+            // dentro y lo que pide se pasa a lo que ocupa en pantalla.
+            double f = EscalaDe(raiz);
             dentro.InvalidateMeasure();
-            dentro.Measure(new Size(Math.Max(1, ancho - aLosLados), double.PositiveInfinity));
-            return Math.Max(deLaRaiz, dentro.DesiredSize.Height + arribaYAbajo);
+            dentro.Measure(new Size(Math.Max(1, ancho / f - aLosLados), double.PositiveInfinity));
+            return Math.Max(deLaRaiz, (dentro.DesiredSize.Height + arribaYAbajo) * f);
         }
         catch { return deLaRaiz; }
     }
@@ -897,7 +967,19 @@ public partial class MainWindow
                 {
                     Log.Info($"panel {nombre}: ha crecido hasta {alto:0} y caben {tope:0}; se desplaza por dentro");
                     Cajon.Content = null;
-                    Cajon.Content = EnvolverConScroll(contenido, tope - bordes);
+                    var envuelto = EnvolverConScroll(contenido, tope - bordes);
+                    Cajon.Content = envuelto;
+                    // Si era la tarjeta, ahora la tarjeta es el scroll: el contenido le
+                    // devuelve su ancho y su margen, y es el scroll el que se coloca.
+                    if (_tarjetaContenido == contenido)
+                    {
+                        var m = contenido.Margin;
+                        contenido.Margin = new Thickness(0, m.Top, m.Right, m.Bottom);
+                        contenido.Width = double.NaN;
+                        contenido.HorizontalAlignment = HorizontalAlignment.Stretch;
+                        _tarjetaContenido = envuelto;
+                        AplicarRecorteDelCajon();
+                    }
                 }
             }
             alto = cabe;

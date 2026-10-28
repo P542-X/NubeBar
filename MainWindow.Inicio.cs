@@ -730,6 +730,12 @@ public partial class MainWindow
         // mismo: el centro de control ES esta portada, y su único acceso es el botón
         // Inicio. Las piezas propias del lanzador —las fijadas y la energía— se quedan:
         // una superficie unificada no es una superficie con menos cosas.
+        //
+        // Pero la energía UNA vez. Aquí iba también la tarjeta «Sistema» del centro de
+        // control, con los mismos cuatro botones —bloquear, suspender, reiniciar, apagar—
+        // justo debajo de la fila de energía. Lo contó el usuario: «en el botón de inicio
+        // está duplicado lo de apagar, reiniciar, suspender». Se queda la fila de energía,
+        // que pide confirmación para reiniciar y apagar; la tarjeta reiniciaba sin preguntar.
         var piezas = new UIElement[]
         {
             CardMultimedia(),
@@ -739,7 +745,6 @@ public partial class MainWindow
             CardConectividad(),
             CrearFijadas(),
             CrearEnergia(),
-            CardAccionesDelSistema(),
         };
 
         for (int i = 0; i < piezas.Length; i++)

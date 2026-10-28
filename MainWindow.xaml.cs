@@ -195,7 +195,10 @@ public partial class MainWindow : Window
                     // tocar. Y un vigilante que resucite la app a mitad de una medida la
                     // invalida de todas formas.
                     if (!Config.SoloLectura)
+                    {
                         Guardian.Lanzar();      // por si me matan: alguien tiene que devolver el shell
+                        Vigia.Empezar(Dispatcher);   // y si me cuelgo, que quede la foto
+                    }
                     // Encenderla hace que las apps nos manden sus iconos a NOSOTROS en
                     // vez de a Explorer. Si el módulo no está puesto en ninguna zona,
                     // los iconos desaparecerían de la barra de Windows sin aparecer en

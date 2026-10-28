@@ -29,6 +29,46 @@ public static partial class Pruebas
         PanelesOCabeOSeDesplaza();
         PanelesEnCadaPantallaYOrientacion();
         RespaldoDeMigracionNuncaSePisa();
+        PanelesSeEscalanConLaPantalla();
+        IconosOscurosSeReconocen();
+    }
+
+    // ================= El tamaño de los paneles según la pantalla =================
+    //
+    // En un 1920x1080 al 125 % (864 de alto en unidades de WPF) los paneles salían con las
+    // medidas de un 2560x1440 y ocupaban media pantalla.
+    static void PanelesSeEscalanConLaPantalla()
+    {
+        Grupo("paneles: se escalan con el alto de la pantalla");
+
+        Igual(1.0, MainWindow.EscalaDePanelesPura(1440, 2560, 0), "en un 1440 al 100 % salen tal cual");
+        Igual(1.0, MainWindow.EscalaDePanelesPura(1080, 1920, 0), "en un 1080 al 100 % también");
+        double portatil = MainWindow.EscalaDePanelesPura(864, 1536, 0);
+        Vale(portatil < 0.9 && portatil >= MainWindow.EscalaMinima,
+             $"en un 1080 al 125 % encogen ({portatil:0.00})");
+        double vertical = MainWindow.EscalaDePanelesPura(1920, 1080, 0);
+        Vale(vertical < 1.0, $"en un monitor vertical, por estrecho, también ({vertical:0.00})");
+        Igual(MainWindow.EscalaMinima, MainWindow.EscalaDePanelesPura(600, 1024, 0),
+              "y nunca por debajo del mínimo, que el texto se tiene que leer");
+        Igual(0.9, MainWindow.EscalaDePanelesPura(864, 1536, 0.9), "el config.json manda si lo pones");
+        Igual(1.5, MainWindow.EscalaDePanelesPura(864, 1536, 7), "pero sin disparates");
+    }
+
+    static void IconosOscurosSeReconocen()
+    {
+        Grupo("iconos: los oscuros se reconocen y los demás no");
+
+        static byte[] Lleno(byte r, byte g, byte b, byte a) =>
+            Enumerable.Range(0, 64).SelectMany(_ => new[] { b, g, r, a }).ToArray();
+
+        Vale(Iconos.LuminanciaMedia(Lleno(10, 10, 10, 255)) < Iconos.LuminanciaOscura,
+             "un trazo negro es oscuro");
+        Vale(Iconos.LuminanciaMedia(Lleno(0, 120, 215, 255)) > Iconos.LuminanciaOscura,
+             "el azul de Windows no lo es");
+        Vale(Iconos.LuminanciaMedia(Lleno(255, 255, 255, 255)) > Iconos.LuminanciaOscura,
+             "el blanco tampoco");
+        Vale(Iconos.LuminanciaMedia(Lleno(0, 0, 0, 0)) == null,
+             "un icono transparente no se juzga");
     }
 
     // ================= Y la red de las migraciones =================

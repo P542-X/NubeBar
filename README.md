@@ -296,6 +296,7 @@ Windows: quien ya ha pedido menos movimiento ahí no tiene que volver a pedirlo 
 | `Barra.OrdenApps` | `[]` | El orden que les has dado arrastrando los iconos; se escribe solo |
 | `Barra.Arrastrable` | `true` | La isla se aparta arrastrándola, y los iconos se reordenan igual |
 | `Barra.SegundosParaVolver` | `1` | Tras quitarle el ratón de encima, cuánto tarda en volver a su sitio |
+| `Barra.EscalaPaneles` | `0` | Tamaño de paneles y menús. `0` = según la pantalla (en un 1920x1080 al 125 % salen al ~86 %); `0.8` más pequeños; `1` tal cual |
 
 ### Módulos
 

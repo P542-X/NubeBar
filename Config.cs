@@ -235,6 +235,7 @@ public class Barra
     public bool TeclasVolumen { get; set; } = true;         // las teclas de volumen las atiende la isla, sin el aviso de Windows
     public bool Arrastrable { get; set; } = true;           // se puede apartar con el ratón
     public double SegundosParaVolver { get; set; } = 1;     // tras dejarla, cuánto tarda en volver
+    public double EscalaPaneles { get; set; } = 0;          // 0 = según la pantalla; 0,8 = más pequeños; 1 = tal cual
     public List<string> OrdenApps { get; set; } = new();    // el orden que les has dado tú arrastrando
     public List<string> NotificacionesSilenciadas { get; set; } = new();   // trozos de AppUserModelId
 }

@@ -132,7 +132,7 @@ public partial class MainWindow : Window
     {
         if (_panelAbierto != PanelBateria) return;
         // Se sustituye el contenido sin cerrar: así no hay que replegar y desplegar
-        Cajon.Content = CrearBateria();
+        CambiarContenidoDelPanel(CrearBateria());
         ReajustarPanel(PanelBateria);
     }
 

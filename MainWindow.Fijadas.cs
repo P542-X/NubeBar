@@ -154,8 +154,16 @@ public partial class MainWindow : Window
 
         // Si está abierta, lo de siempre a mano
         if (g.Ventanas.Count > 0)
+        {
+            // Otra ventana de la misma app, como el «Explorador de archivos» del clic
+            // derecho en la barra de Windows. Abierta no había forma: el clic la trae al
+            // frente y el menú solo ofrecía minimizar o cerrar. Lo contó el usuario: «con
+            // una carpeta abierta no te deja abrir otra desde la nube».
+            if (g.Lanzar.Length > 0)
+                opciones.Add(($"Abrir otra ventana de {nombre}", () => Fuentes.Lanzar(g.Lanzar)));
             opciones.Add(($"Minimizar {(g.Ventanas.Count > 1 ? $"sus {g.Ventanas.Count} ventanas" : "la ventana")}",
                           () => { foreach (var v in g.Ventanas.ToList()) MinimizarVentana(v); }));
+        }
         else
             opciones.Add(($"Abrir {nombre}", () => Fuentes.Lanzar(g.Lanzar)));
 

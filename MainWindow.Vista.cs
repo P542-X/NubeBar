@@ -1663,8 +1663,7 @@ public partial class MainWindow
         DiagVista.Reconstrucciones++;
         Log.Info($"vista gen={_generacionVista} reconstruida A PETICION: {porque}");
         var contenido = ConstruirVista();
-        if (PanelSuperpuestoAbierto && _superpuesta is { } v) v.Cajon.Content = contenido;
-        else Cajon.Content = contenido;
+        CambiarContenidoDelPanel(contenido);
         ReajustarPanel(PanelVista);
     }
 
@@ -1831,11 +1830,11 @@ public partial class MainWindow
         // ----- La foto, o el icono si no hay -----
         t.Hueco = new Grid { Background = _superficieAlta, ClipToBounds = true };
         var icono = v.Icono ?? Nativo.Icono(h);
-        t.Respaldo = new Image
+        t.Respaldo = Legible(new Image
         {
             Source = icono, Width = 34, Height = 34, Opacity = 0.85,
             HorizontalAlignment = HorizontalAlignment.Center,
-        };
+        });
 
         // Una minimizada no se puede fotografiar: no tiene nada que dibujar. Se dice, en vez
         // de dejar un hueco gris que parece un fallo.

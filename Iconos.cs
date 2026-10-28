@@ -72,4 +72,51 @@ static class Iconos
         _cache[clave] = img;
         return img;
     }
+
+    // ---------- ¿Es un icono oscuro? ----------
+    //
+    // Hay apps cuyo icono es un trazo negro sobre transparente (ChatGPT, algunas de
+    // terminal, las de GitHub…). Sobre la isla, que es negra, no se veían: lo contó el
+    // usuario, «hay algunos iconos como el de chatgpt que se ven en negro y el fondo es
+    // negro». Esto mira los píxeles que se ven —pesados por su opacidad— y dice si en
+    // conjunto son oscuros. Se calcula una vez por imagen.
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ImageSource, object> _oscuros = new();
+
+    public const double LuminanciaOscura = 0.06;
+
+    public static bool EsOscuro(ImageSource? img)
+    {
+        if (img is not BitmapSource bmp || bmp.PixelWidth == 0 || bmp.PixelHeight == 0) return false;
+        if (_oscuros.TryGetValue(img, out var ya)) return (bool)ya;
+
+        bool oscuro = false;
+        try
+        {
+            var bgra = new FormatConvertedBitmap(bmp, PixelFormats.Bgra32, null, 0);
+            int ancho = bgra.PixelWidth, alto = bgra.PixelHeight, paso = ancho * 4;
+            var px = new byte[paso * alto];
+            bgra.CopyPixels(px, paso, 0);
+            oscuro = LuminanciaMedia(px) is { } l && l < LuminanciaOscura;
+        }
+        catch { oscuro = false; }
+
+        _oscuros.AddOrUpdate(img, oscuro);
+        return oscuro;
+    }
+
+    // Luminancia media (WCAG) de los píxeles BGRA visibles, pesada por su alfa. Null si
+    // casi no hay nada que se vea. Aparte para poder probarla sin bitmaps.
+    internal static double? LuminanciaMedia(byte[] bgra)
+    {
+        double suma = 0, peso = 0;
+        for (int i = 0; i + 3 < bgra.Length; i += 4)
+        {
+            double a = bgra[i + 3] / 255.0;
+            if (a < 0.1) continue;
+            // Bgra32 no viene premultiplicado: el color es el del píxel tal cual
+            suma += a * Contraste.Luminancia(Color.FromRgb(bgra[i + 2], bgra[i + 1], bgra[i]));
+            peso += a;
+        }
+        return peso < 1 ? null : suma / peso;
+    }
 }

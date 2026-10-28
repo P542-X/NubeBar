@@ -149,8 +149,7 @@ public partial class MainWindow : Window
         // Se sustituye el contenido sin cerrar: así no hay que replegar y desplegar
         // cada vez que descartas una. Vale igual para el cajón de la isla y para la
         // tarjeta flotante de la barra vertical.
-        if (PanelSuperpuestoAbierto && _superpuesta is { } v) v.Cajon.Content = CrearNotificaciones();
-        else Cajon.Content = CrearNotificaciones();
+        CambiarContenidoDelPanel(CrearNotificaciones());
         ReajustarPanel(PanelNotas);
     }
 

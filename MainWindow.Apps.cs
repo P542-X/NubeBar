@@ -190,8 +190,19 @@ public partial class MainWindow
         // la recorta EN SUS PROPIAS COORDENADAS, y al desplazarla solo quedaba visible
         // el trocito final. El Canvas da sitio infinito a sus hijos y no los recorta;
         // el recorte bueno, el de la ventanita que se ve, lo hace el Border.
+        // ---------- Y sitio para que un icono se levante ----------
+        //
+        // El recorte medía justo lo que los botones, y al pasar el ratón el icono sube 2 px
+        // y crece un 8 % con rebote: lo que asomaba por encima se cortaba. Lo contó el
+        // usuario: «cuando me pongo encima de una app hay veces que se cortan por arriba».
+        // Se le da al recorte el hueco que deja la barra a cada lado (4 px con el grosor
+        // de serie) y la tira se baja eso mismo: los iconos siguen exactamente donde estaban.
+        double holgura = Math.Max(0, (_cfg.Barra.Alto - grosorBoton) / 2);
+        double grosorRecorte = grosorBoton + holgura * 2;
+
         var lienzo = new Canvas();
-        if (v) lienzo.Width = grosorBoton; else lienzo.Height = grosorBoton;
+        if (v) lienzo.Width = grosorRecorte; else lienzo.Height = grosorRecorte;
+        if (v) Canvas.SetLeft(_tira, holgura); else Canvas.SetTop(_tira, holgura);
         lienzo.Children.Add(_tira);
 
         _carrusel = new Border
@@ -202,7 +213,7 @@ public partial class MainWindow
             VerticalAlignment = v ? VerticalAlignment.Top : VerticalAlignment.Center,
             Background = Brushes.Transparent     // para que la rueda llegue aunque sobre hueco
         };
-        if (v) _carrusel.Width = grosorBoton; else _carrusel.Height = grosorBoton;
+        if (v) _carrusel.Width = grosorRecorte; else _carrusel.Height = grosorRecorte;
         _carrusel.MouseWheel += Carrusel_Rueda;
         _carrusel.SizeChanged += (_, _) => PintarDesvanecido();
 
@@ -373,6 +384,28 @@ public partial class MainWindow
         AjustarAncho();
     }
 
+    // ---------- Que un icono negro se vea sobre la isla negra ----------
+    //
+    // Un icono que es un trazo oscuro (ChatGPT, por ejemplo) desaparecía sobre el fondo de
+    // la isla. No se le cambia el color —es el icono de la app y se tiene que reconocer—:
+    // se le pone detrás un halo claro, que le dibuja el contorno. Solo con fondo oscuro:
+    // en un tema claro el negro ya se lee.
+    internal const double FondoClaro = 0.4;
+
+    Image Legible(Image img)
+    {
+        try
+        {
+            if (Contraste.Luminancia(_roles.FondoOpaco) < FondoClaro && Iconos.EsOscuro(img.Source))
+                img.Effect = new System.Windows.Media.Effects.DropShadowEffect
+                {
+                    Color = Colors.White, ShadowDepth = 0, BlurRadius = 6, Opacity = 0.85,
+                };
+        }
+        catch { }
+        return img;
+    }
+
     void CrearBotonGrupo(Grupo g, bool enElCarrusel = true)
     {
         // Una app fijada y cerrada no tiene ventana de la que sacar el icono:
@@ -381,7 +414,7 @@ public partial class MainWindow
         var titulo = cerrada ? NombreDeClave(g.Exe) : Nativo.Titulo(g.Ventanas[0]);
         g.Icono = cerrada ? Iconos.De(g.Lanzar, 32) : Nativo.Icono(g.Ventanas[0]);
         UIElement visual = g.Icono != null
-            ? new Image { Source = g.Icono, Width = 18, Height = 18 }
+            ? Legible(new Image { Source = g.Icono, Width = 18, Height = 18 })
             : Texto(titulo.Length > 0 ? titulo[..1] : "?", 14);
 
         // Puntitos: uno por ventana del grupo, con un máximo de tres

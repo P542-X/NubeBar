@@ -235,11 +235,20 @@ public partial class MainWindow : Window
         AlternarPanel(PanelAudio, CrearAudio, AnchoDePanel, alto, ancla: _anclaVolumen);
     }
 
+    // El hueco de la tarjeta de salida en el panel de audio abierto. Para repintarla se
+    // vacía y se vuelve a llenar ESTE hueco, no se cambia la raíz: la raíz es la que lleva
+    // el margen y el ancho de la tarjeta colgada del altavoz (`_tarjetaContenido`) y, si
+    // hizo falta, el scroll. Y solo este hueco: la de brillo pide manejadores del monitor
+    // cada vez que se monta.
+    StackPanel? _audioSalida;
+
     FrameworkElement CrearAudio()
     {
         var columna = new StackPanel { Margin = new Thickness(12, 4, 12, 8) };
         columna.Children.Add(CardVolumen());
-        CardSalida(columna);
+        _audioSalida = new StackPanel();
+        CardSalida(_audioSalida);
+        columna.Children.Add(_audioSalida);
         CardPorAplicacion(columna);
         CardBrillo(columna);
         ApuntarPanel(PanelAudio, columna, AnchoDePanel, TopeDeAlto);
@@ -790,6 +799,12 @@ public partial class MainWindow : Window
     //
     // Nada de bloquear esperando: esto cuelga de un clic y el hilo que lo atiende es el que
     // pinta. Un `Sleep` aquí congela la barra entera.
+    //
+    // Y se espera en el panel de AUDIO, que es donde vive la tarjeta de salida. Esto
+    // preguntaba por `PanelDelCentro` (Inicio) desde que las tarjetas se mudaron: con el
+    // panel de audio abierto el reloj se paraba en el primer tick y el refresco tampoco
+    // hacía nada, así que el «Activa» seguía en la de antes. Lo volvió a contar el
+    // usuario: «cuando clicko una salida diferente no se actualiza en el panel».
     void CambiarLaSalidaYEsperarla(string id)
     {
         try
@@ -798,7 +813,7 @@ public partial class MainWindow : Window
             {
                 // No se pudo ni intentar (Windows que no lo permite, o modo de solo lectura).
                 // Se repinta para que el panel diga lo que de verdad hay.
-                RefrescarControlEntero("no se pudo cambiar la salida de audio");
+                RefrescarSalidaDeAudio("no se pudo cambiar la salida de audio");
                 return;
             }
 
@@ -809,7 +824,7 @@ public partial class MainWindow : Window
                 // Si has cerrado el panel mientras tanto, se deja de preguntar. Seguir sería
                 // enumerar los dispositivos de audio dieciséis veces para repintar algo que
                 // ya no está en pantalla.
-                if (_panelAbierto != PanelDelCentro) { reloj.Stop(); return; }
+                if (_panelAbierto != PanelAudio) { reloj.Stop(); return; }
 
                 bool yaEs;
                 try { yaEs = Audio.Salidas().Any(s => s.EsLaActual && s.Id == id); }
@@ -819,7 +834,7 @@ public partial class MainWindow : Window
                 if (!yaEs && ++intentos < 16) return;
 
                 reloj.Stop();
-                RefrescarControlEntero(yaEs
+                RefrescarSalidaDeAudio(yaEs
                     ? "cambió la salida de audio"
                     : "la salida de audio no llegó a cambiar");
             };
@@ -1165,27 +1180,6 @@ public partial class MainWindow : Window
         return Card(col);
     }
 
-    // ---------- Acciones del sistema ----------
-    //
-    // Con etiqueta, no cuatro iconos sueltos: un icono de apagado sin rótulo se pulsa por
-    // error una vez y ya no se vuelve a abrir el panel con confianza.
-    UIElement CardAccionesDelSistema()
-    {
-        var col = new StackPanel();
-        col.Children.Add(SectionHeader(0xE713, "Sistema"));
-        var rejilla = new UniformGrid { Columns = 4 };
-        rejilla.Children.Add(QuickAction(0xE72E, "Bloquear", false,
-            () => { CerrarPanel(); Energia.Bloquear(); }, "Bloquear la sesión"));
-        rejilla.Children.Add(QuickAction(0xE708, "Suspender", false,
-            () => { CerrarPanel(); Energia.Suspender(); }, "Suspender el equipo"));
-        rejilla.Children.Add(QuickAction(0xE777, "Reiniciar", false,
-            () => { CerrarPanel(); Energia.Reiniciar(); }, "Reiniciar el equipo"));
-        rejilla.Children.Add(AccionDelicada(0xE7E8, "Apagar",
-            () => { CerrarPanel(); Energia.Apagar(); }, "Apagar el equipo"));
-        col.Children.Add(rejilla);
-        return Card(col);
-    }
-
     // ---------- Refrescar ----------
     //
     // Esto es lo único que queda de reconstruir el panel entero, y solo se llama cuando
@@ -1202,9 +1196,18 @@ public partial class MainWindow : Window
         // y su portada. Antes esto montaba un panel "control" aparte, que era la segunda
         // pantalla con lo mismo.
         var contenido = CrearMenuInicio();
-        if (PanelSuperpuestoAbierto && _superpuesta is { } v) v.Cajon.Content = contenido;
-        else Cajon.Content = contenido;
+        CambiarContenidoDelPanel(contenido);
         ReajustarPanel(PanelDelCentro);
+    }
+
+    // Lo mismo para el panel de audio: rehace la tarjeta de salida sin cerrarlo.
+    void RefrescarSalidaDeAudio(string porque)
+    {
+        if (_panelAbierto != PanelAudio || _audioSalida is not { } hueco) return;
+        Log.Info("panel de audio: se rehace la salida porque " + porque);
+        hueco.Children.Clear();
+        CardSalida(hueco);
+        ReajustarPanel(PanelAudio);
     }
 
     // Se conserva el nombre de siempre para quien lo llamara, pero ya NO cierra el panel.
