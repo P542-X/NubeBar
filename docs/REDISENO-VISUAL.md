@@ -552,6 +552,14 @@ del tema nuevo sobre una concha del viejo. Medido en Sakura: concha `#0F0F16` co
 3. **El chaflán** de Videojuegos y Cyberpunk es hoy un radio 0, o sea una esquina recta. La
    esquina CORTADA en diagonal es de la fase 7, y hasta entonces esos dos temas se ven más
    cuadrados de lo que la maqueta pide.
+4. **El halo de la isla está apagado a propósito**, y conviene leer esto antes de encenderlo
+   en la fase 2. `Isla` tiene `ClipToBounds="True"` —lo necesita: es lo que recorta el cajón
+   al crecer— y un `DropShadowEffect` sobre un elemento recortado se recorta con él, al
+   RECTÁNGULO de la caja y no a la forma redondeada. Sale un halo cuadrado alrededor de una
+   isla con las puntas redondas, que asoma justo por donde la curva se separa de la esquina
+   (medido: `#13182E` en la esquina contra `#0C0E17` del interior). Hacerlo bien es ponerlo en
+   una pieza DETRÁS de la isla, con su misma forma y sin recorte. Los paneles y los laterales
+   sí lo llevan, y ahí se ve bien: sus conchas no recortan.
 
 Todo lo que se construya en las fases 1 a 8 toma sus colores, medidas y decoraciones **del
 tema**, nunca de un valor escrito en el código: es lo que hace posible que el Estudio pueda

@@ -596,14 +596,29 @@ public partial class MainWindow : Window
         // se queda apuntando a un efecto que ya no está en la isla — la animación de
         // abrir/cerrar seguiría corriendo sobre un objeto suelto y no se vería nada.
         //
-        // Con el neón puesto manda el halo y `_brillo` se suelta, así que `AnimarBrillo` se
-        // va de vacío por su propia guarda en vez de animar un fantasma. Sin neón, todo
-        // sigue exactamente como estaba.
-        if (EstiloDeAhora.Brilla)
-        {
-            PonerResplandor(Isla, EstiloDeAhora, Realce.Ambiente);
-            _brillo = null;
-        }
+        // ---------- Y por qué el halo de la ISLA está apagado ----------
+        //
+        // Aquí se llamaba a `PonerResplandor(Isla, …)` cuando la forma brillaba, y con el
+        // estilo «Neón» funcionaba porque casi nadie lo tenía puesto. Al pasar el halo a ser
+        // una decoración del tema, ocho de los nueve lo encienden — y entonces se vio lo que
+        // llevaba ahí desde el principio.
+        //
+        // `Isla` tiene `ClipToBounds="True"` (lo necesita: es lo que recorta el cajón al
+        // crecer). Un `DropShadowEffect` sobre un elemento recortado se recorta con él, y el
+        // recorte es el RECTÁNGULO de la caja, no la forma redondeada. Resultado: un halo
+        // cuadrado alrededor de una isla con las puntas redondas, que asoma justo por donde
+        // la curva se separa de la esquina. El usuario lo vio al primer vistazo y lo dijo:
+        // «sobresale un rectángulo de la nube, queda feísimo». Medido: #13182E en la esquina
+        // contra #0C0E17 del interior.
+        //
+        // El halo de la isla es de la FASE 2 del rediseño («La isla: destello del filo, halo,
+        // reloj con brillo…»), y hacerlo bien es ponerlo en una pieza DETRÁS de la isla, con
+        // su misma forma y sin recorte. Encenderlo aquí ahora no es adelantarlo: es enseñar
+        // mal el de la fase 2 antes de construirlo.
+        //
+        // Los paneles y los laterales sí lo llevan, y ahí se ve bien: sus conchas no recortan.
+        //
+        //   if (EstiloDeAhora.Brilla) { PonerResplandor(Isla, EstiloDeAhora, Realce.Ambiente); _brillo = null; }
 
         // La orientación va ANTES de montar las zonas: los widgets se construyen según
         // ella (el separador es una raya a lo ancho o a lo alto, el carrusel se apila o
