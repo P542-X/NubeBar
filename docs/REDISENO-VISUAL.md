@@ -5,7 +5,8 @@ para que una sesión nueva pueda empezar por aquí sin más contexto: qué se qu
 puede y qué no, dónde tocar, en qué orden y cómo comprobarlo.
 
 **La maqueta:** <https://claude.ai/artifact/EPD2FVAWaDM8eeFbzKRcEF> (privada: solo la abre el
-dueño de la cuenta). Dos pantallas: «Isla e Inicio» y «Laterales y dock».
+dueño de la cuenta). Siete pantallas: «Isla e Inicio», «Laterales y dock» y, debajo, los
+paneles que cuelgan de la isla: red, audio, batería, notificaciones y bandeja.
 
 ---
 
@@ -131,7 +132,36 @@ Medidas de la maqueta en unidades de WPF, antes de la escala de paneles
 - Puntos de apps abiertas igual que en la isla.
 - **Mide en píxeles reales**: usar `SitioDelDock` (ver «Lecciones»).
 
-### 5. Lo que ya existe y se reutiliza
+### 5. Los paneles que cuelgan de la isla
+
+Pantallas «Panel de red», «Panel de audio», «Panel de batería», «Notificaciones» y
+«Bandeja» de la maqueta. Comparten la forma del Inicio: **salen de su icono fundidos con la
+isla** (esquinas de arriba rectas), entran con la escala vertical y sus bloques escalonados.
+El icono del que cuelgan se marca con fondo acento al 18 % mientras están abiertos.
+
+- **Red** (`MainWindow.Red.cs`): estado con pastilla «Conectado» (punto verde `#8FC1A0`),
+  la red actual con su señal, velocidad y adaptador y un botón «Desconectar»; lista de
+  redes con su barra propia, filas que se iluminan y la elegida con borde del acento; el
+  botón de volver a buscar **gira** mientras busca; velocidad con tres cifras y, midiendo,
+  una franja del acento que recorre una pista fina; rejilla de acciones (la destructiva con
+  coral al pasar el ratón, las que no aplican atenuadas).
+- **Audio** (`AbrirAudio` en `MainWindow.Control.cs`): volumen general con `−`, deslizador,
+  `+` y cifra; silencio que pinta el botón en coral y apaga el deslizador; salida activa con
+  borde del acento y pastilla «Activa»; **por aplicación** con el icono real de cada app
+  (`Nativo.Icono` de la ventana del proceso de la sesión), su deslizador y su silencio.
+- **Batería** (`MainWindow.Bateria.cs`): icono grande con el rayo si carga, porcentaje en
+  grande, barra que se **llena al abrir** (de 0 a su valor, 1 s); modo de energía como
+  **control segmentado** de tres (el activo con fondo y borde del acento); ahorro y el enlace
+  a Configuración.
+- **Notificaciones** (`MainWindow.CentroNotificaciones.cs`): cabecera con «No molestar»
+  (encendido en el acento) y «Borrar todo»; agrupadas por app con el nombre en el acento;
+  cada aviso con icono, título, hora y texto; la `✕` aparece al pasar el ratón; vacío, un
+  «Todo al día» con una marca.
+- **Bandeja** (`MainWindow.Bandeja.cs`): rejilla de 5 columnas de 44 px; los iconos **entran
+  con un pequeño rebote escalonado**; al pasar el ratón crecen y sale su nombre en una
+  etiqueta propia (en WPF, un `ToolTip` con estilo, no el de serie).
+
+### 6. Lo que ya existe y se reutiliza
 
 - La barra de desplazamiento propia (`BarraDeScroll.cs`).
 - El halo claro para iconos oscuros (`Legible`).
@@ -151,7 +181,8 @@ Cada fase se publica como versión para probarla antes de seguir.
    las apps.
 3. **El menú Inicio**: entrada y escalonado, buscador con franja, música (carátula,
    progreso, ecualizador por pico), teclado y energía.
-4. **Laterales y dock**: entradas, secciones, deslizadores, anillos y lupa del dock.
+4. **Paneles de la isla**: red, audio, batería, notificaciones y bandeja.
+5. **Laterales y dock**: entradas, secciones, deslizadores, anillos y lupa del dock.
 
 Con todo lo decorativo:
 
