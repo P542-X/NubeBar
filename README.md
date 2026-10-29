@@ -138,7 +138,8 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
 - Al cambiar el volumen, la isla se estira y enseña una barra animada 1,5 s.
 - Las notificaciones de Windows asoman unos segundos con el nombre de la app,
   el título y el texto; al pulsarlas se abre la app. Respeta «No molestar» y
-  puedes silenciar apps concretas.
+  puedes silenciar apps concretas. Si te salen repetidas (la de Windows y la de la
+  isla), mira [Si las notificaciones salen dos veces](#si-las-notificaciones-salen-dos-veces).
 
 **Escritorios virtuales**
 - Numeritos tipo *workspaces* de Linux, con el actual en color de acento.
@@ -372,6 +373,33 @@ cuelga) puede quedarse escondida. Para recuperarla:
 **La tecla Windows** también vuelve sola: el gancho de teclado se desinstala al cerrar
 y, si el proceso muere, Windows lo descarta por su cuenta. Si aun así no responde,
 reinicia el Explorador con el comando de arriba.
+
+## Si las notificaciones salen dos veces
+
+Es lo esperado con la configuración de serie de Windows. NubeBar no recibe las
+notificaciones directamente: las lee de la base de datos donde Windows las guarda (la vía
+oficial exigiría empaquetarla y firmarla). Así que se entera **después** de que Windows
+haya enseñado su propio aviso, y no puede impedirlo. Salen las dos.
+
+Para quedarte con una sola:
+
+**Solo las de la isla (recomendado).** Quita el aviso emergente de Windows, pero deja que
+las notificaciones se sigan guardando:
+
+1. **Configuración → Sistema → Notificaciones**.
+2. Entra en cada app que te avise (Discord, correo, WhatsApp…).
+3. Desactiva **Mostrar banners de notificación**.
+4. **No** desactives *Mostrar notificaciones en el centro de notificaciones*: es de ahí de
+   donde las lee NubeBar, y sin eso dejaría de verlas también.
+
+Windows 11 no tiene un interruptor general para los banners; hay que hacerlo app por app.
+
+**Solo las de Windows.** Pon `Barra.Notificaciones` a `false` (o apágalo en Ajustes).
+NubeBar deja de leerlas del todo: ni asoman en la isla ni llegan a su centro de
+notificaciones.
+
+> **No uses «No molestar» para esto:** NubeBar lo respeta, así que callaría los avisos de
+> los dos (las de la isla se siguen guardando en su centro de notificaciones).
 
 ## Licencia
 
