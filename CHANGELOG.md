@@ -6,6 +6,28 @@ construidos por el workflow de Release a partir de la etiqueta.
 
 ---
 
+## v1.0.3
+
+### Cambiado
+
+- **Rediseño visual:** el tema deja de ser tres colores y pasa a ser uno de los nueve de
+  serie, que pinta todas las superficies (isla, paneles y Ajustes) y decide también la
+  forma. Fuera los estilos Normal, Nube y Neón. Ver `docs/REDISENO-VISUAL.md`.
+- Los gestos de borde funcionan también dentro de un juego.
+
+### Arreglado
+
+- **Confirmación de apagar/reiniciar cortada:** salía en una fila nueva debajo de los
+  botones de energía, que son lo último del Inicio, y quedaba por debajo del borde del
+  panel. Ahora ocupa el sitio de los botones, y vuelven al cancelar.
+- Ajustes > Colores ya no es un muro de opciones, y el escritorio actual vuelve a su azul
+  con el número legible.
+- El halo cuadrado que asomaba por las puntas de la isla.
+- La nube de la escena de entrada ya no se deforma al crecer.
+- El diagnóstico de paneles ya no avisa de un desplazamiento que no existe.
+
+---
+
 ## v1.0.2
 
 ### Cambiado

@@ -25,6 +25,7 @@ public partial class MainWindow
 {
 
     StackPanel? _confirmacion;
+    StackPanel? _filaEnergia;
 
     // ================= Cabecera =================
     UIElement CrearCabecera()
@@ -121,6 +122,7 @@ public partial class MainWindow
     UIElement CrearEnergia()
     {
         var fila = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        _filaEnergia = fila;
 
         fila.Children.Add(BotonEnergia("", "Bloquear", Energia.Bloquear, false));
         fila.Children.Add(BotonEnergia("", "Suspender", Energia.Suspender, false));
@@ -160,7 +162,9 @@ public partial class MainWindow
         return b;
     }
 
-    // La confirmación sale dentro del propio panel, no en un cuadro de diálogo
+    // La confirmación sale dentro del propio panel, no en un cuadro de diálogo.
+    // Ocupa el sitio de la fila de botones en vez de ir debajo: la energía es lo
+    // último de la portada y una fila más se quedaba cortada por el borde del panel
     void PedirConfirmacion(string que, Action accion)
     {
         if (_confirmacion == null) return;
@@ -178,20 +182,28 @@ public partial class MainWindow
         var si = Boton(new TextBlock { Text = "Sí, " + que.ToLowerInvariant(), Foreground = _acento }, que, () =>
         {
             Log.Info($"energía: confirmado «{que}»");
-            _confirmacion.Visibility = Visibility.Collapsed;
+            OcultarConfirmacion();
             accion();
             CerrarMenu();
         });
         var no = Boton(new TextBlock { Text = "Cancelar", Foreground = _texto }, "Cancelar", () =>
         {
             Log.Info($"energía: cancelado «{que}»");
-            _confirmacion.Visibility = Visibility.Collapsed;
+            OcultarConfirmacion();
         });
         _confirmacion.Children.Add(si);
         _confirmacion.Children.Add(no);
 
+        if (_filaEnergia != null) _filaEnergia.Visibility = Visibility.Collapsed;
         _confirmacion.Visibility = Visibility.Visible;
         _confirmacion.BeginAnimation(OpacityProperty, Kf(0, 1, 220));
+        _confirmacion.BringIntoView();
+    }
+
+    void OcultarConfirmacion()
+    {
+        if (_confirmacion != null) _confirmacion.Visibility = Visibility.Collapsed;
+        if (_filaEnergia != null) _filaEnergia.Visibility = Visibility.Visible;
     }
 
     // ================= Utilidades =================
