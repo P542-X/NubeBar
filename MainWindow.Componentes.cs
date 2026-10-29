@@ -120,7 +120,7 @@ public partial class MainWindow
         // La concha lleva el halo de AMBIENTE: ancho y flojo, como luz detrás del panel. Es
         // lo que hace que el panel parezca despegado del fondo de pantalla sin dibujarle un
         // marco alrededor.
-        PonerResplandor(b, e, Realce.Ambiente);
+        PonerResplandor(b, e, Realce.Ambiente, aparte: true);
         ChaflanSiToca(b);
         return b;
     }
@@ -155,7 +155,7 @@ public partial class MainWindow
             Child = BajoElBarrido(contenido),
         };
         ChaflanSiToca(b);
-        PonerResplandor(b, e, realce);
+        PonerResplandor(b, e, realce, aparte: true);
         return b;
     }
 
@@ -172,10 +172,14 @@ public partial class MainWindow
     // cada cabecera—: con los dos paneles abiertos hay una docena, y animarlas todas
     // multiplica por tres los efectos que se recalculan en cada fotograma para un latido que
     // en 13 píxeles no se aprecia. El que se ve es el de las tarjetas, y ese sí late.
+    //
+    // `aparte` saca el halo a una pieza propia detrás del contenido (ver `CapaDelHalo`).
+    // Lo piden la concha y las tarjetas de los paneles, que llevan texto dentro.
     void PonerResplandor(UIElement quien, Forma e, Realce realce = Realce.Activo,
-                         bool late = true)
+                         bool late = true, bool aparte = false)
     {
         if (!e.Brilla) { quien.Effect = null; return; }
+        if (aparte && quien is Border { Child: not null } conTexto) quien = CapaDelHalo(conTexto);
 
         var n = Neon.Limpia(_cfg?.Neon);
         var (fDif, fInt) = Realces.De(realce);
@@ -242,6 +246,46 @@ public partial class MainWindow
                 RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever,
                 EasingFunction = suave,
             });
+    }
+
+    // ---------- El halo, en una pieza aparte ----------
+    //
+    // Los paneles se veían borrosos, y no era el escalado: era el halo. Un `DropShadowEffect`
+    // pinta el elemento ENTERO —con su texto— en una imagen intermedia y la pega después; en
+    // cuanto esa imagen cae a medio píxel, todo lo de dentro se suaviza. La barra, sin halo,
+    // salía nítida en la misma ventana.
+    //
+    // Medido fotografiando el panel de red (varianza del laplaciano; más es más nítido):
+    //   416 con el halo en la tarjeta · 792 sin halo · el escalado al 86 % no cambia nada
+    //
+    // Así que el efecto va en una pieza sin texto: una copia del fondo de la tarjeta, debajo
+    // del contenido, que da la misma silueta para difuminar. Es lo mismo que el aura de la
+    // isla (ver el XAML). Fondo y esquinas van enlazados a la tarjeta, así que si cambia de
+    // fondo al pasar el ratón, la copia cambia con ella.
+    const string CapaHalo = "capa-del-halo";
+
+    UIElement CapaDelHalo(Border b)
+    {
+        if (b.Child is Grid { Tag: CapaHalo } ya && ya.Children.Count > 0) return ya.Children[0];
+
+        var sombra = new Border
+        {
+            IsHitTestVisible = false,
+            // Por dentro del filo: el relleno de la tarjeta, sin pisar su borde
+            Margin = new Thickness(-b.Padding.Left, -b.Padding.Top, -b.Padding.Right, -b.Padding.Bottom),
+        };
+        sombra.SetBinding(Border.BackgroundProperty,
+                          new System.Windows.Data.Binding(nameof(Border.Background)) { Source = b });
+        sombra.SetBinding(Border.CornerRadiusProperty,
+                          new System.Windows.Data.Binding(nameof(Border.CornerRadius)) { Source = b });
+
+        var dentro = b.Child;
+        b.Child = null;
+        var capa = new Grid { Tag = CapaHalo };
+        capa.Children.Add(sombra);
+        capa.Children.Add(dentro);
+        b.Child = capa;
+        return sombra;
     }
 
     // ================= SectionHeader =================

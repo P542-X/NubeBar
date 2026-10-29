@@ -761,6 +761,7 @@ public partial class MainWindow
                              Kf(Arriba ? -12 : 12, 0, pequeno ? 260 : 380, retardo, Muelle));
             t.Y = 0;
         }
+        PausarHalos(contenido, Math.Max(msAlto, retardo + (pequeno ? 260 : 380)));
         MedirFotogramas($"abrir panel {nombre}");
         // Cuánto ha tardado el menú desde que soltaste la tecla Windows: hasta que
         // la ventana está colocada y el contenido montado, sin contar la animación
@@ -846,6 +847,7 @@ public partial class MainWindow
 
         // La isla vuelve a su alto normal y solo entonces se encoge la ventana
         double altoIsla = _cfg.Barra.Alto;
+        PausarHalos(Cajon.Content as FrameworkElement, ms);
         AnimarAlto(altoIsla, ms, Comoda, () =>
         {
             if (_panelAbierto != null) return;          // ya se abrió otro por el camino
@@ -1053,6 +1055,7 @@ public partial class MainWindow
             double altoIsla = _cfg.Barra.Alto + alto;
             // Igual que al abrir: si crece, la ventana primero; si encoge, al final
             if (crece) AjustarVentana(altoIsla);
+            PausarHalos(contenido, 220);
             AnimarAlto(altoIsla, 220, Suave, crece ? null : () =>
             {
                 if (_panelAbierto == nombre) AjustarVentana(_cfg.Barra.Alto + _panelAlto);
@@ -1155,6 +1158,67 @@ public partial class MainWindow
         var alto = Kf(desde, hasta, ms, 0, curva);
         if (alTerminar != null) alto.Completed += (_, _) => alTerminar();
         Isla.BeginAnimation(HeightProperty, alto);
+    }
+
+    // ---------- Los halos, en pausa mientras se anima ----------
+    //
+    // Los tirones al abrir y cerrar paneles eran de los halos. Un `DropShadowEffect` obliga
+    // a pintar lo que tiene debajo en una capa aparte y difuminarla, y eso se rehace en
+    // cada fotograma en que su contenido cambia: el aura envuelve la isla entera, que
+    // cambia de alto en cada fotograma, y dentro del panel la concha y cada tarjeta llevan
+    // el suyo mientras el contenido entra fundiéndose y deslizándose.
+    //
+    // Medido con `--diagpaneles` y la isla abajo, fotogramas de más de 25 ms al abrir:
+    //   red 55 %, Inicio 43 %, audio 44 % con todos los halos
+    //   red 47 %, Inicio 29 %, audio 22 % sin el aura de la isla
+    //   red  6 %, Inicio  4 %, audio  4 % sin ninguno
+    //
+    // Así que mientras dura la animación se quitan, y al terminar se devuelven los MISMOS
+    // efectos, con su respiración en marcha. Quieto, el panel se ve igual que antes.
+    readonly System.Collections.Generic.List<(UIElement Quien, System.Windows.Media.Effects.Effect Efecto)>
+        _halosEnPausa = new();
+    System.Windows.Threading.DispatcherTimer? _vueltaDeHalos;
+
+    void PausarHalos(FrameworkElement? contenido, double ms)
+    {
+        ApartarHalo(Aura);
+        if (contenido != null) ApartarHalosDe(contenido);
+
+        // Abrir uno mientras se cierra otro alarga la pausa: los halos vuelven cuando
+        // acaba la ÚLTIMA animación, no a mitad de la siguiente
+        if (_vueltaDeHalos == null)
+        {
+            _vueltaDeHalos = new System.Windows.Threading.DispatcherTimer();
+            _vueltaDeHalos.Tick += (_, _) => DevolverHalos();
+        }
+        _vueltaDeHalos.Stop();
+        _vueltaDeHalos.Interval = TimeSpan.FromMilliseconds(ms + 40);
+        _vueltaDeHalos.Start();
+    }
+
+    void ApartarHalo(UIElement quien)
+    {
+        if (quien.Effect is not { } efecto) return;
+        _halosEnPausa.Add((quien, efecto));
+        quien.Effect = null;
+    }
+
+    // Por el árbol LÓGICO: el panel recién creado aún no tiene árbol visual, y las
+    // conchas y tarjetas se montan con `Child` y `Children`, que son hijos lógicos
+    void ApartarHalosDe(DependencyObject d)
+    {
+        if (d is UIElement u) ApartarHalo(u);
+        foreach (var hijo in LogicalTreeHelper.GetChildren(d))
+            if (hijo is DependencyObject h) ApartarHalosDe(h);
+    }
+
+    void DevolverHalos()
+    {
+        _vueltaDeHalos?.Stop();
+        // Si por el camino alguien le ha puesto otro efecto (un cambio de tema), manda ese
+        foreach (var (quien, efecto) in _halosEnPausa)
+            if (quien.Effect == null) quien.Effect = efecto;
+        _halosEnPausa.Clear();
     }
 
     // ---------- Medir fluidez ----------

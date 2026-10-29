@@ -272,7 +272,7 @@ public partial class MainWindow : Window
     // La posición de casa: la que le toca por su monitor y su configuración
     (int x, int y) SuSitio()
     {
-        double altoDip = AltoVentanaAhora();
+        double altoDip = AltoDeVentana(AltoVentanaAhora());
         int altoPx = Math.Max(1, (int)Math.Round(altoDip * EscalaDeWpf()));
         return (_monitor.X, Arriba ? _monitor.Y : _monitor.Abajo - altoPx);
     }

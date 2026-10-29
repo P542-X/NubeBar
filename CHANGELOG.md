@@ -6,6 +6,23 @@ construidos por el workflow de Release a partir de la etiqueta.
 
 ---
 
+## v1.0.4
+
+### Arreglado
+
+- **La isla parpadeaba al abrir y cerrar paneles con la barra abajo:** la ventana tenía
+  que subir su filo de arriba y crecer a la vez, y al ser transparente Windows enseñaba un
+  fotograma el dibujo viejo en el sitio nuevo. Ahora, con la barra abajo, la ventana mide
+  siempre lo que mediría con el panel más alto y abrir o cerrar ya no la mueve.
+- **Tirones al abrir y cerrar paneles** (red, Inicio, audio…): los halos se recalculaban
+  en cada fotograma de la animación. Ahora se quitan mientras dura y vuelven al terminar.
+  Medido: del 55 % de fotogramas lentos al 5 %.
+- **Paneles borrosos:** el halo de las tarjetas pintaba también su texto en una imagen
+  intermedia, y eso lo suavizaba. Ahora el halo sale de una pieza aparte detrás del
+  contenido y el texto se ve nítido.
+
+---
+
 ## v1.0.3
 
 ### Cambiado

@@ -39,6 +39,7 @@ public partial class MainWindow : Window
     void ColocarEnMonitor(double altoVentanaDip)
     {
         if (Vertical) { ColocarEnMonitorVertical(altoVentanaDip); return; }
+        altoVentanaDip = AltoDeVentana(altoVentanaDip);
 
         var m = _monitor;
         double escala = _self != IntPtr.Zero ? EscalaDeWpf() : m.Escala;
@@ -90,6 +91,21 @@ public partial class MainWindow : Window
         Width = double.NaN;
         Height = double.NaN;
     }
+
+    // ---------- Con la isla abajo, la ventana no cambia de alto ----------
+    //
+    // Arriba, abrir un panel solo baja el filo de abajo de la ventana: lo ya pintado se
+    // queda donde estaba. Abajo hay que SUBIR el filo de arriba, y la ventana es en capas
+    // (AllowsTransparency): Windows enseña un fotograma el dibujo viejo pegado al filo
+    // nuevo, la isla salta para arriba y vuelve —al cerrar, al revés, y desaparece un
+    // instante—. Era el parpadeo al abrir paneles con la isla abajo.
+    //
+    // Así que abajo la ventana mide siempre lo que mediría con el panel más alto que cabe,
+    // y abrir o cerrar ya no la mueve: solo cambia lo que hay dentro. Lo de encima de la
+    // isla es transparente del todo, y en una ventana en capas eso deja pasar el ratón.
+    double AltoDeVentana(double pedido) =>
+        Arriba || Vertical ? pedido
+                           : Math.Max(pedido, _cfg.Barra.Alto + AltoMaximoPanel() + _cfg.Barra.Margen * 2);
 
     // ================= Cuántas apps caben de verdad =================
     // Tu MaxApps manda, pero en un monitor estrecho (el vertical, por ejemplo) una
