@@ -27,13 +27,24 @@ public partial class MainWindow : Window
 
         try
         {
-            var silenciadas = _cfg.Barra.NotificacionesSilenciadas ?? new List<string>();
-            foreach (var a in Notificaciones.Nuevas())
+            // Lo silenciado en el config de siempre sigue valiendo, y además lo que
+            // hayas silenciado desde el propio centro. Las dos listas se juntan al
+            // arrancar (ver EncajarSilenciadasDelConfig).
+            var centro = Centro.Actual;
+
+            // El centro se queda TODO lo que llega —es su historial— y devuelve solo lo
+            // que además hay que enseñar: ni lo descartado, ni lo repetido, ni lo de una
+            // app silenciada.
+            var paraLaIsla = centro.Recibir(Notificaciones.Nuevas());
+            if (paraLaIsla.Count > 0) centro.Guardar();
+
+            foreach (var a in paraLaIsla)
             {
-                // "No molestar" manda: se descartan, no se encolan para después
-                if (NoMolestar.Activo) continue;
-                if (silenciadas.Any(s => a.AumId.Contains(s, StringComparison.OrdinalIgnoreCase))) continue;
-                _cola.Enqueue(a);
+                // "No molestar" solo impide que se ASOME: en el centro se queda. Antes
+                // se descartaban aquí mismo y el modo silencio se comía el historial.
+                if (centro.NoMolestar || NoMolestar.Activo) continue;
+                _cola.Enqueue(new Notificaciones.Aviso(a.Id, a.App, a.Titulo, a.Texto,
+                                                       a.Cuando, a.AumId, a.Acciones));
             }
             SiguienteNota();
         }
@@ -97,7 +108,7 @@ public partial class MainWindow : Window
         if (a.Texto.Length > 0)
             pila.Children.Add(new TextBlock
             {
-                Text = a.Texto, Foreground = _texto, Opacity = 0.7, FontSize = 11,
+                Text = a.Texto, Foreground = _textoAtenuado, FontSize = 11,
                 TextTrimming = TextTrimming.CharacterEllipsis
             });
         Grid.SetColumn(pila, 1);

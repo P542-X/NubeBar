@@ -21,6 +21,11 @@ public partial class MainWindow : Window
 
     static void Levantar(FrameworkElement e, bool arriba)
     {
+        // Con el movimiento reducido el icono no se levanta en absoluto: no hay estado
+        // que mantener (el fondo del hover ya avisa de que estás encima), así que esto
+        // se salta del todo en vez de hacerlo instantáneo, que marearía igual.
+        if (!Animacion.Adorno) return;
+
         // El transform se monta una sola vez y se reutiliza: crearlo en cada
         // MouseEnter dejaría animaciones viejas colgando del objeto anterior.
         if (e.RenderTransform is not TransformGroup g || g.Children.Count != 2)
@@ -64,6 +69,7 @@ public partial class MainWindow : Window
     // esto no hay forma de saber si el clic ha entrado.
     static void Latir(FrameworkElement e)
     {
+        if (!Animacion.Adorno) return;
         if (e.RenderTransform is not TransformGroup g || g.Children.Count != 2) return;
         var escala = (ScaleTransform)g.Children[0];
 
@@ -84,6 +90,7 @@ public partial class MainWindow : Window
     // y baja una vez. Si no hay borde de acento puesto, no hace nada.
     void DestellarBorde()
     {
+        if (!Animacion.Adorno) return;
         if (_brillo == null) return;
         double vuelta = _expandida ? BrilloAbierta : BrilloRecogida;
 

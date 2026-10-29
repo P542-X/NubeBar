@@ -67,6 +67,22 @@ public sealed class GanchoTeclas : IDisposable
     // Una tecla de volumen: +1 subir, -1 bajar, 0 silenciar
     public event Action<int>? TeclaVolumen;
 
+    // ---------- Esc con un panel abierto ----------
+    //
+    // Los paneles del centro de control, audio, red y batería NO piden teclado: la isla
+    // es WS_EX_NOACTIVATE, así que nunca tiene el foco y un `KeyDown` suyo no se dispara
+    // jamás. Por eso Esc no los cerraba: no faltaba un manejador, faltaba alguien a
+    // quien avisar. El hook sí ve la tecla.
+    //
+    // La tecla **no se traga**: se avisa y se deja pasar con `CallNextHookEx`. Un Esc
+    // global que se comiera la tecla rompería el Esc de cualquier otra aplicación, y eso
+    // no lo vale cerrar un panel.
+    public event Action? Escape;
+
+    // Solo se avisa mientras hay un panel abierto, para no llamar en cada Esc del
+    // sistema. Lo pone y lo quita el que abre y cierra el panel.
+    public volatile bool HayPanel;
+
     // Marca de cuándo soltaste la tecla, para poder medir lo que tarda el menú en
     // salir. Lo que se mide es de la tecla a la ventana colocada, sin la animación.
     public static long MarcaTecla;
@@ -229,6 +245,10 @@ public sealed class GanchoTeclas : IDisposable
         if (abajo)
         {
             if (_winAbajo) _otraDurante = true;
+
+            // 3.5) Esc solo, con un panel nuestro abierto: se avisa y se deja pasar
+            if (vk == VkEsc && HayPanel && !Abajo(VkCtrl) && !Abajo(VkAlt) && !Abajo(VkShift))
+                Escape?.Invoke();
 
             // 4) Ctrl+Esc también abre el nuestro
             if (vk == VkEsc && Abajo(VkCtrl))

@@ -44,6 +44,43 @@ public partial class MainWindow
 
     void ApuntarActivaAlPulsar() => _activaAlPulsar = ActivaAjena();
 
+    // ================= La ventana que conocíamos y se ha escondido =================
+    //
+    // Discord, Steam, Telegram y casi todo lo que vive en la bandeja no se minimizan al
+    // pulsar minimizar o la X: **se esconden**. La ventana sigue existiendo pero deja de ser
+    // visible, así que sale de la lista y el grupo se queda con cero ventanas. Y entonces
+    // NubeBar hacía lo peor posible: relanzar el ejecutable, que no hace nada porque ya hay
+    // un proceso corriendo. Resultado: pulsar el icono no producía ningún efecto.
+    //
+    // ---------- Por qué se RECUERDA en vez de buscarla ----------
+    //
+    // La primera versión de esto recorría todas las ventanas de nivel superior invisibles
+    // buscando una «que parezca la principal» de ese ejecutable. Falló dos veces seguidas en
+    // el diagnóstico: encontraba otra ventana del mismo proceso. Y tiene sentido — un proceso
+    // cualquiera tiene varias ventanas invisibles con título, y **adivinar cuál es la buena
+    // es adivinar**. Enseñar la equivocada sería peor que no hacer nada.
+    //
+    // Pero no hace falta adivinar: si el usuario ha usado esa app, su ventana estuvo en la
+    // lista y `g.Ultima` la guarda. Así que se comprueba esa, y solo esa.
+    //
+    // Lo que este camino NO cubre: una app que ya estaba escondida antes de arrancar NubeBar.
+    // Ahí no hay nada recordado, y pulsar el icono la lanza como siempre.
+    IntPtr EscondidaRecordada(Grupo g)
+    {
+        var h = g.Ultima;
+        if (h == IntPtr.Zero || !Nativo.Existe(h)) return IntPtr.Zero;
+        return Nativo.Ficha(h).Visible ? IntPtr.Zero : h;
+    }
+
+    // Lo mismo para el dock, que no tiene el grupo a mano sino su clave.
+    internal IntPtr EscondidaRecordadaPorClave(string clave)
+    {
+        foreach (var g in _grupos.Values)
+            if (string.Equals(Dock.Clave(g.Exe), clave, StringComparison.OrdinalIgnoreCase))
+                return EscondidaRecordada(g);
+        return IntPtr.Zero;
+    }
+
     // Minimizar y, si la app no atiende el mensaje, insistir por las malas
     void MinimizarVentana(IntPtr h)
     {
@@ -75,10 +112,39 @@ public partial class MainWindow
     DispatcherTimer? _tiempoMiniLista;
     Grupo? _grupoSenalado;
 
-    double _anchoTira;                     // ancho natural de la fila entera, medido
+    double _anchoTira;                     // largo natural de la tira entera, medido
 
     double AnchoVisible => Math.Max(AnchoIcono, MaxAppsEfectivo * AnchoIcono);
     double DesplazamientoMaximo => Math.Max(0, _anchoTira - AnchoVisible);
+
+    // ---------- El eje de la tira ----------
+    //
+    // El carrusel es una tira más larga que el hueco que se le da, desplazándose por
+    // dentro de una ventanita. En la barra horizontal eso pasa en X y lo que se mide es
+    // el ancho; en la vertical, en Y y lo que se mide es el alto.
+    //
+    // Estos cinco accesos son los ÚNICOS sitios que lo saben. El resto del carrusel
+    // —la rueda, la inercia, el desvanecido de los extremos, traer a la vista la app
+    // que se acaba de activar— está escrito una sola vez y vale para los dos.
+    DependencyProperty EjeTira => Vertical ? TranslateTransform.YProperty : TranslateTransform.XProperty;
+
+    double Desplazado => _desplazamiento == null ? 0
+                       : Vertical ? _desplazamiento.Y : _desplazamiento.X;
+
+    void PonerDesplazado(double v)
+    {
+        if (_desplazamiento == null) return;
+        if (Vertical) _desplazamiento.Y = v; else _desplazamiento.X = v;
+    }
+
+    // El largo de la ventanita por la que se ve la tira
+    double LargoCarrusel => _carrusel == null ? 0 : Vertical ? _carrusel.Height : _carrusel.Width;
+
+    void PonerLargoCarrusel(double v)
+    {
+        if (_carrusel == null) return;
+        if (Vertical) _carrusel.Height = v; else _carrusel.Width = v;
+    }
 
     // Para el log de diagnóstico: qué grupos hay, en qué orden y con cuántas ventanas
     string ResumenGrupos()
@@ -102,16 +168,20 @@ public partial class MainWindow
         double x0 = -1;
         try { if (_carrusel != null) x0 = Left + _carrusel.TransformToAncestor(this).Transform(new Point(0, 0)).X; }
         catch { }
-        return $"tira={_anchoTira:0} visible={_carrusel?.Width:0} x0={x0:0} " +
-               $"desp={_desplazamiento?.X:0} [{string.Join(" ", nombres)}]{detalle}";
+        return $"tira={_anchoTira:0} visible={LargoCarrusel:0} x0={x0:0} " +
+               $"desp={Desplazado:0} [{string.Join(" ", nombres)}]{detalle}";
     }
 
     // ================= Construcción =================
     UIElement ModuloApps()
     {
-        double altoBoton = Math.Max(20, _cfg.Barra.Alto - 8);
+        bool v = Vertical;
+        double grosorBoton = Math.Max(20, _cfg.Barra.Alto - 8);
 
-        _tira = new StackPanel { Orientation = Orientation.Horizontal, Height = altoBoton };
+        // En vertical la tira se apila y lo que se fija es su ANCHO; en horizontal va
+        // tumbada y lo que se fija es su alto. De ahí para abajo, lo mismo.
+        _tira = new StackPanel { Orientation = v ? Orientation.Vertical : Orientation.Horizontal };
+        if (v) _tira.Width = grosorBoton; else _tira.Height = grosorBoton;
         _desplazamiento = new TranslateTransform();
         _tira.RenderTransform = _desplazamiento;
 
@@ -120,18 +190,30 @@ public partial class MainWindow
         // la recorta EN SUS PROPIAS COORDENADAS, y al desplazarla solo quedaba visible
         // el trocito final. El Canvas da sitio infinito a sus hijos y no los recorta;
         // el recorte bueno, el de la ventanita que se ve, lo hace el Border.
-        var lienzo = new Canvas { Height = altoBoton };
+        // ---------- Y sitio para que un icono se levante ----------
+        //
+        // El recorte medía justo lo que los botones, y al pasar el ratón el icono sube 2 px
+        // y crece un 8 % con rebote: lo que asomaba por encima se cortaba. Lo contó el
+        // usuario: «cuando me pongo encima de una app hay veces que se cortan por arriba».
+        // Se le da al recorte el hueco que deja la barra a cada lado (4 px con el grosor
+        // de serie) y la tira se baja eso mismo: los iconos siguen exactamente donde estaban.
+        double holgura = Math.Max(0, (_cfg.Barra.Alto - grosorBoton) / 2);
+        double grosorRecorte = grosorBoton + holgura * 2;
+
+        var lienzo = new Canvas();
+        if (v) lienzo.Width = grosorRecorte; else lienzo.Height = grosorRecorte;
+        if (v) Canvas.SetLeft(_tira, holgura); else Canvas.SetTop(_tira, holgura);
         lienzo.Children.Add(_tira);
 
         _carrusel = new Border
         {
             ClipToBounds = true,
             Child = lienzo,
-            Height = altoBoton,
-            HorizontalAlignment = HorizontalAlignment.Left,
-            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = v ? HorizontalAlignment.Center : HorizontalAlignment.Left,
+            VerticalAlignment = v ? VerticalAlignment.Top : VerticalAlignment.Center,
             Background = Brushes.Transparent     // para que la rueda llegue aunque sobre hueco
         };
+        if (v) _carrusel.Width = grosorRecorte; else _carrusel.Height = grosorRecorte;
         _carrusel.MouseWheel += Carrusel_Rueda;
         _carrusel.SizeChanged += (_, _) => PintarDesvanecido();
 
@@ -146,7 +228,7 @@ public partial class MainWindow
         // dentro se desplazaría con la rueda y dejaría de estar a mano
         return new StackPanel
         {
-            Orientation = Orientation.Horizontal,
+            Orientation = v ? Orientation.Vertical : Orientation.Horizontal,
             Children = { _carrusel, CrearBotonVista() }
         };
     }
@@ -293,13 +375,35 @@ public partial class MainWindow
         if (_carrusel == null || _tira == null) { AjustarAncho(); return; }
         // Medir sin límite (no UpdateLayout, que fuerza una pasada entera cada segundo)
         _tira.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        _anchoTira = _tira.DesiredSize.Width;
+        _anchoTira = Vertical ? _tira.DesiredSize.Height : _tira.DesiredSize.Width;
         _tira.InvalidateMeasure();
-        _carrusel.Width = Math.Min(_anchoTira, AnchoVisible);
+        PonerLargoCarrusel(Math.Min(_anchoTira, AnchoVisible));
         LimitarDesplazamiento();
         PintarDesvanecido();
         ActualizarBotonVista();
         AjustarAncho();
+    }
+
+    // ---------- Que un icono negro se vea sobre la isla negra ----------
+    //
+    // Un icono que es un trazo oscuro (ChatGPT, por ejemplo) desaparecía sobre el fondo de
+    // la isla. No se le cambia el color —es el icono de la app y se tiene que reconocer—:
+    // se le pone detrás un halo claro, que le dibuja el contorno. Solo con fondo oscuro:
+    // en un tema claro el negro ya se lee.
+    internal const double FondoClaro = 0.4;
+
+    Image Legible(Image img)
+    {
+        try
+        {
+            if (Contraste.Luminancia(_roles.FondoOpaco) < FondoClaro && Iconos.EsOscuro(img.Source))
+                img.Effect = new System.Windows.Media.Effects.DropShadowEffect
+                {
+                    Color = _roles.ColorDe("icono.halo"), ShadowDepth = 0, BlurRadius = 6, Opacity = 0.85,
+                };
+        }
+        catch { }
+        return img;
     }
 
     void CrearBotonGrupo(Grupo g, bool enElCarrusel = true)
@@ -310,7 +414,7 @@ public partial class MainWindow
         var titulo = cerrada ? NombreDeClave(g.Exe) : Nativo.Titulo(g.Ventanas[0]);
         g.Icono = cerrada ? Iconos.De(g.Lanzar, 32) : Nativo.Icono(g.Ventanas[0]);
         UIElement visual = g.Icono != null
-            ? new Image { Source = g.Icono, Width = 18, Height = 18 }
+            ? Legible(new Image { Source = g.Icono, Width = 18, Height = 18 })
             : Texto(titulo.Length > 0 ? titulo[..1] : "?", 14);
 
         // Puntitos: uno por ventana del grupo, con un máximo de tres
@@ -409,6 +513,32 @@ public partial class MainWindow
         {
             CerrarMiniLista();
             if (!g.Fijada) return;
+
+            // ---------- ¿Cerrada, o solo escondida? ----------
+            //
+            // No es lo mismo, y aquí se confundían. Discord, Steam, Telegram y casi todo lo
+            // que vive en la bandeja no se minimizan: **se esconden**. La ventana sigue
+            // existiendo pero deja de ser visible, así que sale de la lista de ventanas y
+            // este código daba la app por cerrada.
+            //
+            // Y entonces hacía lo peor posible: volver a lanzar el ejecutable. El segundo
+            // proceso ve que ya hay uno corriendo y se va sin hacer nada, así que **pulsar el
+            // icono no producía ningún efecto** y la app parecía irrecuperable. Es el fallo
+            // que contó el usuario: «clico dos veces y ya no me deja volver a abrirla».
+            //
+            // Ahora se busca primero la ventana escondida de ese mismo ejecutable y se
+            // enseña, que es lo que hace la barra de tareas de Windows. Si no hay ninguna se
+            // lanza como siempre: en el peor caso, el comportamiento de antes.
+            var escondida = EscondidaRecordada(g);
+            if (escondida != IntPtr.Zero)
+            {
+                Log.Info($"fijada {System.IO.Path.GetFileName(g.Exe)}: no estaba cerrada, estaba " +
+                         $"ESCONDIDA en 0x{escondida.ToInt64():X6} (\"{Nativo.Titulo(escondida)}\"); " +
+                         "se enseña en vez de relanzarla");
+                Nativo.MostrarYActivar(escondida);
+                return;
+            }
+
             Log.Info($"abriendo la app fijada {g.Lanzar}");
             if (g.Boton != null) LatirIcono(g.Exe);   // late mientras la app arranca
             Uso.Apuntar("fijada:" + g.Lanzar);
@@ -491,14 +621,15 @@ public partial class MainWindow
     void DeslizarA(double destino, double ms)
     {
         if (_desplazamiento == null) return;
-        double ahora = _desplazamiento.X;
-        _desplazamiento.BeginAnimation(TranslateTransform.XProperty, null);
-        _desplazamiento.X = destino;
+        var eje = EjeTira;
+        double ahora = Desplazado;
+        _desplazamiento.BeginAnimation(eje, null);
+        PonerDesplazado(destino);
         if (Math.Abs(ahora - destino) < 0.5) { PintarDesvanecido(); return; }
 
         var anim = Kf(ahora, destino, ms, 0, Suave);
         anim.Completed += (_, _) => PintarDesvanecido();
-        _desplazamiento.BeginAnimation(TranslateTransform.XProperty, anim);
+        _desplazamiento.BeginAnimation(eje, anim);
         PintarDesvanecido();
     }
 
@@ -512,14 +643,16 @@ public partial class MainWindow
         int i = _tira.Children.IndexOf(g.Boton);
         if (i < 0) return;
 
-        double izquierda = i * AnchoIcono;
-        double derecha = izquierda + AnchoIcono;
-        double visibleIzq = -_objetivoDesplazamiento;
-        double visibleDer = visibleIzq + _carrusel.Width;
+        // "Antes" y "después" en el eje de la tira: a la izquierda y a la derecha si
+        // está tumbada, arriba y abajo si está apilada. La cuenta es la misma.
+        double antes = i * AnchoIcono;
+        double despues = antes + AnchoIcono;
+        double visibleDesde = -_objetivoDesplazamiento;
+        double visibleHasta = visibleDesde + LargoCarrusel;
 
         double destino = _objetivoDesplazamiento;
-        if (izquierda < visibleIzq) destino = -izquierda;
-        else if (derecha > visibleDer) destino = -(derecha - _carrusel.Width);
+        if (antes < visibleDesde) destino = -antes;
+        else if (despues > visibleHasta) destino = -(despues - LargoCarrusel);
         else return;
 
         _objetivoDesplazamiento = destino;
@@ -530,20 +663,30 @@ public partial class MainWindow
     // Los extremos se difuminan solo por el lado donde quedan apps sin ver
     void PintarDesvanecido()
     {
-        if (_carrusel == null || _carrusel.Width <= 0 || double.IsNaN(_carrusel.Width)) return;
+        double largo = LargoCarrusel;
+        if (_carrusel == null || largo <= 0 || double.IsNaN(largo)) return;
 
-        bool hayIzquierda = _desplazamiento != null && _desplazamiento.X < -0.5;
-        bool hayDerecha = _desplazamiento != null && _desplazamiento.X > -DesplazamientoMaximo + 0.5;
+        bool hayAntes = _desplazamiento != null && Desplazado < -0.5;
+        bool hayDespues = _desplazamiento != null && Desplazado > -DesplazamientoMaximo + 0.5;
 
         if (Environment.GetEnvironmentVariable("NUBEBAR_SINMASCARA") == "1") { _carrusel.OpacityMask = null; return; }
-        if (!hayIzquierda && !hayDerecha) { _carrusel.OpacityMask = null; return; }
+        if (!hayAntes && !hayDespues) { _carrusel.OpacityMask = null; return; }
 
-        double borde = Math.Min(DesvanecidoBorde / _carrusel.Width, 0.45);
-        var mascara = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 0) };
-        mascara.GradientStops.Add(new GradientStop(hayIzquierda ? Colors.Transparent : Colors.Black, 0));
-        mascara.GradientStops.Add(new GradientStop(Colors.Black, borde));
-        mascara.GradientStops.Add(new GradientStop(Colors.Black, 1 - borde));
-        mascara.GradientStops.Add(new GradientStop(hayDerecha ? Colors.Transparent : Colors.Black, 1));
+        // El degradado va en el eje de la tira: de izquierda a derecha si está tumbada,
+        // de arriba abajo si está apilada.
+        double borde = Math.Min(DesvanecidoBorde / largo, 0.45);
+        var mascara = new LinearGradientBrush
+        {
+            StartPoint = new Point(0, 0),
+            EndPoint = Vertical ? new Point(0, 1) : new Point(1, 0)
+        };
+        // Esto es una MÁSCARA de opacidad, no pintura: en una `OpacityMask` de WPF el negro
+        // significa «opaco» y el transparente «no se ve». No son colores, son un uno y un
+        // cero, y cambiarlos por un color del tema rompería el desvanecido del carrusel.
+        mascara.GradientStops.Add(new GradientStop(hayAntes ? Colors.Transparent : Colors.Black, 0));   // color literal a propósito
+        mascara.GradientStops.Add(new GradientStop(Colors.Black, borde));                               // color literal a propósito
+        mascara.GradientStops.Add(new GradientStop(Colors.Black, 1 - borde));                           // color literal a propósito
+        mascara.GradientStops.Add(new GradientStop(hayDespues ? Colors.Transparent : Colors.Black, 1)); // color literal a propósito
         mascara.Freeze();
         _carrusel.OpacityMask = mascara;
     }

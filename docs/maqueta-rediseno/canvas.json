@@ -1,0 +1,28 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-10-28T14:30:00Z" },
+  "title": "NubeBar espectacular",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Isla e Inicio", "is_interactive": true, "radius": 14 },
+    "Laterales.dc.html": { "x": 1520, "y": 0, "w": 1440, "h": 900, "title": "Laterales y dock", "is_interactive": true, "radius": 14 },
+    "Red.dc.html": { "x": 0, "y": 1240, "w": 720, "h": 740, "title": "Panel de red", "is_interactive": true, "radius": 14 },
+    "Audio.dc.html": { "x": 800, "y": 1240, "w": 720, "h": 580, "title": "Panel de audio", "is_interactive": true, "radius": 14 },
+    "Bateria.dc.html": { "x": 1600, "y": 1240, "w": 720, "h": 340, "title": "Panel de batería", "is_interactive": true, "radius": 14 },
+    "Avisos.dc.html": { "x": 2400, "y": 1240, "w": 720, "h": 340, "title": "Notificaciones", "is_interactive": true, "radius": 14 },
+    "Bandeja.dc.html": { "x": 3200, "y": 1240, "w": 720, "h": 260, "title": "Bandeja", "is_interactive": true, "radius": 14 },
+    "Anime.dc.html": { "x": 0, "y": 2340, "w": 1440, "h": 900, "title": "Temas anime: Sakura, Samurái, Otoño y Sad (se eligen abajo)", "is_interactive": true, "radius": 14 },
+    "Temas.dc.html": { "x": 0, "y": 3600, "w": 1440, "h": 900, "title": "Más temas: Oficina, Videojuegos, Invierno y Cyberpunk (se eligen abajo)", "is_interactive": true, "radius": 14 },
+    "Estudio.dc.html": { "x": 1520, "y": 3600, "w": 1440, "h": 900, "title": "Estudio de temas", "is_interactive": true, "radius": 14 },
+    "Paneles.dc.html": { "x": 0, "y": 4860, "w": 1920, "h": 1040, "title": "Todos los paneles en cada uno de los 9 temas (se eligen abajo)", "is_interactive": true, "radius": 14 }
+  },
+  "order": ["Main.dc.html", "Laterales.dc.html", "Red.dc.html", "Audio.dc.html", "Bateria.dc.html", "Avisos.dc.html", "Bandeja.dc.html", "Anime.dc.html", "Temas.dc.html", "Estudio.dc.html", "Paneles.dc.html"],
+  "notes": {
+    "filaPaneles": { "x": 0, "y": 1000, "text": "Paneles que cuelgan de la isla", "kind": "title1", "maxW": 3920 },
+    "filaAnime": { "x": 0, "y": 2100, "text": "Temas: Anime", "kind": "title1", "maxW": 3920 },
+    "filaMas": { "x": 0, "y": 3360, "text": "Más temas y el Estudio de temas", "kind": "title1", "maxW": 2960 },
+    "filaTodos": { "x": 0, "y": 4620, "text": "Paneles en cada tema", "kind": "title1", "maxW": 1920 }
+  },
+  "designSystems": []
+}

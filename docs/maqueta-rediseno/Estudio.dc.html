@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>NubeBar · Estudio de temas</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&amp;family=Nunito:wght@600;800&amp;family=Rajdhani:wght@600;700&amp;family=Orbitron:wght@700&amp;family=Shippori+Mincho:wght@700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#8DA9E8}a:hover{color:#B8C7EC}
+/* La ventana del Estudio usa el tema Profesional; lo que cambia en vivo es la vista
+   previa del centro, que pinta el tema que se está editando. */
+.es{--plata:#C9D2E6;--texto:#E6E9F2;--tenue:#9AA3B8;--filo:rgba(255,255,255,.09);--ui:#8DA9E8;--fondo-ui:#0D0F15;--panel-ui:#12151D;font-family:"Segoe UI Variable","Segoe UI",system-ui,sans-serif;color:var(--texto)}
+.es *{box-sizing:border-box}
+.es button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
+.es button:focus-visible,.es input:focus-visible,.es select:focus-visible{outline:2px solid var(--ui);outline-offset:2px}
+@keyframes girar{to{transform:rotate(360deg)}}
+@keyframes respirar{0%,100%{opacity:.25}50%{opacity:.55}}
+@keyframes rgb{to{filter:hue-rotate(360deg)}}
+@keyframes caer{0%{transform:translate(0,-20px) rotate(0);opacity:0}10%{opacity:.9}100%{transform:translate(-10px,420px) rotate(300deg);opacity:.2}}
+@keyframes flotar{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+
+/* ---------- Barra de arriba ---------- */
+.arriba{height:58px;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid var(--filo);background:var(--panel-ui)}
+.nombre-tema{height:34px;width:220px;padding:0 10px;border-radius:8px;border:1px solid var(--filo);background:#0E1118;color:var(--texto);font:inherit;font-size:14px;font-weight:600}
+.base{font-size:12px;color:var(--tenue);padding:3px 9px;border-radius:999px;background:rgba(255,255,255,.06)}
+.boton-ui{height:34px;padding:0 12px;border-radius:8px;display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;background:rgba(255,255,255,.06);border:1px solid var(--filo);transition:background .2s}
+.boton-ui:hover:not(:disabled){background:rgba(255,255,255,.11)}
+.boton-ui:disabled{opacity:.4;cursor:not-allowed}
+.boton-ui.principal{background:var(--ui);color:#0C0E14;border-color:transparent}
+.boton-ui.principal:hover{background:#A6BCEE}
+.icono-ui{width:34px;padding:0;justify-content:center}
+.consumo{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--tenue)}
+.consumo-barra{width:90px;height:6px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden}
+.consumo-barra span{display:block;height:100%;border-radius:3px;transition:width .3s,background .3s}
+
+/* ---------- Navegación ---------- */
+.nav{width:210px;flex:none;border-right:1px solid var(--filo);background:var(--panel-ui);padding:12px 8px;display:flex;flex-direction:column;gap:2px}
+.nav-item{display:flex;align-items:center;gap:10px;height:38px;padding:0 10px;border-radius:9px;font-size:13.5px;color:var(--plata);text-align:left;transition:background .2s,color .2s}
+.nav-item:hover{background:rgba(255,255,255,.05);color:var(--texto)}
+.nav-item.activo{background:rgba(141,169,232,.14);color:#fff;box-shadow:inset 3px 0 0 var(--ui)}
+.nav-item .num{width:20px;font-size:11.5px;color:var(--tenue);font-variant-numeric:tabular-nums}
+
+/* ---------- Vista previa ---------- */
+.centro{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--fondo-ui)}
+.pestanas{display:flex;align-items:center;gap:4px;padding:10px 14px;border-bottom:1px solid var(--filo)}
+.pestana{height:30px;padding:0 12px;border-radius:7px;font-size:12.5px;color:var(--tenue)}
+.pestana.activa{background:rgba(255,255,255,.08);color:var(--texto)}
+.lienzo{position:relative;flex:1;margin:14px;border-radius:12px;overflow:hidden;border:1px solid var(--filo)}
+.vp{position:absolute;inset:0;font-family:var(--v-fuente),system-ui,sans-serif;font-size:var(--v-tam);color:var(--v-tinta);background:linear-gradient(160deg,color-mix(in srgb,var(--v-acento) 22%,#1b2130),#0f1219 70%)}
+.vp.claro{background:linear-gradient(160deg,color-mix(in srgb,var(--v-acento) 30%,#ffffff),#f2f4f8 70%)}
+.vp-isla-sitio{position:absolute;top:18px;left:50%;width:620px;margin-left:-310px}
+.vp-halo{position:absolute;inset:-2px;border-radius:var(--v-radio-isla);box-shadow:0 6px 26px 3px var(--v-acento);animation:respirar 5s ease-in-out infinite}
+.vp-borde{position:relative;border-radius:var(--v-radio-isla);padding:var(--v-filo);overflow:hidden;isolation:isolate;background:linear-gradient(90deg,var(--v-acento),var(--v-sec))}
+.vp-borde.con-destello::before{content:"";position:absolute;left:50%;top:50%;width:800px;height:800px;margin:-400px 0 0 -400px;background:linear-gradient(90deg,transparent 40%,#fff 49%,var(--v-sec) 51%,transparent 60%);animation:girar 8s linear infinite;z-index:-1}
+.vp-borde.rgb{background:linear-gradient(90deg,#FF3D3D,#FFD23D,#3DFF7A,#3DC4FF,#B03DFF,#FF3D3D);animation:rgb 6s linear infinite}
+.vp-isla{display:flex;align-items:center;gap:6px;height:42px;padding:0 10px;border-radius:calc(var(--v-radio-isla) - 1px);background:var(--v-superficie)}
+.vp-isla img{width:19px;height:19px;display:block}
+.vp-sep{width:1.5px;height:14px;background:color-mix(in srgb,var(--v-tinta) 25%,transparent);margin:0 4px}
+.vp-reloj{font-weight:800;font-variant-numeric:tabular-nums;margin-left:auto;padding:0 6px}
+.vp-punto{width:12px;height:3px;border-radius:2px;background:var(--v-acento);margin-top:-14px;margin-left:-16px}
+.vp-inicio{position:absolute;top:58px;left:50%;width:460px;margin-left:-310px;border-radius:0 0 calc(var(--v-radio-isla) + 4px) calc(var(--v-radio-isla) + 4px);padding:0 var(--v-filo) var(--v-filo);background:linear-gradient(180deg,var(--v-acento),var(--v-sec));box-shadow:0 26px 50px -20px rgba(0,0,0,var(--v-sombra))}
+.vp-inicio-dentro{position:relative;overflow:hidden;border-radius:0 0 calc(var(--v-radio-isla) + 3px) calc(var(--v-radio-isla) + 3px);background:var(--v-superficie);padding:12px;display:flex;flex-direction:column;gap:8px}
+.vp-tarjeta{position:relative;border-radius:var(--v-radio-tarjeta);background:var(--v-tarjeta);border:1px solid color-mix(in srgb,var(--v-acento) 22%,transparent);padding:11px;box-shadow:0 8px 18px -12px rgba(0,0,0,var(--v-sombra))}
+.vp-reloj-grande{font-size:34px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;background:linear-gradient(120deg,var(--v-acento),var(--v-sec));-webkit-background-clip:text;background-clip:text;color:transparent}
+.vp-buscador{height:34px;border-radius:999px;display:flex;align-items:center;gap:8px;padding:0 12px;background:var(--v-tarjeta);border:1.5px solid color-mix(in srgb,var(--v-sec) 45%,transparent);color:color-mix(in srgb,var(--v-tinta) 60%,transparent);font-size:12.5px}
+.vp-boton{height:32px;flex:1;border-radius:calc(var(--v-radio-tarjeta) * .7);display:grid;place-items:center;font-size:12px;font-weight:700;background:color-mix(in srgb,var(--v-sec) 18%,transparent)}
+.vp-boton.activo{background:var(--v-acento);color:var(--v-sobre)}
+.vp-redondo{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:color-mix(in srgb,var(--v-sec) 18%,transparent)}
+.vp-redondo.apagar{background:color-mix(in srgb,var(--v-peligro) 22%,transparent);color:var(--v-peligro)}
+.vp-play{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--v-acento);color:var(--v-sobre)}
+.vp-marca{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:64px;font-weight:800;line-height:1;color:var(--v-acento);opacity:.08;pointer-events:none}
+.vp-particulas{position:absolute;inset:0;pointer-events:none;z-index:3}
+.vp-particula{position:absolute;top:0;animation:caer linear infinite}
+.vp-nube{animation:flotar 3s ease-in-out infinite}
+.antes-despues{position:absolute;left:14px;bottom:14px;display:flex;gap:4px;padding:4px;border-radius:9px;background:rgba(12,14,20,.86);border:1px solid var(--filo)}
+.antes-despues button{height:28px;padding:0 12px;border-radius:6px;font-size:12px;font-weight:600;color:var(--tenue)}
+.antes-despues button.activo{background:rgba(255,255,255,.14);color:var(--texto)}
+.daltonismo{position:absolute;right:14px;bottom:14px;display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:9px;background:rgba(12,14,20,.86);border:1px solid var(--filo);font-size:12px;color:var(--tenue)}
+.daltonismo select,.campo select{height:28px;border-radius:7px;border:1px solid var(--filo);background:#0E1118;color:var(--texto);font:inherit;font-size:12.5px;padding:0 6px}
+
+/* ---------- Inspector ---------- */
+.inspector{width:380px;flex:none;border-left:1px solid var(--filo);background:var(--panel-ui);display:flex;flex-direction:column;min-height:0}
+.inspector-titulo{padding:14px 16px 10px;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:space-between}
+.inspector-cuerpo{flex:1;min-height:0;overflow-y:auto;padding:0 16px 16px;display:flex;flex-direction:column;gap:12px;scrollbar-width:thin;scrollbar-color:rgba(230,233,242,.45) transparent}
+.inspector-cuerpo::-webkit-scrollbar{width:10px}
+.inspector-cuerpo::-webkit-scrollbar-thumb{background:rgba(230,233,242,.45);border-radius:6px;border:3px solid transparent;background-clip:padding-box}
+.inspector-cuerpo::-webkit-scrollbar-button{display:none;height:0}
+.grupo-titulo{font-size:11px;font-weight:700;color:var(--tenue);letter-spacing:.07em;text-transform:uppercase;margin:4px 0 2px}
+.buscar-ui{height:34px;width:100%;padding:0 10px;border-radius:8px;border:1px solid var(--filo);background:#0E1118;color:var(--texto);font:inherit;font-size:13px}
+.fila-color{display:grid;grid-template-columns:22px minmax(0,1fr) auto;align-items:center;gap:10px;padding:7px 8px;border-radius:9px;text-align:left;transition:background .15s}
+.fila-color:hover{background:rgba(255,255,255,.05)}
+.fila-color.elegida{background:rgba(141,169,232,.14);box-shadow:inset 0 0 0 1px rgba(141,169,232,.45)}
+.fila-color .muestra{width:22px;height:22px;border-radius:6px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.25)}
+.fila-color code{font-family:"Cascadia Mono",Consolas,monospace;font-size:12px;color:var(--texto)}
+.fila-color small{display:block;font-size:11px;color:var(--tenue)}
+.hex{font-family:"Cascadia Mono",Consolas,monospace;font-size:11.5px;color:var(--tenue)}
+.picker{border-radius:12px;border:1px solid var(--filo);background:#0E1118;padding:12px;display:flex;flex-direction:column;gap:10px}
+.deslizador-ui{display:grid;grid-template-columns:70px minmax(0,1fr) 40px;align-items:center;gap:10px;font-size:12px;color:var(--tenue)}
+.deslizador-ui output{text-align:right;color:var(--texto);font-variant-numeric:tabular-nums}
+.deslizador-ui input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:10px;border-radius:5px;background:var(--pista,rgba(255,255,255,.14))}
+.deslizador-ui input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 0 0 2px rgba(0,0,0,.4)}
+.deslizador-ui input[type=range]::-moz-range-thumb{width:16px;height:16px;border:0;border-radius:50%;background:#fff}
+.contraste{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:8px 10px;border-radius:9px}
+.contraste.bien{background:rgba(143,193,160,.12);color:#B9E2C6}
+.contraste.mal{background:rgba(217,130,110,.14);color:#F0B3A3}
+.herramientas{display:flex;gap:6px;flex-wrap:wrap}
+.chip{height:30px;padding:0 11px;border-radius:999px;font-size:12px;font-weight:600;background:rgba(255,255,255,.06);border:1px solid var(--filo);display:inline-flex;align-items:center;gap:6px;transition:background .2s}
+.chip:hover{background:rgba(255,255,255,.11)}
+.chip.activo{background:rgba(141,169,232,.18);border-color:rgba(141,169,232,.55);color:#fff}
+.campo{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px}
+.interruptor{position:relative;width:40px;height:22px;border-radius:11px;background:rgba(255,255,255,.16);transition:background .2s;flex:none}
+.interruptor::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
+.interruptor.encendido{background:var(--ui)}
+.interruptor.encendido::after{transform:translateX(18px)}
+.texto-ui{height:32px;width:100%;padding:0 10px;border-radius:8px;border:1px solid var(--filo);background:#0E1118;color:var(--texto);font:inherit;font-size:13px}
+.tarjetas-tema{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.tarjeta-tema{height:62px;border-radius:10px;display:flex;align-items:flex-end;padding:7px 8px;font-size:11.5px;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6);box-shadow:inset 0 0 0 1px rgba(255,255,255,.15);transition:transform .2s}
+.tarjeta-tema:hover{transform:translateY(-2px)}
+.nota-ui{font-size:12px;color:var(--tenue);line-height:1.45}
+</style>
+</helmet>
+<div class="es" style="position: relative; width: 1440px; height: 900px; overflow: hidden; display: flex; flex-direction: column; background: #0D0F15;">
+
+  <svg width="0" height="0" style="position: absolute;" aria-hidden="true">
+    <filter id="f-protanopia"><feColorMatrix type="matrix" values="0.567 0.433 0 0 0  0.558 0.442 0 0 0  0 0.242 0.758 0 0  0 0 0 1 0"></feColorMatrix></filter>
+    <filter id="f-deuteranopia"><feColorMatrix type="matrix" values="0.625 0.375 0 0 0  0.7 0.3 0 0 0  0 0.3 0.7 0 0  0 0 0 1 0"></feColorMatrix></filter>
+    <filter id="f-tritanopia"><feColorMatrix type="matrix" values="0.95 0.05 0 0 0  0 0.433 0.567 0 0  0 0.475 0.525 0 0  0 0 0 1 0"></feColorMatrix></filter>
+  </svg>
+
+  <!-- Barra de arriba -->
+  <div class="arriba">
+    <svg width="20" height="20" viewBox="0 0 24 18" aria-hidden="true"><path d="M6 16h11.5a4 4 0 0 0 .6-7.96A5.5 5.5 0 0 0 7.4 6.6 4.7 4.7 0 0 0 6 16z" fill="#C9D2E6"></path></svg>
+    <span style="font-size: 14px; font-weight: 700; margin-right: 6px;">Estudio de temas</span>
+    <label for="nombre-tema" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">Nombre del tema</label>
+    <input id="nombre-tema" class="nombre-tema" type="text" value="Mi tema">
+    <span class="base">basado en Profesional</span>
+    <button class="boton-ui icono-ui" aria-label="Deshacer" onClick="{{deshacer}}" disabled="{{sinAtras}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 14L4 9l5-5"></path><path d="M4 9h11a5 5 0 0 1 0 10h-3"></path></svg></button>
+    <button class="boton-ui icono-ui" aria-label="Rehacer" onClick="{{rehacer}}" disabled="{{sinAdelante}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 14l5-5-5-5"></path><path d="M20 9H9a5 5 0 0 0 0 10h3"></path></svg></button>
+    <div style="flex: 1;"></div>
+    <div class="consumo" title="Lo que gastan las decoraciones del tema">Consumo
+      <div class="consumo-barra"><span style="width: {{consumoAncho}}; background: {{consumoColor}};"></span></div>
+      <b style="color: var(--texto);">{{consumoTexto}}</b>
+    </div>
+    <button class="boton-ui" onClick="{{sorprendeme}}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"></rect><circle cx="8.5" cy="8.5" r="1.4" fill="currentColor"></circle><circle cx="15.5" cy="15.5" r="1.4" fill="currentColor"></circle><circle cx="12" cy="12" r="1.4" fill="currentColor"></circle></svg>Sorpréndeme</button>
+    <button class="boton-ui">Probar en la barra</button>
+    <button class="boton-ui">Exportar .nubetema</button>
+    <button class="boton-ui principal">Guardar</button>
+  </div>
+
+  <div style="flex: 1; min-height: 0; display: flex;">
+
+    <!-- Apartados -->
+    <nav class="nav" aria-label="Apartados del Estudio">
+      <sc-for list="{{apartados}}" as="s" hint-placeholder-count="10">
+        <button class="nav-item {{s.clase}}" onClick="{{s.ir}}"><span class="num">{{s.n}}</span>{{s.nombre}}</button>
+      </sc-for>
+    </nav>
+
+    <!-- Vista previa -->
+    <div class="centro">
+      <div class="pestanas">
+        <button class="pestana activa">Isla e Inicio</button>
+        <button class="pestana">Paneles</button>
+        <button class="pestana">Laterales</button>
+        <button class="pestana">Dock</button>
+        <span style="margin-left: auto; font-size: 12px; color: var(--tenue);">Vista previa en vivo</span>
+      </div>
+      <div class="lienzo">
+        <div class="vp {{vp.claseClaro}}" style="{{vp.estilo}}">
+
+          <div class="vp-isla-sitio">
+            <sc-if value="{{vp.halo}}" hint-placeholder-val="{{true}}"><div class="vp-halo" aria-hidden="true"></div></sc-if>
+            <div class="vp-borde {{vp.claseBorde}}">
+              <div class="vp-isla">
+                <img src="/_blob/4e8306afd2f9c384ca64728e2577f274" alt="">
+                <span class="vp-sep"></span>
+                <img src="/_blob/e0984066416df1568fbdf0261ebae845" alt="">
+                <span class="vp-punto" aria-hidden="true"></span>
+                <img src="/_blob/6d5b0ce4dc72fddea414eeb915593619" alt="">
+                <img src="/_blob/07e3c1f6fdbbb26062f6f6eddc01e70f" alt="">
+                <img src="/_blob/be47ad89d05d24e5d04398b75ed6b736" alt="">
+                <img src="/_blob/c55c03934836160ba79f8a368fa26df2" alt="">
+                <span class="vp-sep"></span>
+                <span style="font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: color-mix(in srgb, var(--v-sec) 20%, transparent);">ES</span>
+                <span class="vp-reloj">{{hora}}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="vp-inicio">
+            <div class="vp-inicio-dentro">
+              <sc-if value="{{vp.particulas}}" hint-placeholder-val="{{false}}">
+                <div class="vp-particulas" aria-hidden="true">
+                  <sc-for list="{{vp.lista}}" as="p" hint-placeholder-count="0">
+                    <span class="vp-particula" style="left: {{p.x}}; width: {{p.tam}}; height: {{p.alto}}; border-radius: {{p.radio}}; background: {{p.color}}; animation-duration: {{p.dur}}; animation-delay: {{p.retraso}};"></span>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <div class="vp-tarjeta" style="display: flex; align-items: center; gap: 10px; overflow: hidden;">
+                <sc-if value="{{vp.conMarca}}" hint-placeholder-val="{{false}}"><span class="vp-marca" aria-hidden="true">{{vp.marca}}</span></sc-if>
+                <sc-if value="{{vp.mascota}}" hint-placeholder-val="{{true}}">
+                  <svg class="vp-nube" width="48" height="40" viewBox="0 0 64 52" aria-hidden="true">
+                    <path d="M16 46h33a11 11 0 0 0 1.8-21.9A16 16 0 0 0 19 19.5 13.3 13.3 0 0 0 16 46z" fill="#FFFFFF" stroke="var(--v-sec)" stroke-width="2"></path>
+                    <sc-if value="{{vp.accGorro}}" hint-placeholder-val="{{false}}"><path d="M20 22 Q34 6 50 21 Z" fill="#D7303F"></path><rect x="18" y="19.5" width="34" height="5" rx="2.5" fill="#F2F7FC"></rect><circle cx="35" cy="9" r="3.6" fill="#F2F7FC"></circle></sc-if>
+                    <sc-if value="{{vp.accCinta}}" hint-placeholder-val="{{false}}"><path d="M18 24 Q34 18 52 25 L51 29 Q34 22 19 28Z" fill="#D7263D"></path></sc-if>
+                    <sc-if value="{{vp.accCascos}}" hint-placeholder-val="{{false}}"><path d="M17 32 Q17 14 34 14 Q51 14 51 32" fill="none" stroke="var(--v-acento)" stroke-width="2.4"></path><rect x="12.5" y="28" width="7" height="11" rx="2" fill="var(--v-acento)"></rect><rect x="48.5" y="28" width="7" height="11" rx="2" fill="var(--v-acento)"></rect></sc-if>
+                    <sc-if value="{{vp.accGafas}}" hint-placeholder-val="{{false}}"><rect x="22" y="28" width="9" height="6" rx="2" fill="#1A1A1A"></rect><rect x="37" y="28" width="9" height="6" rx="2" fill="#1A1A1A"></rect><path d="M31 30h6" stroke="#1A1A1A" stroke-width="1.6"></path></sc-if>
+                    <ellipse cx="28" cy="32" rx="2.4" ry="3" fill="#2B2B3A"></ellipse><ellipse cx="40" cy="32" rx="2.4" ry="3" fill="#2B2B3A"></ellipse>
+                    <ellipse cx="23.5" cy="37" rx="3.2" ry="1.8" fill="#FF8FB8" opacity=".6"></ellipse><ellipse cx="44.5" cy="37" rx="3.2" ry="1.8" fill="#FF8FB8" opacity=".6"></ellipse>
+                    <path d="M31.5 38.5q2.5 2.5 5 0" fill="none" stroke="#2B2B3A" stroke-width="1.6" stroke-linecap="round"></path>
+                  </svg>
+                </sc-if>
+                <div style="position: relative; flex: 1; display: flex; flex-direction: column; gap: 2px;">
+                  <span style="font-size: 1.15em; font-weight: 800;">{{saludo}}</span>
+                  <span style="font-size: .85em; opacity: .7;">{{fecha}}</span>
+                </div>
+                <span class="vp-reloj-grande" style="position: relative;">{{hora}}</span>
+              </div>
+              <div class="vp-buscador"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>{{pistaBuscador}}</div>
+              <div class="vp-tarjeta" style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 52px; height: 52px; border-radius: calc(var(--v-radio-tarjeta) * .8); background: linear-gradient(140deg, var(--v-acento), var(--v-sec)); flex: none;"></div>
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
+                  <span style="font-weight: 800; font-size: .95em;">[Título de la canción]</span>
+                  <div style="height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--v-tinta) 18%, transparent);"><div style="width: 42%; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--v-acento), var(--v-sec));"></div></div>
+                </div>
+                <span class="vp-play"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6.5" y="5" width="4" height="14" rx="1.5"></rect><rect x="13.5" y="5" width="4" height="14" rx="1.5"></rect></svg></span>
+              </div>
+              <div class="vp-tarjeta" style="display: flex; gap: 6px;">
+                <span class="vp-boton activo">ES</span><span class="vp-boton">EN-US</span><span class="vp-boton">EN-ES</span>
+              </div>
+              <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                <span class="vp-redondo"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg></span>
+                <span class="vp-redondo"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6"></path><path d="M20 4v5h-5"></path></svg></span>
+                <span class="vp-redondo apagar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 3v9"></path><path d="M6.3 7a8 8 0 1 0 11.4 0"></path></svg></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="antes-despues" role="group" aria-label="Comparar">
+          <button class="{{claseAntes}}" onClick="{{verAntes}}">Antes</button>
+          <button class="{{claseDespues}}" onClick="{{verDespues}}">Después</button>
+        </div>
+        <label class="daltonismo">Daltonismo
+          <select onChange="{{cambiarDaltonismo}}" aria-label="Simular daltonismo">
+            <option value="ninguno">Ninguno</option>
+            <option value="protanopia">Protanopia</option>
+            <option value="deuteranopia">Deuteranopia</option>
+            <option value="tritanopia">Tritanopia</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <!-- Inspector -->
+    <aside class="inspector" aria-label="Herramientas">
+      <div class="inspector-titulo">{{tituloSeccion}}</div>
+      <div class="inspector-cuerpo">
+
+        <sc-if value="{{sec.partida}}" hint-placeholder-val="{{false}}">
+          <span class="grupo-titulo">Partir de un tema</span>
+          <div class="tarjetas-tema">
+            <sc-for list="{{temasBase}}" as="b" hint-placeholder-count="9">
+              <button class="tarjeta-tema" style="background: {{b.fondo}};" onClick="{{b.usar}}">{{b.nombre}}</button>
+            </sc-for>
+          </div>
+          <span class="grupo-titulo">Generar</span>
+          <div class="herramientas">
+            <button class="chip" onClick="{{sorprendeme}}">Sorpréndeme</button>
+            <button class="chip">Desde una imagen…</button>
+            <button class="chip">Desde mi fondo de escritorio</button>
+          </div>
+          <span class="grupo-titulo">Armonías a partir del acento</span>
+          <div class="herramientas">
+            <sc-for list="{{armonias}}" as="r" hint-placeholder-count="4">
+              <button class="chip" onClick="{{r.aplicar}}"><span style="width: 12px; height: 12px; border-radius: 50%; background: {{r.muestra}};"></span>{{r.nombre}}</button>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{sec.colores}}" hint-placeholder-val="{{true}}">
+          <label for="buscar-color" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">Buscar un color</label>
+          <input id="buscar-color" class="buscar-ui" type="text" placeholder="Buscar color… (reloj, apagar, filo)" value="{{filtro}}" onInput="{{filtrar}}">
+          <div class="herramientas">
+            <button class="chip"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M14 4l6 6M4 20l3-1 10-10-2-2L5 17z"></path></svg>Cuentagotas</button>
+            <button class="chip"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l7 17 2-7 7-2z"></path></svg>Elegir en pantalla</button>
+            <button class="chip" onClick="{{restablecerTodo}}">Restablecer todo</button>
+          </div>
+          <sc-for list="{{grupos}}" as="g" hint-placeholder-count="2">
+            <span class="grupo-titulo">{{g.nombre}}</span>
+            <sc-for list="{{g.filas}}" as="f" hint-placeholder-count="4">
+              <button class="fila-color {{f.clase}}" onClick="{{f.elegir}}">
+                <span class="muestra" style="background: {{f.color}};"></span>
+                <span><code>{{f.clave}}</code><small>{{f.nota}}</small></span>
+                <span class="hex">{{f.hex}}</span>
+              </button>
+            </sc-for>
+          </sc-for>
+          <div class="picker">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="width: 34px; height: 34px; border-radius: 8px; background: {{sel.hex}}; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25);"></span>
+              <div style="display: flex; flex-direction: column;"><code style="font-family: Consolas, monospace; font-size: 12.5px;">{{sel.nombre}}</code><span class="hex">{{sel.hex}}</span></div>
+            </div>
+            <div class="deslizador-ui"><span>Tono</span><input type="range" min="0" max="360" value="{{sel.h}}" onInput="{{sel.cambiarH}}" aria-label="Tono" style="--pista: linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00);"><output>{{sel.h}}°</output></div>
+            <div class="deslizador-ui"><span>Saturación</span><input type="range" min="0" max="100" value="{{sel.s}}" onInput="{{sel.cambiarS}}" aria-label="Saturación" style="--pista: {{sel.pistaS}};"><output>{{sel.s}}%</output></div>
+            <div class="deslizador-ui"><span>Luz</span><input type="range" min="0" max="100" value="{{sel.l}}" onInput="{{sel.cambiarL}}" aria-label="Luz" style="--pista: {{sel.pistaL}};"><output>{{sel.l}}%</output></div>
+            <div class="deslizador-ui"><span>Opacidad</span><input type="range" min="20" max="100" value="{{sel.a}}" onInput="{{sel.cambiarA}}" aria-label="Opacidad"><output>{{sel.a}}%</output></div>
+            <div class="contraste {{contraste.clase}}">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 3v18" fill="currentColor"></path></svg>
+              Texto sobre tarjeta: <b>{{contraste.ratio}}</b> · {{contraste.veredicto}}
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{sec.forma}}" hint-placeholder-val="{{false}}">
+          <span class="grupo-titulo">Esquinas</span>
+          <div class="deslizador-ui"><span>Isla</span><input type="range" min="0" max="26" value="{{d.radioIsla}}" onInput="{{cambiar.radioIsla}}" aria-label="Radio de la isla"><output>{{d.radioIsla}}</output></div>
+          <div class="deslizador-ui"><span>Tarjetas</span><input type="range" min="0" max="24" value="{{d.radioTarjeta}}" onInput="{{cambiar.radioTarjeta}}" aria-label="Radio de las tarjetas"><output>{{d.radioTarjeta}}</output></div>
+          <span class="grupo-titulo">Filo y sombra</span>
+          <div class="deslizador-ui"><span>Filo</span><input type="range" min="0" max="4" step="0.5" value="{{d.filo}}" onInput="{{cambiar.filo}}" aria-label="Grosor del filo"><output>{{d.filo}} px</output></div>
+          <div class="deslizador-ui"><span>Sombra</span><input type="range" min="0" max="90" value="{{d.sombra}}" onInput="{{cambiar.sombra}}" aria-label="Intensidad de la sombra"><output>{{d.sombra}}%</output></div>
+          <span class="grupo-titulo">Superficies</span>
+          <div class="deslizador-ui"><span>Opacidad</span><input type="range" min="60" max="100" value="{{d.opacidad}}" onInput="{{cambiar.opacidad}}" aria-label="Opacidad de las superficies"><output>{{d.opacidad}}%</output></div>
+          <p class="nota-ui">Esquinas en chaflán, separaciones, alto de la isla y tamaño de iconos van en este mismo apartado.</p>
+        </sc-if>
+
+        <sc-if value="{{sec.letra}}" hint-placeholder-val="{{false}}">
+          <span class="grupo-titulo">Fuente</span>
+          <div class="herramientas">
+            <sc-for list="{{fuentes}}" as="f" hint-placeholder-count="6">
+              <button class="chip {{f.clase}}" style="font-family: {{f.css}};" onClick="{{f.elegir}}">{{f.nombre}}</button>
+            </sc-for>
+          </div>
+          <button class="chip" style="align-self: flex-start;">Importar .ttf u .otf…</button>
+          <span class="grupo-titulo">Tamaño</span>
+          <div class="deslizador-ui"><span>Base</span><input type="range" min="11" max="18" value="{{d.tam}}" onInput="{{cambiar.tam}}" aria-label="Tamaño de letra"><output>{{d.tam}} px</output></div>
+          <p class="nota-ui">También: letra distinta para títulos, peso, mayúsculas y espaciado de los títulos de sección.</p>
+        </sc-if>
+
+        <sc-if value="{{sec.decoraciones}}" hint-placeholder-val="{{false}}">
+          <div class="campo">Partículas en el Inicio<button class="interruptor {{on.particulas}}" role="switch" aria-checked="{{aria.particulas}}" aria-label="Partículas" onClick="{{alternar.particulas}}"></button></div>
+          <div class="herramientas">
+            <sc-for list="{{formas}}" as="f" hint-placeholder-count="6">
+              <button class="chip {{f.clase}}" onClick="{{f.elegir}}">{{f.nombre}}</button>
+            </sc-for>
+          </div>
+          <div class="deslizador-ui"><span>Cantidad</span><input type="range" min="2" max="24" value="{{d.cantidad}}" onInput="{{cambiar.cantidad}}" aria-label="Cantidad de partículas"><output>{{d.cantidad}}</output></div>
+          <div class="deslizador-ui"><span>Velocidad</span><input type="range" min="1" max="3" step="0.5" value="{{d.velocidad}}" onInput="{{cambiar.velocidad}}" aria-label="Velocidad de las partículas"><output>×{{d.velocidad}}</output></div>
+          <span class="grupo-titulo">Mascota</span>
+          <div class="campo">Nubecita<button class="interruptor {{on.mascota}}" role="switch" aria-checked="{{aria.mascota}}" aria-label="Mascota" onClick="{{alternar.mascota}}"></button></div>
+          <div class="herramientas">
+            <sc-for list="{{accesorios}}" as="x" hint-placeholder-count="5">
+              <button class="chip {{x.clase}}" onClick="{{x.elegir}}">{{x.nombre}}</button>
+            </sc-for>
+          </div>
+          <span class="grupo-titulo">Brillos</span>
+          <div class="campo">Halo de la isla<button class="interruptor {{on.halo}}" role="switch" aria-checked="{{aria.halo}}" aria-label="Halo" onClick="{{alternar.halo}}"></button></div>
+          <div class="campo">Destello del filo<button class="interruptor {{on.destello}}" role="switch" aria-checked="{{aria.destello}}" aria-label="Destello del filo" onClick="{{alternar.destello}}"></button></div>
+          <div class="campo">Modo RGB<button class="interruptor {{on.rgb}}" role="switch" aria-checked="{{aria.rgb}}" aria-label="Modo RGB" onClick="{{alternar.rgb}}"></button></div>
+          <span class="grupo-titulo">Marca de agua</span>
+          <input class="texto-ui" type="text" placeholder="Un texto o un kanji: 侍, 秋, ☁…" value="{{d.marca}}" onInput="{{cambiarMarca}}" aria-label="Marca de agua">
+        </sc-if>
+
+        <sc-if value="{{sec.textos}}" hint-placeholder-val="{{false}}">
+          <span class="grupo-titulo">Saludo</span>
+          <input class="texto-ui" type="text" value="{{d.plantilla}}" onInput="{{cambiarPlantilla}}" aria-label="Plantilla del saludo">
+          <p class="nota-ui">Usa <code>{saludo}</code>, <code>{nombre}</code> y <code>{hora}</code>.</p>
+          <span class="grupo-titulo">Pista del buscador</span>
+          <input class="texto-ui" type="text" value="{{d.pista}}" onInput="{{cambiarPista}}" aria-label="Pista del buscador">
+        </sc-if>
+
+        <sc-if value="{{sec.otra}}" hint-placeholder-val="{{false}}">
+          <p class="nota-ui">{{textoOtra}}</p>
+        </sc-if>
+
+      </div>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.inicial = {
+      colores: { acento: [221, 67, 73], secundario: [215, 35, 60], superficie: [225, 22, 7], tarjeta: [225, 18, 11], tinta: [225, 30, 93], peligro: [12, 58, 64] },
+      alfa: { acento: 100, secundario: 100, superficie: 94, tarjeta: 100, tinta: 100, peligro: 100 },
+      radioIsla: 22, radioTarjeta: 14, filo: 1, sombra: 60, opacidad: 94, fuente: 'Segoe UI Variable', tam: 13,
+      particulas: false, forma: 'copo', cantidad: 10, velocidad: 1, mascota: true, accesorio: 'ninguno',
+      halo: true, destello: true, rgb: false, marca: '', plantilla: '{saludo}, {nombre}', pista: 'Buscar aplicaciones, archivos y en la web…',
+    };
+    this.state = { ahora: new Date(), seccion: 'colores', sel: 'acento', filtro: '', antes: false, daltonismo: 'ninguno', d: this.inicial, atras: [], adelante: [] };
+  }
+  componentDidMount() { this.reloj = setInterval(() => this.setState({ ahora: new Date() }), 1000); }
+  componentWillUnmount() { clearInterval(this.reloj); }
+  poner(cambios) { this.setState({ d: { ...this.state.d, ...cambios }, atras: [...this.state.atras.slice(-49), this.state.d], adelante: [] }); }
+  renderVals() {
+    const S = this.state, d = S.antes ? this.inicial : S.d;
+    const hex = ([h, s, l]) => { s /= 100; l /= 100; const k = (n) => (n + h / 30) % 12, a = s * Math.min(l, 1 - l); const f = (n) => Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1))))); return '#' + [f(0), f(8), f(4)].map((x) => x.toString(16).padStart(2, '0')).join('').toUpperCase(); };
+    const rgba = (k) => { const x = hex(d.colores[k]); const al = (d.alfa[k] ?? 100) / 100; const n = parseInt(x.slice(1), 16); return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + al + ')'; };
+    const lum = (x) => { const n = parseInt(x.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255].map((c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }).reduce((t, c, i) => t + c * [0.2126, 0.7152, 0.0722][i], 0); };
+    const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+    const claro = d.colores.tarjeta[2] > 60;
+    const supCol = d.colores.superficie; const supAl = Math.min(d.alfa.superficie, d.opacidad);
+    const nSup = parseInt(hex(supCol).slice(1), 16);
+    const fuentesCss = { 'Segoe UI Variable': '"Segoe UI Variable","Segoe UI"', 'M PLUS Rounded 1c': '"M PLUS Rounded 1c"', 'Nunito': '"Nunito"', 'Rajdhani': '"Rajdhani"', 'Orbitron': '"Orbitron"', 'Shippori Mincho': '"Shippori Mincho"' };
+    const filtro = S.daltonismo === 'ninguno' ? 'none' : 'url(#f-' + S.daltonismo + ')';
+    const estilo = [
+      '--v-acento: ' + rgba('acento'), '--v-sec: ' + rgba('secundario'),
+      '--v-superficie: rgba(' + (nSup >> 16) + ',' + ((nSup >> 8) & 255) + ',' + (nSup & 255) + ',' + supAl / 100 + ')',
+      '--v-tarjeta: ' + rgba('tarjeta'), '--v-tinta: ' + rgba('tinta'), '--v-peligro: ' + rgba('peligro'),
+      '--v-sobre: ' + (lum(hex(d.colores.acento)) > 0.45 ? '#111' : '#fff'),
+      '--v-radio-isla: ' + d.radioIsla + 'px', '--v-radio-tarjeta: ' + d.radioTarjeta + 'px', '--v-filo: ' + d.filo + 'px',
+      '--v-sombra: ' + (d.sombra / 100), '--v-fuente: ' + fuentesCss[d.fuente], '--v-tam: ' + d.tam + 'px', 'filter: ' + filtro,
+    ].join('; ');
+    const formasDef = { copo: ['50%', '#FFFFFF'], petalo: ['50% 0 50% 0', '#FF8FB8'], hoja: ['50% 0', '#E8743B'], gota: ['1px', 'rgba(180,198,234,.7)'], pixel: ['0', '#39FF88'], estrella: ['2px', '#FCEE0A'] };
+    const [radioP, colorP] = formasDef[d.forma] ?? formasDef.copo;
+    const lista = Array.from({ length: d.cantidad }, (_, i) => {
+      const gota = d.forma === 'gota'; const t = 4 + (i % 3) * 2;
+      return { x: (((i * 37) % 92) + 4) + '%', tam: gota ? '1.5px' : t + 'px', alto: gota ? '14px' : t + 'px', radio: radioP, color: colorP,
+        dur: ((gota ? 1.6 : 8) / d.velocidad + (i % 4) * (gota ? 0.2 : 1)).toFixed(1) + 's', retraso: (-(i * (gota ? 0.3 : 1.1))).toFixed(1) + 's' };
+    });
+    const coste = (d.particulas ? d.cantidad * d.velocidad * 2.2 : 0) + (d.halo ? 12 : 0) + (d.destello ? 10 : 0) + (d.rgb ? 18 : 0) + (d.mascota ? 4 : 0);
+    const nivel = coste < 30 ? ['Bajo', '#8FC1A0'] : coste < 60 ? ['Medio', '#D8C08F'] : ['Alto', '#D9826E'];
+    const h = S.ahora.getHours(), dos = (n) => String(n).padStart(2, '0');
+    const horaTxt = dos(h) + ':' + dos(S.ahora.getMinutes());
+    const saludo = h < 6 ? 'Buenas noches' : h < 14 ? 'Buenos días' : h < 21 ? 'Buenas tardes' : 'Buenas noches';
+    const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+    const catalogo = [
+      ['Isla', [['isla.fondo', 'superficie', ''], ['isla.filo', 'acento', 'del acento'], ['isla.destello', 'secundario', ''], ['reloj.texto', 'tinta', 'del texto'], ['app.punto.activo', 'acento', 'del acento']]],
+      ['Inicio y paneles', [['panel.fondo', 'superficie', 'de isla.fondo'], ['tarjeta.fondo', 'tarjeta', ''], ['texto', 'tinta', ''], ['boton.play', 'acento', 'del acento'], ['buscador.filo', 'secundario', 'del secundario'], ['energia.apagar', 'peligro', '']]],
+    ];
+    const q = S.filtro.trim().toLowerCase();
+    const grupos = catalogo.map(([nombre, filas]) => ({
+      nombre,
+      filas: filas.filter(([clave]) => !q || clave.includes(q)).map(([clave, base, nota]) => ({
+        clave, nota: nota ? 'se calcula ' + nota : 'propio', hex: hex(d.colores[base]), color: rgba(base),
+        clase: S.sel === base && !nota ? 'elegida' : '', elegir: () => this.setState({ sel: base }),
+      })),
+    })).filter((g) => g.filas.length);
+    const k = S.sel, [hh, ss, ll] = S.d.colores[k];
+    const fijarCol = (i) => (ev) => { const c = [...S.d.colores[k]]; c[i] = Number(ev.target.value); this.poner({ colores: { ...S.d.colores, [k]: c } }); };
+    const rat = ratio(hex(d.colores.tinta), hex(d.colores.tarjeta));
+    const nombresSec = [['partida', 'Punto de partida'], ['colores', 'Colores'], ['forma', 'Forma'], ['letra', 'Letra'], ['decoraciones', 'Decoraciones'], ['movimiento', 'Movimiento'], ['textos', 'Textos y detalles'], ['vista', 'Vista previa y prueba'], ['automatico', 'Automático'], ['compartir', 'Compartir']];
+    const otras = {
+      movimiento: 'Velocidad general, curva con rebote o suave, cómo entran los paneles (escala, deslizar o fundido), el escalonado, cuánto se levantan los iconos y la lupa del dock. Siempre por debajo del ajuste de animaciones de Windows.',
+      vista: 'Vista previa de todas las superficies con datos de ejemplo, antes y después, probar el tema en la barra real con un botón de volver, deshacer ilimitado e historial de versiones. El medidor de consumo está arriba.',
+      automatico: 'Tema según la hora (claro de día, oscuro de noche), según la fecha (fiestas), según el escritorio virtual o según el monitor.',
+      compartir: 'Exportar e importar como un fichero .nubetema (valores, fuentes e imágenes). Solo datos, nunca código: al importar se valida todo y un tema roto no puede tumbar la barra.',
+    };
+    const bool = (n) => ({ [n]: d[n] ? 'encendido' : '' });
+    const temasBase = [
+      ['Profesional', 'linear-gradient(135deg,#1B2130,#8DA9E8)', [221, 67, 73], [215, 35, 60], [225, 22, 7], [225, 18, 11], [225, 30, 93]],
+      ['Oficina', 'linear-gradient(135deg,#F6F8FB,#2F6FDB)', [218, 71, 52], [220, 15, 66], [210, 33, 98], [0, 0, 100], [215, 24, 16]],
+      ['Videojuegos', 'linear-gradient(135deg,#0B0B10,#39FF88)', [145, 100, 61], [313, 100, 62], [240, 20, 5], [233, 19, 9], [222, 30, 94]],
+      ['Invierno', 'linear-gradient(135deg,#FFFFFF,#3A8FD6)', [207, 65, 53], [200, 70, 70], [205, 100, 99], [0, 0, 100], [207, 40, 20]],
+      ['Cyberpunk', 'linear-gradient(135deg,#0A0614,#FCEE0A)', [57, 97, 51], [184, 100, 50], [265, 54, 5], [266, 50, 9], [256, 100, 95]],
+      ['Sakura', 'linear-gradient(135deg,#FFE4EF,#FF8FB8)', [337, 100, 78], [256, 81, 80], [330, 100, 99], [0, 0, 100], [270, 22, 30]],
+      ['Samurái', 'linear-gradient(135deg,#1B181D,#D7263D)', [353, 70, 50], [40, 49, 57], [280, 13, 6], [280, 9, 10], [40, 47, 90]],
+      ['Otoño', 'linear-gradient(135deg,#FFF6EA,#E8743B)', [20, 79, 57], [35, 87, 60], [36, 100, 97], [40, 100, 99], [15, 35, 22]],
+      ['Sad', 'linear-gradient(135deg,#2A3142,#8FA8D8)', [220, 47, 70], [221, 18, 51], [222, 22, 12], [225, 23, 16], [222, 33, 90]],
+    ].map(([nombre, fondo, ac, se, su, ta, ti]) => ({ nombre, fondo, usar: () => this.poner({ colores: { ...S.d.colores, acento: ac, secundario: se, superficie: su, tarjeta: ta, tinta: ti } }) }));
+    const [ah, as, al] = S.d.colores.acento;
+    const armonias = [['Complementaria', (ah + 180) % 360], ['Análoga', (ah + 30) % 360], ['Tríada', (ah + 120) % 360], ['Monocromática', ah]].map(([nombre, h2]) => ({
+      nombre, muestra: hex([h2, nombre === 'Monocromática' ? Math.max(10, as - 30) : as, al]),
+      aplicar: () => this.poner({ colores: { ...S.d.colores, secundario: [h2, nombre === 'Monocromática' ? Math.max(10, as - 30) : as, Math.min(85, al)] } }),
+    }));
+    const plantilla = d.plantilla.replace('{saludo}', saludo).replace('{nombre}', 'Xavier').replace('{hora}', horaTxt);
+    return {
+      hora: horaTxt,
+      fecha: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][S.ahora.getDay()] + ', ' + S.ahora.getDate() + ' de ' + meses[S.ahora.getMonth()],
+      saludo: plantilla, pistaBuscador: d.pista,
+      vp: {
+        estilo, claseClaro: claro ? 'claro' : '', halo: d.halo, particulas: d.particulas, lista, mascota: d.mascota,
+        claseBorde: (d.destello ? 'con-destello ' : '') + (d.rgb ? 'rgb' : ''),
+        conMarca: !!d.marca, marca: d.marca,
+        accGorro: d.accesorio === 'gorro', accCinta: d.accesorio === 'hachimaki', accCascos: d.accesorio === 'auriculares', accGafas: d.accesorio === 'gafas',
+      },
+      consumoAncho: Math.min(100, Math.round(coste)) + '%', consumoColor: nivel[1], consumoTexto: nivel[0],
+      sinAtras: S.atras.length === 0, sinAdelante: S.adelante.length === 0,
+      deshacer: () => { if (!S.atras.length) return; this.setState({ d: S.atras[S.atras.length - 1], atras: S.atras.slice(0, -1), adelante: [S.d, ...S.adelante] }); },
+      rehacer: () => { if (!S.adelante.length) return; this.setState({ d: S.adelante[0], adelante: S.adelante.slice(1), atras: [...S.atras, S.d] }); },
+      sorprendeme: () => { const h2 = Math.floor(Math.random() * 360); const oscuro = Math.random() < 0.6; this.poner({ colores: { ...S.d.colores, acento: [h2, 70, oscuro ? 68 : 52], secundario: [(h2 + 40) % 360, 55, oscuro ? 62 : 60], superficie: oscuro ? [h2, 20, 7] : [h2, 40, 98], tarjeta: oscuro ? [h2, 18, 11] : [h2, 30, 100], tinta: oscuro ? [h2, 25, 93] : [h2, 30, 16] } }); },
+      claseAntes: S.antes ? 'activo' : '', claseDespues: S.antes ? '' : 'activo',
+      verAntes: () => this.setState({ antes: true }), verDespues: () => this.setState({ antes: false }),
+      cambiarDaltonismo: (ev) => this.setState({ daltonismo: ev.target.value }),
+      apartados: nombresSec.map(([id, nombre], i) => ({ n: i + 1, nombre, clase: S.seccion === id ? 'activo' : '', ir: () => this.setState({ seccion: id }) })),
+      tituloSeccion: (nombresSec.find(([id]) => id === S.seccion) ?? ['', ''])[1],
+      sec: { partida: S.seccion === 'partida', colores: S.seccion === 'colores', forma: S.seccion === 'forma', letra: S.seccion === 'letra', decoraciones: S.seccion === 'decoraciones', textos: S.seccion === 'textos', otra: !!otras[S.seccion] },
+      textoOtra: otras[S.seccion] ?? '',
+      temasBase, armonias,
+      filtro: S.filtro, filtrar: (ev) => this.setState({ filtro: ev.target.value }),
+      restablecerTodo: () => this.poner({ colores: this.inicial.colores, alfa: this.inicial.alfa }),
+      grupos,
+      sel: {
+        nombre: k, hex: hex([hh, ss, ll]), h: hh, s: ss, l: ll, a: S.d.alfa[k] ?? 100,
+        pistaS: 'linear-gradient(90deg,' + hex([hh, 0, ll]) + ',' + hex([hh, 100, ll]) + ')',
+        pistaL: 'linear-gradient(90deg,#000,' + hex([hh, ss, 50]) + ',#fff)',
+        cambiarH: fijarCol(0), cambiarS: fijarCol(1), cambiarL: fijarCol(2),
+        cambiarA: (ev) => this.poner({ alfa: { ...S.d.alfa, [k]: Number(ev.target.value) } }),
+      },
+      contraste: { ratio: rat.toFixed(1).replace('.', ',') + ':1', clase: rat >= 4.5 ? 'bien' : 'mal', veredicto: rat >= 4.5 ? 'se lee bien' : 'se lee mal: sube la luz del texto o baja la de la tarjeta' },
+      d: S.d,
+      cambiar: Object.fromEntries(['radioIsla', 'radioTarjeta', 'filo', 'sombra', 'opacidad', 'tam', 'cantidad', 'velocidad'].map((n) => [n, (ev) => this.poner({ [n]: Number(ev.target.value) })])),
+      fuentes: Object.keys(fuentesCss).map((nombre) => ({ nombre, css: fuentesCss[nombre], clase: S.d.fuente === nombre ? 'activo' : '', elegir: () => this.poner({ fuente: nombre }) })),
+      formas: [['copo', 'Copo'], ['petalo', 'Pétalo'], ['hoja', 'Hoja'], ['gota', 'Gota'], ['pixel', 'Píxel'], ['estrella', 'Estrella']].map(([id, nombre]) => ({ nombre, clase: S.d.forma === id ? 'activo' : '', elegir: () => this.poner({ forma: id, particulas: true }) })),
+      accesorios: [['ninguno', 'Ninguno'], ['gorro', 'Gorro'], ['hachimaki', 'Hachimaki'], ['auriculares', 'Auriculares'], ['gafas', 'Gafas de sol']].map(([id, nombre]) => ({ nombre, clase: S.d.accesorio === id ? 'activo' : '', elegir: () => this.poner({ accesorio: id, mascota: true }) })),
+      on: { ...bool('particulas'), ...bool('mascota'), ...bool('halo'), ...bool('destello'), ...bool('rgb') },
+      aria: { particulas: String(S.d.particulas), mascota: String(S.d.mascota), halo: String(S.d.halo), destello: String(S.d.destello), rgb: String(S.d.rgb) },
+      alternar: Object.fromEntries(['particulas', 'mascota', 'halo', 'destello', 'rgb'].map((n) => [n, () => this.poner({ [n]: !S.d[n] })])),
+      cambiarMarca: (ev) => this.poner({ marca: ev.target.value }),
+      cambiarPlantilla: (ev) => this.poner({ plantilla: ev.target.value }),
+      cambiarPista: (ev) => this.poner({ pista: ev.target.value }),
+    };
+  }
+}
+</script>
+</body>
+</html>

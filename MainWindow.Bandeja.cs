@@ -18,13 +18,15 @@ public partial class MainWindow : Window
     StackPanel? _bandeja;
     Button? _botonMas;
     readonly Dictionary<NotifyIcon, Button> _botonesBandeja = new();
+    int _fantasmasBandeja;      // ver el Tick: solo se repinta si esta cuenta cambia
 
     const string PanelBandeja = "bandeja";
     const double AnchoIconoBandeja = 26;
 
-    bool HayModuloBandeja() =>
-        _cfg.Modulos.Izquierda.Concat(_cfg.Modulos.Centro).Concat(_cfg.Modulos.Derecha)
-                     .Any(m => m.Equals("bandeja", StringComparison.OrdinalIgnoreCase));
+    // Por `ModuloPuesto` (MainWindow.Widgets.cs), que mira las mismas listas que se
+    // dibujan. Tenía su propia consulta a `_cfg.Modulos`, que es la segunda fuente de
+    // verdad que separó a las fijadas de su tira.
+    bool HayModuloBandeja() => ModuloPuesto("bandeja");
 
     UIElement ModuloBandeja()
     {
@@ -48,7 +50,11 @@ public partial class MainWindow : Window
     void RefrescarBandeja()
     {
         if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(new Action(RefrescarBandeja)); return; }
-        if (_bandeja == null || Bandeja.Iconos is not { } iconos) return;
+        if (_bandeja == null || !Bandeja.Encendida) return;
+        // Filtrados por `Bandeja.Vivos()`: tras reiniciar Explorer la colección conserva el
+        // registro viejo de las apps que se volvieron a registrar, con su ventana ya
+        // muerta. Ver Bandeja.Vivos.
+        var iconos = Bandeja.Vivos();
 
         int tope = Math.Max(0, _cfg.Barra.MaxBandeja);
         // Los que no caben se van al desplegable "^", igual que en Windows
@@ -129,6 +135,12 @@ public partial class MainWindow : Window
             Padding = new Thickness(0)
         };
 
+        // El nombre para el lector de pantalla: el mismo texto que la ayuda emergente, que
+        // es el que trae el propio icono de bandeja («Wallpaper Engine», «NordVPN
+        // desconectado»). El contenido es una imagen, así que sin esto un lector anuncia
+        // catorce botones idénticos y mudos — la bandeja entera.
+        System.Windows.Automation.AutomationProperties.SetName(b, TipDe(icono));
+
         // El icono cambia solo (Discord con mensajes, el antivirus escaneando...)
         icono.PropertyChanged += (_, e) =>
         {
@@ -152,7 +164,14 @@ public partial class MainWindow : Window
         try
         {
             if (propiedad is null or "Icon") img.Source = icono.Icon;
-            if (propiedad is null or "Title") b.ToolTip = TipDe(icono);
+            // El nombre va con la ayuda emergente: si el icono pasa a decir «Discord: 3
+            // mensajes», un lector de pantalla tiene que oír eso y no el texto de hace una
+            // hora. Dos sitios donde se escribe lo mismo, y por eso van en la misma línea.
+            if (propiedad is null or "Title")
+            {
+                b.ToolTip = TipDe(icono);
+                System.Windows.Automation.AutomationProperties.SetName(b, TipDe(icono));
+            }
             if (propiedad == "IsHidden") RefrescarBandeja();
         }
         catch (Exception ex) { Log.Error("refrescar icono de bandeja", ex); }
@@ -197,7 +216,10 @@ public partial class MainWindow : Window
         Log.Info($"bandeja: \"{TipDe(icono).Split('\n')[0]}\" no admite clics (es de la barra de " +
                  $"tareas de Windows, no de una app): se abre {que}");
 
-        if (g == GuidVolumen) { AbrirControl(); return; }
+        // El icono de volumen de la barra de Windows abre nuestro panel de AUDIO, que es
+        // donde vive el volumen. Antes abría el centro de control, que ya no es un panel
+        // aparte: su superficie es la de Inicio.
+        if (g == GuidVolumen) { AbrirAudio(); return; }
         if (g == GuidRed) { AbrirRed(); return; }
         if (g == GuidBateria) { AbrirBateria(); return; }
         if (g == GuidSeguridad) { AbrirAjustes("windowsdefender:"); return; }
@@ -245,7 +267,10 @@ public partial class MainWindow : Window
     // ---------- El desplegable "^" ----------
     void AlternarBandejaExtra()
     {
-        if (Bandeja.Iconos is not { } iconos) return;
+        // La misma lista filtrada que usa la tira: si aquí se contara sin filtrar, el "^"
+        // diría "otros 3" y en la rejilla saldrían 2.
+        var iconos = Bandeja.Vivos();
+        if (!Bandeja.Encendida) return;
         int tope = Math.Max(0, _cfg.Barra.MaxBandeja);
         var resto = iconos.Where(i => !i.IsHidden).Skip(tope).ToList();
         if (resto.Count == 0) return;
@@ -253,8 +278,13 @@ public partial class MainWindow : Window
         int porFila = Math.Min(6, resto.Count);
         int filas = (int)Math.Ceiling(resto.Count / (double)porFila);
 
+        // Con el «^» como ancla: el panel cuelga del botón que lo abre, como el de audio
+        // cuelga del altavoz. Sin ancla se dibujaba de punta a punta de la isla con los
+        // iconos centrados dentro, y no se notaba porque tampoco tenía superficie propia:
+        // sin filo, un contenedor de ancho completo y uno que abraza su contenido se dibujan
+        // exactamente igual. Al darle la concha de C5, la primera captura lo enseñó.
         AlternarPanel(PanelBandeja, () => RejillaBandeja(resto, porFila),
-                      porFila * 40 + 20, filas * 40 + 20);
+                      porFila * 40 + 20, filas * 40 + 20, ancla: _botonMas);
     }
 
     FrameworkElement RejillaBandeja(List<NotifyIcon> iconos, int porFila)
@@ -269,13 +299,44 @@ public partial class MainWindow : Window
             Width = porFila * 40,
             HorizontalAlignment = HorizontalAlignment.Center
         };
+        // ---------- Entran con rebote, uno detrás de otro ----------
+        //
+        // La maqueta: «los iconos entran con un pequeño rebote escalonado». No es adorno: una
+        // rejilla de diez iconos que aparece de golpe se lee como una imagen; entrando uno
+        // detrás de otro se lee como una lista, que es lo que es, y el ojo la recorre en el
+        // orden en que está puesta.
+        //
+        // Respeta el nivel de animación: sin adorno entran puestos y ya está.
+        int n = 0;
         foreach (var i in iconos)
         {
             var b = BotonBandeja(i);
             b.Width = 36;
             b.Height = 36;
             rejilla.Children.Add(b);
+
+            if (Animacion.Adorno)
+            {
+                double retardo = n * 40;
+                var escala = new ScaleTransform(0.4, 0.4);
+                b.RenderTransformOrigin = new Point(0.5, 0.5);
+                b.RenderTransform = escala;
+                b.Opacity = 0;
+                b.BeginAnimation(OpacityProperty, Kf(0, 1, 180, retardo));
+                escala.BeginAnimation(ScaleTransform.ScaleXProperty, Kf(0.4, 1, 420, retardo, Muelle));
+                escala.BeginAnimation(ScaleTransform.ScaleYProperty, Kf(0.4, 1, 420, retardo, Muelle));
+            }
+            n++;
         }
-        return rejilla;
+
+        // Con la concha de C5, como los demás paneles. Éste era el único del programa que no
+        // pintaba **nada** de contenedor —ni fondo, ni filo, ni esquinas—: los iconos
+        // flotaban sobre el fondo de la isla y no había borde que dijera dónde empieza y
+        // acaba el desplegable.
+        //
+        // Aquí el margen no es 0: la rejilla no trae margen propio, así que la concha pone el
+        // suyo. `AlternarPanel` ya reserva ese hueco (`porFila * 40 + 20`), que es de donde
+        // salen los 20 px — el 10 de cada lado que pone `PanelShell`.
+        return PanelShell(rejilla, 10);
     }
 }

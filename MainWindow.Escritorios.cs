@@ -14,12 +14,43 @@ public partial class MainWindow : Window
 
     UIElement ModuloEscritorios()
     {
+        // ---------- E1: en vertical, los escritorios se APILAN ----------
+        //
+        // La orientación estaba escrita a mano en horizontal, y en una barra vertical eso
+        // ponía los números uno al lado de otro: con dos escritorios, el «2» se salía de la
+        // columna y se dibujaba **fuera de la superficie de la barra**, sobre el escritorio.
+        //
+        // No lo había cazado nadie porque la configuración de este equipo no lleva el módulo
+        // de escritorios, y la única captura vertical anterior —la de D6.1— lo añadía estando
+        // en horizontal. Lo vio la captura de la composición vertical de E1.
         _escritorios = new StackPanel
         {
-            Orientation = Orientation.Horizontal,
+            Orientation = Vertical ? Orientation.Vertical : Orientation.Horizontal,
             VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Center,
             Background = Brushes.Transparent     // sin fondo no llega la rueda a los huecos
         };
+
+        // ---------- Y la huella se olvida, porque describía el panel de ANTES ----------
+        //
+        // Aquí estaba el fallo de «añado escritorios, dice que se ha añadido, y no aparece».
+        //
+        // `RefrescarEscritorios` no repinta si la huella de lo que tocaría dibujar es la
+        // misma que la última vez. Eso es correcto y es lo que mantiene la barra quieta. El
+        // problema es que la huella vive en un campo de `MainWindow` y el StackPanel se tira
+        // y se vuelve a crear en CADA remonte —y remontar es lo que pasa al añadir cualquier
+        // módulo, al entrar o salir de edición y al tocar cualquier ajuste—. Con los mismos
+        // escritorios de siempre, la huella no cambia: el panel recién nacido preguntaba
+        // «¿hay algo que pintar?», la huella del panel muerto contestaba que no, y se quedaba
+        // vacío. Cero por cero píxeles, dentro de la barra, con todo el modelo diciendo que
+        // el módulo estaba puesto.
+        //
+        // Al arrancar funcionaba porque la huella empieza vacía. Por eso «reinicia NubeBar»
+        // lo arreglaba y nada más lo arreglaba.
+        //
+        // La regla, para el siguiente módulo que lleve caché de repintado: **una huella
+        // describe un elemento concreto; si recreas el elemento, la huella ya no vale**.
+        _huellaEscritorios = "";
 
         if (!Escritorios.Disponible) return _escritorios;   // Windows que no reconoce: ni se pinta
 
@@ -37,8 +68,7 @@ public partial class MainWindow : Window
         return _escritorios;
     }
 
-    int _escritoriosPintados = -1;
-    int _actualPintado = -1;
+    string _huellaEscritorios = "";
 
     void RefrescarEscritorios()
     {
@@ -46,20 +76,49 @@ public partial class MainWindow : Window
         try
         {
             var todos = Escritorios.Todos();
-            int actual = todos.FirstOrDefault(d => d.EsElActual)?.Numero ?? 1;
+            var fichas = FichasDeEscritorios(todos);
+            var talla = HyprIndicador.TallaQueCabe(SitioParaElIndicador(), Vertical);
 
-            // Repintar entero cada segundo haría parpadear el hover: solo cuando
-            // de verdad cambia el número de escritorios o cuál es el actual
-            if (todos.Count == _escritoriosPintados && actual == _actualPintado) return;
-            _escritoriosPintados = todos.Count;
-            _actualPintado = actual;
+            // ---------- Repintar solo cuando cambia lo que se dibuja ----------
+            //
+            // Antes se comparaban dos cosas: cuántos escritorios hay y cuál es el actual.
+            // Con el nombre y el número de ventanas eso ya no basta — renombrar un
+            // escritorio no cambia ninguna de las dos, y el indicador se quedaría
+            // mintiendo hasta que cambiara el número de escritorios.
+            //
+            // Y tampoco puede entrar todo: con el título de las ventanas dentro, cada
+            // pulsación de tecla en el navegador repintaría la isla. La huella la decide
+            // `HyprIndicador`, y hay pruebas de qué entra y qué no.
+            var huella = HyprIndicador.Huella(fichas, talla);
+            if (!HyprVista.TocaRepintar(_huellaEscritorios, huella)) return;
+            _huellaEscritorios = huella;
+
+            // E6: la nube marca el cambio de escritorio. Va aquí, después de la huella, para
+            // que solo salte cuando lo dibujado ha cambiado de verdad.
+            var elActual = fichas.FirstOrDefault(f => f.EsElActual);
+            if (elActual != null) NubeAlCambiarDeEscritorio(elActual.Numero);
 
             _escritorios.Children.Clear();
+
+            // ---------- El rótulo del actual ----------
+            //
+            // Va delante de los números y es lo nuevo de D6: "2/4 · Trabajo". Con poco
+            // sitio se cae solo (lo decide `TallaQueCabe`), y en vertical no sale nunca
+            // porque una columna de 30 píxeles no tiene dónde ponerlo.
+            var actual = fichas.FirstOrDefault(f => f.EsElActual);
+            if (actual != null && talla is HyprIndicador.Talla.Completo or HyprIndicador.Talla.Medio)
+                _escritorios.Children.Add(RotuloDelEscritorio(actual, fichas.Count, talla));
+
             foreach (var d in todos)
             {
-                var b = Boton(NumeroEscritorio(d), d.Nombre, () => Escritorios.Ir(d.Id));
+                var f = fichas.FirstOrDefault(x => x.Numero == d.Numero)
+                        ?? new HyprIndicador.Ficha(d.Numero, d.Nombre, d.EsElActual, 0);
+                var b = Boton(NumeroEscritorio(d, f), HyprIndicador.ParaLeer(f, fichas.Count),
+                              () => Escritorios.Ir(d.Id));
                 b.Width = 22;
                 b.Padding = new Thickness(0);
+                System.Windows.Automation.AutomationProperties.SetName(
+                    b, HyprIndicador.ParaLeer(f, fichas.Count));
                 _escritorios.Children.Add(b);
             }
 
@@ -78,26 +137,181 @@ public partial class MainWindow : Window
         catch (Exception ex) { Log.Error("pintar los escritorios", ex); }
     }
 
-    // El actual va en color de acento y con un puntito debajo; los demás, tenues
-    UIElement NumeroEscritorio(Escritorios.Info d)
+    // ---------- El actual, en un cuadrado azul RELLENO ----------
+    //
+    // Es lo que pide la maqueta: «el actual en un cuadrado azul relleno, no en texto de
+    // acento». Y al hacerlo se cae sola una cosa que estaba mal: el actual se decía TRES
+    // veces —número azul, seminegrita, y una rayita azul debajo—. Tres marcas para un dato
+    // binario es de lo que hace que una barra parezca recargada sin que uno sepa señalar por
+    // qué. El relleno lo dice entero y de un vistazo, así que la rayita sobra.
+    //
+    // El color sale del catálogo (`escritorio.actual.fondo`), no de un cian escrito a mano.
+    // La regla de antes —«aquí estás» no puede salir del mismo tono que «cuidado»— se conserva
+    // entera, pero vive ahora en la derivación de esa clave: manda el acento del tema, y solo
+    // si el acento se confunde con el de peligro manda el secundario. Así el indicador es del
+    // tema que tengas puesto en vez de un cian que no es de ninguno.
+    //
+    // El número de encima tampoco se pinta de un color fijo. Un blanco a pelo sobre un relleno
+    // claro —y hay cuatro temas claros— se lee mal; la clave `escritorio.actual.texto` da la
+    // versión del color de texto que de verdad contrasta encima, que es para lo que existe.
+    //
+    // Y el puntito de estado sigue yendo por TAMAÑO, no por color: el color ya lo ocupa
+    // «cuál es el actual», y dos informaciones en el mismo canal no se distinguen.
+    UIElement NumeroEscritorio(Escritorios.Info d, HyprIndicador.Ficha f)
     {
-        var pila = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center };
-        pila.Children.Add(new TextBlock
+        var relleno = _roles.Pincel("escritorio.actual.fondo");
+        var tintaEncima = _roles.Pincel("escritorio.actual.texto");
+
+        var fila = new Grid { HorizontalAlignment = HorizontalAlignment.Center };
+
+        // El cuadrado existe SIEMPRE y lo que cambia es si está relleno. Creándolo solo para
+        // el actual, la caja del número cambiaría de tamaño al cambiar de escritorio y los
+        // demás números darían un salto lateral — que se nota bastante más que el cambio.
+        fila.Children.Add(new Border
         {
-            Text = d.Numero.ToString(),
-            Foreground = d.EsElActual ? _acentoLegible : _texto,
-            Opacity = d.EsElActual ? 1 : 0.45,
-            FontSize = 12,
-            HorizontalAlignment = HorizontalAlignment.Center
+            Width = 20, Height = 20,
+            CornerRadius = new CornerRadius(6),
+            Background = d.EsElActual ? relleno : Brushes.Transparent,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = new TextBlock
+            {
+                Text = d.Numero.ToString(),
+                Foreground = d.EsElActual ? tintaEncima : _roles.Pincel("escritorio.numero"),
+                Opacity = d.EsElActual ? 1 : 0.45,
+                FontSize = 12,
+                FontWeight = d.EsElActual ? FontWeights.SemiBold : FontWeights.Normal,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+            },
         });
-        pila.Children.Add(new Border
+
+        double punto = HyprIndicador.PuntoDe(f.Como);
+        if (punto > 0)
+            fila.Children.Add(new Border
+            {
+                Width = punto, Height = punto,
+                CornerRadius = new CornerRadius(punto / 2),
+                // Sobre el relleno azul el punto va de la tinta legible, no del azul: con el
+                // dibujo de antes el punto del escritorio ACTUAL habría quedado azul sobre
+                // azul, invisible justo en el único donde importa.
+                Background = d.EsElActual ? tintaEncima : _texto,
+                Opacity = d.EsElActual ? 0.95 : 0.40,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(0, 1, 1, 0),
+            });
+
+        return fila;
+    }
+
+    // ---------- El rótulo "2/4 · Trabajo" ----------
+    FrameworkElement RotuloDelEscritorio(HyprIndicador.Ficha actual, int total,
+                                         HyprIndicador.Talla talla)
+    {
+        var caja = new StackPanel
         {
-            Width = 10, Height = 2, CornerRadius = new CornerRadius(1),
-            Background = _acento,
-            Opacity = d.EsElActual ? 1 : 0,
-            Margin = new Thickness(0, 1, 0, 0),
-            HorizontalAlignment = HorizontalAlignment.Center
+            Orientation = Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 7, 0),
+        };
+
+        // La nube, pequeña: es la identidad de NubeHypr y la marca de que esto es suyo. El
+        // tamaño lo decide `HyprPinta`, con topes, para que no pueda convertirse en una
+        // mascota gigante — es la regla que el documento pide y la que impide que la
+        // identidad se coma la barra.
+        double lado = HyprPinta.TamanoDeLaNube(_cfg.Barra.Alto);
+        lado = Math.Min(lado, 18);           // dentro de la isla manda el alto de la barra
+        caja.Children.Add(new System.Windows.Shapes.Path
+        {
+            Data = Nubecita.Molde(),
+            Fill = new SolidColorBrush(HyprPinta.Azul(_roles)),
+            Width = lado, Height = lado * Nubecita.Proporcion(),
+            Stretch = Stretch.Uniform,
+            Opacity = 0.9,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 5, 0),
+            IsHitTestVisible = false,
         });
-        return pila;
+
+        caja.Children.Add(new TextBlock
+        {
+            Text = HyprIndicador.Rotulo(actual, total, talla),
+            Foreground = new SolidColorBrush(HyprPinta.AzulTinta(_roles, _roles.FondoOpaco)),
+            FontSize = 11.5,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+        });
+
+        System.Windows.Automation.AutomationProperties.SetName(
+            caja, HyprIndicador.ParaLeer(actual, total));
+        return caja;
+    }
+
+    // ---------- Cuántas ventanas hay en cada escritorio ----------
+    //
+    // Se pregunta a `Escritorios.EspacioDe` por cada ventana de la instantánea que ya
+    // existe: ni se enumera de nuevo ni se sondea. Si la API no contesta para una ventana,
+    // esa no se cuenta — un número de más sería peor que un número de menos.
+    //
+    // ---------- Y por qué hay una caché aquí ----------
+    //
+    // `EspacioDe` es una llamada COM al shell. `RefrescarEscritorios` está en la lista de
+    // actualizadores, o sea que corre **una vez por segundo**; con veinte ventanas abiertas
+    // eso son veinte llamadas COM por segundo para un numerito que casi nunca cambia. Lo
+    // encontré revisando el coste de lo que había añadido en D6, no en una medición: a 5
+    // ventanas no se nota, y a 50 sí.
+    //
+    // Dos segundos de caché es el mismo plazo que usa `HyprEspacios.Mapa` desde D4, y por el
+    // mismo motivo: mover una ventana de escritorio es un gesto humano, y tardar dos
+    // segundos en reflejarlo no se percibe. Lo que sí se percibe es la CPU.
+    static readonly TimeSpan CaducaElRecuento = TimeSpan.FromSeconds(2);
+    DateTime _cuandoSeContaron = DateTime.MinValue;
+    Dictionary<IntPtr, int> _ventanaPorEscritorio = new();
+
+    List<HyprIndicador.Ficha> FichasDeEscritorios(List<Escritorios.Info> todos)
+    {
+        var mapa = _ventanaPorEscritorio;
+        if (DateTime.Now - _cuandoSeContaron > CaducaElRecuento)
+        {
+            mapa = new Dictionary<IntPtr, int>();
+            try
+            {
+                var porId = new Dictionary<Guid, int>();
+                foreach (var d in todos) porId[d.Id] = d.Numero;
+
+                foreach (var w in GestorVentanas.Todas)
+                {
+                    var id = Escritorios.EspacioDe(w.Hwnd);
+                    if (id != Guid.Empty && porId.TryGetValue(id, out int n)) mapa[w.Hwnd] = n;
+                }
+                _ventanaPorEscritorio = mapa;
+                _cuandoSeContaron = DateTime.Now;
+            }
+            catch (Exception ex)
+            {
+                Log.Error("contar las ventanas de cada escritorio", ex);
+                // Si la API falla se usa el recuento anterior en vez de enseñar ceros: un
+                // indicador que parpadea a "vacío" cada vez que el shell tarda es peor que
+                // uno que se queda un momento con el número de antes.
+                mapa = _ventanaPorEscritorio;
+            }
+        }
+
+        var espacios = todos
+            .Select(d => new HyprEspacios.Espacio(d.Id, d.Nombre, d.Numero - 1, d.EsElActual))
+            .ToList();
+        return HyprIndicador.Fichas(espacios, mapa);
+    }
+
+    // Cuánto sitio hay para el rótulo. En la isla horizontal es lo que queda libre; en
+    // vertical, el ancho de la columna. Se pasa a `TallaQueCabe`, que decide cuánta
+    // información cabe — y la decisión se puede comprobar sin pintar nada.
+    double SitioParaElIndicador()
+    {
+        if (Vertical) return _cfg.Barra.Alto;      // en vertical, "alto" es el grosor
+        double libre = ActualWidth > 0 ? ActualWidth : _monitor.Ancho / Math.Max(1, _monitor.Escala);
+        return Math.Max(0, libre * 0.22);            // el indicador no se queda con la isla
     }
 }

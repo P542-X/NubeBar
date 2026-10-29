@@ -23,13 +23,37 @@ public partial class MainWindow : Window
     Config _cfg = Config.Cargar() ?? new Config();
     IntPtr _self, _ultimaActiva;
 
+    // ---------- Con qué se pinta antes de que haya tema ----------
+    //
+    // Eran negro, blanco y el azul aciano de WPF, escritos aquí. Duran lo que tarda
+    // `AplicarTema` en correr, pero eran cinco colores de la interfaz fuera del catálogo, y
+    // ninguno de ellos es de ningún tema: `CornflowerBlue` no lo eligió nadie.
+    //
+    // Ahora el estado inicial es el tema de serie. Si algo se pinta antes de aplicar el tema
+    // —o si aplicar el tema falla— lo que se ve es Profesional, no tres colores de nadie.
+    static readonly Roles DeSerie = Roles.PorDefecto();
+
     // Pinceles fijos: cuando cambia el tema se anima su color, y todo lo que los usa cambia suave
-    readonly SolidColorBrush _fondo = new(Colors.Black), _texto = new(Colors.White),
-                             _acento = new(Colors.CornflowerBlue), _hover = new(Color.FromArgb(0x30, 255, 255, 255));
+    readonly SolidColorBrush _fondo = new(DeSerie.Fondo), _texto = new(DeSerie.Texto),
+                             _acento = new(DeSerie.Acento), _hover = new(DeSerie.SuperficieAlta);
     // El acento "legible" es el mismo color corregido para que se lea sobre el
     // fondo. Se usa en TEXTO; para bordes y barras sigue valiendo el de verdad.
-    readonly SolidColorBrush _acentoLegible = new(Colors.CornflowerBlue);
-    Color _cTexto = Colors.White, _cAcento = Colors.CornflowerBlue, _cAcentoLegible = Colors.CornflowerBlue;
+    readonly SolidColorBrush _acentoLegible = new(DeSerie.AcentoTinta);
+    Color _cTexto = DeSerie.Texto, _cAcento = DeSerie.Acento, _cAcentoLegible = DeSerie.AcentoTinta;
+
+    // Los colores del tema por rol, para que un widget pueda preguntar "¿de qué color
+    // pinto una fila?" sin mezclar a ojo. Se recalcula en AplicarTema.
+    Roles _roles = DeSerie;
+
+    // Y sus pinceles, con el mismo truco que los de arriba: el pincel es fijo y lo que
+    // cambia es su Color, animado. Por eso al cambiar de tema TODO lo que los use se
+    // tiñe solo y en suave, sin volver a montar nada.
+    //
+    // Antes esto no existía y cada sitio se hacía su propio
+    // `new SolidColorBrush(FromArgb(0x33, _cTexto…))`: veinticinco mezclas a ojo, cada
+    // una con su alfa, y ninguna cambiaba de color hasta que se remontaba el panel.
+    readonly SolidColorBrush _superficie = new(), _superficieAlta = new(), _borde = new(), _elegido = new(),
+                             _textoAtenuado = new(), _secundario = new(), _sistema = new();
 
     readonly List<Action> _actualizadores = new();
     readonly DispatcherTimer _tick = new() { Interval = TimeSpan.FromSeconds(1) };
@@ -56,7 +80,7 @@ public partial class MainWindow : Window
     DateTime _wpUltimo;
     string _ultimoColorEnviado = "";
 
-    const string FuenteIconos = "Segoe Fluent Icons, Segoe MDL2 Assets";
+    internal const string FuenteIconos = "Segoe Fluent Icons, Segoe MDL2 Assets";
 
     // Curvas: "Muelle" se pasa un pelín y vuelve (como la isla del iPhone), "Suave" frena sin rebote
     static readonly IEasingFunction Muelle = new BackEase { Amplitude = 0.35, EasingMode = EasingMode.EaseOut };
@@ -66,10 +90,14 @@ public partial class MainWindow : Window
     // plegaba casi entero en los primeros 80 ms y parecía un corte, no un cierre.
     // Comoda arranca despacio y acelera, que es como se dobla algo de verdad.
     static readonly IEasingFunction Comoda = new CubicEase { EasingMode = EasingMode.EaseInOut };
-    static Duration Ms(double ms) => new(TimeSpan.FromMilliseconds(ms));
+    // El otro embudo: las animaciones de COLOR piden una Duration, no keyframes. Se
+    // escala aquí por el mismo motivo que en Kf.
+    static Duration Ms(double ms) => new(TimeSpan.FromMilliseconds(Animacion.Escalar(ms)));
 
     bool EsIsla => _cfg.Barra.Modo.Equals("isla", StringComparison.OrdinalIgnoreCase);
-    bool Arriba => !_cfg.Barra.Posicion.Equals("abajo", StringComparison.OrdinalIgnoreCase);
+    // Lo consulta medio proyecto. Pasa por PosicionEfectiva para que los bordes
+    // laterales (que cuelgan de la franja de arriba) no se tomen por "abajo".
+    bool Arriba => ArribaEfectivo;
 
     // ================= Una isla por monitor =================
     // Hay una ventana de estas por cada pantalla. La del monitor principal es la
@@ -94,12 +122,33 @@ public partial class MainWindow : Window
         {
             Log.Nuevo();
             // Ningún error tumba la app: se apunta en el log y se sigue
-            Application.Current.DispatcherUnhandledException += (_, e) => { Log.Error("interfaz", e.Exception); e.Handled = true; };
-            TaskScheduler.UnobservedTaskException += (_, e) => { Log.Error("tarea", e.Exception); e.SetObserved(); };
+            // ---------- Todo fallo pasa por `Apuntar` ----------
+            //
+            // Antes cada manejador hacía lo suyo: la interfaz apuntaba y perdonaba, la tarea
+            // apuntaba, y el fatal enseñaba la barra de Windows y ya. Ese último dejaba
+            // NubeBar a medio morir — con la bandeja secuestrada, los ganchos puestos y la
+            // reserva de pantalla sin soltar: barra de Windows visible y NubeBar zombi.
+            //
+            // Ahora los tres apuntan en el mismo sitio y `Panico` decide. Perdonar un fallo
+            // de pintado sigue siendo lo correcto —más vale un módulo tonto que quedarte sin
+            // barra—, pero el MISMO fallo cinco veces en veinte segundos ya no se perdona:
+            // eso no es un módulo, es una barra que no se puede dibujar.
+            Application.Current.DispatcherUnhandledException += (_, e) =>
+            {
+                Apuntar(Panico.Clase.Interfaz, DondeFallo(e.Exception), e.Exception);
+                e.Handled = true;
+            };
+            TaskScheduler.UnobservedTaskException += (_, e) =>
+            {
+                Apuntar(Panico.Clase.Tarea, DondeFallo(e.Exception), e.Exception);
+                e.SetObserved();
+            };
             AppDomain.CurrentDomain.UnhandledException += (_, e) =>
             {
-                Log.Error("FATAL", e.ExceptionObject);
-                Nativo.MostrarBarraWindows(true);   // nunca dejarte sin barra de tareas
+                // Esta mata el proceso quiera uno o no, así que `Panico` la da por grave de
+                // entrada: hay que soltar el escritorio ANTES de irnos.
+                Apuntar(Panico.Clase.Fondo, DondeFallo(e.ExceptionObject as Exception),
+                        e.ExceptionObject);
             };
         }
         Islas.Add(this);
@@ -120,9 +169,21 @@ public partial class MainWindow : Window
                 _self = new WindowInteropHelper(this).Handle;
                 Nativo.NoActivable(_self);
                 VigilarCambiosDePantalla();
+        // ---------- Lo que vive dentro de un panel nunca arrastra la isla ----------
+        //
+        // Se marca el CAJÓN, que es donde `AbrirPanel` mete el contenido de todos los
+        // paneles. Marcarlo una vez aquí cubre audio, el centro de control, red, batería,
+        // la vista de ventanas y lo que venga: ninguno tiene que acordarse de protegerse.
+        //
+        // Marcar cada control por su cuenta era la otra opción y es la que se olvida: el
+        // deslizador de volumen no estaba marcado y la nube se iba detrás del ratón.
+        SinArrastre(Cajon);
+        if (_superpuesta is { } sup) SinArrastre(sup.Cajon);
+
                 MontarArrastre();
                 Aplicar();
                 if (_esJefa) RegistrarAtajos();
+            ApuntarSaludDeHypr();
             }
             catch (Exception ex) { Log.Error("arranque", ex); }
 
@@ -130,11 +191,24 @@ public partial class MainWindow : Window
             // en Aplicar hay que hacerla aparecer o no se vería nada
             AnimarAparicion();
 
+            // Y aquí ya hay nube que enseñar: la escena de entrada puede levantar la
+            // pintura. Lo avisa la JEFA y una sola vez; las demás islas no mandan en
+            // esto. Si no había escena, no hace nada (ver EscenaArranque).
+            if (_esJefa) EscenaArranque.InterfazLista();
+
             try
             {
                 if (_esJefa)
                 {
-                    Guardian.Lanzar();          // por si me matan: alguien tiene que devolver el shell
+                    // Un diagnóstico no lleva vigilante: es otro proceso, no ve la bandera de
+                    // solo lectura y acabaría reescribiendo el config que la medida no debe
+                    // tocar. Y un vigilante que resucite la app a mitad de una medida la
+                    // invalida de todas formas.
+                    if (!Config.SoloLectura)
+                    {
+                        Guardian.Lanzar();      // por si me matan: alguien tiene que devolver el shell
+                        Vigia.Empezar(Dispatcher);   // y si me cuelgo, que quede la foto
+                    }
                     // Encenderla hace que las apps nos manden sus iconos a NOSOTROS en
                     // vez de a Explorer. Si el módulo no está puesto en ninguna zona,
                     // los iconos desaparecerían de la barra de Windows sin aparecer en
@@ -144,12 +218,35 @@ public partial class MainWindow : Window
                     Uso.Cargar();
                     _ = Fuentes.CargarApps();   // el índice del buscador se arma por detrás
                     MontarTeclaWindows();
-                    if (_cfg.Barra.Notificaciones && Notificaciones.Disponible) Notificaciones.Arrancar();
+                    // El gestor de ventanas: una instantánea para toda la aplicación, al día
+                    // por los eventos de Windows en vez de por un sondeo.
+                    GestorVentanas.Arrancar(Dispatcher);
+                    // El gestor de fondos: un reloj para toda la aplicación, no uno por
+                    // ventana de ajustes. Ver GestorFondos.
+                    GestorFondos.Arrancar(Dispatcher);
+                    _ = GestorFondos.AplicarAsync(_cfg.Fondo);
+                    MontarAjusteDeBordes();
+                    if (_cfg.Barra.Notificaciones && Notificaciones.Disponible)
+                    {
+                        Notificaciones.Arrancar();
+                        Centro.Arrancar(_cfg.Barra.NotificacionesSilenciadas, Dispatcher);
+                    }
+                    // El clima: solo la jefa. Con tres monitores habría tres islas, y cada
+                    // una pidiendo el tiempo son tres peticiones por cuarto de hora para
+                    // enseñar el mismo número. `Clima` guarda la lectura en estático, así
+                    // que los paneles de las otras islas la leen sin pedir nada.
+                    ArrancarClima();
                 }
                 VigilarWallpaperEngine();
                 MontarPulsoAudio();
                 _tick.Tick += (_, _) => Tick();
                 _tick.Start();
+                // Y la primera pasada YA, no dentro de un segundo: el reloj espera su primer
+                // intervalo antes de saltar, y hasta entonces la isla salía a medias —sin las
+                // apps, sin el «ES» del teclado— y se completaba de golpe un segundo después.
+                // Todo lo que el tick necesita ya está montado aquí (el gestor de ventanas
+                // hace su primera lectura al arrancar).
+                Tick();
                 VigilarPantallaCompleta();
                 await ActualizarWallpaper(true);
             }
@@ -163,8 +260,32 @@ public partial class MainWindow : Window
                      $"ventana L={Left} T={Top} {ActualWidth}x{ActualHeight} visible={IsVisible} | " +
                      $"isla {Isla.ActualWidth:0}x{Isla.ActualHeight:0} opacidad={Isla.Opacity:0.##} | " +
                      $"monitor ({_monitor.X},{_monitor.Y}) {_monitor.Ancho}x{_monitor.Alto} dpi={_monitor.Dpi} | " +
-                     $"MaxApps={MaxAppsEfectivo} | Modo={_cfg.Barra.Modo} | " +
+                     $"MaxApps={MaxAppsEfectivo} | {ResumenDelPanel()} | " +
                      $"Wallpaper Engine={WallpaperEngine.Exe ?? "no encontrado"}");
+
+            // El modo diagnóstico: solo la jefa, y después de que todo esté en marcha.
+            if (DiagVista.Encendido && _esJefa) await CorrerDiagnosticoDeLaVista();
+            if (DiagInicio.Encendido && _esJefa) await CorrerDiagnosticoDeInicio();
+            if (DiagBandeja.Encendido && _esJefa) await CorrerDiagnosticoDeLaBandeja();
+            if (DiagHypr.Encendido && _esJefa) await CorrerDiagnosticoDeHypr();
+            if (DiagMotor.Encendido && _esJefa) await CorrerDiagnosticoDelMotor();
+            if (DiagEspacios.Encendido && _esJefa) await CorrerDiagnosticoDeEspacios();
+            if (DiagAtajos.Encendido && _esJefa) await CorrerDiagnosticoDeAtajos();
+            if (DiagReglas.Encendido && _esJefa) await CorrerDiagnosticoDeReglas();
+            if (DiagD6.Encendido && _esJefa) await CorrerDiagnosticoD6();
+            if (DiagD7.Encendido && _esJefa) await CorrerDiagnosticoD7();
+            if (DiagPrefijos.Encendido && _esJefa) await CorrerDiagnosticoDePrefijos();
+            if (ArnesEspacios.Encendido && _esJefa) await CorrerArnesDeEspacios();
+            if (ArnesAplicar.Encendido && _esJefa) await CorrerArnesDeAplicar();
+            if (ArnesLayout.Encendido && _esJefa) await CorrerArnesDeLayout();
+            if (DiagRejilla.Encendido && _esJefa) await CorrerDiagnosticoDeRejilla();
+            if (DiagCapturas.Encendido && _esJefa) await CorrerCapturas();
+            if (DiagNeon.Encendido && _esJefa) await CorrerDiagnosticoDelNeon();
+            if (DiagVigilia.Encendido && _esJefa) await CorrerVigilia();
+            if (DiagGuia.Encendido && _esJefa) await CorrerGuiaManual();
+            if (DiagE0.Encendido && _esJefa) await CorrerDiagnosticoE0();
+            if (DiagModulos.Encendido && _esJefa) await CorrerDiagnosticoModulos();
+            if (DiagPaneles.Encendido && _esJefa) await CorrerDiagnosticoDePaneles();
         };
         Closed += (_, _) =>
         {
@@ -182,6 +303,17 @@ public partial class MainWindow : Window
             if (!_esJefa) return;                      // lo global lo desmonta solo la jefa
 
             Nativo.QuitarAtajo(_self, IdAtajoVista);   // el atajo vuelve a quien lo quiera
+            // D7: todo lo de NubeHypr se suelta en un solo sitio, con inventario antes y
+            // después. Antes eran dos líneas aquí y el resto repartido; la forma de que una
+            // se quedara sin soltar no era escribirla mal, era añadir la octava y no
+            // acordarse de este cierre. Ver MainWindow.Salud.cs y HyprSalud.HayQueSoltar.
+            SoltarTodoLoDeHypr();
+            SoltarElDock();           // E2: y la superficie del dock, que el tablero quede vacío
+            SoltarTodosLosLaterales();   // E3: los paneles laterales y sus deslizadores
+            DesmontarAjusteDeBordes();                 // antes de Parar(): el reloj del ratón es nuestro
+            DejarDeEscucharEscape();                   // y el Esc de los paneles se da de baja
+            GestorFondos.Apagar();                     // y el reloj de la presentación se suelta
+            GestorVentanas.Parar();                    // y los ganchos de ventanas se sueltan
             _gancho?.Dispose();                        // y la tecla Windows vuelve a la normalidad
             Bandeja.Apagar();                          // los iconos vuelven a la bandeja de Explorer
             Notificaciones.Limpiar();                  // y la copia de su base se borra del temporal
@@ -222,8 +354,46 @@ public partial class MainWindow : Window
             // ejemplo) se quedaba a la vista hasta un segundo entero y se veía
             // el parpadeo. Ahora lo hace el vigilante de 150 ms.
             Historial.Anotar(Nativo.Cpu(), Nativo.Ram());
+            // Y si el centro de control está abierto, sus dos métricas se repintan solas.
+            // Va aquí, en el Tick que ya corre una vez por segundo, en vez de un reloj
+            // nuevo: dos relojes para lo mismo es lo que acaba descompasado.
+            RefrescarMetricasDelControl();
         }
         if (_esJefa) VigilarNotificaciones();
+        // D7: el supervisor de NubeHypr. Cuelga de este reloj y no de uno propio —dos
+        // relojes para cosas parecidas es lo que acaba descompasado—, mira una vez cada
+        // cinco segundos y solo apunta cuando el estado cambia. Ver MainWindow.Salud.cs.
+        VigilarLaSaludDeHypr();
+        NubeAlRecuperarse();      // E6: un destello al salir del modo seguro
+
+        // E2: el dock. Se refresca con el pulso de siempre y NO reconstruye nada si lo que
+        // dibujaría es idéntico a lo que hay: lo decide su huella.
+        RefrescarDock();
+        // E3/E4: y los paneles laterales, con el mismo pulso y el mismo gesto de borde.
+        // Apagados de serie: ver MainWindow.LateralesAlBorde.cs.
+        RefrescarLateralesAlBorde();
+        // ---------- Los fantasmas de la bandeja ----------
+        //
+        // Una app que se cierra bien manda su NIM_DELETE y la colección avisa sola. Una
+        // que se muere de golpe —o cuyo registro queda huérfano al reiniciar Explorer—
+        // no manda nada, y nadie avisaría nunca.
+        //
+        // Así que se CUENTAN los fantasmas una vez por segundo (una llamada a `IsWindow`
+        // por icono, nada) y solo se repinta si la cuenta ha cambiado. No es reconstruir
+        // la bandeja en cada fotograma: es mirar un número y no tocar nada mientras sea
+        // el mismo. Es la misma regla que el vigilante de ventanas, que se encontró con
+        // el parpadeo por no tenerla.
+        if (_esJefa && Bandeja.Encendida)
+        {
+            int fantasmas = Bandeja.Fantasmas();
+            if (fantasmas != _fantasmasBandeja)
+            {
+                Log.Info($"bandeja: fantasmas={fantasmas} (eran {_fantasmasBandeja}): " +
+                         "iconos cuya ventana ya no existe; se repinta una vez");
+                _fantasmasBandeja = fantasmas;
+                RefrescarBandeja();
+            }
+        }
         VigilarVuelta();
         RefrescarMusica();
         VigilarPulsoAudio();   // si ha empezado a sonar algo, despierta al pulso
@@ -244,7 +414,7 @@ public partial class MainWindow : Window
             }
         if (Environment.GetEnvironmentVariable("NUBEBAR_DIAG") == "1")
             Log.Info($"DIAG tick [{_monitor.Dispositivo}] isla={Isla.ActualWidth:0.00} exp={_expandida} " +
-                     $"oculta={_escondidaPorPantalla} asomada={_asomada} | {ResumenGrupos()}");
+                     $"oculta={_recogida} asomada={_asomada} | {ResumenGrupos()}");
     }
 
     // ================= Tema y posición =================
@@ -257,6 +427,7 @@ public partial class MainWindow : Window
         _aplicando = true;
         try { AplicarTema(); }
         finally { _aplicando = false; }
+        AjustarAnchoPendiente();
     }
 
     void AplicarTema()
@@ -265,7 +436,32 @@ public partial class MainWindow : Window
         var b = _cfg.Barra;
         WallpaperEngine.RutaManual = _cfg.Wallpaper.Ruta;
 
-        Color fondo = Hex(t.Fondo, Colors.Black), texto = Hex(t.Texto, Colors.White), acento = Hex(t.Acento, Colors.CornflowerBlue);
+        // Antes de montar nada: el nivel de animación lo leen Kf y Ms, por los que
+        // pasa todo lo que se mueve, así que tiene que estar puesto ya.
+        Animacion.Elegir(_cfg.Animaciones.Nivel);
+        // El idioma, antes de montar nada: lo que se construya a partir de aquí ya se traduce
+        // al pintarse. Cambiarlo en Ajustes recarga el config y vuelve a pasar por aquí, así
+        // que no hace falta reiniciar.
+        Textos.Elegir(_cfg.Tema.Idioma);
+
+        // Y con él, el estilo de los botones, que también depende del nivel. Va aquí y
+        // no en el constructor porque los botones se vuelven a crear unas líneas más
+        // abajo (LlenarZonas): así cambiar el nivel en caliente se ve en el acto.
+        Resources[typeof(Button)] = EstiloBoton();
+
+        // ---------- De dónde sale el color desde el rediseño ----------
+        //
+        // Del tema puesto (`Tema.Id`, uno de los nueve de serie) pasado por la cascada, con
+        // encima lo que el usuario le haya cambiado (`Tema.Colores`). Antes salía de tres
+        // claves del config; ahora esas tres son solo dos entradas más de la cascada, y la
+        // migración v4→v5 ya las movió ahí.
+        var tema = TemasDeSerie.De(t.Id);
+        var pintura = new Pintura(tema, t.Colores, t.Radios, t.Letras);
+
+        Color fondo = pintura.Color(ClavesBase.Superficie),
+              texto = pintura.Color(ClavesBase.Tinta),
+              acento = pintura.Color(ClavesBase.Acento);
+        Color fondoDelTema = fondo, textoDelTema = texto, acentoDelTema = acento;
         if (t.DesdeWallpaper && _paleta is { } p)
         {
             fondo = Color.FromArgb(fondo.A, p.Fondo.R, p.Fondo.G, p.Fondo.B);  // se respeta tu opacidad
@@ -290,7 +486,7 @@ public partial class MainWindow : Window
         // nada que distinguir, así que se vuelve al de por defecto y se avisa.
         if (Contraste.Saturacion(acento) < 0.08 && Contraste.Entre(acento, texto) < 1.5)
         {
-            var porDefecto = Color.FromRgb(0x7A, 0xA2, 0xF7);
+            var porDefecto = DeSerie.Acento;
             Log.Info($"el acento {acento} es un gris igual que el texto {texto}: no se distinguiría " +
                      $"de nada, se usa {porDefecto} (cámbialo en Ajustes > Colores)");
             acento = porDefecto;
@@ -313,42 +509,140 @@ public partial class MainWindow : Window
                      $"(origen: {(t.DesdeWallpaper && _paleta != null ? "wallpaper" : "config")})");
 
         _cTexto = texto; _cAcento = acento;
+
+        // ---------- Y la pintura se rehace con lo que de verdad se va a pintar ----------
+        //
+        // El wallpaper y las tres correcciones de arriba pueden haber movido el fondo, el
+        // texto o el acento. Si lo han hecho, los tres entran como personalizaciones DE ESTA
+        // SESIÓN —encima de las del usuario, sin tocar el config— y todo lo que se deriva de
+        // ellos se recalcula con los valores de verdad.
+        //
+        // Antes esto era lo mismo pero dicho de otra forma: «los roles se recalculan con los
+        // colores ya resueltos, no con los del config en bruto». Un widget que pregunte por
+        // `tarjeta.fondo` tiene que recibir algo que pegue con lo que está pintado.
+        if (fondo != fondoDelTema || texto != textoDelTema || acento != acentoDelTema)
+        {
+            var deLaSesion = new Dictionary<string, string>(t.Colores, StringComparer.OrdinalIgnoreCase)
+            {
+                [ClavesBase.Superficie] = Relleno.Hex(fondo),
+                [ClavesBase.Tinta] = Relleno.Hex(texto),
+                [ClavesBase.Acento] = Relleno.Hex(acento),
+            };
+            pintura = new Pintura(tema, deLaSesion, t.Radios, t.Letras);
+        }
+
+        _roles = Roles.Desde(pintura);
+        _forma = Formas.Del(pintura);
+
+        // La barra de desplazamiento propia, para TODA la aplicación: se pone en los
+        // recursos de la app y no en los de esta ventana para que llegue también a Ajustes
+        // y a las ventanas flotantes. Ver `BarraDeScroll`.
+        try
+        {
+            Application.Current.Resources[typeof(System.Windows.Controls.Primitives.ScrollBar)] =
+                BarraDeScroll.Estilo(texto, _cAcentoLegible);
+        }
+        catch (Exception ex) { Log.Error("montar la barra de desplazamiento", ex); }
+
         AnimarColor(_fondo, fondo);
         AnimarColor(_texto, texto);
         AnimarColor(_acento, acento);
         AnimarColor(_acentoLegible, _cAcentoLegible);
-        AnimarColor(_hover, Color.FromArgb(0x30, texto.R, texto.G, texto.B));
 
-        Isla.CornerRadius = new CornerRadius(t.Radio);
-        FontFamily = new FontFamily(t.Fuente);
+        // El hover es, conceptualmente, la superficie elevada: lo que hay bajo el
+        // ratón. Antes era un 0x30 del texto escrito aquí a mano; ahora lo decide el
+        // tema, así que Nube puede tener un hover azulado en vez de un gris del texto.
+        AnimarColor(_hover, _roles.SuperficieAlta);
+
+        AnimarColor(_superficie, _roles.Superficie);
+        AnimarColor(_elegido, _roles.Seleccion);
+        AnimarColor(_superficieAlta, _roles.SuperficieAlta);
+        AnimarColor(_borde, _roles.Borde);
+        AnimarColor(_textoAtenuado, _roles.TextoAtenuado);
+        AnimarColor(_secundario, _roles.SecundarioTinta);
+        AnimarColor(_sistema, _roles.SistemaTinta);
+
+        // El radio sale del tema (o de lo que el usuario haya puesto encima), no de una clave
+        // suelta del config: es lo que permite que Videojuegos y Cyberpunk vayan a radio 0 y
+        // que Sakura vaya a 25.
+        Isla.CornerRadius = new CornerRadius(pintura.Radio(Piezas.Isla));
+        // ---------- La letra sale del tema ----------
+        //
+        // Leía `Tema.Fuente` del config, o sea una sola letra para todo y elegida aparte. Pero
+        // la letra ES del tema —Cyberpunk pide Orbitron en los títulos y Rajdhani en el resto,
+        // Sakura una redondeada, Samurái una de pincel— y hasta ahora el tema la declaraba, se
+        // guardaba, se probaba y no la usaba nadie.
+        FontFamily = LetraDe(pintura.Fuente(Letras.Texto));
         FontSize = t.TamanoFuente;
 
-        // Filo y brillo de acento: es lo que hace que el color del wallpaper se note,
-        // porque si no el acento solo pinta la rayita de 3 px bajo la app activa
-        Isla.BorderBrush = _acento;
-        Isla.BorderThickness = new Thickness(t.BordeAcento ? 1 : 0);
+        // ---------- El filo de la isla, y la luz que lo recorre ----------
+        //
+        // El filo ya no es «el acento si BordeAcento está puesto»: es la clave `isla.filo` del
+        // tema, que es lo que la maqueta fija (1 px, blanco al 9 % en Profesional).
+        //
+        // Y encima, si el tema lleva la decoración `destello-filo`, ese filo pasa a ser un
+        // degradado con una franja estrecha de luz que da la vuelta al contorno. `BordeAcento`
+        // se queda como el interruptor de quien no lo quiera.
+        PonerFiloDeLaIsla(pintura, t.BordeAcento);
+
+        // ---------- Y el halo, en la envoltura ----------
+        PonerAuraDeLaIsla(pintura);
         AjustarBrillo(t.BordeAcento, acento);
 
-        _actualizadores.Clear();
-        // Los módulos se montan de cero: si has quitado "apps", el carrusel de la vez
-        // anterior ya no está en la isla y hay que olvidarlo (si sigue, ModuloApps lo
-        // vuelve a poner)
-        _tira = null;
-        _carrusel = null;
-        PrepararFijas();                    // la tira de las fijadas, antes que el carrusel
-        Llenar(Izq, _cfg.Modulos.Izquierda);
-        Llenar(Cen, _cfg.Modulos.Centro);
-        Llenar(Der, _cfg.Modulos.Derecha);
+        // ---------- Y el halo del neón, también en la BARRA ----------
+        //
+        // Esto faltaba y es lo que hacía que el estilo pareciera no funcionar. El halo se le
+        // puso a `PanelShell`, a `Card` y a la tarjeta de los laterales... y la isla no pasa
+        // por ninguno de los tres: se viste aquí, a mano, desde la fase A.
+        //
+        // O sea que elegías «Neón» y la barra —que es lo que tienes delante todo el día—
+        // seguía exactamente igual. El usuario lo dijo así: «creo que lo del neón no
+        // funciona». Y desde donde él mira, no funcionaba.
+        //
+        // Es el fallo de siempre en este proyecto: la pieza buena existe y hay una superficie
+        // que no la llama. Van ya unas cuantas.
+        //
+        // ---------- Y hay que convivir con el brillo que YA tenía ----------
+        //
+        // `AjustarBrillo` lleva desde la fase A gestionando `Isla.Effect`: es el brillo de
+        // acento que se enciende con `Tema.BordeAcento` y que `AnimarBrillo` sube y baja al
+        // expandirse la isla. Poner el halo encima sin más lo sustituye, y entonces `_brillo`
+        // se queda apuntando a un efecto que ya no está en la isla — la animación de
+        // abrir/cerrar seguiría corriendo sobre un objeto suelto y no se vería nada.
+        //
+        // ---------- Y por qué el halo de la ISLA está apagado ----------
+        //
+        // Aquí se llamaba a `PonerResplandor(Isla, …)` cuando la forma brillaba, y con el
+        // estilo «Neón» funcionaba porque casi nadie lo tenía puesto. Al pasar el halo a ser
+        // una decoración del tema, ocho de los nueve lo encienden — y entonces se vio lo que
+        // llevaba ahí desde el principio.
+        //
+        // `Isla` tiene `ClipToBounds="True"` (lo necesita: es lo que recorta el cajón al
+        // crecer). Un `DropShadowEffect` sobre un elemento recortado se recorta con él, y el
+        // recorte es el RECTÁNGULO de la caja, no la forma redondeada. Resultado: un halo
+        // cuadrado alrededor de una isla con las puntas redondas, que asoma justo por donde
+        // la curva se separa de la esquina. El usuario lo vio al primer vistazo y lo dijo:
+        // «sobresale un rectángulo de la nube, queda feísimo». Medido: #13182E en la esquina
+        // contra #0C0E17 del interior.
+        //
+        // El halo de la isla es de la FASE 2 del rediseño («La isla: destello del filo, halo,
+        // reloj con brillo…»), y hacerlo bien es ponerlo en una pieza DETRÁS de la isla, con
+        // su misma forma y sin recorte. Encenderlo aquí ahora no es adelantarlo: es enseñar
+        // mal el de la fase 2 antes de construirlo.
+        //
+        // Los paneles y los laterales sí lo llevan, y ahí se ve bien: sus conchas no recortan.
+        //
+        //   if (EstiloDeAhora.Brilla) { PonerResplandor(Isla, EstiloDeAhora, Realce.Ambiente); _brillo = null; }
 
-        // Con "fijadas" puesto y "apps" quitado no hay carrusel que refresque los
-        // grupos, pero las fijas siguen necesitando que alguien las pinte y les lleve
-        // la cuenta de ventanas abiertas
-        if (FijasAparte && _tira == null)
-        {
-            _grupos.Clear();
-            RefrescarApps();
-            _actualizadores.Add(RefrescarApps);
-        }
+        // La orientación va ANTES de montar las zonas: los widgets se construyen según
+        // ella (el separador es una raya a lo ancho o a lo alto, el carrusel se apila o
+        // se tumba), y montarlos primero habría dejado la mitad girada.
+        OrientarZonas();
+
+        // Montar las zonas es más que rellenarlas: ver RemontarZonas, que es el ÚNICO
+        // sitio desde el que se hace. El modo edición llamaba antes a LlenarZonas a
+        // secas y se saltaba este preámbulo, lo que hacía desaparecer las fijadas.
+        RemontarZonas();
 
         // Primero el diseño de la isla y después el tamaño de la ventana: asignar
         // Window.Width/Height hace un SetWindowPos que bombea mensajes y provoca un
@@ -357,26 +651,47 @@ public partial class MainWindow : Window
         // Recargar el config con un panel abierto lo cierra: sus medidas ya no valen
         CerrarPanelAlRecargar();
 
-        Contenido.Height = b.Alto;          // la fila de los módulos no cambia aunque crezca el cajón
-        Isla.BeginAnimation(HeightProperty, null);
-        Isla.Height = b.Alto;
-        Isla.BeginAnimation(WidthProperty, null);
-        Isla.HorizontalAlignment = EsIsla ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
-        ColocarCajon();                     // alineación vertical, márgenes y orden de las filas
+        double grosorVentana = b.Alto + b.Margen * 2;
 
-        _expandida = false;
-        FijarLados(!EsIsla);
-        // En modo isla el ancho siempre va fijado a mano (ver AnimarAncho); en modo barra, automático
-        Isla.Width = EsIsla ? MedirAncho() : double.NaN;
+        if (Vertical)
+        {
+            // La barra vertical no tiene nada que medir ni que expandir: su grosor lo
+            // fija el config y su largo es la pantalla. Todo lo de la isla horizontal
+            // (MedirAncho, Expandir, el cajón de dentro) se queda quieto, que ya está
+            // apagado en modo barra.
+            Contenido.Height = double.NaN;
+            Contenido.Width = double.NaN;
+            ColocarBarraVertical();
+            _expandida = false;
+            FijarLados(true);
+            ColocarEnMonitorVertical(grosorVentana);
+        }
+        else
+        {
+            ColocarBarraHorizontal();
+            Contenido.Height = b.Alto;      // la fila de los módulos no cambia aunque crezca el cajón
+            Contenido.Width = double.NaN;
+            Isla.BeginAnimation(HeightProperty, null);
+            Isla.Height = b.Alto;
+            Isla.BeginAnimation(WidthProperty, null);
+            Isla.HorizontalAlignment = AlineacionDeLaIsla();
+            ColocarCajon();                 // alineación vertical, márgenes y orden de las filas
 
-        // La ventana es una franja transparente de todo el ancho de SU monitor
-        double altoVentana = b.Alto + b.Margen * 2;
-        ColocarEnMonitor(altoVentana);
+            _expandida = false;
+            FijarLados(!EsIsla);
+            // En modo isla el ancho siempre va fijado a mano (ver AnimarAncho); en modo barra, automático
+            Isla.Width = EsIsla ? MedirAncho() : double.NaN;
 
-        // Solo el modo barra reserva espacio; la isla flota encima de las ventanas, como en el iPhone.
+            // La ventana es una franja transparente de todo el ancho de SU monitor
+            ColocarEnMonitor(grosorVentana);
+        }
+
         // Esto va en el hilo de la ventana porque la AppBar se registra con nuestro propio hwnd.
-        if (!EsIsla && b.ReservarEspacio)
-            AppBar.Registrar(_self, Arriba, (int)Math.Round(altoVentana * _monitor.Escala),
+        // El borde lo decide PanelNube.BordeAppBar: con la barra vertical es ABE_LEFT o
+        // ABE_RIGHT y lo que se reserva es ANCHO, no alto.
+        if (ReservaHueco)
+            AppBar.Registrar(_self, PanelNube.BordeAppBar(b.Modo, PosicionEfectiva),
+                             (int)Math.Round(grosorVentana * _monitor.Escala),
                              _monitor.X, _monitor.Y, _monitor.Ancho, _monitor.Alto);
         else AppBar.Quitar(_self);
 
@@ -389,11 +704,22 @@ public partial class MainWindow : Window
         if (!_cerrando) EncolarShell(() => Nativo.MostrarBarraWindows(mostrar, conIsla));
 
         AplicarAtajo();   // por si has cambiado AtajoVistaGeneral en caliente
+        AplicarAtajosDeHypr();   // y los de NubeHypr: `Registrar` suelta antes, no se duplican
+        AplicarReglasDeHypr();   // y la escucha de reglas se engancha o se suelta según el modo
         if (_gancho != null)
         {
             _gancho.Activo = _cfg.Inicio.TeclaWindows;
             _gancho.Volumen = _cfg.Barra.TeclasVolumen;
         }
+
+        // Lo último: aquí arriba la isla se ha dejado recogida. Si se está editando,
+        // hay que volver a abrirla, o cada acción del modo edición (que guarda, y
+        // guardar recarga) cerraría la isla en las narices de quien está editando.
+        RestaurarEdicion();
+
+        // Y la visibilidad del panel: orden Z y autoocultar. Va al final porque
+        // depende de que la ventana ya esté colocada y la bandeja montada.
+        AplicarVisibilidad();
     }
 
     int Px(double dip) =>
@@ -410,9 +736,24 @@ public partial class MainWindow : Window
     // solo dibuja el camino hasta él. Si una animación fallase, todo se vería igual, sin saltos.
 
     // Animación con espera inicial: se queda en "desde" durante "retardo" y luego va a "hasta"
+    //
+    // Por aquí pasan casi todas las animaciones de números de la isla, así que es el
+    // sitio donde se aplica el nivel de animación (ver Animacion.cs). Con el nivel en
+    // "reducido" el factor es 0 y se devuelve una animación de un solo fotograma en el
+    // valor final: nada se mueve, pero nadie se queda a medias.
     static DoubleAnimationUsingKeyFrames Kf(double desde, double hasta, double ms, double retardo = 0, IEasingFunction? curva = null)
     {
         var a = new DoubleAnimationUsingKeyFrames();
+
+        if (!Animacion.Hay)
+        {
+            a.KeyFrames.Add(new DiscreteDoubleKeyFrame(hasta, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+            return a;
+        }
+
+        ms = Animacion.Escalar(ms);
+        retardo = Animacion.Escalar(retardo);
+
         a.KeyFrames.Add(new DiscreteDoubleKeyFrame(desde, KeyTime.FromTimeSpan(TimeSpan.Zero)));
         if (retardo > 0) a.KeyFrames.Add(new DiscreteDoubleKeyFrame(desde, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(retardo))));
         a.KeyFrames.Add(new EasingDoubleKeyFrame(hasta, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(retardo + ms)), curva));
@@ -471,10 +812,25 @@ public partial class MainWindow : Window
     void AnimarAparicion()
     {
         double distancia = _cfg.Barra.Alto + _cfg.Barra.Margen * 2;
-        var mover = new TranslateTransform();            // base Y = 0 (posición final)
+        var mover = new TranslateTransform();            // base 0 = posición final
         Isla.RenderTransform = mover;
-        mover.BeginAnimation(TranslateTransform.YProperty, Kf(Arriba ? -distancia : distancia, 0, 700, 0, Muelle));
+        _mover = mover;
         Isla.BeginAnimation(OpacityProperty, Kf(0, 1, 400));
+
+        // Entra por su propio borde: la horizontal cae de arriba (o sube de abajo) y la
+        // vertical entra desde su lado.
+        bool v = Vertical;
+        var eje = v ? TranslateTransform.XProperty : TranslateTransform.YProperty;
+        double desde = (v ? PegadaIzquierda : Arriba) ? -distancia : distancia;
+
+        // Con el autoocultar encendido su sitio es FUERA de la pantalla, no dentro
+        // (lo decide AplicarVisibilidad, que ya ha corrido en Aplicar). Caer con
+        // rebote y recogerse acto seguido se vería como un tic, y además la caída
+        // dejaría el transform en 0 y la isla se quedaría a la vista marcada como
+        // recogida: entonces no volvería a esconderse hasta el siguiente cambio.
+        if (_recogida && !_asomada) { if (v) mover.X = desde; else mover.Y = desde; return; }
+
+        mover.BeginAnimation(eje, Kf(desde, 0, 700, 0, Muelle));
     }
 
     // Ancho natural del contenido, medido sin límite para que las columnas "*" del
@@ -518,12 +874,51 @@ public partial class MainWindow : Window
 
     // El contenido cambia solo (minuto, CPU, RAM, apps que abres o cierras): la isla
     // se adapta deslizándose en vez de dar el salto de un fotograma
+    //
+    // ---------- Se mide DESPUÉS del layout, no en caliente ----------
+    //
+    // Aquí estaba por qué la hora salía cortada un segundo al arrancar. Lo contó el
+    // usuario: «cuando se inicia la app, la zona donde está la hora tarda un poco más en
+    // iniciarse». Medido en el log: en el primer tick se meten las apps (la isla mide 584)
+    // y en ese MISMO tick se hace visible el «ES» del teclado; la medida de detrás seguía
+    // diciendo 584, porque un cambio de visibilidad tres niveles más abajo no marca la
+    // zona como sucia hasta que pasa el layout, y `Measure` devuelve lo que tenía guardado.
+    // Hasta el tick siguiente —un segundo— no salía 612, y entretanto la hora quedaba
+    // fuera de la isla.
+    //
+    // Así que pedir un ajuste ya no mide: programa UNA medida para cuando WPF haya hecho
+    // su pasada de layout (prioridad Loaded, que va detrás de la de pintar). Varias
+    // peticiones seguidas —la bandeja manda una por icono al arrancar— se juntan en una.
+    // Y si toca medir en mitad de otra animación de ancho, se repite al terminar esta en
+    // vez de esperar al siguiente tick.
+    bool _anchoProgramado, _anchoTrasAnimar;
+
     void AjustarAncho()
     {
-        if (!EsIsla || _aplicando || _animandoAncho) return;
+        if (_anchoProgramado) return;
+        _anchoProgramado = true;
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            _anchoProgramado = false;
+            AjustarAnchoYa();
+        }), System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    void AjustarAnchoYa()
+    {
+        if (!EsIsla) return;
+        if (_aplicando || _animandoAncho) { _anchoTrasAnimar = true; return; }
         double hasta = Math.Max(MedirAncho(), _panelAncho);   // con panel abierto manda el panel
         if (Math.Abs(hasta - Isla.ActualWidth) < 0.5) return;
         AnimarAncho(hasta, 280, Suave);
+    }
+
+    // Lo que se quedó sin medir mientras la isla se desplegaba o se aplicaba el config.
+    void AjustarAnchoPendiente()
+    {
+        if (!_anchoTrasAnimar) return;
+        _anchoTrasAnimar = false;
+        AjustarAncho();
     }
 
     // Expandir / contraer la isla: el ancho se anima con muelle y los laterales
@@ -542,6 +937,10 @@ public partial class MainWindow : Window
     void Expandir(bool abrir, bool forzar = false)
     {
         if (!EsIsla || abrir == _expandida) return;
+        // Editando, la isla se queda abierta pase lo que pase: si se recogiera a
+        // mitad de un arrastre no habría dónde soltar el widget. Solo Editar(false),
+        // que pasa forzar, puede cerrarla.
+        if (!abrir && EdicionAnclada && !forzar) return;
         if (abrir && _sinExpandir) return;     // la tienes cogida: no se abre mientras la llevas
         // Con un panel estrecho abierto, volver a pasar el ratón NO la re-expande:
         // la isla crecería y el panel se quedaría descuadrado dentro, con el
@@ -568,6 +967,7 @@ public partial class MainWindow : Window
             _animandoAncho = false;
             if (_expandida != abrir) return;   // la interrumpió otra animación
             if (!abrir) Izq.Visibility = Der.Visibility = Visibility.Collapsed;
+            AjustarAnchoPendiente();
         });
 
         foreach (var lado in new Panel[] { Izq, Der })
@@ -684,6 +1084,37 @@ public partial class MainWindow : Window
 
         if (!antes.Equals(nueva.Barra.Monitores, StringComparison.OrdinalIgnoreCase)) Reorganizar();
         else foreach (var i in Islas.ToList()) i.Aplicar();
+
+        // Y el fondo. Va aquí y no en `Aplicar()` por dos razones: `Aplicar()` corre una
+        // vez por isla —con dos pantallas se pondría el fondo dos veces— y el fondo no es
+        // de una isla, es del escritorio.
+        //
+        // `AplicarAsync` no hace nada si la huella no cambió, así que recargar el config
+        // por cualquier otro motivo no vuelve a leer una imagen de 20 MB. Eso es lo que
+        // hace que aplicar un perfil con fondo —"Noche"— cambie el fondo de verdad, y que
+        // guardar cualquier otro ajuste no lo toque.
+        _ = GestorFondos.AplicarAsync(nueva.Fondo);
+
+        // ---------- Y el clima, si lo acabas de encender ----------
+        //
+        // Esto faltaba, y se nota en cuanto lo usas: enciendes el clima, escribes tu ciudad,
+        // y el panel sigue diciendo «el tiempo está apagado» hasta el siguiente tick... que
+        // es de QUINCE MINUTOS. Lo contó el usuario: «pongo clima Barcelona y no sale».
+        //
+        // El fallo de fondo es de los de siempre en este proyecto: `ArrancarClima` pide el
+        // tiempo al arrancar, el reloj lo pide cada cuarto de hora, y nadie lo pedía al
+        // cambiar el ajuste — que es justo el instante en que el usuario está mirando.
+        //
+        // Lo pide la jefa, no las tres islas: `Clima` guarda la lectura en estático.
+        try { Islas.FirstOrDefault(i => i._esJefa)?.PedirElClima(); } catch { }
+
+        // Y los paneles laterales que estén abiertos. Son ventanas aparte, así que `Aplicar()`
+        // —que repinta la isla— no les llega: sin esto se quedan con los colores de antes
+        // hasta que los cierras y los vuelves a abrir. Ver `RepintarLateralesAbiertos`.
+        foreach (var i in Islas.ToList())
+        {
+            try { i.RepintarLateralesAbiertos(); } catch { }
+        }
     }
 
     void ProgramarRecarga() => Dispatcher.InvokeAsync(() => { _recarga.Stop(); _recarga.Start(); });
@@ -796,6 +1227,7 @@ public partial class MainWindow : Window
         opciones.AddRange(OpcionesDeCerrarTodas());
         // Solo si la tecla Windows es nuestra: es lo único que la trae de vuelta
         if (_cfg.Inicio.TeclaWindows) opciones.Add(("Esconder la isla", () => EsconderAMano(true)));
+        opciones.Add((_editando ? "Salir de la edición" : "Editar la nube", AlternarEdicion));
         opciones.Add(("Ajustes…", AbrirAjustes));
         opciones.Add(("Recargar el config", () =>
         {
@@ -846,10 +1278,26 @@ public partial class MainWindow : Window
             pila.Children.Add(b);
         }
 
+        // ---------- Con la concha de C5, como el resto de los paneles ----------
+        //
+        // Un menú contextual sin superficie propia es el único del programa que se apoyaba
+        // entero en el fondo de la isla: sin filo que dijera dónde acaba, y con el escritorio
+        // transparentándose al 10 % detrás de cada opción.
+        var concha = PanelShell(pila, 0);
+
+        // ---------- Y el gesto va en la CONCHA, no en la pila ----------
+        //
+        // Esto no es un detalle de implementación, es el fallo que habría metido al añadir la
+        // concha sin pensarlo: el menú se cierra al salir el ratón, y si el oyente siguiera
+        // en la pila, moverse de la pila al filo de la concha —que es DENTRO del menú, a la
+        // vista— lo cerraría en la cara del usuario.
+        //
+        // De paso arregla el caso que ya existía antes de la concha: la pila no llegaba al
+        // borde de la isla, así que acercarse a su filo ya cerraba el menú.
         bool tocado = false;
-        pila.MouseEnter += (_, _) => tocado = true;
-        pila.MouseLeave += (_, _) => { if (tocado && _panelAbierto == PanelMenu) CerrarPanel(); };
-        return pila;
+        concha.MouseEnter += (_, _) => tocado = true;
+        concha.MouseLeave += (_, _) => { if (tocado && _panelAbierto == PanelMenu) CerrarPanel(); };
+        return concha;
     }
 
     public void AbrirAjustes()
@@ -872,44 +1320,14 @@ public partial class MainWindow : Window
     }
 
     // ================= Módulos =================
-    void Llenar(Panel panel, List<string> modulos)
-    {
-        panel.Children.Clear();
-        foreach (var m in modulos) panel.Children.Add(CrearModulo(m));
-    }
-
-    UIElement CrearModulo(string nombre) => nombre.ToLowerInvariant() switch
-    {
-        "inicio"           => Boton(Texto("⊞", 16), "Inicio", AbrirMenuInicio),
-        "apps"             => ModuloApps(),
-        "fijadas"          => ModuloFijas(),
-        "reloj"            => Etiqueta(() => DateTime.Now.ToString("HH:mm"), animar: true),
-        "fecha"            => Etiqueta(() => DateTime.Now.ToString("ddd d MMM"), animar: true),
-        // "muestra" reserva el ancho del valor más largo para que la isla no respire
-        // al pasar de "CPU 8%" a "CPU 11%" cada segundo
-        "cpu"              => Etiqueta(() => $"CPU {Nativo.Cpu()}%", muestra: "CPU 100%"),
-        "ram"              => Etiqueta(() => $"RAM {Nativo.Ram()}%", muestra: "RAM 100%"),
-        "bateria"          => Etiqueta(Nativo.Bateria, muestra: "BAT 100%"),
-        "musica"           => new StackPanel
-                              {
-                                  Orientation = Orientation.Horizontal,
-                                  Children = { ModuloCaratula(), ModuloBarras() }
-                              },
-        "musica-caratula"  => ModuloCaratula(),
-        "musica-barras"    => ModuloBarras(),
-        "wallpaper"        => ModuloWallpaper(),
-        "wallpaper-titulo" => Etiqueta(() => _wpTitulo ?? "", animar: true),
-        "bandeja"          => ModuloBandeja(),
-        "control"          => ModuloControl(),
-        "escritorios"      => ModuloEscritorios(),
-        "iconos"           => Boton(Glifo("\uE890"), "Mostrar / ocultar iconos del escritorio", () =>
-                              {
-                                  _iconosOcultos = !_iconosOcultos;
-                                  WallpaperEngine.Enviar(_iconosOcultos ? "hideIcons" : "showIcons");
-                              }),
-        "separador"        => new Border { Width = 1, Height = 16, Margin = new Thickness(6, 0, 6, 0), Background = _texto, Opacity = 0.3 },
-        _                  => ModuloDesconocido(nombre)
-    };
+    // El switch de dieciséis casos que había aquí se ha mudado a
+    // MainWindow.Widgets.cs, donde cada caso es ahora el cuerpo de un widget
+    // registrado. Las expresiones son las mismas, una a una; lo que cambia es que el
+    // reloj de casa y un widget de fuera se montan por la misma puerta (CrearWidget),
+    // y que un widget que reviente ya no se lleva la isla por delante.
+    //
+    // "muestra", en las etiquetas, reserva el ancho del valor más largo para que la
+    // isla no respire al pasar de "CPU 8%" a "CPU 11%" cada segundo.
 
     // Un nombre de módulo que esta versión no conoce. Pasa de verdad: el config se
     // migra solo y le añade módulos nuevos, así que un exe viejo se encuentra con
@@ -929,51 +1347,119 @@ public partial class MainWindow : Window
 
     // "muestra" = el texto más largo que llegará a mostrar este módulo. Se reserva su
     // ancho para que el contenido cambiante no haga respirar a la isla cada segundo.
-    TextBlock Etiqueta(Func<string> valor, bool animar = false, string? muestra = null)
+    //
+    // "vertical" es cómo se escribe el mismo dato cuando la barra es una COLUMNA: la
+    // hora en dos líneas, "CPU" sobre su porcentaje. Lo dice cada widget porque por
+    // dónde se parte un texto depende de lo que significa, y adivinarlo en un sitio
+    // común (¿por el espacio?, ¿por los dos puntos?) sale mal al primer caso raro.
+    TextBlock Etiqueta(Func<string> valor, bool animar = false, string? muestra = null,
+                       Func<string>? vertical = null, bool brillo = false)
     {
+        bool v = Vertical;
         var tb = new TextBlock
         {
-            Margin = new Thickness(6, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
             Visibility = Visibility.Collapsed
         };
         // Cifras de ancho fijo: si no, un "1" ocupa menos que un "8" y el texto baila
         Typography.SetNumeralAlignment(tb, FontNumeralAlignment.Tabular);
-        if (muestra != null) tb.MinWidth = AnchoDeTexto(muestra);
+
+        if (v)
+        {
+            // El margen va en el eje en el que se separan los módulos. Puesto en
+            // horizontal (6 a cada lado) se comía 12 px de una columna de 38, que es
+            // exactamente lo que cortaba la hora: "00:05" mide 34 y le quedaban 36.
+            tb.Margin = new Thickness(0, 6, 0, 6);
+            tb.HorizontalAlignment = HorizontalAlignment.Center;
+            tb.TextAlignment = TextAlignment.Center;
+            // Las tres redes que impiden que se recorte: parte por donde pueda, nunca
+            // mide más que la columna, y si aun así no cabe, se encoge.
+            tb.TextWrapping = TextWrapping.Wrap;
+            tb.MaxWidth = AnchoUtilDeLaColumna;
+            // Nada de MinWidth: lo que no sobra en una columna es justamente ancho.
+        }
+        else
+        {
+            tb.Margin = new Thickness(6, 0, 6, 0);
+            if (muestra != null) tb.MinWidth = AnchoDeTexto(muestra);
+        }
 
         void Act()
         {
-            var nuevo = valor();
+            var nuevo = (v && vertical != null ? vertical() : valor()) ?? "";
             if (nuevo == tb.Text) return;
             bool habia = tb.Text.Length > 0;
             tb.Text = nuevo;
             tb.Visibility = nuevo.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+            if (v) EncajarEnLaColumna(tb);
             if (animar && habia) DeslizarTexto(tb);   // el minuto entra desde abajo
         }
         Act();
         _actualizadores.Add(Act);
+        // El brillo va DESPUÉS de que `Act()` haya puesto el texto: el pincel se mapea sobre
+        // la caja del TextBlock, y con la caja vacía el degradado no tendría dónde recorrer.
+        if (brillo) PonerBrilloDeTexto(tb);
         return tb;
     }
 
+    // Lo que de verdad le queda a un widget a lo ancho de la columna: el grosor menos
+    // el filo de acento por los dos lados.
+    double AnchoUtilDeLaColumna => Math.Max(16, _cfg.Barra.Alto - Isla.BorderThickness.Left * 2);
+
+    // La última red contra el recorte: si una línea sigue sin caber —"100%" no se puede
+    // partir, y con el grosor al mínimo tampoco cabe entero— se baja el tamaño de letra
+    // hasta que quepa. Encoger se lee; recortar, no.
+    void EncajarEnLaColumna(TextBlock tb)
+    {
+        try
+        {
+            tb.FontSize = FontSize;                 // siempre desde el tamaño del tema
+            if (tb.Text.Length == 0) return;
+
+            double disponible = AnchoUtilDeLaColumna;
+            double mayor = 0;
+            foreach (var linea in tb.Text.Split('\n'))
+                mayor = Math.Max(mayor, AnchoDeTexto(linea, tb.FontSize));
+
+            if (mayor <= disponible || mayor <= 0) return;
+            tb.FontSize = Math.Max(7, Math.Floor(tb.FontSize * disponible / mayor));
+        }
+        catch { }
+    }
+
     // Ancho que ocuparía ese texto con la fuente y el tamaño actuales del tema
-    double AnchoDeTexto(string texto)
+    double AnchoDeTexto(string texto) => AnchoDeTexto(texto, FontSize);
+
+    // Y con un tamaño concreto, que es lo que hace falta para encogerlo hasta que quepa
+    double AnchoDeTexto(string texto, double tamano)
     {
         try
         {
             double ppp = VisualTreeHelper.GetDpi(this).PixelsPerDip;
             var tipo = new Typeface(FontFamily, FontStyle, FontWeight, FontStretch);
+            // El pincel no se pinta: `FormattedText` lo pide para poder dibujar, y aquí solo
+            // se le pregunta el ancho. Da igual cuál sea.
             return new FormattedText(texto, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
-                                     tipo, FontSize, Brushes.Black, ppp).Width;
+                                     tipo, tamano, Brushes.Black, ppp).Width;   // color literal a propósito
         }
         catch (Exception ex)
         {
             Log.Error("medir texto", ex);
-            return texto.Length * FontSize * 0.6;   // aproximación, mejor eso que nada
+            return texto.Length * tamano * 0.6;   // aproximación, mejor eso que nada
         }
     }
 
+    // ---------- Aquí se traduce ----------
+    //
+    // Y no en las ~1900 llamadas. Las cadenas de interfaz de este proyecto se pasan como
+    // argumento a un puñado de ayudantes, así que traduciendo DENTRO de ellos se cubren
+    // cientos de sitios tocando diez funciones — y sin riesgo de romper una llamada.
+    //
+    // `Textos.T` devuelve la cadena tal cual si no está traducida, así que lo que falte sale
+    // en español: nunca peor que antes. Ver `Textos.cs`.
     TextBlock Texto(string t, double tamano) => new()
     {
-        Text = t, FontSize = tamano, Foreground = _texto,
+        Text = Textos.T(t), FontSize = tamano, Foreground = _texto,
         HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center
     };
 
@@ -990,9 +1476,27 @@ public partial class MainWindow : Window
     {
         var b = new Button
         {
-            Content = contenido, ToolTip = tip, Foreground = _texto,
+            // El tooltip también: es texto que el usuario lee, y en media interfaz es lo
+            // único que explica qué hace un icono.
+            Content = contenido, ToolTip = Textos.T(tip), Foreground = _texto,
             Height = Math.Max(20, _cfg.Barra.Alto - 8)
         };
+
+        // ---------- Y su nombre para el lector de pantalla ----------
+        //
+        // Una línea con mucho alcance: por aquí pasan casi todos los botones de la barra y
+        // de sus paneles, y ninguno tenía nombre. Medido con `--diagpaneles`: diecisiete de
+        // diecisiete en audio, veintitrés de veintitrés en Inicio, catorce de catorce en la
+        // bandeja… El contenido suele ser un glifo del área privada o un `Grid`, así que un
+        // lector leía un carácter sin significado, o nada.
+        //
+        // La ayuda emergente ya decía la frase correcta —«Cerrar esta ventana», «Abrir
+        // Energía y batería»— pero un ToolTip NO es el nombre de UIA: es otra propiedad, y
+        // los lectores no la usan como nombre. Estaba el texto bueno escrito y puesto en el
+        // sitio que no era.
+        if (!string.IsNullOrWhiteSpace(tip))
+            System.Windows.Automation.AutomationProperties.SetName(b, tip);
+
         // Soltar algo que venías arrastrando no es pulsar este botón (ver ClicDeArrastre)
         b.Click += (_, _) => { if (ClicDeArrastre()) return; accion(); Tick(); };
         if (levantar) ConLevantado(b);

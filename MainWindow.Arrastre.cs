@@ -52,9 +52,60 @@ public partial class MainWindow : Window
 
             if (!_cfg.Barra.Arrastrable || _siguiendoRaton != null) return;
 
+            // La barra vertical no se aparta con el ratón. No es un olvido: es una
+            // franja reservada pegada a su lado, como la barra de Windows, y toda la
+            // maquinaria de apartarla y devolverla (CasaDeLaVentana, AnimarVuelta, el
+            // filo que no se puede mover) está escrita en el eje de la horizontal.
+            // Media función aquí se vería como un fallo; esto se ve como una decisión.
+            if (Vertical) return;
+
+            // Editando, lo que se coge es un widget, no la isla. Si no cediera aqui,
+            // arrastrar un bloque moveria la barra entera por la pantalla.
+            if (EdicionAnclada) return;
+
             // Si has cogido un icono del carrusel, lo que se mueve es el icono,
             // no la isla entera. Cada arrastre con lo suyo.
             if (EsDelCarrusel(e.OriginalSource)) return;
+
+            // ---------- Y si el clic nace sobre un control, el gesto es suyo ----------
+            //
+            // Esto es lo que faltaba. La guarda de abajo solo conocía la vista general, así
+            // que con el panel de audio abierto `_panelAbierto` valía "audio" y la isla se
+            // iba detrás del ratón mientras arrastrabas el deslizador de volumen.
+            //
+            // No se puede resolver con `e.Handled` en el control: este manejador va en un
+            // `PreviewMouseLeftButtonDown` de un ANTEPASADO y los eventos Preview van de la
+            // raíz a la hoja. Cuando el deslizador se entera, la isla ya ha empezado.
+            //
+            // Se mira el ORIGEN y se sube por el árbol. Ver MainWindow.Gesto.cs.
+            if (GestoDeUnControl(e.OriginalSource, Isla))
+            {
+                _huboArrastre = false;
+                return;
+            }
+
+            // ---------- Con la vista general abierta, el gesto NO es de la isla ----------
+            //
+            // Lo que se arrastra es una ventana del escritorio, no la nube. Tres
+            // comprobaciones y no una, porque cada una tapa un agujero distinto:
+            //
+            //  1. **El panel abierto es la vista.** Lo normal.
+            //  2. **El clic sale del árbol visual de la vista.** Esto es lo que faltaba:
+            //     no vale con que la tarjeta ponga `e.Handled`, porque este manejador va
+            //     en un `PreviewMouseLeftButtonDown` de un ANTEPASADO, y los eventos
+            //     Preview van de la raíz a la hoja — cuando la tarjeta se entera, la isla
+            //     ya ha empezado su arrastre.
+            //  3. **Ya hay un ajuste en marcha**, de una tarjeta o de una ventana real.
+            //     Dos gestos a la vez con un solo botón no existen; si el estado dice que
+            //     sí, el que no empieza es este.
+            if (_panelAbierto == PanelVista || EnLaVista(e.OriginalSource) || AjustandoAlgo)
+            {
+                Log.Info("arrastre isla NO EMPIEZA: el gesto es de la vista general" +
+                         (_panelAbierto == PanelVista ? " (panel=vista)" : "") +
+                         (EnLaVista(e.OriginalSource) ? " (el clic sale de la vista)" : "") +
+                         (AjustandoAlgo ? " (ya hay un ajuste en marcha)" : ""));
+                return;
+            }
 
             _raizRaton = PuntoRaton();
             var r = Nativo.Rectangulo(_self);
@@ -114,7 +165,12 @@ public partial class MainWindow : Window
             Expandir(false);
 
             Isla.Cursor = Cursors.SizeAll;
-            Log.Info("arrastrando la isla");
+            // Si esto sale con la vista abierta es un FALLO, no una curiosidad: significa
+            // que las tres comprobaciones de arriba no han bastado.
+            DiagVista.ArrastresIsla++;
+            if (_panelAbierto == PanelVista) DiagVista.ArrastresIslaConVistaAbierta++;
+            Log.Info((_panelAbierto == PanelVista ? "ERROR: " : "") + "arrastre isla INICIADO" +
+                     (_panelAbierto == PanelVista ? " CON LA VISTA ABIERTA" : ""));
         }
 
         MoverVentanaA(_raizX + (int)Math.Round(dx), _raizY + (int)Math.Round(dy));

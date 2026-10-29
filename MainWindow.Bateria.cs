@@ -11,9 +11,17 @@ namespace NubeBar;
 // que no tiene nada de batería.
 public partial class MainWindow : Window
 {
-    const string PanelBateria = "bateria";
+    internal const string PanelBateria = "bateria";
 
-    void AbrirBateria() => AlternarPanel(PanelBateria, CrearBateria, 340, 150, teclado: false);
+    // Con su ancla, como audio y red. `_anclaBateria` se guardaba en `MainWindow.Control.cs`
+    // desde que existe el botón… y no la pasaba nadie: el panel se dibujaba de punta a punta
+    // de la isla con 340 px de contenido centrados dentro.
+    //
+    // No se veía porque este panel tampoco tenía superficie propia: sin filo, un contenedor
+    // de ancho completo y uno que abraza el contenido se dibujan igual. Al darle la concha de
+    // C5 quedó a la vista en la primera captura.
+    void AbrirBateria() => AlternarPanel(PanelBateria, CrearBateria, 340, 150,
+                                         teclado: false, ancla: _anclaBateria);
 
     FrameworkElement CrearBateria()
     {
@@ -26,7 +34,7 @@ public partial class MainWindow : Window
         cabecera.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         var pila = Glifo(Bateria.Glifo(e));
         pila.FontSize = 26;
-        pila.Foreground = e.Ahorro ? Brushes.Gold : _acentoLegible;
+        pila.Foreground = e.Ahorro ? _roles.Pincel("bateria.ahorro") : _acentoLegible;
         pila.Margin = new Thickness(0, 0, 12, 0);
         cabecera.Children.Add(pila);
 
@@ -41,15 +49,28 @@ public partial class MainWindow : Window
         var canal = new Border
         {
             Height = 6, CornerRadius = new CornerRadius(3), Margin = new Thickness(0, 10, 0, 0),
-            Background = new SolidColorBrush(Color.FromArgb(0x33, _cTexto.R, _cTexto.G, _cTexto.B))
+            Background = _superficieAlta
         };
         var lleno = new Border
         {
             Height = 6, CornerRadius = new CornerRadius(3), HorizontalAlignment = HorizontalAlignment.Left,
-            Background = e.Ahorro ? Brushes.Gold : e.PorCiento <= 15 && !e.Enchufado ? Brushes.Tomato : _acento
+            Background = e.Ahorro ? _roles.Pincel("bateria.ahorro")
+                      : e.PorCiento <= 15 && !e.Enchufado ? _roles.Pincel("bateria.bajo") : _acento
         };
         canal.Child = lleno;
-        canal.SizeChanged += (_, _) => lleno.Width = canal.ActualWidth * e.PorCiento / 100.0;
+        // ---------- Se llena al abrir, no aparece llena ----------
+        //
+        // La maqueta: «barra que se llena al abrir (de 0 a su valor, 1 s)». Lo que gana no es
+        // vistosidad: una barra que crece te dice CUÁNTO ha crecido, así que el 74 % se lee
+        // sin tener que mirar la cifra. Apareciendo ya llena, la barra es un adorno al lado
+        // del número.
+        canal.SizeChanged += (_, _) =>
+        {
+            double destino = canal.ActualWidth * e.PorCiento / 100.0;
+            if (!Animacion.Adorno) { lleno.Width = destino; return; }
+            lleno.Width = 0;
+            lleno.BeginAnimation(WidthProperty, Kf(0, destino, 1000, 0, Suave));
+        };
         columna.Children.Add(canal);
 
         // --- Modo de energía ---
@@ -95,7 +116,7 @@ public partial class MainWindow : Window
         var ahorro = Boton(new TextBlock
         {
             Text = e.Ahorro ? "Ahorro de batería: activado" : "Ahorro de batería: desactivado",
-            Foreground = e.Ahorro ? Brushes.Gold : _texto, FontSize = 11, Opacity = e.Ahorro ? 1 : 0.7
+            Foreground = e.Ahorro ? _roles.Pincel("bateria.ahorro") : _texto, FontSize = 11, Opacity = e.Ahorro ? 1 : 0.7
         }, "Abrir el ahorro de batería en Configuración", () => AbrirAjustes("ms-settings:batterysaver"));
         ahorro.HorizontalAlignment = HorizontalAlignment.Left;
         ahorro.Margin = new Thickness(-6, 0, 0, 0);
@@ -108,14 +129,23 @@ public partial class MainWindow : Window
         abajo.Children.Add(ajustes);
         columna.Children.Add(abajo);
 
-        return columna;
+        // Con la concha de C5, como audio, red y el centro de control. Hasta aquí este panel
+        // se apoyaba en el fondo de la isla, que es translúcido: el escritorio se
+        // transparentaba detrás del porcentaje y del tiempo restante. Es el mismo
+        // razonamiento que `MainWindow.Laterales.cs` lleva escrito desde E3 —«un panel de
+        // controles con el escritorio transparentándose detrás hace ilegible cualquier texto
+        // pequeño»— aplicado donde faltaba.
+        //
+        // `margen: 0` porque el contenido ya trae el suyo. La concha pondría un segundo
+        // margen encima y el panel engordaría sin que nadie lo hubiera pedido.
+        return PanelShell(columna, 0);
     }
 
     void RefrescarBateria()
     {
         if (_panelAbierto != PanelBateria) return;
         // Se sustituye el contenido sin cerrar: así no hay que replegar y desplegar
-        Cajon.Content = CrearBateria();
+        CambiarContenidoDelPanel(CrearBateria());
         ReajustarPanel(PanelBateria);
     }
 

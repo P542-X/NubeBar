@@ -7,79 +7,10 @@
 
     <Window.Resources>
         <SolidColorBrush x:Key="Hover" Color="#30FFFFFF"/>
-        <Style TargetType="Button">
-            <Setter Property="Margin" Value="2,0"/>
-            <Setter Property="Padding" Value="6,0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Grid Background="Transparent">
-                            <!-- Fondo del hover: aparece y desaparece con fundido -->
-                            <Border x:Name="bg" Background="{DynamicResource Hover}" CornerRadius="8" Opacity="0"/>
-                            <ContentPresenter x:Name="cp" Margin="{TemplateBinding Padding}"
-                                              HorizontalAlignment="Center" VerticalAlignment="Center"
-                                              RenderTransformOrigin="0.5,0.5">
-                                <ContentPresenter.RenderTransform>
-                                    <ScaleTransform/>
-                                </ContentPresenter.RenderTransform>
-                            </ContentPresenter>
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Trigger.EnterActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="bg" Storyboard.TargetProperty="Opacity"
-                                                             To="1" Duration="0:0:0.15"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.EnterActions>
-                                <Trigger.ExitActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="bg" Storyboard.TargetProperty="Opacity"
-                                                             To="0" Duration="0:0:0.3"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.ExitActions>
-                            </Trigger>
-                            <!-- Al pulsar: se encoge un poco y rebota -->
-                            <Trigger Property="IsPressed" Value="True">
-                                <Trigger.EnterActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="cp" To="0.82" Duration="0:0:0.08"
-                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"/>
-                                            <DoubleAnimation Storyboard.TargetName="cp" To="0.82" Duration="0:0:0.08"
-                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.EnterActions>
-                                <Trigger.ExitActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="cp" To="1" Duration="0:0:0.35"
-                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)">
-                                                <DoubleAnimation.EasingFunction>
-                                                    <BackEase EasingMode="EaseOut" Amplitude="0.6"/>
-                                                </DoubleAnimation.EasingFunction>
-                                            </DoubleAnimation>
-                                            <DoubleAnimation Storyboard.TargetName="cp" To="1" Duration="0:0:0.35"
-                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)">
-                                                <DoubleAnimation.EasingFunction>
-                                                    <BackEase EasingMode="EaseOut" Amplitude="0.6"/>
-                                                </DoubleAnimation.EasingFunction>
-                                            </DoubleAnimation>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.ExitActions>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+        <!-- El estilo de los botones ya no está aquí: se construye en
+             MainWindow.Botones.cs, porque sus animaciones tienen que poder cambiar
+             con el nivel de animación y una Duration escrita en XAML se congela
+             dentro de la plantilla. -->
     </Window.Resources>
 
     <!-- La ventana ocupa todo el ancho y es transparente (los clics la atraviesan);
@@ -92,32 +23,56 @@
          Como el Border recorta a sus bordes, animar Isla.Height hace que el panel se
          despliegue desde dentro de la isla en vez de aparecer como una ventana nueva.
          Con Posicion="abajo" se intercambian las filas (ver ColocarCajon). -->
-    <Border x:Name="Isla" Padding="10,0" MinWidth="120" ClipToBounds="True" Opacity="0"
-            VerticalAlignment="Top"
-            MouseEnter="Isla_MouseEnter" MouseLeave="Isla_MouseLeave"
-            MouseRightButtonUp="Isla_Salir" MouseDown="Isla_MouseDown">
-        <Grid x:Name="Cuerpo">
-            <Grid.RowDefinitions>
-                <RowDefinition x:Name="FilaIsla" Height="Auto"/>
-                <RowDefinition x:Name="FilaCajon" Height="*"/>
-            </Grid.RowDefinitions>
+    <!-- Una sola celda: la isla manda y se coloca con sus propias alineaciones.
+         El panel de la barra VERTICAL no está aquí: vive en su propia ventana
+         superpuesta (ver VentanaSuperpuesta.cs), porque metido en esta ventana
+         dependía de que la franja de 54 px se ensanchara y de que el orden Z de la
+         barra le valiera, y ninguna de las dos cosas se cumple siempre. -->
+    <Grid x:Name="Raiz">
+        <!-- ══ El aura de la isla ══
+             Una envoltura SIN fondo y SIN recorte, cuyo único trabajo es llevar el
+             `DropShadowEffect` del halo.
 
-            <Grid x:Name="Contenido" Grid.Row="0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <StackPanel x:Name="Izq" Grid.Column="0" Orientation="Horizontal"
-                            HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                <StackPanel x:Name="Cen" Grid.Column="1" Orientation="Horizontal" Margin="8,0"
-                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                <StackPanel x:Name="Der" Grid.Column="2" Orientation="Horizontal"
-                            HorizontalAlignment="Right" VerticalAlignment="Center"/>
+             Por qué no va en la isla: `Isla` tiene `ClipToBounds="True"` —lo necesita, es lo
+             que recorta el cajón al crecer— y un efecto sobre un elemento recortado se
+             recorta con él, al RECTÁNGULO de la caja y no a la forma redondeada. Salía un
+             halo cuadrado asomando por las puntas, y el usuario lo cazó al primer vistazo.
+
+             Puesto aquí, lo que el efecto difumina es el CONTENIDO de la envoltura, que es la
+             isla con sus esquinas redondas. La silueta sale bien y nada la recorta. -->
+        <Border x:Name="Aura">
+        <Border x:Name="Isla" Padding="10,0" MinWidth="120" ClipToBounds="True" Opacity="0"
+                VerticalAlignment="Top"
+                MouseEnter="Isla_MouseEnter" MouseLeave="Isla_MouseLeave"
+                MouseRightButtonUp="Isla_Salir" MouseDown="Isla_MouseDown">
+            <Grid x:Name="Cuerpo">
+                <Grid.RowDefinitions>
+                    <RowDefinition x:Name="FilaIsla" Height="Auto"/>
+                    <RowDefinition x:Name="FilaCajon" Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Las tres zonas. En horizontal el Grid tiene columnas * Auto * y los
+                     StackPanel van en fila; en vertical se le cambian por FILAS y los
+                     StackPanel se apilan (ver OrientarZonas). Por eso cada uno lleva
+                     puestos Grid.Column Y Grid.Row: el que no se usa vale 0 y da igual. -->
+                <Grid x:Name="Contenido" Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel x:Name="Izq" Grid.Column="0" Orientation="Horizontal"
+                                HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                    <StackPanel x:Name="Cen" Grid.Column="1" Orientation="Horizontal" Margin="8,0"
+                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <StackPanel x:Name="Der" Grid.Column="2" Orientation="Horizontal"
+                                HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+
+                <!-- El cajón: aquí dentro van la mini lista, la vista general y el menú Inicio -->
+                <ContentPresenter x:Name="Cajon" Grid.Row="1"/>
             </Grid>
-
-            <!-- El cajón: aquí dentro van la mini lista, la vista general y el menú Inicio -->
-            <ContentPresenter x:Name="Cajon" Grid.Row="1"/>
-        </Grid>
-    </Border>
+        </Border>
+        </Border>
+    </Grid>
 </Window>

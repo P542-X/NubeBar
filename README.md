@@ -48,6 +48,22 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
 - **Esconder la isla**: clic derecho en la isla → «Esconder la isla» y se va de
   todas las pantallas. Vuelve al pulsar la tecla Windows.
 - Vista general tipo Exposé con todas las ventanas, con atajo global.
+- **Ajustar ventanas a los bordes**: arrastra una ventana al borde izquierdo o
+  derecho y se queda en media pantalla; a una esquina, en un cuarto; arriba,
+  maximizada. Antes de soltar se ve dónde va a caer, y lo que se ve es lo que
+  pasa: el ajuste cae en la pantalla del puntero, no en la de origen. Respeta el
+  área de trabajo, así que con «Reservar espacio» puesto no se mete debajo de la
+  isla. Se puede apagar en Ajustes.
+- `NubeBar.exe --ventanas [informe.txt]` cuenta qué ventanas ve y por qué
+  descarta las demás, agrupadas por programa. Es de solo lectura —no activa, no
+  mueve, no cierra nada— y está para que «me faltan aplicaciones» se pueda
+  investigar con los datos de la máquina en vez de cambiando el filtro a ciegas.
+- `NubeBar.exe --diagvista [segundos]` abre la vista general, la deja quieta y cuenta
+  qué le pasa: reconciliaciones, reconstrucciones completas (que son una anomalía),
+  tarjetas creadas o eliminadas, miniaturas reemplazadas y de qué tipo de evento de
+  Windows viene cada aviso. Hay que parar antes la NubeBar que esté puesta, porque
+  arranca una de verdad: el parpadeo que vino a medir solo existía con la isla y sus
+  animaciones en marcha.
 
 **El menú Inicio propio**
 - Se abre con la tecla Windows (interceptada sin romper ninguna combinación `Win+…`).
@@ -217,6 +233,42 @@ la isla se adapta sola. Las claves que no reconoce se conservan tal cual.
 | `Tema.EnviarColorAlWallpaper` | `false` | Manda tu acento a Wallpaper Engine como `schemecolor` |
 | `Tema.BordeAcento` | `true` | Filo de 1 px y halo suave del color de acento |
 
+En una instalación nueva el tema que entra es **Nube** (coral, naranja y azul nube
+sobre azul profundo). Si ya tienes `config.json`, tu tema no se toca.
+
+#### Roles de color
+
+Todos opcionales: lo que no pongas se **deriva** del fondo y del texto, así que un
+tema puede seguir siendo tres colores y nada cambia. Se ponen cuando el tema quiere
+mandar, como hace Nube con su naranja y su azul, que no se pueden sacar del acento.
+
+| Clave | Qué hace |
+|---|---|
+| `Tema.Superficie` | Tarjetas y filas dentro de un panel |
+| `Tema.SuperficieAlta` | Lo que está bajo el ratón o elegido |
+| `Tema.Borde` | Separadores y filos |
+| `Tema.TextoAtenuado` | Segundo renglón, unidades, pistas |
+| `Tema.Secundario` | Detalles cálidos; si falta, el propio acento |
+| `Tema.Sistema` | Red, volumen, batería; si falta, el propio acento |
+| `Tema.Positivo` | Verde de "todo bien" |
+| `Tema.Aviso` | Ámbar de "ojo" |
+| `Tema.Negativo` | Rojo de "esto va mal" |
+
+Cada acento tiene además su versión para **texto**, que no se configura: es el mismo
+color corregido para que se lea sobre el fondo de verdad (WCAG, 3,5:1 sobre la isla y
+4,5:1 sobre una superficie clara). Por eso un coral que vale de relleno se profundiza
+solo cuando hace de letra.
+
+### Animaciones
+
+| Clave | Por defecto | Qué hace |
+|---|---|---|
+| `Animaciones.Nivel` | `"auto"` | `"auto"` (sigue a Windows), `"completo"`, `"equilibrado"` (las acorta un 40 % y quita el rebote), `"reducido"` (sin movimiento, pero con fundidos muy cortos) o `"desactivado"` (sin nada: ni movimiento ni fundidos) |
+| `Animaciones.Robot` | `"primera-vez"` | Cuándo se ve la escena de entrada: `"primera-vez"`, `"cada-inicio"`, `"al-cambiar-tema"` o `"nunca"`. La escena todavía no está implementada |
+
+Con `"auto"` se lee **Accesibilidad → Efectos visuales → Efectos de animación** de
+Windows: quien ya ha pedido menos movimiento ahí no tiene que volver a pedirlo aquí.
+
 ### Barra
 
 | Clave | Por defecto | Qué hace |
@@ -230,6 +282,7 @@ la isla se adapta sola. Las claves que no reconoce se conservan tal cual.
 | `Barra.MaxApps` | `10` | Iconos de apps visibles a la vez; el resto, con la rueda |
 | `Barra.AgruparApps` | `true` | Las ventanas del mismo programa, en un solo icono |
 | `Barra.AtajoVistaGeneral` | `"Ctrl+Alt+W"` | Atajo global de la vista general |
+| `Barra.AjustarAlArrastrar` | `true` | Arrastrar una ventana a un borde la ajusta ahí, con previsualización |
 | `Barra.Monitores` | `"todos"` | `"todos"` (una isla por pantalla) o `"principal"` |
 | `Barra.AppsPorMonitor` | `true` | Cada isla enseña solo las apps de su pantalla |
 | `Barra.OcultarEnPantallaCompleta` | `true` | La isla se esconde si algo ocupa su pantalla entera |
@@ -243,6 +296,7 @@ la isla se adapta sola. Las claves que no reconoce se conservan tal cual.
 | `Barra.OrdenApps` | `[]` | El orden que les has dado arrastrando los iconos; se escribe solo |
 | `Barra.Arrastrable` | `true` | La isla se aparta arrastrándola, y los iconos se reordenan igual |
 | `Barra.SegundosParaVolver` | `1` | Tras quitarle el ratón de encima, cuánto tarda en volver a su sitio |
+| `Barra.EscalaPaneles` | `0` | Tamaño de paneles y menús. `0` = según la pantalla (en un 1920x1080 al 125 % salen al ~86 %); `0.8` más pequeños; `1` tal cual |
 
 ### Módulos
 
@@ -257,8 +311,17 @@ Listas de nombres; el orden es el orden en que salen.
 ```
 
 Disponibles: `inicio`, `apps`, `fijadas`, `reloj`, `fecha`, `cpu`, `ram`, `bateria`,
-`musica`, `bandeja`, `control`, `escritorios`, `wallpaper`, `wallpaper-titulo`,
-`iconos`, `separador`.
+`musica`, `musica-caratula`, `musica-barras`, `bandeja`, `control`, `escritorios`,
+`wallpaper`, `wallpaper-titulo`, `iconos`, `separador`.
+
+La lista sale del registro de widgets, así que es la misma en el config, en
+**Ajustes → Módulos** y en el log. `musica-caratula` y `musica-barras` son la carátula
+y las barras por separado, para quien no quiera las dos juntas.
+
+Hay además una clave `Paneles` reservada. **No se lee del fichero todavía**: se
+rellena sola a partir de `Barra` y `Modulos` cada vez que se carga la configuración, y
+existe para que añadir un segundo panel, o uno lateral, no obligue a cambiar el
+`config.json` de nadie. Editarla a mano no hace nada.
 
 La zona del **centro se ve siempre**, con la isla recogida o desplegada; la
 izquierda y la derecha solo al desplegarse. Por eso ahí viven las apps: `fijadas`
@@ -275,7 +338,7 @@ Si prefieres la isla pequeña en reposo, muévelos a la izquierda en Ajustes > M
 | `Inicio.TeclaWindows` | `true` | La tecla Windows abre este menú en vez del de Windows |
 | `Inicio.BuscarArchivos` | `true` | Busca también archivos con el índice de Windows Search |
 | `Inicio.BuscadorWeb` | Google | Prefijo de la búsqueda web |
-| `Inicio.Saludo` | `true` | Cabecera con «Buenas tardes, …» |
+| `Inicio.Saludo` | `true` | Cabecera con «Buenas tardes, …», la fecha y la hora |
 
 ### Wallpaper
 

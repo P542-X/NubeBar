@@ -14,3 +14,12 @@ dist/
 PROGRESO.md
 INFORME.md
 PRUEBAS-PARA-PAULO.md
+# Una carpeta por fase: así cada binario se puede comparar con el de la fase anterior y la
+# versión estable (dist-nuevo) no se sobreescribe nunca.
+#
+# Con comodín y no una por una. La lista escrita a mano se quedó atrás en cuanto apareció
+# una carpeta nueva —`dist-f1` salió en `git status` como fichero sin seguimiento con un
+# binario de 90 MB dentro—, y es la misma forma de fallo que las listas de banderas: hay
+# que acordarse de ampliarla.
+dist*/
+experimental-NO-EJECUTAR/

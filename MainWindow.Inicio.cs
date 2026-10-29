@@ -19,8 +19,13 @@ namespace NubeBar;
 // comandos y web). Lo rápido se calcula al teclear; los archivos van por detrás.
 public partial class MainWindow
 {
-    const string PanelInicio = "inicio";
-    const double AnchoMenu = 660, AltoFila = 44, FilasVisibles = 9;
+    internal const string PanelInicio = "inicio";
+    // Seis filas visibles, las mismas que `MaxFilas`: el alto reservaba nueve y el buscador
+    // nunca enseña más de seis, así que sobraban tres filas vacías debajo de la portada. Si
+    // la portada pide más, `AbrirPanel` le da lo que mide.
+    const double AnchoMenu = 660, AltoFila = 44, FilasVisibles = 6;
+    // El mismo número, visible para las pruebas: el ancho de la superficie de Inicio.
+    internal const double AnchoDeInicio = AnchoMenu;
     // Seis y se acabó. Veinte filas era una lista para recorrer con la rueda, y un
     // buscador no es para recorrerlo: o lo que quieres está arriba del todo o la
     // puntuación está mal. Con seis, lo que sale tiene que ser lo bueno.
@@ -38,12 +43,48 @@ public partial class MainWindow
     Point _ratonAlPintar = new(double.NaN, double.NaN);
     Categoria? _filtro;                 // Tab va rotando entre las categorías que hay
     CancellationTokenSource? _buscaArchivos;
+    readonly Relevo _relevo = new();      // descarta los archivos que llegan tarde
     DispatcherTimer? _esperaArchivos;
 
     // Con la portada (lo que suena, accesos, gráficas, wallpaper, fijadas y energía)
     // hace falta bastante más alto que con la lista de resultados a secas
     double AltoCabecera => _cfg.Inicio.Saludo ? 58 : 0;
     double AltoMenu => AltoCabecera + 8 + 38 + 8 + AltoFila * FilasVisibles + 10;
+
+    // ---------- Y lo que de verdad cabe (C1) ----------
+    //
+    // En horizontal el menú se despliega desde la isla hacia el centro de la pantalla y
+    // tiene todo el ancho del monitor para él: 660 px siempre caben. Al lado de una
+    // barra VERTICAL no: hay que descontar la franja de la barra, su margen y la
+    // separación, y en una pantalla estrecha —o con un grosor grande— 660 ya no entran.
+    // Una tarjeta más ancha que ese hueco no se recorta: se queda fuera de la ventana y
+    // simplemente no se ve.
+    //
+    // Estas dos propiedades son lo único que cambia de medidas entre las dos
+    // orientaciones; el panel de dentro es el mismo y no se entera.
+    double AnchoMenuEfectivo => !Vertical ? AnchoMenu
+        : Math.Min(AnchoMenu, AnchoMaximoDeTarjeta(_monitor.Ancho / _monitor.Escala,
+                                                   Grosor, _cfg.Barra.Margen, SeparacionPanel));
+
+    double AltoMenuEfectivo => !Vertical ? AltoMenu
+        : Math.Min(AltoMenu, AltoMaximoDeTarjeta(_monitor.Alto / _monitor.Escala, _cfg.Barra.Margen));
+
+    // ---------- El tope de alto ----------
+    //
+    // `AltoMenu` es lo que mide la LISTA de resultados, y es un mínimo: `AbrirPanel` le
+    // da más si el contenido lo pide. Con la portada —multimedia, acciones rápidas,
+    // CPU/RAM, fondo, conectividad, fijadas, energía y sistema— el contenido pide mucho
+    // más, y sin tope el panel se comería la pantalla: con el centro de control pasó
+    // exactamente eso, medido ("pedía 560 de alto pero necesita 1076; se le da el que
+    // necesita"). El tope es el criterio del resto de los paneles: nunca más del 62 % del
+    // monitor, y la portada se desplaza por dentro con su propio scroll.
+    internal static double TopeDeInicio(double altoPantalla) =>
+        Math.Max(360, Math.Min(960, altoPantalla * 0.62));
+
+    double AltoMaximoDeInicio() => Vertical
+        ? Math.Min(TopeDeInicio(_monitor.Alto / _monitor.Escala),
+                   AltoMaximoDeTarjeta(_monitor.Alto / _monitor.Escala, _cfg.Barra.Margen))
+        : TopeDeInicio(_monitor.Alto / _monitor.Escala);
 
     // ================= Tecla Windows =================
     // Hay un solo hook de teclado para todas las islas: lo monta la jefa y lo
@@ -107,6 +148,7 @@ public partial class MainWindow
             CerrarMenu();
             return;
         }
+        ApuntarBoton("tecla Windows");   // TEMPORAL: diagnóstico del flujo
         AbrirMenuInicio();
     }
 
@@ -161,11 +203,78 @@ public partial class MainWindow
     }
 
     // ================= Abrir y cerrar =================
+    // El botón "⊞" de la zona, para que la tarjeta salga a su lado y no en el medio de
+    // la pantalla. Si el módulo "inicio" no está puesto en ninguna zona, se queda en
+    // null y la tarjeta se centra, que es la salida razonable.
+    Button? _botonInicio;
+
+    internal UIElement ModuloInicio() => _botonInicio =
+        Boton(Texto("⊞", 16), "Inicio", () => { ApuntarBoton("⊞ lanzador"); AbrirMenuInicio(); });
+
     void AbrirMenuInicio()
     {
-        if (!AlternarPanel(PanelInicio, CrearMenuInicio, AnchoMenu, AltoMenu, teclado: true)) return;
+        // ---------- La vigilancia de lo que suena ----------
+        //
+        // Abrir Inicio no puede parar la música. Eso está medido —la reproducción sigue y
+        // el progreso avanza con la superficie abierta— y los guardias de `Musica` y
+        // `Audio` lo garantizan mientras se monta.
+        //
+        // Este muestreo es el INSTRUMENTO que lo demostró, y se queda: apagado en el uso
+        // normal (cuesta cuatro enumeraciones de dispositivos y tres tareas por apertura,
+        // y eso no se le cobra a nadie por si acaso) y encendido con `--diaginicio`, que
+        // es cuando se quiere volver a comprobar.
+        long mutAntes = Musica.Mutaciones;
+        int volAntes = 0; bool mudoAntes = false; string salidaAntes = "";
+        if (DiagInicio.Encendido)
+        {
+            volAntes = Audio.Volumen();
+            mudoAntes = Audio.Silenciado;
+            salidaAntes = SalidaActual();
+            ApuntarMultimedia("antes de abrir Inicio", mutAntes, volAntes, mudoAntes, salidaAntes);
+        }
+
+        // ---------- Anclado a su botón, en las dos orientaciones ----------
+        //
+        // En horizontal NO se pasaba ancla, y sin ancla el cajón de la isla se despliega
+        // de punta a punta: 1163 px en una pantalla de 2560, mientras el panel pide 660.
+        // El contenido se estira a ese hueco —de ahí las tarjetas estiradas— y el trozo
+        // de isla que queda sin tarjeta deja ver el escritorio de detrás. Medido:
+        // "ancho pedido: 660 / ancho real: 1131 / recorte del cajón: NO".
+        //
+        // Era deliberado ("igual que siempre", decía el comentario), pero ese "siempre"
+        // es justo lo que no se aguanta mirando. Con ancla, el cajón se recorta como una
+        // tarjeta del ancho pedido colgada del botón Inicio, que es su entrada.
+        //
+        // El ancla es la referencia REAL del botón, no una coordenada: `XdeTarjeta` le
+        // pregunta dónde está en cada fotograma —así la sigue mientras la isla crece o
+        // cambia de borde— y en vertical `ColocarPanelFlotante` usa su centro en
+        // coordenadas de pantalla. De ahí salen los cuatro bordes sin un número a mano.
+        //
+        // Si quitas el módulo de Inicio de la isla, `_botonInicio` es null y se ancla a
+        // la isla: la tarjeta sale centrada, pero RECORTADA, que es lo que importa.
+        if (!AlternarPanel(PanelInicio, CrearMenuInicio, AnchoMenuEfectivo, AltoMenuEfectivo,
+                           teclado: true, ancla: (FrameworkElement?)_botonInicio ?? Isla,
+                           scrollPropio: true, topeDuro: AltoMaximoDeInicio())) return;
         _filtro = null;
         CapturarClicsFuera(true);
+
+        // Los 30 segundos muestreados, solo con el diagnóstico encendido (ver arriba).
+        // Si la reproducción se corta, el log dice en qué momento y si alguien pidió el
+        // cambio.
+        if (DiagInicio.Encendido)
+            Dispatcher.InvokeAsync(async () =>
+            {
+                foreach (int s in new[] { 2, 10, 30 })
+                {
+                    await Task.Delay(s == 2 ? 2000 : s == 10 ? 8000 : 20000);
+                    if (_panelAbierto != PanelInicio)
+                    {
+                        Log.Info($"multimedia: Inicio ya estaba cerrado a los {s} s");
+                        return;
+                    }
+                    ApuntarMultimedia($"{s} s con Inicio abierto", mutAntes, volAntes, mudoAntes, salidaAntes);
+                }
+            }, DispatcherPriority.Background);
         Dispatcher.InvokeAsync(() =>
         {
             _caja?.Focus();
@@ -186,7 +295,9 @@ public partial class MainWindow
                         .Take(5).Select(f => f.GetMethod()?.Name ?? "?")));
         CapturarClicsFuera(false);
         _buscaArchivos?.Cancel();
+        _relevo.Olvidar();
         _esperaArchivos?.Stop();
+        OlvidarMenuDeApp();
         CerrarPanel();
     }
 
@@ -194,10 +305,23 @@ public partial class MainWindow
     // mismo a los pocos segundos y cerraba el menú solo mientras escribías. El criterio
     // bueno es el que pediste: un clic de verdad fuera. Se consigue capturando el ratón
     // en el subárbol de la isla, que es como se comportan los menús de Windows.
+    // La captura del ratón es de la isla, y solo sirve cuando el panel vive DENTRO de
+    // ella: es el caso horizontal. Con la barra vertical el menú está en otra ventana, y
+    // la captura de WPF no cruza ventanas — capturarla en la isla desviaba allí los
+    // clics de la tarjeta (la caja de búsqueda y las filas no recibían ninguno) y encima
+    // los contaba como "clic fuera", así que el primer clic en el buscador lo cerraba.
+    //
+    // Para ese caso no se captura nada: el clic de fuera lo caza igual el vigilante de
+    // 150 ms, que trabaja en coordenadas de PANTALLA y ya sabía apañárselas cuando
+    // Windows nos quita la captura (ver VigilarClicFueraDelMenu).
+    FrameworkElement? _capturada;
+
     void CapturarClicsFuera(bool activar)
     {
         if (activar)
         {
+            if (Vertical) return;
+            _capturada = Isla;
             Isla.PreviewMouseDown += ClicQuizaFuera;
             Isla.PreviewMouseUp += RearmarCaptura;
             Isla.LostMouseCapture += RecuperarCaptura;
@@ -205,19 +329,47 @@ public partial class MainWindow
         }
         else
         {
-            Isla.PreviewMouseDown -= ClicQuizaFuera;
-            Isla.PreviewMouseUp -= RearmarCaptura;
-            Isla.LostMouseCapture -= RecuperarCaptura;
-            if (ReferenceEquals(Mouse.Captured, Isla)) Mouse.Capture(null);
+            // Se suelta de DONDE se cogió y no de donde toque ahora: si el config
+            // cambiara de orientación con el menú abierto, quitar los manejadores de la
+            // otra superficie los dejaría puestos para siempre.
+            if (_capturada is not { } sobre) return;
+            sobre.PreviewMouseDown -= ClicQuizaFuera;
+            sobre.PreviewMouseUp -= RearmarCaptura;
+            sobre.LostMouseCapture -= RecuperarCaptura;
+            if (ReferenceEquals(Mouse.Captured, sobre)) Mouse.Capture(null);
+            _capturada = null;
+        }
+    }
+
+    // ¿Este punto cae dentro del menú? Con la barra vertical el menú son DOS
+    // superficies: la barra y su tarjeta. InputHitTest y no un rectángulo porque
+    // acierta hasta en las esquinas redondeadas.
+    bool DentroDelMenu(Point enPantalla)
+    {
+        if (Toca(Isla, enPantalla)) return true;
+        // Con la barra vertical el menú vive en su propia ventana superpuesta: lo que
+        // cuenta es su rectángulo de PANTALLA, no un hit-test dentro de la isla.
+        if (_superpuesta is { } sup && sup.Contiene((int)enPantalla.X, (int)enPantalla.Y)) return true;
+        return false;
+
+        static bool Toca(FrameworkElement e, Point pantalla)
+        {
+            try
+            {
+                if (e.ActualWidth <= 0 || e.ActualHeight <= 0) return false;
+                var p = e.PointFromScreen(pantalla);
+                if (p.X < 0 || p.Y < 0 || p.X > e.ActualWidth || p.Y > e.ActualHeight) return false;
+                return e.InputHitTest(p) != null;
+            }
+            catch { return false; }
         }
     }
 
     void ClicQuizaFuera(object remitente, MouseButtonEventArgs e)
     {
         if (_panelAbierto != PanelInicio) return;
-        var p = e.GetPosition(Isla);
-        bool dentro = p.X >= 0 && p.Y >= 0 && p.X <= Isla.ActualWidth && p.Y <= Isla.ActualHeight;
-        if (dentro) return;
+        var sobre = _capturada ?? Isla;
+        if (DentroDelMenu(sobre.PointToScreen(e.GetPosition(sobre)))) return;
         CerrarMenu();
         e.Handled = true;
     }
@@ -265,7 +417,9 @@ public partial class MainWindow
         try
         {
             var r = Monitores.Raton();
-            if (Isla.InputHitTest(Isla.PointFromScreen(new Point(r.X, r.Y))) != null) return;
+            // Las dos superficies, no solo la isla: con la barra vertical, un clic en
+            // la tarjeta del menú estaba "fuera de la isla" y lo cerraba.
+            if (DentroDelMenu(new Point(r.X, r.Y))) return;
             Log.Info("clic fuera del menú: se cierra");
             CerrarMenu();
         }
@@ -356,7 +510,9 @@ public partial class MainWindow
             // de pantalla (Win+Shift+S, Impr Pant) salía pero no te dejaba arrastrar
             // el recuadro. El clic de fuera lo sigue cazando el vigilante de 150 ms.
             if (!Nativo.EsNuestra(Nativo.Activa())) return;
-            Mouse.Capture(Isla, CaptureMode.SubTree);
+            // Solo se recupera si se cogió: en vertical no se captura nada (ver
+            // CapturarClicsFuera), y volver a capturar aquí reintroduciría el fallo.
+            if (_capturada is { } sobre) Mouse.Capture(sobre, CaptureMode.SubTree);
         }, DispatcherPriority.Input);
     }
 
@@ -376,19 +532,114 @@ public partial class MainWindow
 
         _caja = new TextBox
         {
-            Height = 38,
-            Padding = new Thickness(12, 0, 12, 0),
+            Padding = new Thickness(9, 0, 12, 0),
             VerticalContentAlignment = VerticalAlignment.Center,
-            Background = new SolidColorBrush(Color.FromArgb(0x24, _cTexto.R, _cTexto.G, _cTexto.B)),
+            // Transparente a propósito: el fondo y las esquinas los pone el marco de más
+            // abajo. Pintados aquí daban lo que se veía en la captura — un rectángulo gris
+            // de esquinas rectas, de filo a filo, entre tarjetas oscuras redondeadas: la
+            // pieza que peor encajaba de todo el lanzador.
+            Background = Brushes.Transparent,
             Foreground = _texto,
             CaretBrush = _acentoLegible,
             BorderThickness = new Thickness(0),
             FontSize = FontSize + 3,
             Tag = "caja"
         };
-        _caja.TextChanged += (_, _) => Buscar(_caja!.Text);
-        Grid.SetRow(_caja, 1);
-        raiz.Children.Add(_caja);
+        // ---------- Y una pista dentro de la caja ----------
+        //
+        // No la había: el lanzador se abría con una franja vacía y un cursor parpadeando.
+        // Quien no sepa que ahí se busca —y que se buscan aplicaciones, archivos Y la web—
+        // no tiene de dónde deducirlo. Se vio mirando una captura del menú entero, no el
+        // código: en el código la caja parece perfectamente normal.
+        //
+        // Un TextBlock detrás, que no recoge clics y se esconde en cuanto escribes. Es el
+        // mismo patrón que el buscador de la biblioteca; no se toca la plantilla del
+        // TextBox porque eso serían dos formas de poner una pista en la misma aplicación.
+        var pistaDeLaCaja = new TextBlock
+        {
+            Text = "Buscar aplicaciones, archivos y en la web…",
+            Foreground = _texto,
+            Opacity = 0.45,
+            FontSize = FontSize + 3,
+            Margin = new Thickness(10, 0, 13, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            IsHitTestVisible = false,
+        };
+
+        _caja.TextChanged += (_, _) =>
+        {
+            pistaDeLaCaja.Visibility = _caja!.Text.Length == 0
+                                     ? Visibility.Visible : Visibility.Collapsed;
+            Buscar(_caja.Text);
+        };
+
+        // ---------- El marco: lupa dentro y esquinas redondas ----------
+        //
+        // Es la misma construcción que `VentanaAjustes.CajaDeBusqueda`: un borde que pone el
+        // fondo y el radio, una lupa delante y el campo transparente encima. No se toca la
+        // plantilla del TextBox, que es justo lo que pide el comentario de la pista — dos
+        // formas de hacer un buscador en la misma aplicación es lo que había que evitar.
+        //
+        // Y la lupa no es adorno: era una franja gris con un cursor parpadeando. Quien no
+        // supiera ya que ahí se busca no tenía de dónde deducirlo. La pista de texto lo dice
+        // y desaparece al escribir; la lupa se queda.
+        var filaDeLaCaja = new Grid();
+        filaDeLaCaja.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        filaDeLaCaja.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var lupa = Glifo(char.ConvertFromUtf32(0xE721));   // Search
+        lupa.FontSize = 14;
+        lupa.Opacity = 0.5;
+        lupa.Margin = new Thickness(13, 0, 0, 0);
+        lupa.VerticalAlignment = VerticalAlignment.Center;
+        Grid.SetColumn(lupa, 0);
+        filaDeLaCaja.Children.Add(lupa);
+
+        Grid.SetColumn(_caja, 1);
+        filaDeLaCaja.Children.Add(_caja);
+        Grid.SetColumn(pistaDeLaCaja, 1);
+        filaDeLaCaja.Children.Add(pistaDeLaCaja);   // después: por encima del campo
+
+        // ---------- El filo del buscador, y la franja ----------
+        //
+        // La maqueta: «Buscador: filo de 1 px. Al pasar el ratón o con foco, una franja del
+        // acento recorre el filo (misma técnica que la isla, 4 s)».
+        //
+        // Por qué solo al enfocar o al pasar por encima: una luz girando sin parar alrededor
+        // del campo de texto es movimiento junto a lo que estás leyendo y escribiendo. Girando
+        // SOLO cuando lo señalas, la luz dice «aquí vas a escribir», que es información.
+        var marcoDeLaCaja = new Border
+        {
+            Height = 38,
+            Background = _roles.Pincel("buscador.fondo"),
+            BorderBrush = _roles.Pincel("buscador.filo"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(_roles.Pintura.Radio(Piezas.Boton)),
+            Child = filaDeLaCaja,
+        };
+
+        void FranjaDelBuscador(bool encendida)
+        {
+            if (encendida && Animacion.Adorno)
+                marcoDeLaCaja.BorderBrush = FiloQueRecorre(
+                    _roles.ColorDe("buscador.filo"),
+                    _roles.ColorDe("buscador.filo.foco"),
+                    _roles.ColorDe(ClavesBase.Acento), 4);
+            else
+                marcoDeLaCaja.BorderBrush = encendida
+                    ? _roles.Pincel("buscador.filo.foco")
+                    : _roles.Pincel("buscador.filo");
+        }
+        marcoDeLaCaja.MouseEnter += (_, _) => FranjaDelBuscador(true);
+        marcoDeLaCaja.MouseLeave += (_, _) => { if (!_caja!.IsKeyboardFocusWithin) FranjaDelBuscador(false); };
+        _caja.GotKeyboardFocus += (_, _) => FranjaDelBuscador(true);
+        _caja.LostKeyboardFocus += (_, _) => { if (!marcoDeLaCaja.IsMouseOver) FranjaDelBuscador(false); };
+        Grid.SetRow(marcoDeLaCaja, 1);
+        raiz.Children.Add(marcoDeLaCaja);
+
+        // Y el nombre, para quien no puede ver la pista.
+        System.Windows.Automation.AutomationProperties.SetName(
+            _caja, "Buscar aplicaciones, archivos y en la web");
 
         // El teclado se escucha en la RAÍZ del panel, no solo en la caja: así las
         // flechas, Intro, Tab y Escape siguen funcionando aunque el foco se haya ido a
@@ -411,7 +662,7 @@ public partial class MainWindow
         {
             Height = AltoFila - 4,
             CornerRadius = new CornerRadius(8),
-            Background = new SolidColorBrush(Color.FromArgb(0x33, _cAcentoLegible.R, _cAcentoLegible.G, _cAcentoLegible.B)),
+            Background = _elegido,
             BorderBrush = _acentoLegible,
             BorderThickness = new Thickness(1),
             HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -435,8 +686,8 @@ public partial class MainWindow
         Grid.SetRow(_scroll, 2);
         raiz.Children.Add(_scroll);
 
-        // Sin nada escrito no se ven resultados, sino el panel de siempre: lo que
-        // suena, los accesos rápidos, las gráficas, el wallpaper y las fijadas
+        // Sin nada escrito no se ven resultados, sino la portada: lo que suena, el
+        // idioma del teclado y la energía
         _portada = CrearPortada();
         Grid.SetRow(_portada, 2);
         raiz.Children.Add(_portada);
@@ -453,43 +704,171 @@ public partial class MainWindow
         Grid.SetRow(_pista, 2);
         raiz.Children.Add(_pista);
 
-        return raiz;
+        // La capa del menú del clic derecho, la última de todas: tiene que quedar por
+        // encima de la lista y de la portada (ver MainWindow.MenuApp.cs). Vive
+        // colapsada y no estorba hasta que se pide.
+        var capaMenu = CrearCapaMenuApp();
+        Grid.SetRow(capaMenu, 0);
+        Grid.SetRowSpan(capaMenu, 3);
+        raiz.Children.Add(capaMenu);
+
+        _raizMenu = raiz;
+
+        // ---------- La superficie opaca ----------
+        //
+        // `PanelShell` existía desde el rediseño y esta superficie —la que de verdad se
+        // abre con el botón Inicio y con la tecla Windows— nunca lo consumía: la raíz era
+        // este `Grid`, que no pinta nada. El contenido se apoyaba directamente en la isla,
+        // que es translúcida, y por eso se leía el texto del escritorio de detrás. La
+        // traza lo decía con todas las letras: "shell opaco: NO (Grid)".
+        //
+        // Con margen 0 porque la raíz ya trae el suyo (6, 8, 6, 10) y dos acolchados
+        // seguidos dejan el panel con un marco que no pega.
+        return PanelShell(raiz, 0);
     }
 
-    ScrollViewer? _portada;
+    FrameworkElement? _portada;
 
     // Entra escalonada: cada tarjeta un pelín después que la anterior
-    ScrollViewer CrearPortada()
+    FrameworkElement CrearPortada()
+    {
+        // ---------- Montar es LEER ----------
+        //
+        // Mientras se construye la portada, las puertas que escriben audio y multimedia
+        // están cerradas: si alguna tarjeta intentara pausar, cambiar el volumen o el
+        // dispositivo de salida, no pasa y queda apuntado con su nombre en el log. Ver
+        // `Musica.Permitido` y `Audio.Permitido`.
+        //
+        // El `finally` no es adorno: si una tarjeta lanzara y el guardia se quedara
+        // puesto, el siguiente clic del usuario en pausa no haría nada.
+        Musica.Construyendo = true;
+        Audio.Construyendo = true;
+        try { return MontarPortada(); }
+        finally
+        {
+            Musica.Construyendo = false;
+            Audio.Construyendo = false;
+        }
+    }
+
+    FrameworkElement MontarPortada()
     {
         var pila = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
-        var piezas = new UIElement[]
-        {
-            CrearTarjetaMusica(),
-            CrearAccesosRapidos(),
-            CrearGraficas(),
-            CrearTarjetaWallpaper(),
-            CrearFijadas(),
-            CrearEnergia()
-        };
 
-        for (int i = 0; i < piezas.Length; i++)
+        // Las tarjetas son las del diseño aprobado (`Card`, opacas y con su filo), las
+        // mismas que se montaron para el centro de control. No hay dos pantallas con lo
+        // mismo: el centro de control ES esta portada, y su único acceso es el botón
+        // Inicio. Las piezas propias del lanzador —las fijadas y la energía— se quedan:
+        // una superficie unificada no es una superficie con menos cosas.
+        //
+        // Pero la energía UNA vez. Aquí iba también la tarjeta «Sistema» del centro de
+        // control, con los mismos cuatro botones —bloquear, suspender, reiniciar, apagar—
+        // justo debajo de la fila de energía. Lo contó el usuario: «en el botón de inicio
+        // está duplicado lo de apagar, reiniciar, suspender». Se queda la fila de energía,
+        // que pide confirmación para reiniciar y apagar; la tarjeta reiniciaba sin preguntar.
+        //
+        // ---------- Y solo lo que se usa ----------
+        //
+        // La portada llegó a llevar ocho tarjetas: multimedia, acciones rápidas, CPU/RAM,
+        // fondo, conectividad, fijadas, energía… El usuario lo dejó claro: «solo me interesa
+        // que se vea la música sonando, el buscador, apagar y encender, y el idioma del
+        // teclado; lo demás fuera». Esas tarjetas siguen existiendo —los laterales usan las
+        // suyas— pero aquí ya no se montan.
+        var piezas = new List<UIElement> { CardMultimedia() };
+
+        // El idioma del teclado solo sale si tienes más de una distribución: la propia tarjeta
+        // lo decide y se añade a una pila. Se recoge de ahí para que entre en su sitio y con
+        // la misma animación que el resto.
+        var teclado = new StackPanel();
+        CardTeclado(teclado);
+        foreach (UIElement t in teclado.Children.OfType<UIElement>().ToList())
+        {
+            teclado.Children.Remove(t);
+            piezas.Add(t);
+        }
+
+        piezas.Add(CrearEnergia());
+
+        for (int i = 0; i < piezas.Count; i++)
         {
             pila.Children.Add(piezas[i]);
             if (piezas[i] is not FrameworkElement fe) continue;
-            var mover = new TranslateTransform { Y = 14 };
+            // Los tiempos son los de la maqueta: «cada tarjeta escalonada 50 ms más tarde
+            // que la anterior (sube 10 px y aparece)». Estaban en 45 ms y 14 px, que es lo
+            // mismo con otros números — pero el plan los fija, y que el código y el plan
+            // digan lo mismo es lo que hace que el plan siga sirviendo dentro de seis meses.
+            var mover = new TranslateTransform { Y = 10 };
             fe.RenderTransform = mover;
-            double retardo = 90 + i * 45;
+            double retardo = 90 + i * 50;
             fe.BeginAnimation(OpacityProperty, Kf(0, 1, 240, retardo));
-            mover.BeginAnimation(TranslateTransform.YProperty, Kf(14, 0, 420, retardo, Muelle));
+            mover.BeginAnimation(TranslateTransform.YProperty, Kf(10, 0, 420, retardo, Muelle));
             mover.Y = 0;
         }
 
-        return new ScrollViewer
+        var desplazable = new ScrollViewer
         {
             Content = pila,
             VerticalScrollBarVisibility = ScrollBarVisibility.Hidden,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
         };
+
+        // ---------- Las decoraciones del tema ----------
+        //
+        // Dos capas y en este orden, que importa:
+        //
+        //   - La MARCA DE AGUA va DETRÁS del contenido. Es un fondo; delante taparía texto.
+        //   - Las PARTÍCULAS van DELANTE, que es donde se ven caer. Ninguna recibe el ratón.
+        //
+        // «Pétalos de sakura cayendo SOLO dentro del menú Inicio, nunca sobre el escritorio».
+        //
+        // Las dos funciones devuelven null si el tema no las lleva o si el nivel de animación
+        // dice que no, y entonces no se monta nada: una capa vacía también cuesta.
+        var marca = MarcaDeAgua();
+        var lluvia = Particulas.Para(_roles.Pintura);
+        if (marca == null && lluvia == null) return desplazable;
+
+        var capas = new Grid();
+        if (marca != null) capas.Children.Add(marca);
+        capas.Children.Add(desplazable);
+        if (lluvia != null) capas.Children.Add(lluvia);
+        return capas;
+    }
+
+    // ---------- La marca de agua ----------
+    //
+    // El argumento de la decoración ES lo que se pinta: `marca-de-agua:侍` pinta un kanji, y
+    // `marca-de-agua:★` pintaría una estrella. Así un tema del usuario puede poner la suya sin
+    // que haya que tocar código ni añadir una imagen al programa.
+    //
+    // Abajo a la derecha y sobresaliendo por el borde: una marca centrada se lee como un logo
+    // mal puesto; medio salida se lee como lo que es, papel con filigrana.
+    UIElement? MarcaDeAgua()
+    {
+        var texto = _roles.Pintura.Tema.Argumento(Decoraciones.MarcaDeAgua);
+        if (string.IsNullOrWhiteSpace(texto)) return null;
+
+        var t = new TextBlock
+        {
+            Text = texto,
+            // Grande y medio salida por la esquina. Con la primera medida (-42 abajo) solo
+            // asomaban los trazos de arriba y se leía como un kanji CORTADO, que es otra cosa:
+            // una filigrana se reconoce porque la ves entera y apagada, no porque adivines un
+            // trozo. Subida, el cuerpo queda detrás de las tarjetas —que es su sitio— y lo que
+            // se ve por el hueco de abajo es su mitad, no su borde.
+            FontSize = 140,
+            Foreground = _roles.Pincel("marca.agua"),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            Margin = new Thickness(0, 0, -8, -8),
+            IsHitTestVisible = false,
+        };
+        // Al lector de pantalla no se le anuncia: es papel pintado, no contenido. Anunciarlo
+        // sería leerle un adorno en medio del menú. En WPF eso se dice sacándolo del árbol de
+        // automatización, no poniéndole un nombre vacío —un nombre vacío sigue siendo un nodo
+        // que el lector recorre—.
+        System.Windows.Automation.AutomationProperties.SetIsOffscreenBehavior(
+            t, System.Windows.Automation.IsOffscreenBehavior.Offscreen);
+        return new Grid { Children = { t }, ClipToBounds = true, IsHitTestVisible = false };
     }
 
     // ================= Búsqueda =================
@@ -522,8 +901,8 @@ public partial class MainWindow
             }
         }
 
-        foreach (var r in encontrados) r.Puntos += Uso.Empujon(r.Clave);
-        _resultados = Ordenar(encontrados);
+        foreach (var r in encontrados) r.Puntos = Ranking.ConCostumbre(r.Puntos, Uso.Empujon(r.Clave), r.Nivel);
+        _resultados = Ranking.Ordenar(encontrados);
         Pintar();
         reloj.Stop();
 
@@ -533,40 +912,21 @@ public partial class MainWindow
         ProgramarArchivos(limpia);
     }
 
-    // Ordena y, si hay un ganador claro, tira lo que no le llega ni de lejos.
-    //
-    // Con seis filas el relleno se nota: escribiendo "cmd" salía el Símbolo del
-    // sistema el primero y detrás cuatro cosas que solo tienen las letras c, m y d
-    // desperdigadas por el nombre ("Blackmagic RAW Speed Test"). Bajar el liston del
-    // parecido no vale, porque es el mismo que aguanta las erratas ("fotosop" ->
-    // Photoshop). Lo que sí vale es mirarlo en relación al mejor: si uno saca mucho
-    // más que otro, el otro no es lo que buscabas.
-    //
-    // El liston lo pone el mejor de los resultados NORMALES: el cálculo y el comando
-    // valen 10 a propósito para ir siempre los primeros y no deben subirlo. Y la
-    // búsqueda en la web se queda siempre, que es la salida de emergencia.
-    static List<Resultado> Ordenar(List<Resultado> encontrados)
-    {
-        var orden = encontrados.OrderByDescending(r => r.Puntos).ToList();
-        double mejor = orden.Where(r => r.Puntos < 2).Select(r => r.Puntos).DefaultIfEmpty(0).Max();
-        if (mejor <= 0) return orden;
-        double liston = mejor * 0.6;
-        return orden.Where(r => r.Puntos >= liston || r.Categoria == Categoria.Web).ToList();
-    }
-
     // La propia ventana de ajustes, buscable como cualquier otra cosa
     Resultado? AjustesDeLaNube(string norm)
     {
-        double p = Math.Max(Parecido.Puntuar(norm, "Ajustes de la nube"),
-                            Parecido.Puntuar(norm, "NubeBar configuración"));
-        if (p < 0.5) return null;
+        var m = Parecido.Medir(norm, "Ajustes de la nube");
+        var m2 = Parecido.Medir(norm, "NubeBar configuración");
+        if (m2.Puntos > m.Puntos) m = m2;
+        if (m.Puntos < 0.5) return null;
         return new Resultado
         {
             Categoria = Categoria.Ajuste,
             Titulo = "Ajustes de la nube",
             Detalle = "Cambiar colores, módulos y comportamiento",
             Clave = "ajuste:nubebar",
-            Puntos = p,
+            Puntos = m.Puntos,
+            Nivel = m.Nivel,
             Abrir = AbrirAjustes
         };
     }
@@ -578,9 +938,13 @@ public partial class MainWindow
             foreach (var h in g.Ventanas)
             {
                 var titulo = Nativo.Titulo(h);
-                double p = Parecido.Puntuar(norm, titulo);
-                double pe = Parecido.Puntuar(norm, Path.GetFileNameWithoutExtension(g.Exe));
-                double mejor = Math.Max(p, pe * 0.9);
+                var porTitulo = Parecido.Medir(norm, titulo);
+                var porExe = Parecido.Medir(norm, Path.GetFileNameWithoutExtension(g.Exe));
+                // El nombre del ejecutable vale un poco menos que el título de la
+                // ventana: el título es lo que estás viendo en la barra de tareas.
+                bool ganaTitulo = porTitulo.Puntos >= porExe.Puntos * 0.9;
+                double mejor = ganaTitulo ? porTitulo.Puntos : porExe.Puntos * 0.9;
+                var nivelV = ganaTitulo ? porTitulo.Nivel : porExe.Nivel;
                 if (mejor < 0.5) continue;
                 var v = h;
                 yield return new Resultado
@@ -590,7 +954,8 @@ public partial class MainWindow
                     Detalle = Path.GetFileName(g.Exe),
                     Clave = "ventana:" + Path.GetFileName(g.Exe),
                     IconoRuta = g.Exe.StartsWith("hwnd:") ? null : g.Exe,
-                    Puntos = mejor * 1.02,     // saltar a algo ya abierto suele ser lo que quieres
+                    Puntos = Math.Min(1.0, mejor * 1.02),   // saltar a algo abierto suele ser lo que quieres
+                    Nivel = nivelV,
                     Abrir = () => Nativo.Activar(v)
                 };
             }
@@ -600,6 +965,7 @@ public partial class MainWindow
     void ProgramarArchivos(string consulta)
     {
         _buscaArchivos?.Cancel();
+        _relevo.Olvidar();
         _esperaArchivos?.Stop();
         if (!_cfg.Inicio.BuscarArchivos || consulta.Length < 3 || consulta.StartsWith(">")) return;
 
@@ -616,15 +982,27 @@ public partial class MainWindow
         var consulta = _caja.Text.Trim();
         if (consulta.Length < 3) return;
 
+        // Dos cerrojos, y hacen falta los dos. El token corta la consulta a Windows
+        // Search en cuanto sigues escribiendo; el turno del relevo descarta lo que ya
+        // venía de vuelta cuando se canceló —una tarea puede haber terminado justo
+        // antes y estar ya en la cola del hilo de interfaz, y entonces el token no
+        // dice nada—. Sin el turno salían archivos de "doc" debajo de "documento".
         var cts = new CancellationTokenSource();
+        var anterior = _buscaArchivos;
         _buscaArchivos = cts;
+        anterior?.Cancel();
+        anterior?.Dispose();
+        long turno = _relevo.Pedir();
+
         Task.Run(() => Fuentes.Archivos(consulta, 8, cts.Token), cts.Token)
             .ContinueWith(t =>
             {
+                if (!_relevo.SigueSiendoLaUltima(turno)) return;
                 if (cts.IsCancellationRequested || !t.IsCompletedSuccessfully) return;
-                if (_caja == null || _caja.Text.Trim() != consulta) return;   // ya has seguido escribiendo
-                foreach (var r in t.Result) r.Puntos += Uso.Empujon(r.Clave);
-                _resultados = Ordenar(_resultados.Concat(t.Result).ToList());
+                if (_panelAbierto != PanelInicio || _caja == null) return;
+                if (_caja.Text.Trim() != consulta) return;   // ya has seguido escribiendo
+                foreach (var r in t.Result) r.Puntos = Ranking.ConCostumbre(r.Puntos, Uso.Empujon(r.Clave), r.Nivel);
+                _resultados = Ranking.Ordenar(_resultados.Concat(t.Result));
                 Pintar();
             }, TaskScheduler.FromCurrentSynchronizationContext());
     }
@@ -715,6 +1093,25 @@ public partial class MainWindow
             if (i >= 0) { _seleccion = i; MoverMarca(); }
         };
         zona.MouseLeftButtonUp += (_, _) => Ejecutar(r, false);
+
+        // Clic derecho: el menú de ESTA aplicación. Se marca como manejado para que no
+        // suba hasta la isla y abra el suyo —el de cerrar aplicaciones y salir de
+        // NubeBar—, que no tiene nada que ver con lo que tienes bajo el puntero. El
+        // clic izquierdo sigue abriendo, igual que antes.
+        if (TieneMenuDeApp(r))
+            zona.MouseRightButtonUp += (_, e) =>
+            {
+                e.Handled = true;
+                int i = Visibles.FindIndex(x => ReferenceEquals(x, r));
+                if (i >= 0) { _seleccion = i; MoverMarca(); }
+                AbrirMenuDeApp(r, e.GetPosition(_raizMenu ?? (IInputElement)zona));
+            };
+        else
+            // Sin menú propio, pero tampoco el de la isla: un cálculo o una búsqueda
+            // en la web no tienen nada que ofrecer, y abrir ahí "Salir de NubeBar" es
+            // la clase de sorpresa que hace que no te fíes de un clic derecho.
+            zona.MouseRightButtonUp += (_, e) => e.Handled = true;
+
         return zona;
     }
 
@@ -765,6 +1162,19 @@ public partial class MainWindow
     // ================= Teclado =================
     void CajaTecla(object remitente, KeyEventArgs e)
     {
+        // Con el menú de una aplicación abierto, las teclas son suyas: Esc lo cierra a
+        // él y no el buscador entero, y las flechas no mueven una marca que ahora mismo
+        // está detrás de una tarjeta.
+        if (MenuDeAppAbierto)
+        {
+            if (e.Key == Key.Escape) { CerrarMenuDeApp(); e.Handled = true; }
+            // Las flechas, Intro y Tab se comen: actuarían sobre una lista que ahora
+            // está detrás de la tarjeta y no se ve. Lo que se escriba sigue yendo a la
+            // caja, que es inofensivo y evita tener que acordarse de volver a ella.
+            else if (e.Key is Key.Down or Key.Up or Key.Enter or Key.Tab) e.Handled = true;
+            return;
+        }
+
         var visibles = Visibles;
         switch (e.Key)
         {

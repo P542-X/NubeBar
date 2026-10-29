@@ -55,17 +55,25 @@ public partial class MainWindow : Window
     // una tira y otra: si la de las fijas no existiera aún, se los quedaría todos.
     void PrepararFijas()
     {
-        bool puesto = _cfg.Modulos.Izquierda.Concat(_cfg.Modulos.Centro).Concat(_cfg.Modulos.Derecha)
-                          .Any(m => m.Equals("fijadas", StringComparison.OrdinalIgnoreCase));
-        _tiraFijas = puesto
-            ? new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Height = Math.Max(20, _cfg.Barra.Alto - 8),
-                Margin = new Thickness(0, 0, 4, 0),
-                VerticalAlignment = VerticalAlignment.Center
-            }
-            : null;
+        // Por `ModuloPuesto`, que mira LO MISMO que se dibuja. Preguntarle a
+        // `_cfg.Modulos` por su cuenta era la segunda fuente de verdad, y cuando se
+        // separó de la primera esta línea dejó `_tiraFijas` en null mientras
+        // `LlenarZonas` seguía montando "fijadas": NullReferenceException y hueco vacío.
+        if (!ModuloPuesto("fijadas")) { _tiraFijas = null; return; }
+
+        // Con la barra vertical las fijadas también se apilan, y lo que se fija es su
+        // ancho en vez de su alto (ver "El eje de la tira" en MainWindow.Apps.cs).
+        bool v = Vertical;
+        double grosor = Math.Max(20, _cfg.Barra.Alto - 8);
+        _tiraFijas = new StackPanel
+        {
+            Orientation = v ? Orientation.Vertical : Orientation.Horizontal,
+            Width = v ? grosor : double.NaN,
+            Height = v ? double.NaN : grosor,
+            Margin = v ? new Thickness(0, 0, 0, 4) : new Thickness(0, 0, 4, 0),
+            HorizontalAlignment = v ? HorizontalAlignment.Center : HorizontalAlignment.Stretch,
+            VerticalAlignment = v ? VerticalAlignment.Stretch : VerticalAlignment.Center
+        };
     }
 
     UIElement ModuloFijas()
@@ -146,8 +154,16 @@ public partial class MainWindow : Window
 
         // Si está abierta, lo de siempre a mano
         if (g.Ventanas.Count > 0)
+        {
+            // Otra ventana de la misma app, como el «Explorador de archivos» del clic
+            // derecho en la barra de Windows. Abierta no había forma: el clic la trae al
+            // frente y el menú solo ofrecía minimizar o cerrar. Lo contó el usuario: «con
+            // una carpeta abierta no te deja abrir otra desde la nube».
+            if (g.Lanzar.Length > 0)
+                opciones.Add(($"Abrir otra ventana de {nombre}", () => Fuentes.Lanzar(g.Lanzar)));
             opciones.Add(($"Minimizar {(g.Ventanas.Count > 1 ? $"sus {g.Ventanas.Count} ventanas" : "la ventana")}",
                           () => { foreach (var v in g.Ventanas.ToList()) MinimizarVentana(v); }));
+        }
         else
             opciones.Add(($"Abrir {nombre}", () => Fuentes.Lanzar(g.Lanzar)));
 

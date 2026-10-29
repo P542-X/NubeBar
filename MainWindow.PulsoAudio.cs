@@ -58,8 +58,8 @@ public partial class MainWindow
         // asomando por un lado y el otro por el otro, que es el efecto que buscas.
         if (_filoFrio == null)
         {
-            _filoFrio = CrearFilo(Color.FromRgb(0x4D, 0xE8, 0xFF));
-            _filoCalido = CrearFilo(Color.FromRgb(0xFF, 0x4D, 0x8D));
+            _filoFrio = CrearFilo(_roles.ColorDe("pulso.frio"));
+            _filoCalido = CrearFilo(_roles.ColorDe("pulso.calido"));
             _mueveFrio = (TranslateTransform)_filoFrio.RenderTransform;
             _mueveCalido = (TranslateTransform)_filoCalido!.RenderTransform;
         }

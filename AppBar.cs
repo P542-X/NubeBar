@@ -35,9 +35,17 @@ static class AppBar
 
     static APPBARDATA Datos(IntPtr h) => new() { cbSize = Marshal.SizeOf<APPBARDATA>(), hWnd = h };
 
+    public const uint ABE_LEFT = 0, ABE_TOP = 1, ABE_RIGHT = 2, ABE_BOTTOM = 3;
+
     // El rectángulo que se pide es el del MONITOR de esa isla, en píxeles de pantalla:
     // así Windows reserva el hueco en la pantalla correcta y no siempre en la principal.
-    public static void Registrar(IntPtr h, bool arriba, int altoPx, int mx, int my, int mAncho, int mAlto)
+    //
+    // `borde` es el de Windows (lo decide PanelNube.BordeAppBar) y `grosorPx` es lo que
+    // se reserva en la dirección que toque: el alto si la franja es horizontal, el
+    // ancho si es vertical. El ABM_QUERYPOS puede mover el filo que no fijamos nosotros
+    // —si ya hay otra appbar en ese lado, Windows nos aparta—, así que al volver se
+    // vuelve a clavar el grosor contra el filo exterior y solo entonces se asienta.
+    public static void Registrar(IntPtr h, uint borde, int grosorPx, int mx, int my, int mAncho, int mAlto)
     {
         var d = Datos(h);
         if (_registradas.Add(h))
@@ -48,15 +56,22 @@ static class AppBar
 
         if (mAncho <= 0 || mAlto <= 0) { mx = 0; my = 0; mAncho = GetSystemMetrics(0); mAlto = GetSystemMetrics(1); }
 
-        d.uEdge = arriba ? 1u : 3u;                                  // ABE_TOP / ABE_BOTTOM
-        d.rc = new RECT
+        d.uEdge = borde;
+        d.rc = borde switch
         {
-            Left = mx, Right = mx + mAncho,
-            Top = arriba ? my : my + mAlto - altoPx,
-            Bottom = arriba ? my + altoPx : my + mAlto
+            ABE_LEFT   => new RECT { Left = mx,                      Right = mx + grosorPx, Top = my,                     Bottom = my + mAlto },
+            ABE_RIGHT  => new RECT { Left = mx + mAncho - grosorPx,   Right = mx + mAncho,   Top = my,                     Bottom = my + mAlto },
+            ABE_BOTTOM => new RECT { Left = mx,                      Right = mx + mAncho,   Top = my + mAlto - grosorPx,  Bottom = my + mAlto },
+            _          => new RECT { Left = mx,                      Right = mx + mAncho,   Top = my,                     Bottom = my + grosorPx },
         };
         SHAppBarMessage(ABM_QUERYPOS, ref d);
-        if (arriba) d.rc.Bottom = d.rc.Top + altoPx; else d.rc.Top = d.rc.Bottom - altoPx;
+        switch (borde)
+        {
+            case ABE_LEFT:   d.rc.Right = d.rc.Left + grosorPx; break;
+            case ABE_RIGHT:  d.rc.Left = d.rc.Right - grosorPx; break;
+            case ABE_BOTTOM: d.rc.Top = d.rc.Bottom - grosorPx; break;
+            default:         d.rc.Bottom = d.rc.Top + grosorPx; break;
+        }
         SHAppBarMessage(ABM_SETPOS, ref d);
     }
 

@@ -78,7 +78,11 @@ jobs:
           # El instalador lleva el exe dentro: si pesa mucho menos, no lo lleva
           if ($mb -lt 20) { throw "el instalador pesa $mb MB: ¿lleva el exe dentro?" }
 
+      # La copia como artefacto es un extra: lo que vale es la Release. Con la cuota de
+      # almacenamiento de artefactos llena este paso falla, y no puede llevarse por
+      # delante la publicación (pasó con la v1.4.1).
       - name: Guardarlos también como artefacto
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: NubeBar-win-x64

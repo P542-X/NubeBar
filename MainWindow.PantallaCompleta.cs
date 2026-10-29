@@ -13,7 +13,7 @@ namespace NubeBar;
 // navegador). Se esconde SOLO la isla de esa pantalla; la de la otra sigue a lo suyo.
 public partial class MainWindow : Window
 {
-    bool _escondidaPorPantalla;   // el monitor tiene algo a pantalla completa
+    bool _recogida;   // el monitor tiene algo a pantalla completa
     bool _asomada;                // está asomando porque tienes el ratón en el borde
     DateTime _ratonEnElBorde = DateTime.MaxValue;
     TranslateTransform? _mover;
@@ -35,7 +35,7 @@ public partial class MainWindow : Window
             i._ratonEnElBorde = DateTime.MaxValue;
             // Al volver, si su pantalla sigue con algo a pantalla completa, se queda
             // fuera: el siguiente repaso la deja asomar como siempre con el ratón
-            i.Deslizar(esconder || i._escondidaPorPantalla);
+            i.Deslizar(esconder || i._recogida);
         }
         Log.Info(esconder ? "isla escondida a mano (vuelve con Win)" : "isla de vuelta con la tecla Windows");
     }
@@ -55,8 +55,12 @@ public partial class MainWindow : Window
             jefa?.VigilarBarraDeWindows();
             foreach (var i in Islas.ToList())
             {
-                try { i.VigilarClicFueraDelMenu(); i.VigilarClicFueraDelPanel(); }
+                try { i.VigilarClicFueraDelMenu(); i.VigilarClicFueraDelPanel(); i.VigilarEscDelPanel(); }
                 catch (Exception ex) { Log.Error("clic fuera del menú", ex); }
+                // Antes de decidir nada: quién lleva el ratón y cuánto lleva en el filo.
+                // Va delante a propósito — lo que viene detrás lo consulta.
+                try { i.MuestrearBordes(); }
+                catch (Exception ex) { Log.Error("muestrear los bordes", ex); }
                 try { i.RevisarPantallaCompleta(); }
                 catch (Exception ex) { Log.Error("pantalla completa", ex); }
             }
@@ -131,51 +135,92 @@ public partial class MainWindow : Window
     }
 
 
-    // ¿Está el ratón dentro de la franja donde vive la isla? Se mide con el alto
-    // de la barra, no con ActualHeight: con un panel abierto ActualHeight es el del
-    // panel entero y la franja saldría enorme.
+    // ¿Está el ratón dentro de la franja donde vive la isla? Se mide con el GROSOR de
+    // la barra, no con ActualWidth/Height: con un panel abierto la ventana es mucho
+    // más grande y la franja saldría enorme.
+    //
+    // En vertical la franja es una columna pegada a su lado, no una fila: es la misma
+    // cuenta con los dos ejes cambiados de sitio.
     bool RatonEnLaFranja()
     {
         var p = Monitores.Raton();
-        double altoDip = _cfg.Barra.Alto + _cfg.Barra.Margen * 2;
-        int franja = (int)Math.Round(altoDip * _monitor.Escala);
+        double grosorDip = _cfg.Barra.Alto + _cfg.Barra.Margen * 2;
+        int franja = (int)Math.Round(grosorDip * _monitor.Escala);
+
+        if (Vertical)
+            return p.Y >= _monitor.Y && p.Y < _monitor.Abajo &&
+                   (PegadaIzquierda ? p.X < _monitor.X + franja : p.X > _monitor.Derecha - franja);
+
         return p.X >= _monitor.X && p.X < _monitor.Derecha &&
                (Arriba ? p.Y < _monitor.Y + franja : p.Y > _monitor.Abajo - franja);
     }
 
+    // El filo de la pantalla por el que la barra asoma: los 2-3 px donde hay que dejar
+    // el ratón para que vuelva. Mismo criterio, con el eje que toque.
+    bool RatonEnElFilo()
+    {
+        var p = Monitores.Raton();
+        if (Vertical)
+            return p.Y >= _monitor.Y && p.Y < _monitor.Abajo &&
+                   (PegadaIzquierda ? p.X <= _monitor.X + 2 : p.X >= _monitor.Derecha - 3);
+
+        return p.X >= _monitor.X && p.X < _monitor.Derecha &&
+               (Arriba ? p.Y <= _monitor.Y + 2 : p.Y >= _monitor.Abajo - 3);
+    }
+
+    // Dos motivos distintos para recogerse, y el mismo deslizamiento para los dos:
+    //
+    //   - el panel está en visibilidad "autoocultar": se recoge SIEMPRE, y asoma
+    //     cuando pegas el ratón al borde (es lo que hace el panel de Plasma);
+    //   - hay algo a pantalla completa y el config lo pide (lo de siempre).
+    //
+    // Lo de abajo no distingue cuál de los dos ha sido: le basta saber si toca estar
+    // recogida. Así el asomar por el borde, el no esconderse con un panel abierto y
+    // el quedarse asomada si tienes el ratón encima valen igual para el modo nuevo,
+    // sin repetir ni una línea.
+    // La regla está en PanelNube.TocaRecogerse (sin ventana, y por tanto probable);
+    // aquí solo se le dan los tres datos. HayPantallaCompleta se consulta al final a
+    // propósito: recorre ventanas y con el autoocultar encendido no hace falta.
+    (bool Toca, string Motivo) TocaRecogerse() =>
+        PanelNube.TocaRecogerse(VisibilidadPanel, _cfg.Barra.OcultarEnPantallaCompleta,
+                                !PanelAutoOculta && _cfg.Barra.OcultarEnPantallaCompleta && HayPantallaCompleta());
+
     void RevisarPantallaCompleta()
     {
         if (_escondidaAMano) return;
-        if (!_cfg.Barra.OcultarEnPantallaCompleta)
+        if (!PanelNube.PuedeRecogerse(VisibilidadPanel, _cfg.Barra.OcultarEnPantallaCompleta))
         {
-            if (_escondidaPorPantalla) { _escondidaPorPantalla = false; _asomada = false; Deslizar(false); }
+            if (_recogida) { _recogida = false; _asomada = false; Deslizar(false); }
             return;
         }
 
-        bool completa = HayPantallaCompleta();
+        var (recoger, motivo) = TocaRecogerse();
 
-        if (completa != _escondidaPorPantalla)
+        if (recoger != _recogida)
         {
-            _escondidaPorPantalla = completa;
+            _recogida = recoger;
             // Si justo cuando toca esconderse tienes el ratón encima de la isla, se
             // queda asomada. Pasaba al cerrar un panel: el primer plano volvía a la
             // ventana maximizada y la isla desaparecía debajo del puntero, que es
             // justo donde acababas de hacer clic.
-            _asomada = completa && RatonEnLaFranja();
+            _asomada = recoger && RatonEnLaFranja();
             _ratonEnElBorde = DateTime.MaxValue;
-            Deslizar(completa && !_asomada);
-            Log.Info($"pantalla completa en {_monitor.Dispositivo}: " +
-                     (completa ? _asomada ? "sí, pero la isla se queda asomada (tienes el ratón encima)"
-                                          : "sí, la isla se esconde"
-                               : "no, la isla vuelve"));
+            Deslizar(recoger && !_asomada);
+            Log.Info($"la isla de {_monitor.Dispositivo} " +
+                     (recoger ? _asomada ? $"tendría que recogerse ({motivo}), pero se queda asomada (tienes el ratón encima)"
+                                         : $"se recoge ({motivo})"
+                              : "vuelve"));
             return;
         }
-        if (!_escondidaPorPantalla) return;
+        if (!_recogida) return;
 
-        // Escondida: el ratón pegado al borde durante 300 ms la hace asomar
-        var p = Monitores.Raton();
-        bool enElBorde = p.X >= _monitor.X && p.X < _monitor.Derecha &&
-                         (Arriba ? p.Y <= _monitor.Y + 2 : p.Y >= _monitor.Abajo - 3);
+        // Escondida: el ratón pegado al filo durante 300 ms la hace asomar.
+        //
+        // Con la guardia delante. Esto era el otro síntoma del fallo de los paneles: en un
+        // juego, mirar rápido hacia arriba clava el puntero contra el filo de arriba y la isla
+        // asomaba sola en mitad de la partida. Los 300 ms no lo evitaban porque el puntero no
+        // pasa por el filo — se queda ahí mientras sigas girando.
+        bool enElBorde = _ratonEsTuyo && RatonEnElFilo();
 
         if (!_asomada)
         {
@@ -201,10 +246,21 @@ public partial class MainWindow : Window
     // ---------- La animación ----------
     // Igual que el resto: el valor real de la propiedad es siempre el estado final y
     // la animación solo dibuja el camino. Si fallara, la isla quedaría donde toca.
+    // Se va por SU borde: la horizontal por arriba o por abajo moviéndose en Y, la
+    // vertical por su lado moviéndose en X. Es el mismo deslizamiento con el eje
+    // cambiado, y por eso el autoocultar y la pantalla completa funcionan igual en los
+    // cuatro bordes sin una línea de más en quien los decide.
     void Deslizar(bool fuera)
     {
-        double distancia = ActualHeight > 0 ? ActualHeight : _cfg.Barra.Alto + _cfg.Barra.Margen * 2;
-        double destino = fuera ? (Arriba ? -distancia : distancia) : 0;
+        bool v = Vertical;
+        var eje = v ? TranslateTransform.XProperty : TranslateTransform.YProperty;
+        double propio = _cfg.Barra.Alto + _cfg.Barra.Margen * 2;
+        double medida = v ? ActualWidth : ActualHeight;
+        // Con un panel abierto la ventana es mucho más grande que la franja: lo que hay
+        // que apartar es la BARRA, así que nunca más que su propio grosor.
+        double distancia = medida > 0 ? Math.Min(medida, propio) : propio;
+        bool haciaAtras = v ? PegadaIzquierda : Arriba;
+        double destino = fuera ? (haciaAtras ? -distancia : distancia) : 0;
 
         if (_mover == null || Isla.RenderTransform is not TranslateTransform t || t != _mover)
         {
@@ -212,10 +268,14 @@ public partial class MainWindow : Window
             if (_mover == null) { _mover = new TranslateTransform(); Isla.RenderTransform = _mover; }
         }
 
-        double desde = _mover.Y;
-        _mover.BeginAnimation(TranslateTransform.YProperty, null);
-        _mover.Y = destino;
-        _mover.BeginAnimation(TranslateTransform.YProperty,
-                              Kf(desde, destino, 260, 0, Suave));
+        // Al cambiar de orientación en caliente el otro eje tiene que volver a cero, o
+        // la barra se queda apartada en una dirección que ya no se usa.
+        if (v && Math.Abs(_mover.Y) > 0.01) { _mover.BeginAnimation(TranslateTransform.YProperty, null); _mover.Y = 0; }
+        if (!v && Math.Abs(_mover.X) > 0.01) { _mover.BeginAnimation(TranslateTransform.XProperty, null); _mover.X = 0; }
+
+        double desde = v ? _mover.X : _mover.Y;
+        _mover.BeginAnimation(eje, null);
+        if (v) _mover.X = destino; else _mover.Y = destino;
+        _mover.BeginAnimation(eje, Kf(desde, destino, 260, 0, Suave));
     }
 }

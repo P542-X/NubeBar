@@ -20,7 +20,14 @@ namespace NubeBar;
 // del original: en el peor caso, la copia sale un poco antigua y ya está.
 public static class Notificaciones
 {
-    public sealed record Aviso(long Id, string App, string Titulo, string Texto, DateTime Cuando, string AumId);
+    // Una acción rápida de la notificación. `Uri` solo viene cuando se puede lanzar de
+    // verdad —un protocolo: http, ms-settings, el que sea—; las acciones que solo sabe
+    // atender la app dueña a través de la plataforma de Windows llegan con Uri vacío y
+    // el centro no las enseña. Ver el comentario de Acciones().
+    public sealed record AccionRapida(string Texto, string Uri);
+
+    public sealed record Aviso(long Id, string App, string Titulo, string Texto, DateTime Cuando,
+                               string AumId, IReadOnlyList<AccionRapida>? Acciones = null);
 
     // Solo lo cambian las pruebas, para apuntar a una base sintética.
     // NUBEBAR_NOTIS_PRUEBA=<carpeta> hace lo mismo desde fuera: es la única forma
@@ -130,6 +137,56 @@ public static class Notificaciones
         }
     }
 
+    // ---------- Quién ha mandado notificaciones alguna vez ----------
+    //
+    // Existe para contestar una pregunta concreta y que se repite: «¿se pueden añadir las
+    // notificaciones de Steam, de Epic o de Discord?».
+    //
+    // La respuesta no depende de NubeBar. Aquí no hay una lista de apps permitidas: se lee
+    // `wpndatabase.db`, que es **donde Windows guarda las suyas**. Cualquier aplicación que
+    // mande un *toast* del sistema sale ya, sin tocar una línea de código. Las que dibujan su
+    // propio recuadro —su propia ventana, con su propio aspecto— no pasan por ahí, y entonces
+    // no hay nada que leer: no es que estén filtradas, es que no existen para Windows.
+    //
+    // Así que en vez de discutirlo, esto lo mide: devuelve cada remitente y cuántas lleva.
+    // Si tu app sale en la lista, el centro ya la enseña. Si no sale, es que nunca ha mandado
+    // una notificación de Windows.
+    public static List<(string App, string AumId, int Cuantas)> Remitentes()
+    {
+        var lista = new List<(string, string, int)>();
+        if (!Disponible) return lista;
+        try
+        {
+            Copiar();
+            var cadena = new SqliteConnectionStringBuilder
+            {
+                DataSource = Copia,
+                Mode = SqliteOpenMode.ReadOnly,
+                Pooling = false
+            }.ToString();
+
+            using var con = new SqliteConnection(cadena);
+            con.Open();
+            using var cmd = con.CreateCommand();
+            cmd.CommandText = @"
+                SELECT h.PrimaryId, COUNT(*) AS cuantas
+                FROM Notification n
+                JOIN NotificationHandler h ON h.RecordId = n.HandlerId
+                WHERE n.Type = 'toast'
+                GROUP BY h.PrimaryId
+                ORDER BY cuantas DESC;";
+
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                string aumid = r.IsDBNull(0) ? "" : r.GetString(0);
+                lista.Add((NombreBonito(aumid), aumid, r.GetInt32(1)));
+            }
+        }
+        catch (Exception ex) { Log.Error("leer los remitentes de notificaciones", ex); }
+        return lista;
+    }
+
     static List<Aviso> Leer(int cuantas)
     {
         var lista = new List<Aviso>();
@@ -171,7 +228,7 @@ public static class Notificaciones
 
             var (titulo, texto) = Partir(xml);
             if (titulo.Length == 0 && texto.Length == 0) continue;
-            lista.Add(new Aviso(id, NombreBonito(aumid), titulo, texto, cuando, aumid));
+            lista.Add(new Aviso(id, NombreBonito(aumid), titulo, texto, cuando, aumid, Acciones(xml)));
         }
         return lista;
     }
@@ -218,16 +275,127 @@ public static class Notificaciones
 
     // El identificador de app es feísimo ("Microsoft.WindowsStore_8wekyb3d8bbwe!App").
     // Se le quita la parafernalia para enseñar algo legible.
-    static string NombreBonito(string aumid)
+    //
+    // ---------- Y los trozos numéricos no cuentan ----------
+    //
+    // Coger el último trozo tras el punto va bien con `Microsoft.WindowsStore` → «WindowsStore»
+    // y fatal con `OperaSoftware.OperaGXWebBrowser.1746016074`, que daba **«1746016074»**. Salió
+    // al enseñar el origen en el reproductor: un número de diez cifras donde tenía que poner de
+    // dónde sale la música.
+    //
+    // Así que los trozos que son solo dígitos se saltan: son versiones o marcas de tiempo del
+    // instalador, nunca el nombre.
+    //
+    // Es público porque lo usa el reproductor además del centro de notificaciones. Dos copias
+    // de esta limpieza serían dos sitios que un día enseñan nombres distintos para la misma app.
+    public static string NombreBonito(string aumid)
     {
         if (string.IsNullOrWhiteSpace(aumid)) return "Windows";
         var trozo = aumid.Split('!')[0];
         trozo = trozo.Split('_')[0];
-        int punto = trozo.LastIndexOf('.');
-        if (punto >= 0 && punto < trozo.Length - 1) trozo = trozo[(punto + 1)..];
+
+        var partes = trozo.Split('.');
+        for (int i = partes.Length - 1; i >= 0; i--)
+        {
+            var p = partes[i];
+            if (p.Length == 0) continue;
+            if (p.All(char.IsDigit)) continue;       // una versión no es un nombre
+            return p;
+        }
         return trozo.Length == 0 ? aumid : trozo;
     }
 
+
+    // ---------- Las acciones rápidas de una notificación ----------
+    //
+    // Un toast puede traer botones ("Responder", "Marcar como leído", "Ver pedido").
+    // Vienen en el XML como <action content="..." arguments="..." activationType="...">.
+    //
+    // Y aquí hay un límite que conviene dejar escrito en vez de disimular: **solo se
+    // pueden pulsar las de tipo `protocol`**. Esas son una URI y lanzarlas es abrirla.
+    // Las de tipo `foreground`/`background` —las de responder a un mensaje, las que de
+    // verdad querrías— no son una URI: son un argumento que Windows le entrega a la app
+    // dueña a través de la plataforma de notificaciones, y para hablar con esa
+    // plataforma hace falta identidad de paquete, que es justo lo que NubeBar no tiene
+    // (ver la cabecera de este archivo).
+    //
+    // Fingirlo sería lo peor de los dos mundos: un botón "Responder" que en realidad
+    // abre la app y pierde lo que ibas a responder. Así que esas no se enseñan, y
+    // pulsar la tarjeta —que abre la app dueña— sigue siendo lo que hay.
+    static IReadOnlyList<AccionRapida>? Acciones(string xml)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(xml)) return null;
+            var doc = XDocument.Parse(xml);
+            var lista = new List<AccionRapida>();
+
+            foreach (var a in doc.Descendants().Where(e => e.Name.LocalName == "action"))
+            {
+                var texto = (a.Attribute("content")?.Value ?? "").Trim();
+                var argumento = (a.Attribute("arguments")?.Value ?? "").Trim();
+                var tipo = (a.Attribute("activationType")?.Value ?? "").Trim();
+                if (texto.Length == 0) continue;
+                if (!tipo.Equals("protocol", StringComparison.OrdinalIgnoreCase)) continue;
+                if (!EsUriLanzable(argumento)) continue;
+
+                // ---------- Y sin repetir el mismo rótulo ----------
+                //
+                // No es paranoia: Microsoft Defender manda DOS `<action>` con el mismo
+                // `content` —«Ver menos notificaciones»— y el centro pintaba los dos, uno al
+                // lado del otro. Salió en una captura, no leyendo el código.
+                //
+                // Los argumentos pueden ser distintos, sí; pero dos botones con el mismo
+                // texto son indistinguibles para quien los mira, así que enseñar los dos no
+                // le da una opción más: le da una duda. Se queda el primero.
+                if (lista.Any(x => string.Equals(x.Texto, texto, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+
+                lista.Add(new AccionRapida(texto, argumento));
+                if (lista.Count == 3) break;      // tres botones llenan la tarjeta
+            }
+            return lista.Count == 0 ? null : lista;
+        }
+        catch { return null; }
+    }
+
+    // Solo esquemas, y solo los que abren algo. Nada de file: ni de javascript:: lo que
+    // llega aquí viene de una app cualquiera y acaba en ShellExecute.
+    internal static bool EsUriLanzable(string uri)
+    {
+        if (string.IsNullOrWhiteSpace(uri)) return false;
+        int dosPuntos = uri.IndexOf(':');
+        if (dosPuntos <= 0) return false;
+        var esquema = uri[..dosPuntos].ToLowerInvariant();
+        if (esquema is "file" or "javascript" or "vbscript" or "data" or "shell") return false;
+        foreach (var c in esquema)
+            if (!char.IsLetterOrDigit(c) && c != '+' && c != '-' && c != '.') return false;
+        return true;
+    }
+
+    // Lanza una acción rápida. Pasa por el shell igual que un enlace del navegador.
+    public static void Lanzar(AccionRapida a)
+    {
+        if (!EsUriLanzable(a.Uri)) return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = a.Uri, UseShellExecute = true
+            })?.Dispose();
+        }
+        catch (Exception ex) { Log.Error("lanzar una acción de notificación", ex); }
+    }
+
+    // El historial que ya había cuando NubeBar arrancó. `Nuevas()` solo trae lo que ha
+    // llegado desde entonces —para no soltar de golpe en la isla las de los últimos
+    // días— pero el centro de notificaciones sí tiene que enseñarlas: es su historial.
+    // No toca `_ultimaVista`, así que llamarlo no se come ningún aviso pendiente.
+    public static List<Aviso> Historial(int cuantas)
+    {
+        try { return Leer(Math.Clamp(cuantas, 1, 200)); }
+        catch (Exception ex) { Log.Error("leer el historial de notificaciones", ex); return new List<Aviso>(); }
+    }
     // Pulsar el aviso abre la app dueña
     public static void Abrir(string aumid)
     {

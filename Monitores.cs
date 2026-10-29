@@ -145,9 +145,144 @@ public static class Monitores
         return p;
     }
 
+    // ---------- ¿Lleva el ratón alguien que no eres tú? ----------
+    //
+    // Las dos sondas que `GestosDeBorde` necesita para no abrir paneles dentro de una partida.
+    // Están aquí porque este fichero ya es el que le pregunta a Windows por el puntero, y una
+    // segunda casa para preguntar lo mismo es una segunda casa que se queda sin actualizar.
+    //
+    // Las dos fallan hacia «no»: si Windows no contesta, se supone que el ratón es tuyo y los
+    // gestos siguen funcionando. Es lo correcto en la duda — un gesto que deja de funcionar
+    // por una llamada que falló es peor que uno que se dispara de más.
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct CURSORINFO
+    {
+        public int cbSize;
+        public int flags;
+        public IntPtr hCursor;
+        public POINT ptScreenPos;
+    }
+
+    [DllImport("user32.dll")] static extern bool GetCursorInfo(ref CURSORINFO ci);
+    [DllImport("user32.dll")] static extern bool GetClipCursor(out RECT r);
+
+    const int CURSOR_SHOWING = 0x0001;
+    const int SM_XVIRTUALSCREEN = 76, SM_YVIRTUALSCREEN = 77;
+    const int SM_CXVIRTUALSCREEN = 78, SM_CYVIRTUALSCREEN = 79;
+
+    [DllImport("user32.dll")] static extern int GetSystemMetrics(int i);
+
+    // Confinado a un rectángulo más pequeño que el escritorio entero. Lo hace `ClipCursor`, y
+    // lo hacen los juegos para que el puntero no se te escape a la otra pantalla.
+    //
+    // Se compara con holgura de 1 px: el rectángulo del escritorio virtual y el que devuelve
+    // `GetClipCursor` salen del mismo sitio, pero con varias pantallas de DPI distinto se ha
+    // visto bailar un píxel, y un píxel de baile apagaría los gestos para siempre.
+    public static bool RatonAcotado()
+    {
+        try
+        {
+            if (!GetClipCursor(out var c)) return false;
+            int x = GetSystemMetrics(SM_XVIRTUALSCREEN), y = GetSystemMetrics(SM_YVIRTUALSCREEN);
+            int an = GetSystemMetrics(SM_CXVIRTUALSCREEN), al = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+            if (an <= 0 || al <= 0) return false;
+            return c.Left > x + 1 || c.Top > y + 1 ||
+                   c.Right < x + an - 1 || c.Bottom < y + al - 1;
+        }
+        catch { return false; }
+    }
+
+    // Sin puntero dibujado. Señal débil a propósito: ver `GestosDeBorde.EsTuGesto`.
+    public static bool RatonEscondido()
+    {
+        try
+        {
+            var ci = new CURSORINFO { cbSize = Marshal.SizeOf<CURSORINFO>() };
+            if (!GetCursorInfo(ref ci)) return false;
+            return (ci.flags & CURSOR_SHOWING) == 0;
+        }
+        catch { return false; }
+    }
+
     [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(POINT p);
 
     // La ventana que hay bajo el puntero (la de más arriba)
     public static IntPtr VentanaBajoElRaton() =>
         GetCursorPos(out var p) ? WindowFromPoint(p) : IntPtr.Zero;
+
+    // ---------- A cuántos hercios va esa pantalla ----------
+    //
+    // No se usa para marcar el ritmo —de eso se encarga el compositor, y la escena de
+    // entrada avanza por tiempo transcurrido, no por fotogramas contados— sino para
+    // saber contra qué comparar: sin el refresco real no hay forma de decir si 97
+    // fotogramas por segundo están bien o están mal.
+    //
+    // Primero el modo de pantalla, que es el dato exacto de ese monitor. Si no se puede
+    // (sesión remota, driver raro), la cadencia de presentación que publica DWM, que es
+    // la que de verdad manda. Y si tampoco, 60, que es lo más probable.
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    struct DEVMODE
+    {
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmDeviceName;
+        public ushort dmSpecVersion, dmDriverVersion, dmSize, dmDriverExtra;
+        public uint dmFields;
+        public int dmPositionX, dmPositionY;
+        public uint dmDisplayOrientation, dmDisplayFixedOutput;
+        public short dmColor, dmDuplex, dmYResolution, dmTTOption, dmCollate;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmFormName;
+        public ushort dmLogPixels;
+        public uint dmBitsPerPel, dmPelsWidth, dmPelsHeight, dmDisplayFlags, dmDisplayFrequency;
+        public uint dmICMMethod, dmICMIntent, dmMediaType, dmDitherType;
+        public uint dmReserved1, dmReserved2, dmPanningWidth, dmPanningHeight;
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    static extern bool EnumDisplaySettings(string? dispositivo, int modo, ref DEVMODE dm);
+
+    [DllImport("dwmapi.dll")] static extern int DwmGetCompositionTimingInfo(IntPtr hwnd, ref DWM_TIMING_INFO info);
+    [DllImport("kernel32.dll")] static extern bool QueryPerformanceFrequency(out long f);
+
+    // Solo hacen falta los tres primeros campos, pero la estructura va entera: DWM
+    // comprueba cbSize y rechaza la llamada si no cuadra.
+    [StructLayout(LayoutKind.Sequential)]
+    struct DWM_TIMING_INFO
+    {
+        public int cbSize;
+        public double rateRefreshNum, rateRefreshDen;
+        public long qpcRefreshPeriod;
+        public double rateCompose1, rateCompose2;
+        public long qpcVBlank, cRefresh; public uint cDXRefresh;
+        public long qpcCompose, cFrame; public uint cDXPresent;
+        public long cRefreshFrame, cFrameSubmitted; public uint cDXPresentSubmitted;
+        public long cFrameConfirmed; public uint cDXPresentConfirmed;
+        public long cRefreshConfirmed; public uint cDXRefreshConfirmed;
+        public long cFramesLate; public uint cFramesOutstanding;
+        public long cFrameDisplayed, qpcFrameDisplayed, cRefreshFrameDisplayed;
+        public long cFrameComplete, qpcFrameComplete, cFramePending, qpcFramePending;
+        public long cFramesDisplayed, cFramesComplete, cFramesPending, cFramesAvailable;
+        public long cFramesDropped, cFramesMissed, cRefreshNextDisplayed, cRefreshNextPresented;
+        public long cRefreshesDisplayed, cRefreshesPresented, cRefreshStarted;
+        public long cPixelsReceived, cPixelsDrawn, cBuffersEmpty;
+    }
+
+    public static double Hercios(string dispositivo)
+    {
+        try
+        {
+            var dm = new DEVMODE { dmSize = (ushort)Marshal.SizeOf<DEVMODE>() };
+            if (EnumDisplaySettings(dispositivo, -1, ref dm) && dm.dmDisplayFrequency > 1)
+                return dm.dmDisplayFrequency;
+        }
+        catch { }
+        try
+        {
+            var info = new DWM_TIMING_INFO { cbSize = Marshal.SizeOf<DWM_TIMING_INFO>() };
+            if (DwmGetCompositionTimingInfo(IntPtr.Zero, ref info) == 0 && info.qpcRefreshPeriod > 0 &&
+                QueryPerformanceFrequency(out long f))
+                return (double)f / info.qpcRefreshPeriod;
+        }
+        catch { }
+        return 60;
+    }
 }

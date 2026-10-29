@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>NubeBar · Notificaciones</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#8DA9E8;text-decoration:none}a:hover{color:#B8C7EC}
+.nb{--plata:#C9D2E6;--coral:#D9826E;--texto:#E6E9F2;--tenue:#9AA3B8;--filo:rgba(255,255,255,.09);--panel:rgba(12,14,20,.94);font-family:"Segoe UI Variable","Segoe UI",system-ui,sans-serif;color:var(--texto)}
+.nb *{box-sizing:border-box}
+.nb button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
+.nb button:focus-visible,.nb a:focus-visible{outline:2px solid var(--acento);outline-offset:3px}
+@keyframes girar{to{transform:rotate(360deg)}}
+@keyframes fluir{to{background-position:-250% center}}
+@keyframes entrar{from{opacity:0;transform:scaleY(.6)}to{opacity:1;transform:none}}
+@keyframes subir{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes latido{0%{box-shadow:0 0 0 0 rgba(217,130,110,.5)}100%{box-shadow:0 0 0 6px rgba(217,130,110,0)}}
+
+.isla-borde{position:absolute;top:10px;right:20px;width:760px;border-radius:23px;padding:1px;overflow:hidden;isolation:isolate;background:var(--filo);z-index:2}
+.isla-borde::before{content:"";position:absolute;left:50%;top:50%;width:900px;height:900px;margin:-450px 0 0 -450px;background:linear-gradient(90deg,transparent 40%,rgba(201,210,230,.6) 49%,var(--acento) 51%,transparent 60%);animation:girar 9s linear infinite;z-index:-1}
+.isla{display:flex;align-items:center;justify-content:flex-end;gap:6px;height:46px;padding:0 12px;border-radius:22px;background:var(--panel)}
+.isla img{width:22px;height:22px;display:block}
+.isla .oscuro{filter:drop-shadow(0 0 3px rgba(255,255,255,.85))}
+.sep{width:1px;height:20px;background:rgba(255,255,255,.1);margin:0 5px}
+.ic{width:28px;height:28px;display:grid;place-items:center;border-radius:8px;color:var(--plata)}
+.ic.abierto{background:rgba(141,169,232,.18);color:#fff}
+.chip-es{font-size:12px;font-weight:600;padding:3px 7px;border-radius:6px;background:rgba(255,255,255,.06);color:var(--plata)}
+.reloj{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;background:linear-gradient(90deg,var(--texto) 40%,#fff 50%,var(--texto) 60%);background-size:250% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:fluir 7s linear infinite}
+.fecha{font-size:13px;color:var(--plata);padding:0 4px}
+.insignia{position:absolute;top:2px;right:1px;min-width:14px;height:14px;padding:0 3px;border-radius:7px;background:var(--coral);color:#1a0f0c;font-size:9.5px;font-weight:700;display:grid;place-items:center;animation:latido 2.4s ease-out infinite}
+
+.panel{position:absolute;top:55px;z-index:1;border-radius:0 0 20px 20px;padding:0 1px 1px;background:linear-gradient(180deg,var(--filo),rgba(201,210,230,.18));box-shadow:0 30px 60px -22px rgba(0,0,0,.9);transform-origin:top;animation:entrar .5s cubic-bezier(.22,1.1,.36,1) both}
+.panel-dentro{border-radius:0 0 19px 19px;background:var(--panel);padding:14px;display:flex;flex-direction:column;gap:10px}
+.escalon{animation:subir .5s cubic-bezier(.22,1.1,.36,1) both}
+.boton-icono{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;color:var(--plata);transition:background .2s,color .2s}
+.boton-icono:hover{background:rgba(255,255,255,.08)}
+.boton-icono.encendido{color:var(--acento);background:rgba(141,169,232,.14)}
+.grupo{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:600;color:var(--acento);padding:2px 2px 0}
+.aviso{position:relative;display:flex;gap:11px;padding:12px;border-radius:13px;background:rgba(255,255,255,.04);border:1px solid var(--filo);transition:background .2s,border-color .2s}
+.aviso:hover{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.14)}
+.aviso .cerrar{opacity:0;transition:opacity .2s}
+.aviso:hover .cerrar,.aviso .cerrar:focus-visible{opacity:1}
+.ficha{width:32px;height:32px;flex:none;border-radius:9px;display:grid;place-items:center;background:rgba(255,255,255,.06)}
+.ficha img{width:22px;height:22px;display:block}
+
+@media (prefers-reduced-motion:reduce){.nb *{animation:none!important}}
+</style>
+</helmet>
+<div class="nb" style="--acento: {{accent}}; position: relative; width: 720px; height: 340px; overflow: hidden; background: linear-gradient(160deg, #1b2130 0%, #10141d 45%, #0a0c12 100%);">
+
+  <div class="isla-borde">
+    <div class="isla">
+      <img src="/_blob/6d5b0ce4dc72fddea414eeb915593619" alt="">
+      <img src="/_blob/07e3c1f6fdbbb26062f6f6eddc01e70f" alt="">
+      <img src="/_blob/be47ad89d05d24e5d04398b75ed6b736" alt="">
+      <img class="oscuro" src="/_blob/b82066d331d454bdae2321d5e0545c8d" alt="">
+      <img src="/_blob/c55c03934836160ba79f8a368fa26df2" alt="">
+      <div class="sep" aria-hidden="true"></div>
+      <span class="chip-es">ES</span>
+      <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"></path><circle cx="12" cy="19" r="1" fill="currentColor"></circle></svg></span>
+      <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"></path><path d="M16.5 8.5a5 5 0 0 1 0 7"></path></svg></span>
+      <span class="ic"><svg width="20" height="16" viewBox="0 0 28 16" aria-hidden="true"><rect x="1" y="2" width="22" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"></rect><rect x="3" y="4" width="18" height="8" rx="1.5" fill="currentColor"></rect></svg></span>
+      <div class="sep" aria-hidden="true"></div>
+      <span class="reloj">{{hora}}</span>
+      <div class="sep" aria-hidden="true"></div>
+      <span class="ic abierto" style="position: relative;" aria-label="Notificaciones (abierto)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14v10H10l-5 4z"></path></svg><sc-if value="{{hayAvisos}}" hint-placeholder-val="{{true}}"><span class="insignia">{{cuantos}}</span></sc-if></span>
+      <span class="ic"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg></span>
+      <span class="fecha">{{fecha}}</span>
+    </div>
+  </div>
+
+  <div class="panel" style="width: 430px; right: 20px;">
+    <div class="panel-dentro">
+
+      <div class="escalon" style="display: flex; align-items: center; gap: 6px; animation-delay: 40ms;">
+        <span style="font-size: 14.5px; font-weight: 600; flex: 1;">Notificaciones</span>
+        <button class="boton-icono {{claseNoMolestar}}" aria-label="No molestar" aria-pressed="{{noMolestar}}" onClick="{{alternarNoMolestar}}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"></path></svg>
+        </button>
+        <sc-if value="{{hayAvisos}}" hint-placeholder-val="{{true}}">
+          <button style="font-size: 12.5px; font-weight: 600; color: var(--acento); padding: 6px 8px; border-radius: 8px;" onClick="{{borrarTodo}}">Borrar todo</button>
+        </sc-if>
+      </div>
+
+      <sc-if value="{{hayAvisos}}" hint-placeholder-val="{{true}}">
+        <sc-for list="{{avisos}}" as="n" hint-placeholder-count="2">
+          <div class="escalon" style="display: flex; flex-direction: column; gap: 6px; animation-delay: {{n.retraso}};">
+            <div class="grupo">{{n.app}}</div>
+            <div class="aviso">
+              <span class="ficha" style="color: var(--acento);">
+                <sc-if value="{{n.tieneIcono}}" hint-placeholder-val="{{false}}"><img src="{{n.icono}}" alt=""></sc-if>
+                <sc-if value="{{n.sinIcono}}" hint-placeholder-val="{{true}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"></path></svg></sc-if>
+              </span>
+              <div style="flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+                <div style="display: flex; justify-content: space-between; gap: 10px;">
+                  <span style="font-size: 13px; font-weight: 600;">{{n.titulo}}</span>
+                  <span style="font-size: 11.5px; color: var(--tenue); font-variant-numeric: tabular-nums;">{{n.hora}}</span>
+                </div>
+                <span style="font-size: 12px; color: var(--tenue); line-height: 1.4;">{{n.texto}}</span>
+              </div>
+              <button class="boton-icono cerrar" style="position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; background: #1a1e28;" aria-label="Descartar" onClick="{{n.descartar}}">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+              </button>
+            </div>
+          </div>
+        </sc-for>
+      </sc-if>
+
+      <sc-if value="{{vacio}}" hint-placeholder-val="{{false}}">
+        <div class="escalon" style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 22px 0 14px; color: var(--tenue); font-size: 13px;">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>
+          Todo al día
+          <a href="#" style="font-size: 12px;" onClick="{{reponer}}">Volver a ver los de ejemplo</a>
+        </div>
+      </sc-if>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#8DA9E8","options":["#8DA9E8","#9FB4C7","#7FA8B8","#A9A3D0"]},"$preview":{"width":720,"height":340}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { ahora: new Date(), quitados: [], noMolestar: false };
+  }
+  componentDidMount() { this.reloj = setInterval(() => this.setState({ ahora: new Date() }), 1000); }
+  componentWillUnmount() { clearInterval(this.reloj); }
+  renderVals() {
+    const a = this.state.ahora, dos = (n) => String(n).padStart(2, '0');
+    const dias = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'], meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    const todos = [
+      { id: 'defender', app: 'Seguridad de Windows', icono: '', titulo: 'Actualizar protección antivirus', texto: 'La protección antivirus no está actualizada. Pulsa para actualizar Microsoft Defender.', hora: '10:32' },
+      { id: 'teams', app: 'Microsoft Teams', icono: '/_blob/67916f7f95e500bcb4299ab3b2b5d482', titulo: '[Remitente]', texto: '[Vista previa del mensaje]', hora: '14:05' },
+    ];
+    const avisos = todos.filter((n) => !this.state.quitados.includes(n.id)).map((n, i) => ({
+      ...n, tieneIcono: !!n.icono, sinIcono: !n.icono, retraso: (60 + i * 50) + 'ms',
+      descartar: () => this.setState({ quitados: [...this.state.quitados, n.id] }),
+    }));
+    return {
+      accent: this.props.accent ?? '#8DA9E8',
+      hora: dos(a.getHours()) + ':' + dos(a.getMinutes()),
+      fecha: dias[a.getDay()] + ' ' + a.getDate() + ' ' + meses[a.getMonth()],
+      avisos, hayAvisos: avisos.length > 0, vacio: avisos.length === 0, cuantos: avisos.length,
+      borrarTodo: () => this.setState({ quitados: todos.map((n) => n.id) }),
+      reponer: (ev) => { ev.preventDefault(); this.setState({ quitados: [] }); },
+      noMolestar: this.state.noMolestar ? 'true' : 'false',
+      claseNoMolestar: this.state.noMolestar ? 'encendido' : '',
+      alternarNoMolestar: () => this.setState({ noMolestar: !this.state.noMolestar }),
+    };
+  }
+}
+</script>
+</body>
+</html>

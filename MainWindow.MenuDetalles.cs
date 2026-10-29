@@ -13,12 +13,17 @@ using System.Windows.Media.Imaging;
 
 namespace NubeBar;
 
-// Lo que lleva el menú Inicio además del buscador: cabecera con saludo, lo que
-// suena, accesos rápidos, gráficas, el wallpaper, las apps fijadas y energía.
+// Lo que lleva la superficie de Inicio además del buscador y de las tarjetas del centro
+// de control: la cabecera con el saludo, las apps fijadas y los botones de energía.
+//
+// Lo que suena, los accesos rápidos, las gráficas de CPU/RAM y el wallpaper vivían aquí
+// con tarjetas hechas a mano; ahora son las tarjetas aprobadas de MainWindow.Control.cs
+// (CardMultimedia, CardAccionesRapidas, CardMetricas, CardFondo), que es lo que hace que
+// haya UNA superficie y no dos con lo mismo.
+
 public partial class MainWindow
 {
-    Grafica? _graficaCpu, _graficaRam;
-    Border? _tarjetaMusica;
+
     StackPanel? _confirmacion;
     StackPanel? _filaEnergia;
 
@@ -37,8 +42,7 @@ public partial class MainWindow
         };
         var fecha = new TextBlock
         {
-            Foreground = _texto,
-            Opacity = 0.5,
+            Foreground = _textoAtenuado,
             FontSize = FontSize - 1,
             Margin = new Thickness(0, 2, 0, 0)
         };
@@ -67,7 +71,9 @@ public partial class MainWindow
         }
         Act();
         _actualizadoresMenu.Add(Act);
-        return caja;
+        // En tarjeta, como el resto de la portada: suelto, con todo lo de al lado dentro
+        // de una tarjeta opaca, se veía como un bloque de botones flotando.
+        return Tarjeta(caja);
     }
 
     static string Saludo(DateTime t) => t.Hour switch
@@ -78,269 +84,6 @@ public partial class MainWindow
     };
 
     static string Mayuscula(string s) => s.Length == 0 ? s : char.ToUpper(s[0]) + s[1..];
-
-    // ================= Lo que suena =================
-    UIElement CrearTarjetaMusica()
-    {
-        var caratula = new Border
-        {
-            Width = 52, Height = 52,
-            CornerRadius = new CornerRadius(8),
-            ClipToBounds = true,
-            Margin = new Thickness(0, 0, 12, 0),
-            Background = new SolidColorBrush(Color.FromArgb(0x22, _cTexto.R, _cTexto.G, _cTexto.B))
-        };
-        var img = new Image { Stretch = Stretch.UniformToFill };
-        caratula.Child = img;
-
-        var titulo = new TextBlock { Foreground = _texto, FontSize = FontSize + 1, TextTrimming = TextTrimming.CharacterEllipsis };
-        var artista = new TextBlock { Foreground = _texto, Opacity = 0.55, FontSize = FontSize - 1, TextTrimming = TextTrimming.CharacterEllipsis };
-
-        var barra = new Border
-        {
-            Height = 3,
-            CornerRadius = new CornerRadius(1.5),
-            Background = new SolidColorBrush(Color.FromArgb(0x33, _cTexto.R, _cTexto.G, _cTexto.B)),
-            Margin = new Thickness(0, 7, 0, 0),
-            HorizontalAlignment = HorizontalAlignment.Stretch
-        };
-        var avance = new Border
-        {
-            Height = 3,
-            CornerRadius = new CornerRadius(1.5),
-            Background = _acento,
-            HorizontalAlignment = HorizontalAlignment.Left,
-            Width = 0
-        };
-        var pistaBarra = new Grid();
-        pistaBarra.Children.Add(barra);
-        pistaBarra.Children.Add(avance);
-
-        var textos = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        textos.Children.Add(titulo);
-        textos.Children.Add(artista);
-        textos.Children.Add(pistaBarra);
-
-        var anterior = Boton(Glifo(""), "Anterior", Musica.Anterior);
-        var playPausa = Boton(Glifo(""), "Pausa o reanudar", Musica.PlayPausa);
-        var siguiente = Boton(Glifo(""), "Siguiente", Musica.Siguiente);
-        var mandos = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(10, 0, 0, 0),
-            Children = { anterior, playPausa, siguiente }
-        };
-
-        var fila = new Grid();
-        fila.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        fila.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        fila.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        Grid.SetColumn(caratula, 0); Grid.SetColumn(textos, 1); Grid.SetColumn(mandos, 2);
-        fila.Children.Add(caratula); fila.Children.Add(textos); fila.Children.Add(mandos);
-
-        _tarjetaMusica = Tarjeta(fila);
-        _tarjetaMusica.Visibility = Visibility.Collapsed;
-
-        void Act()
-        {
-            if (_musica is not { } m)
-            {
-                _tarjetaMusica.Visibility = Visibility.Collapsed;
-                return;
-            }
-            _tarjetaMusica.Visibility = Visibility.Visible;
-            titulo.Text = m.Titulo;
-            artista.Text = m.Artista.Length > 0 ? m.Artista : m.AppId;
-            if (!ReferenceEquals(img.Source, Musica.Caratula)) img.Source = Musica.Caratula;
-            if (playPausa.Content is TextBlock g) g.Text = m.Sonando ? "" : "";
-            avance.Width = Math.Max(0, pistaBarra.ActualWidth * m.Avance);
-        }
-        Act();
-        _actualizadoresMenu.Add(Act);
-        return _tarjetaMusica;
-    }
-
-    // ================= Accesos rápidos =================
-    UIElement CrearAccesosRapidos()
-    {
-        var fila = new UniformGrid { Columns = 4, Margin = new Thickness(0, 2, 0, 0) };
-
-        fila.Children.Add(Acceso("", "Wallpaper", () => _wpPausado,
-            () => { _wpPausado = !_wpPausado; WallpaperEngine.Enviar(_wpPausado ? "pause" : "play"); },
-            encendidoEs: "pausado"));
-
-        fila.Children.Add(Acceso("", "Iconos", () => _iconosOcultos,
-            () => { _iconosOcultos = !_iconosOcultos; WallpaperEngine.Enviar(_iconosOcultos ? "hideIcons" : "showIcons"); },
-            encendidoEs: "ocultos"));
-
-        fila.Children.Add(Acceso("", "Silencio", () => Audio.Silenciado,
-            () => Audio.Silenciar(!Audio.Silenciado),
-            encendidoEs: "silenciado"));
-
-        fila.Children.Add(Acceso("", "No molestar", () => NoMolestar.Activo,
-            NoMolestar.AbrirAjustes,
-            encendidoEs: "activo",
-            nota: "Windows no deja cambiarlo desde fuera: se abre su ajuste"));
-
-        return Tarjeta(fila);
-    }
-
-    // Cada acceso se pinta con el acento cuando está encendido
-    UIElement Acceso(string glifo, string nombre, Func<bool> encendido, Action pulsar,
-                     string encendidoEs, string? nota = null)
-    {
-        var icono = new TextBlock
-        {
-            Text = glifo,
-            FontFamily = new FontFamily(FuenteIconos),
-            FontSize = 18,
-            HorizontalAlignment = HorizontalAlignment.Center
-        };
-        var etiqueta = new TextBlock
-        {
-            Text = nombre,
-            FontSize = FontSize - 3,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            Margin = new Thickness(0, 4, 0, 0)
-        };
-        var dentro = new StackPanel { Children = { icono, etiqueta } };
-        var marco = new Border
-        {
-            Child = dentro,
-            CornerRadius = new CornerRadius(10),
-            Margin = new Thickness(4),
-            Padding = new Thickness(0, 9, 0, 8),
-            BorderThickness = new Thickness(1)
-        };
-
-        var boton = Boton(marco, nota ?? nombre, () => { pulsar(); Tick(); });
-        boton.Height = double.NaN;
-        boton.Padding = new Thickness(0);
-
-        void Act()
-        {
-            bool on = false;
-            try { on = encendido(); } catch { }
-            marco.Background = on
-                ? new SolidColorBrush(Color.FromArgb(0x33, _cAcento.R, _cAcento.G, _cAcento.B))
-                : new SolidColorBrush(Color.FromArgb(0x14, _cTexto.R, _cTexto.G, _cTexto.B));
-            marco.BorderBrush = on ? _acento : Brushes.Transparent;
-            icono.Foreground = on ? _acento : _texto;
-            etiqueta.Foreground = on ? _acento : _texto;
-            etiqueta.Opacity = on ? 1 : 0.6;
-            boton.ToolTip = nota ?? $"{nombre}: {(on ? encendidoEs : "no")}";
-        }
-        Act();
-        _actualizadoresMenu.Add(Act);
-        return boton;
-    }
-
-    // ================= Gráficas =================
-    UIElement CrearGraficas()
-    {
-        _graficaCpu = new Grafica();
-        _graficaRam = new Grafica();
-        _graficaCpu.Colorear(_cAcento);
-        _graficaRam.Colorear(_cAcento);
-        _graficaCpu.Rellenar(Historial.Cpu);
-        _graficaRam.Rellenar(Historial.Ram);
-
-        var cpu = ConGrafica("CPU", _graficaCpu, () => $"{Nativo.Cpu()}%");
-        var ram = ConGrafica("RAM", _graficaRam, () => $"{Nativo.Ram()}%");
-
-        var fila = new UniformGrid { Columns = 2 };
-        fila.Children.Add(cpu);
-        fila.Children.Add(ram);
-        return Tarjeta(fila);
-    }
-
-    UIElement ConGrafica(string nombre, Grafica g, Func<string> valor)
-    {
-        var titulo = new TextBlock { Text = nombre, Foreground = _texto, Opacity = 0.6, FontSize = FontSize - 2 };
-        var numero = new TextBlock { Foreground = _acento, FontSize = FontSize + 2, HorizontalAlignment = HorizontalAlignment.Right };
-        Typography.SetNumeralAlignment(numero, FontNumeralAlignment.Tabular);
-
-        var arriba = new Grid();
-        arriba.Children.Add(titulo);
-        arriba.Children.Add(numero);
-
-        var pila = new StackPanel { Margin = new Thickness(8, 2, 8, 2) };
-        pila.Children.Add(arriba);
-        pila.Children.Add(g);
-
-        void Act()
-        {
-            numero.Text = valor();
-            g.Rellenar(nombre == "CPU" ? Historial.Cpu : Historial.Ram);
-        }
-        Act();
-        _actualizadoresMenu.Add(Act);
-        return pila;
-    }
-
-    // ================= Wallpaper =================
-    UIElement CrearTarjetaWallpaper()
-    {
-        var mini = new Border
-        {
-            Width = 72, Height = 40,
-            CornerRadius = new CornerRadius(6),
-            ClipToBounds = true,
-            Margin = new Thickness(0, 0, 12, 0),
-            Background = new SolidColorBrush(Color.FromArgb(0x22, _cTexto.R, _cTexto.G, _cTexto.B))
-        };
-        var img = new Image { Stretch = Stretch.UniformToFill };
-        mini.Child = img;
-
-        var titulo = new TextBlock { Foreground = _texto, TextTrimming = TextTrimming.CharacterEllipsis };
-        var pie = new TextBlock { Text = "Wallpaper actual", Foreground = _texto, Opacity = 0.5, FontSize = FontSize - 2 };
-        var textos = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        textos.Children.Add(titulo);
-        textos.Children.Add(pie);
-
-        var fila = new StackPanel { Orientation = Orientation.Horizontal, Children = { mini, textos } };
-        var tarjeta = Tarjeta(fila);
-
-        string? ultimaPreview = null;
-        void Act()
-        {
-            titulo.Text = _wpTitulo ?? "ninguno";
-            var prev = _wpRuta != null ? WallpaperEngine.Preview(_wpRuta) : null;
-            if (prev != ultimaPreview)
-            {
-                ultimaPreview = prev;
-                img.Source = null;
-                // Decodificar el JPEG cuesta unos 30 ms: fuera del camino de la
-                // animación de apertura, que si no se come un par de fotogramas
-                if (prev != null && File.Exists(prev))
-                {
-                    var ruta = prev;
-                    Dispatcher.InvokeAsync(() =>
-                    {
-                        if (ultimaPreview != ruta) return;
-                        try
-                        {
-                            var b = new BitmapImage();
-                            b.BeginInit();
-                            b.UriSource = new Uri(ruta);
-                            b.DecodePixelWidth = 160;
-                            b.CacheOption = BitmapCacheOption.OnLoad;
-                            b.EndInit();
-                            b.Freeze();
-                            img.Source = b;
-                            img.BeginAnimation(OpacityProperty, Kf(0, 1, 240));
-                        }
-                        catch { }
-                    }, System.Windows.Threading.DispatcherPriority.Background);
-                }
-            }
-            tarjeta.Visibility = _wpTitulo != null ? Visibility.Visible : Visibility.Collapsed;
-        }
-        Act();
-        _actualizadoresMenu.Add(Act);
-        return tarjeta;
-    }
 
     // ================= Apps fijadas =================
     UIElement CrearFijadas()
@@ -359,9 +102,8 @@ public partial class MainWindow
             var nombre = new TextBlock
             {
                 Text = Path.GetFileNameWithoutExtension(ruta),
-                Foreground = _texto,
+                Foreground = _textoAtenuado,
                 FontSize = FontSize - 3,
-                Opacity = 0.75,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 MaxWidth = 80,
@@ -397,7 +139,9 @@ public partial class MainWindow
         var caja = new StackPanel();
         caja.Children.Add(fila);
         caja.Children.Add(_confirmacion);
-        return caja;
+        // En tarjeta, como el resto de la portada: suelto, con todo lo de al lado dentro
+        // de una tarjeta opaca, se veía como un bloque de botones flotando.
+        return Tarjeta(caja);
     }
 
     UIElement BotonEnergia(string glifo, string nombre, Action accion, bool confirmar)
@@ -463,12 +207,12 @@ public partial class MainWindow
     }
 
     // ================= Utilidades =================
-    Border Tarjeta(UIElement dentro) => new()
-    {
-        Child = dentro,
-        CornerRadius = new CornerRadius(12),
-        Background = new SolidColorBrush(Color.FromArgb(0x14, _cTexto.R, _cTexto.G, _cTexto.B)),
-        Padding = new Thickness(10, 9, 10, 9),
-        Margin = new Thickness(0, 0, 0, 8)
-    };
+    // La tarjeta de la portada. Antes se pintaba a mano con `_superficie`, que lleva
+    // alfa: apoyada sobre una isla translúcida, el escritorio se leía a través de dos
+    // capas transparentes seguidas. Ahora es la MISMA tarjeta del resto de los paneles
+    // —`Card`, opaca y con su filo— para que no haya dos definiciones de lo mismo que se
+    // separen con el tiempo, y para que las piezas propias del lanzador (las fijadas, la
+    // energía) se vean igual que las del centro de control, que están al lado. El
+    // acolchado se mantiene en 10 para no cambiar el aire que ya tenía la portada.
+    Border Tarjeta(UIElement dentro) => Card(dentro, dentro: 10);
 }

@@ -193,17 +193,20 @@ public static class Fuentes
 
         foreach (var o in _ordenes)
         {
-            double p = Parecido.Puntuar(consultaNorm, o.Nombre);
+            var m = Parecido.Medir(consultaNorm, o.Nombre);
             bool exacta = false;
             foreach (var a in o.Alias)
             {
                 if (a == consultaNorm) { exacta = true; break; }
-                p = Math.Max(p, Parecido.Puntuar(consultaNorm, a));
+                var ma = Parecido.Medir(consultaNorm, a);
+                if (ma.Puntos > m.Puntos) m = ma;
             }
+            double p = m.Puntos;
+            var nivel = m.Nivel;
             // Haber escrito el alias ENTERO no es parecerse: es haberla pedido por su
             // nombre. Por encima del 1.0 de un parecido perfecto, para que "cmd" ponga
             // la consola la primera aunque tengas cien archivos .cmd por el disco.
-            if (exacta) p = 1.3;
+            if (exacta) { p = 1.3; nivel = Nivel.Exacta; }
             if (p < 0.5) continue;
 
             var destino = o.Destino;
@@ -217,6 +220,7 @@ public static class Fuentes
                 IconoRuta = icono,
                 Carpeta = Path.GetDirectoryName(icono),
                 Puntos = p,
+                Nivel = nivel,
                 Abrir = () => Lanzar(icono)
             };
         }
@@ -257,7 +261,8 @@ public static class Fuentes
     {
         foreach (var a in _apps)
         {
-            double p = Parecido.Puntuar(consultaNorm, a.Nombre);
+            var m = Parecido.Medir(consultaNorm, a.Nombre);
+            double p = m.Puntos;
             if (p < 0.45) continue;
             var entrada = a;
             yield return new Resultado
@@ -270,6 +275,7 @@ public static class Fuentes
                 Carpeta = entrada.Ruta.StartsWith("shell:", StringComparison.OrdinalIgnoreCase)
                           ? null : Path.GetDirectoryName(entrada.Ruta),
                 Puntos = p,
+                Nivel = m.Nivel,
                 Abrir = () => Lanzar(entrada.Ruta)
             };
         }
@@ -325,7 +331,8 @@ public static class Fuentes
     {
         foreach (var (nombre, pagina) in _ajustes)
         {
-            double p = Parecido.Puntuar(consultaNorm, nombre);
+            var m = Parecido.Medir(consultaNorm, nombre);
+            double p = m.Puntos;
             if (p < 0.5) continue;
             var pg = pagina;
             yield return new Resultado
@@ -335,6 +342,7 @@ public static class Fuentes
                 Detalle = pg,
                 Clave = "ajuste:" + pg,
                 Puntos = p * 0.95,
+                Nivel = m.Nivel,
                 Abrir = () => Lanzar(pg)
             };
         }
@@ -491,7 +499,8 @@ public static class Fuentes
                 if (r.Length == 0 || EsTrastero(r)) continue;
                 // Un archivo nunca debería ganarle a una app que se parece lo mismo:
                 // casi siempre lo que buscas es el programa, no un fichero suelto
-                double p = Parecido.Puntuar(norm, nombre) * 0.72;
+                var m = Parecido.Medir(norm, nombre);
+                double p = m.Puntos * 0.72;
                 if (p < 0.4) continue;
                 salida.Add(new Resultado
                 {
@@ -503,6 +512,7 @@ public static class Fuentes
                     IconoRuta = r,
                     Carpeta = Path.GetDirectoryName(r),
                     Puntos = p,
+                    Nivel = m.Nivel,
                     Abrir = () => Lanzar(r)
                 });
             }
