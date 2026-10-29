@@ -6,6 +6,17 @@ construidos por el workflow de Release a partir de la etiqueta.
 
 ---
 
+## v1.0.5
+
+### Añadido
+
+- **Cerrar ventanas una a una desde la nube:** en la mini lista que sale sobre un programa
+  con varias ventanas (por ejemplo, varias carpetas abiertas), cada fila lleva una ✕ que
+  cierra solo esa ventana, sin tener que traerla delante primero. Se cierra por las
+  buenas: si hay algo sin guardar, el programa lo pregunta.
+
+---
+
 ## v1.0.4
 
 ### Arreglado

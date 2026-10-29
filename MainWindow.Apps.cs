@@ -777,9 +777,35 @@ public partial class MainWindow
             boton.Height = 28;
             boton.PreviewMouseLeftButtonDown += (_, _) => ApuntarActivaAlPulsar();
             boton.HorizontalContentAlignment = HorizontalAlignment.Left;
-            lista.Children.Add(boton);
+
+            // La ✕ de cada fila: cerrar una carpeta de diez sin tener que traerla delante
+            // primero. Va en los 24 px que `AnchoMiniLista` ya reservaba a la derecha.
+            var renglon = new Grid();
+            renglon.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            renglon.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            renglon.Children.Add(boton);
+            var aspa = Glifo(GlifoAspa);
+            aspa.FontSize = 10;
+            aspa.Foreground = _textoAtenuado;
+            var cerrar = Boton(aspa, "Cerrar esta ventana", () => CerrarDesdeMiniLista(h, g, lista, renglon));
+            cerrar.Width = 24;
+            cerrar.Height = 28;
+            Grid.SetColumn(cerrar, 1);
+            renglon.Children.Add(cerrar);
+            lista.Children.Add(renglon);
         }
         return lista;
+    }
+
+    // Por las buenas (WM_CLOSE, como la vista general): si la app pregunta si guardas, te
+    // lo pregunta. La fila se quita ya y la lista se encoge; con una sola ventana la mini
+    // lista ya no tiene sentido y se cierra, como cuando no llega a abrirse.
+    void CerrarDesdeMiniLista(IntPtr h, Grupo g, StackPanel lista, UIElement renglon)
+    {
+        CerrarLaVentana(h, "mini lista");
+        lista.Children.Remove(renglon);
+        if (lista.Children.Count < 2) { CerrarMiniLista(); return; }
+        ReajustarPanel("grupo:" + g.Exe);
     }
 
     void CerrarMiniLista()

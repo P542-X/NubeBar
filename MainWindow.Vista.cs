@@ -2324,10 +2324,10 @@ public partial class MainWindow
         }), System.Windows.Threading.DispatcherPriority.Background);
     }
 
-    void CerrarLaVentana(IntPtr h)
+    void CerrarLaVentana(IntPtr h, string desde = "vista general")
     {
         if (!Nativo.Existe(h)) { GestorVentanas.Refrescar(); return; }
-        Log.Info($"vista general: cerrar \"{Nativo.Titulo(h)}\"");
+        Log.Info($"{desde}: cerrar \"{Nativo.Titulo(h)}\"");
         Nativo.CerrarVentana(h);
         Miniaturas.Olvidar(h);
         // Se le da un respiro para que la app atienda el WM_CLOSE (puede preguntarte si
