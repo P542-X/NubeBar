@@ -617,8 +617,13 @@ del tema nuevo sobre una concha del viejo. Medido en Sakura: concha `#0F0F16` co
    RECTÁNGULO de la caja y no a la forma redondeada. Sale un halo cuadrado alrededor de una
    isla con las puntas redondas, que asoma justo por donde la curva se separa de la esquina
    (medido: `#13182E` en la esquina contra `#0C0E17` del interior). Hacerlo bien es ponerlo en
-   una pieza DETRÁS de la isla, con su misma forma y sin recorte. Los paneles y los laterales
-   sí lo llevan, y ahí se ve bien: sus conchas no recortan.
+   una pieza DETRÁS de la isla, con su misma forma y sin recorte. Es lo que se hizo con los
+   paneles laterales, y por el mismo motivo: aquí se escribió que ellos «sí lo llevan y se
+   ve bien, sus conchas no recortan», y era media verdad. La concha de `PanelShell` no
+   recorta, pero la de un panel lateral no es ésa —es `VentanaSuperpuesta.Tarjeta`, que sí
+   recorta— y su halo salió cuadrado en la v1.0.5. Ahora cada una de las dos lleva su aura
+   detrás; la de los laterales, en `VentanaSuperpuesta.Envoltura`, con la regla exigida en
+   la prueba `ElHaloDelPanelLateralNoVaEnLoRecortado`.
 
 Todo lo que se construya en las fases 1 a 8 toma sus colores, medidas y decoraciones **del
 tema**, nunca de un valor escrito en el código: es lo que hace posible que el Estudio pueda

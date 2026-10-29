@@ -64,7 +64,7 @@ public partial class MainWindow
             // Volviendo a poner el efecto, la animación arranca de cero justo antes del
             // primer disparo y las fases pasan a significar lo que dicen.
             var vIzq = _laterales.GetValueOrDefault(Lateral.Lado.Izquierda);
-            if (vIzq != null) PonerResplandor(vIzq.Tarjeta, EstiloDeAhora, Realce.Ambiente);
+            if (vIzq != null) PonerResplandor(vIzq.Aura, EstiloDeAhora, Realce.Ambiente);
             await Task.Delay(60);   // que el primer fotograma del ciclo nuevo llegue a pintarse
 
             var origen = DateTime.Now;
@@ -90,7 +90,7 @@ public partial class MainWindow
                 // que de verdad se está pintando. Preguntar por el sitio equivocado habría
                 // dado «no cambia» con la animación corriendo perfectamente.
                 var vLat = _laterales.GetValueOrDefault(Lateral.Lado.Izquierda);
-                if (vLat?.Tarjeta.Effect is System.Windows.Media.Effects.DropShadowEffect ef)
+                if (vLat?.Aura.Effect is System.Windows.Media.Effects.DropShadowEffect ef)
                 {
                     double blur = (double)ef.GetValue(
                         System.Windows.Media.Effects.DropShadowEffect.BlurRadiusProperty);
@@ -99,7 +99,7 @@ public partial class MainWindow
                     Apunta($"[NEON] {i + 1}/6 efecto: blur={blur:0.0} opacidad={op:0.000} " +
                            $"congelado={ef.IsFrozen} fase={enElCiclo:0.00}");
                 }
-                else Apunta($"[NEON] {i + 1}/6 · la tarjeta NO tiene efecto puesto");
+                else Apunta($"[NEON] {i + 1}/6 · el aura NO tiene efecto puesto");
 
                 await FotoEnPantalla(_laterales.GetValueOrDefault(Lateral.Lado.Izquierda),
                                      $"40-neon-{i + 1}-{DiagNeon.QueTocaVer[i].Split(' ')[0]}",

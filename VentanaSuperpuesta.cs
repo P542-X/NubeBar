@@ -1,6 +1,7 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Interop;
 using System.Windows.Media;
 
@@ -45,6 +46,10 @@ public sealed class VentanaSuperpuesta : Window
     // WPF— es lo que se descuadra al cambiar de pantalla.
     public readonly Border Tarjeta;
     public readonly ContentPresenter Cajon;
+
+    // La pieza que lleva el halo del neón. Está DETRÁS de la tarjeta, no alrededor; el
+    // por qué, con los dos fallos que lo obligaron, en `Envoltura`.
+    public readonly Border Aura;
 
     IntPtr _self;
     IntPtr _aDondeVolver;          // quién tenía el foco antes de que lo pidiéramos
@@ -91,15 +96,11 @@ public sealed class VentanaSuperpuesta : Window
         // esto se vería un parpadeo en la esquina de arriba a la izquierda.
         Left = -32000; Top = -32000; Width = 10; Height = 10;
 
-        Cajon = new ContentPresenter();
-        Tarjeta = new Border
-        {
-            Child = Cajon,
-            ClipToBounds = true,
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            VerticalAlignment = VerticalAlignment.Stretch
-        };
-        Content = Tarjeta;
+        var piezas = Envoltura();
+        Aura = piezas.Aura;
+        Tarjeta = piezas.Tarjeta;
+        Cajon = piezas.Cajon;
+        Content = piezas.Raiz;
 
         SourceInitialized += (_, _) =>
         {
@@ -108,6 +109,82 @@ public sealed class VentanaSuperpuesta : Window
             // panel necesite escribir se le quita el NOACTIVATE un rato (ver Teclado).
             Nativo.NoActivable(_self);
         };
+    }
+
+    // ---------- La envoltura: el aura DETRÁS de la tarjeta ----------
+    //
+    // Devuelve las cuatro piezas montadas. Está fuera del constructor a propósito: la regla
+    // que hay aquí abajo es justo la que se incumplió, y así se puede exigir en una prueba
+    // sin tener que abrir una ventana (`Owner` obliga a que la dueña ya se haya mostrado).
+    //
+    // ---------- Por qué el halo no puede ir en `Tarjeta` ----------
+    //
+    // Por dos motivos, cada uno descubierto en una captura distinta:
+    //
+    //  1. **Saldría cuadrado.** `Tarjeta` tiene `ClipToBounds` —lo necesita: es lo que
+    //     impide que el contenido asome por las esquinas al desplazarse— y un efecto sobre
+    //     un elemento recortado se recorta CON él, al rectángulo de la caja y no a la forma
+    //     redondeada. El panel tiene las puntas redondas y el halo salía con las cuatro
+    //     esquinas en ángulo recto, un rectángulo de luz alrededor de una caja curva. Lo
+    //     contó el usuario: «en los paneles laterales los bordes redondeados del neón no se
+    //     ven redondeados, se ven rectangulares».
+    //
+    //     Es EL MISMO fallo que tuvo la isla —ver el aura de `MainWindow.xaml`— y al
+    //     arreglarlo allí se escribió «los paneles y los laterales sí lo llevan, y ahí se ve
+    //     bien: sus conchas no recortan». Media verdad: la concha de `PanelShell` no
+    //     recorta, pero la de los laterales no es ésa, es esta tarjeta, y sí recorta.
+    //
+    //  2. **Dejaría el texto borroso.** Un `DropShadowEffect` pinta el elemento ENTERO, con
+    //     todo lo escrito dentro, en una imagen intermedia que luego pega; en cuanto esa
+    //     imagen cae a medio píxel, todo lo de dentro se suaviza. Es lo que ya se midió en
+    //     `CapaDelHalo` (416 de nitidez con el halo encima del texto contra 792 sin él), y
+    //     es también el motivo de que el aura vaya DETRÁS y no envolviendo: una envoltura
+    //     deja el texto dentro del efecto otra vez.
+    //
+    // Así que el aura es una COPIA DE LA SILUETA: un borde sin nada escrito dentro, con el
+    // mismo tamaño y las mismas esquinas que la tarjeta, puesto debajo en el mismo hueco del
+    // Grid. El efecto difumina esa silueta —que sí es redonda, y a la que nada recorta— y la
+    // tarjeta se pinta encima, opaca y nítida.
+    //
+    // El fondo del aura NO se enlaza: lo pone quien quiera halo (`PintarConchaLateral`) y
+    // solo si el estilo brilla. El dock y la previsualización usan esta misma clase y no
+    // llevan halo; con el fondo enlazado les aparecería detrás un rectángulo de su propio
+    // color que, al escalarse la tarjeta y no el aura, asomaría por los bordes.
+    internal static (Grid Raiz, Border Aura, Border Tarjeta, ContentPresenter Cajon) Envoltura()
+    {
+        var cajon = new ContentPresenter();
+
+        var tarjeta = new Border
+        {
+            Child = cajon,
+            ClipToBounds = true,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch
+        };
+
+        // Sin fondo (lo pone quien quiera halo) y SIN recorte, que es todo el punto. El
+        // margen y las esquinas van enlazados a la tarjeta para que la sigan sola: el margen
+        // lo mueve `ColocarLateral` en cada colocación —es el aire donde cabe el halo— y las
+        // esquinas las cambia el tema, y una copia que se queda atrás es una silueta que no
+        // es la del panel.
+        var aura = new Border
+        {
+            IsHitTestVisible = false,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch
+        };
+        aura.SetBinding(FrameworkElement.MarginProperty,
+                        new Binding(nameof(FrameworkElement.Margin)) { Source = tarjeta });
+        aura.SetBinding(Border.CornerRadiusProperty,
+                        new Binding(nameof(Border.CornerRadius)) { Source = tarjeta });
+
+        // El aura primero: en un Grid sin filas ni columnas los hijos comparten el hueco y
+        // se pintan en orden, así que el que va antes queda detrás.
+        var raiz = new Grid();
+        raiz.Children.Add(aura);
+        raiz.Children.Add(tarjeta);
+
+        return (raiz, aura, tarjeta, cajon);
     }
 
     // ---------- Colocar, en píxeles de pantalla ----------

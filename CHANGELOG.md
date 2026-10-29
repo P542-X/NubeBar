@@ -6,6 +6,20 @@ construidos por el workflow de Release a partir de la etiqueta.
 
 ---
 
+## v1.0.6
+
+### Arreglado
+
+- **El neón de los paneles laterales salía con las esquinas en ángulo recto:** un
+  rectángulo de luz alrededor de un panel con las puntas redondas. El halo estaba
+  enganchado a la tarjeta del panel, y la tarjeta recorta su contenido para que no asome
+  por las esquinas; WPF recorta el resultado del efecto con ese mismo recorte, que es el
+  RECTÁNGULO de la caja. Ahora el halo sale de una pieza aparte detrás del panel, con su
+  misma silueta y sin recortar, así que sigue las curvas. Es el mismo arreglo que ya
+  llevaban la isla y las tarjetas de dentro de los paneles.
+
+---
+
 ## v1.0.5
 
 ### Añadido

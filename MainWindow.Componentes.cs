@@ -181,6 +181,21 @@ public partial class MainWindow
         if (!e.Brilla) { quien.Effect = null; return; }
         if (aparte && quien is Border { Child: not null } conTexto) quien = CapaDelHalo(conTexto);
 
+        // ---------- Un halo sobre algo recortado sale CUADRADO ----------
+        //
+        // WPF recorta el resultado del efecto con el `ClipToBounds` del elemento, y ese
+        // recorte es el RECTÁNGULO de la caja: el halo pierde las esquinas redondeadas y se
+        // convierte en un rectángulo de luz alrededor de una superficie curva.
+        //
+        // Ha pasado dos veces —la isla (ver el aura de `MainWindow.xaml`) y la concha de los
+        // paneles laterales (ver `VentanaSuperpuesta.Envoltura`)—, y las dos se descubrieron
+        // mirando una captura. No hay forma de arreglarlo desde aquí: la solución es poner el
+        // efecto en una pieza sin recorte, y eso lo decide quien monta la superficie. Así que
+        // al menos queda dicho en el registro, que es donde se mira cuando algo «se ve raro».
+        if (quien.ClipToBounds)
+            Log.Info($"AVISO: halo sobre un {quien.GetType().Name} con ClipToBounds; " +
+                     "saldrá cuadrado. Va en una pieza aparte sin recorte (ver Envoltura).");
+
         var n = Neon.Limpia(_cfg?.Neon);
         var (fDif, fInt) = Realces.De(realce);
 

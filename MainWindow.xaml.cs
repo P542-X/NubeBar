@@ -630,7 +630,11 @@ public partial class MainWindow : Window
         // su misma forma y sin recorte. Encenderlo aquí ahora no es adelantarlo: es enseñar
         // mal el de la fase 2 antes de construirlo.
         //
-        // Los paneles y los laterales sí lo llevan, y ahí se ve bien: sus conchas no recortan.
+        // Los paneles lo llevan así desde C5 (ver `CapaDelHalo`). Los laterales NO lo llevaban:
+        // aquí se escribió «y los laterales también, sus conchas no recortan», y era media
+        // verdad —la concha de un lateral es `VentanaSuperpuesta.Tarjeta`, que sí recorta—, así
+        // que su halo salió cuadrado en la v1.0.5. Ya tienen su aura detrás; ver
+        // `VentanaSuperpuesta.Envoltura`, que es donde está escrita la regla para esta isla.
         //
         //   if (EstiloDeAhora.Brilla) { PonerResplandor(Isla, EstiloDeAhora, Realce.Ambiente); _brillo = null; }
 

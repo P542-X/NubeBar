@@ -276,8 +276,26 @@ public partial class MainWindow
         v.Tarjeta.BorderBrush = new SolidColorBrush(_roles.Borde);
         v.Tarjeta.BorderThickness = new Thickness(est.GrosorFilo);
         v.Tarjeta.CornerRadius = new CornerRadius(est.RadioShell);
-        PonerResplandor(v.Tarjeta, est, Realce.Ambiente);
         ChaflanSiToca(v.Tarjeta);
+
+        // ---------- El halo va en el AURA, nunca en la tarjeta ----------
+        //
+        // Aquí estaba `PonerResplandor(v.Tarjeta, …)`, y la tarjeta tiene `ClipToBounds`:
+        // el efecto se recortaba con ella, al RECTÁNGULO, y el halo salía con las cuatro
+        // esquinas en ángulo recto alrededor de un panel de puntas redondas. El por qué
+        // completo —y el segundo motivo, la borrosidad— en `VentanaSuperpuesta.Envoltura`.
+        //
+        // El aura es una copia de la silueta puesta detrás, así que necesita el mismo fondo
+        // que la tarjeta: es su opacidad la que el efecto difumina. Y solo cuando el estilo
+        // brilla: sin halo, un relleno de más detrás de una tarjeta opaca es trabajo que no
+        // se ve, y en cuanto el fondo deje de ser opaco se vería doble.
+        //
+        // `ChaflanSiToca` va antes a propósito: deja la tarjeta en radio 0, y el enlace del
+        // aura lo copia. Un chaflán de 14 px bajo un difuminado de 44 no se distingue, y así
+        // el aura no necesita saber nada de las esquinas.
+        v.Tarjeta.Effect = null;
+        v.Aura.Background = est.Brilla ? v.Tarjeta.Background : null;
+        PonerResplandor(v.Aura, est, Realce.Ambiente);
     }
 
     // ================= La ventana =================

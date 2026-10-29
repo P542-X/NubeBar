@@ -32,6 +32,78 @@ public static partial class Pruebas
         PanelesSeEscalanConLaPantalla();
         IconosOscurosSeReconocen();
         LaBarraDeScrollEsLaNuestra();
+        ElHaloDelPanelLateralNoVaEnLoRecortado();
+    }
+
+    // ================= El halo del panel lateral =================
+    //
+    // ---------- De dónde sale esto ----------
+    //
+    // «En los paneles laterales los bordes redondeados del neón no se ven redondeados, se
+    // ven rectangulares» (v1.0.5). El halo estaba enganchado a `VentanaSuperpuesta.Tarjeta`,
+    // que tiene `ClipToBounds` —lo necesita: es lo que impide que el contenido asome por las
+    // esquinas—, y WPF recorta el resultado del efecto con ese recorte: al RECTÁNGULO de la
+    // caja. Un rectángulo de luz alrededor de un panel con las puntas redondas.
+    //
+    // Es la SEGUNDA vez que pasa. La primera fue la isla, y al arreglarla allí se escribió
+    // «los paneles y los laterales sí lo llevan, y ahí se ve bien: sus conchas no recortan»
+    // — media verdad, porque la concha de los laterales no es la de `PanelShell`, es esta
+    // tarjeta, y sí recorta. Un comentario no impidió la repetición; esta prueba sí.
+    //
+    // Lo que se exige es la FORMA de la envoltura, no el color de un píxel: que exista una
+    // pieza sin recortar donde colgar el efecto, que esté DETRÁS de la tarjeta y no
+    // envolviéndola —envolver mete el texto dentro del efecto otra vez, y eso es la
+    // borrosidad que se midió en `CapaDelHalo`— y que la tarjeta siga recortando.
+    //
+    // Va sobre `Envoltura()` y no sobre una ventana de verdad porque `Owner` obliga a que la
+    // dueña ya se haya mostrado, y una prueba no abre ventanas.
+    static void ElHaloDelPanelLateralNoVaEnLoRecortado()
+    {
+        Grupo("panel lateral: el halo va en una pieza sin recortar, y detrás");
+
+        var (raiz, aura, tarjeta, cajon) = VentanaSuperpuesta.Envoltura();
+
+        // La regla que se incumplió: el halo necesita algo que NO se recorte.
+        Vale(!aura.ClipToBounds, "el aura no recorta: es quien puede llevar el halo");
+
+        // Y la que no se puede perder al arreglarla: el contenido no asoma por las esquinas.
+        Vale(tarjeta.ClipToBounds, "la tarjeta sigue recortando su contenido");
+
+        // Detrás, no alrededor. Si el aura envolviera a la tarjeta, el efecto volvería a
+        // pintar el texto en una imagen intermedia y los paneles volverían a verse borrosos.
+        Vale(!ReferenceEquals(aura.Child, tarjeta), "el aura no envuelve a la tarjeta");
+        Vale(aura.Child == null, "el aura no lleva nada escrito dentro que difuminar");
+        Igual(2, raiz.Children.Count, "la raíz tiene las dos piezas");
+        Igual(0, raiz.Children.IndexOf(aura), "el aura va primero: se pinta detrás");
+        Igual(1, raiz.Children.IndexOf(tarjeta), "y la tarjeta encima, opaca y nítida");
+
+        // Y el cajón, donde siempre: dentro de la tarjeta.
+        Vale(ReferenceEquals(tarjeta.Child, cajon), "el cajón va dentro de la tarjeta");
+
+        // Un halo no puede comerse los clics del panel que adorna.
+        Vale(!aura.IsHitTestVisible, "el aura no recibe ratón");
+
+        // La silueta tiene que seguir a la tarjeta sola. El margen lo mueve `ColocarLateral`
+        // en cada colocación —es el aire donde cabe el halo— y las esquinas las cambia el
+        // tema; una copia que hay que acordarse de actualizar es una copia que se queda atrás.
+        foreach (var (prop, como) in new[]
+        {
+            ((System.Windows.DependencyProperty)System.Windows.FrameworkElement.MarginProperty, "el margen"),
+            (System.Windows.Controls.Border.CornerRadiusProperty, "las esquinas"),
+        })
+        {
+            var enlace = System.Windows.Data.BindingOperations.GetBinding(aura, prop);
+            Vale(enlace != null && ReferenceEquals(enlace.Source, tarjeta),
+                 $"{como} del aura sigue a la tarjeta por enlace");
+        }
+
+        // El fondo NO va enlazado, y es a propósito: el dock y la previsualización usan esta
+        // misma clase sin halo, y un relleno heredado les saldría detrás como un rectángulo
+        // de su propio color. Lo pone `PintarConchaLateral`, y solo si el estilo brilla.
+        Vale(aura.Background == null, "el aura nace sin fondo: lo pone quien quiera halo");
+        Vale(System.Windows.Data.BindingOperations.GetBinding(
+                 aura, System.Windows.Controls.Border.BackgroundProperty) == null,
+             "y el fondo no va enlazado");
     }
 
     // ================= La barra de desplazamiento propia =================
