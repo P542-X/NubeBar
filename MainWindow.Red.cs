@@ -637,11 +637,23 @@ public partial class MainWindow : Window
             _ when Red.PideClave(w) => "Conectar (pide contraseña)",
             _ => "Conectar"
         };
-        // La fila entera no crece al pasar por encima (se salía de la isla por los
-        // lados): crece solo el icono del wifi, que tiene sitio en su columna
+        // ---------- Una fila de la lista no se levanta: se ilumina ----------
+        //
+        // `levantar: false` ya estaba, y por su motivo: la fila entera creciendo un 8 % son
+        // quince píxeles por lado y se salía de la isla.
+        //
+        // Lo que se hizo entonces fue levantar SOLO el icono del wifi, que tenía sitio en su
+        // columna. Y eso es lo que había que quitar ahora: en una LISTA, el elemento bajo el
+        // cursor se señala iluminando su fila entera, no dando un brinco a un trozo de ella.
+        // El icono saltando a destiempo dentro de una fila quieta se lee como un fallo de
+        // dibujo, y además mueve el único punto de la fila que el ojo usa para seguir dónde
+        // está mientras recorre la lista.
+        //
+        // No hace falta poner nada a cambio: la plantilla de `Boton` ya pinta el fondo de
+        // `SuperficieAlta` bajo el ratón (ver `MainWindow.Botones.cs`, elemento «bg»), que es
+        // exactamente el gris que señala la fila. Lo decía el propio comentario de `Levantar`:
+        // «el fondo del hover ya avisa de que estás encima».
         var fila = Boton(g, tip, () => PulsarWifi(w), levantar: false);
-        fila.MouseEnter += (_, _) => Levantar(icono, true);
-        fila.MouseLeave += (_, _) => Levantar(icono, false);
         fila.Height = AltoFilaWifi;
         fila.Margin = new Thickness(-6, 0, 0, 0);
         // Estirada, y con su contenido estirado también: `Boton` centra lo que le pones, y
