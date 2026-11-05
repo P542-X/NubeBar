@@ -575,6 +575,26 @@ public sealed class OpcionesClima
     public double Longitud { get; set; }
 }
 
+// Lo que el usuario le ha puesto a cada monitor. Solo los alias: la entrada de vídeo NO se
+// guarda a propósito.
+//
+// ---------- Por qué no se recuerda la entrada ----------
+//
+// Guardar «este monitor estaba en HDMI 1» invita a restaurarlo al arrancar, y eso es
+// exactamente lo que el plan prohíbe: «no implementar automatizaciones que cambien entradas
+// sin consentimiento explícito del usuario». Un NubeBar que al encender el PC le cambia el
+// canal a tu monitor porque así lo dejaste ayer es un NubeBar que te roba la pantalla.
+//
+// ---------- Y por qué la clave no es DISPLAY1 ----------
+//
+// La clave es la del EDID (`Edid.Datos.Clave`): fabricante, código de producto y serie. Windows
+// reasigna los `DISPLAY1`/`DISPLAY2` al reiniciar o al cambiar un cable, así que un alias
+// guardado contra la ranura acaba puesto en el monitor de al lado.
+public sealed class OpcionesMonitores
+{
+    public Dictionary<string, string> Alias { get; set; } = new();
+}
+
 public class Config
 {
     // La versión del esquema de este fichero. Ver Esquema.cs: lo que la mantiene al día
@@ -594,6 +614,7 @@ public class Config
     public OpcionesClima Clima { get; set; } = new();
     public OpcionesNeon Neon { get; set; } = new();
     public OpcionesLaterales Laterales { get; set; } = new();
+    public OpcionesMonitores Monitores { get; set; } = new();
 
     // ---------- Un diagnóstico no escribe en los datos de nadie ----------
     //

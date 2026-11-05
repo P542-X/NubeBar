@@ -301,5 +301,12 @@ public partial class MainWindow : Window
         _reposo?.Stop();
         try { Reorganizar(); }
         catch (Exception ex) { Log.Error("reorganizar pantallas", ex); }
+
+        // Y lo que sabíamos de los monitores por DDC/CI deja de valer: han podido entrar o salir
+        // pantallas, y las capacidades guardadas eran de otras. Esto solo OLVIDA —no pregunta
+        // nada, que sería hablar por el cable desde el hilo de la interfaz—; el panel vuelve a
+        // preguntar la próxima vez que se abra.
+        try { Entradas.Replantear(); }
+        catch (Exception ex) { Log.Error("replantear los monitores DDC/CI", ex); }
     }
 }

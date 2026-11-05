@@ -157,12 +157,13 @@ public static class Lateral
         public const int VolumenMedio = 0xE994; // Volume2
         public const int Teclado = 0xE765;      // KeyboardClassic
         public const int Pila = 0xEBA8;         // una pila con nivel, para el chip del editor
+        public const int Lapiz = 0xE70F;        // Edit — el lápiz del alias de un monitor
 
         public static readonly int[] Todos =
         {
             Perfil, Rapidas, Volumen, Brillo, Carpetas, Maquina, Ajustes,
             Medios, Avisos, Calendario, Escritorio, Conexion, Clima,
-            Wifi, SinRed, Silencio, VolumenBajo, VolumenMedio, Teclado, Pila,
+            Wifi, SinRed, Silencio, VolumenBajo, VolumenMedio, Teclado, Pila, Lapiz,
         };
     }
 

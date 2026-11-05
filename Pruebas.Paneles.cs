@@ -321,6 +321,11 @@ public static partial class Pruebas
             ("aviso", 44),
             ("bandeja", 140),
             ("bateria", 161),
+            // 401 con DOS monitores físicos, que es lo que hay en la máquina de desarrollo:
+            // una tarjeta por monitor. Con una pantalla pide ~243 y con tres ~559, así que es
+            // el único panel de esta tabla cuyo alto depende del equipo — y por eso entra
+            // también en la ronda de `--diagpaneles`, que lo mide donde se ejecute.
+            ("monitores", 401),
             ("notificaciones", 154),
             ("vista", 320),
             ("red", 608),          // el del recorte: 4 tarjetas, con las wifis dentro

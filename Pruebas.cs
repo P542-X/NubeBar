@@ -309,6 +309,10 @@ public static partial class Pruebas
             // Preguntar antes de mover ventanas de verdad (Pruebas.Confirmar.cs).
             CorrerConfirmar();
 
+            // La entrada de vídeo por DDC/CI: capacidades del monitor y EDID
+            // (Pruebas.Monitores.cs).
+            CorrerMonitores();
+
             // C5.9: la superficie de Inicio
             PanelRaizOpaca();
             InicioColgadoDeSuBoton();

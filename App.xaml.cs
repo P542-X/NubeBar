@@ -199,6 +199,19 @@ public partial class App : Application
             return;
         }
 
+        // "NubeBar.exe --diagmonitores [--cambiar <clave|nº> <hex>] [informe.txt]": qué monitores
+        // hay, quiénes son según su EDID y qué entradas de vídeo gestionan, preguntado POR EL
+        // CABLE. Va aquí, con los que no abren ventana, porque no necesita ninguna: es una tabla.
+        //
+        // Sin `--cambiar` solo LEE. Ningún diagnóstico le cambia el canal a tu monitor por su
+        // cuenta: ver DiagMonitores.cs.
+        if (e.Args.Length > 0 && e.Args[0] == DiagMonitores.Bandera)
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Shutdown(DiagMonitores.Correr(e.Args));
+            return;
+        }
+
         // "NubeBar.exe --diagvista [segundos]": arranca NubeBar DE VERDAD, abre la vista
         // general, la deja quieta y cuenta qué le pasa. El bucle que hacía parpadear la
         // cuadrícula solo existe con la isla, sus animaciones y los ganchos de Windows en

@@ -421,6 +421,19 @@ public sealed class ConfigArbol
         Seccion(seccion)[clave] = a;
     }
 
+    // Un diccionario de cadena a cadena, para los alias de los monitores. Es `PonerAtajos`
+    // sin la clave escrita dentro: cuando hizo falta el segundo mapa, lo que tocaba era un
+    // parámetro y no una segunda copia.
+    //
+    // Se sustituye SOLO esa clave: las demás de la sección —incluidas las que esta versión no
+    // conozca— se quedan donde están, que es la regla de toda esta casa.
+    public void PonerMapa(string seccion, string clave, IReadOnlyDictionary<string, string> mapa)
+    {
+        var obj = new JsonObject();
+        foreach (var (k, v) in mapa) obj[k] = v;
+        Seccion(seccion)[clave] = obj;
+    }
+
     // ---------- Disco ----------
     // Encoder relajado: si no, un "Ctrl+Alt+F9" se guarda como "Ctrl+Alt+F9".
     // Es JSON válido, pero este fichero se edita a mano y así queda legible.

@@ -138,6 +138,18 @@ public partial class MainWindow : Window, IAnfitrionWidget
         R("control", "Centro de control", "Idioma, red, volumen y batería", "", CategoriaWidget.Sistema,
           i => i.ModuloControl());
 
+        // ---------- La entrada de vídeo de cada monitor ----------
+        //
+        // Va con los de sistema y no con los de apps porque es estado del equipo, como la red o
+        // el sonido. Y lleva `puedeNoVerse` porque de verdad puede no verse: si ningún monitor
+        // del equipo contesta al VCP 0x60, el icono no se dibuja nunca (ver
+        // `Entradas.Disponible`). Sin esa nota, el editor de módulos deja un hueco invisible en
+        // la barra y no dice por qué.
+        R("monitores", "Monitores", "La entrada de vídeo de cada pantalla: DisplayPort, HDMI…",
+          char.ConvertFromUtf32(Lateral.Glifos.Escritorio), CategoriaWidget.Sistema,
+          i => i.ModuloMonitores(),
+          puedeNoVerse: "si ningún monitor permite cambiar su entrada por DDC/CI, no se dibuja");
+
         // ---------- Y los mismos, sueltos ----------
         //
         // «Centro de control» monta los cuatro juntos, así que en la barra se ven como cuatro

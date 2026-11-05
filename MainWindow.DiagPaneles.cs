@@ -134,6 +134,10 @@ public partial class MainWindow
             ("audio", () => AbrirAudio()),
             ("red", () => AbrirRed()),
             ("bateria", () => AbrirBateria()),
+            // El de los monitores entra en la ronda porque su alto DEPENDE DEL EQUIPO: una
+            // tarjeta por monitor físico. Con dos pantallas pide el doble que con una, y es
+            // justo el tipo de panel que se corta en el equipo de otro y no en el tuyo.
+            ("monitores", () => AbrirMonitores()),
             ("bandeja", () => AlternarBandejaExtra()),
             ("notificaciones", () => AbrirNotificaciones()),
             ("vista", () => AlternarVista()),
