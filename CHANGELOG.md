@@ -6,6 +6,66 @@ construidos por el workflow de Release a partir de la etiqueta.
 
 ---
 
+## v1.0.7
+
+### Añadido
+
+- **Cambiar la entrada de vídeo del monitor desde la barra:** un módulo nuevo, «Monitores»,
+  que habla con el propio monitor por el cable (DDC/CI, VCP `0x60`) y le dice a cuál de sus
+  conectores ponerse. Pasar el monitor a HDMI para jugar en la consola y devolverlo a
+  DisplayPort, sin agacharse a buscar el botón de debajo de la pantalla.
+
+  Por cada monitor enseña su modelo de verdad —leído de su EDID, no el «Generic PnP Monitor»
+  que devuelve Windows—, si DDC/CI responde, en qué entrada está, y un botón por cada entrada
+  que **el monitor anuncia**: si no las anuncia, no se inventan botones y queda el campo de
+  código manual. Después de mandar el cambio vuelve a leer el `0x60` para comprobarlo, y
+  distingue las tres respuestas que no son lo mismo: cambió, lo aceptó y sigue donde estaba, o
+  lo aceptó y dejó de contestar (lo normal al quitarle la señal a la pantalla donde vives).
+
+  Se le puede poner un mote a cada monitor («PS5», «Monitor principal»), guardado contra su
+  identidad del EDID y no contra `DISPLAY1`, que Windows reasigna al reiniciar.
+
+  El icono solo sale si algún monitor del equipo gestiona su entrada. Nada de esto ocurre en
+  el hilo de la interfaz, y NubeBar nunca cambia una entrada por su cuenta: solo cuando lo
+  pulsas.
+
+  **No es una capturadora.** Cambia el canal del monitor; no trae a Windows la imagen que
+  llega por HDMI. La consola se sigue viendo en el monitor, no en una ventana.
+
+- **`NubeBar.exe --diagmonitores`:** qué monitores hay, quiénes son según su EDID y qué
+  entradas gestionan, preguntado por el cable. De solo lectura: para mandar un cambio hay que
+  pedirlo con `--cambiar <clave|nº> <código hex>`, y entonces además comprueba que ningún otro
+  monitor se haya movido.
+
+### Arreglado
+
+- **Pulsar una app en la barra no siempre la traía delante.** Había que ir a «ver todas las
+  ventanas», clic derecho y colocarla en un sitio para que apareciera — y ese rodeo era la
+  pista: colocar usa `SetWindowPos`, que no pide permiso, mientras que traer al frente usa
+  `SetForegroundWindow`, que sí. Windows niega ese permiso a quien no acaba de recibir
+  entrada del usuario, y las ventanas de NubeBar no toman el foco al pulsarlas, así que para
+  Windows el proceso que lo pedía era uno que no estabas tocando. No se notaba porque
+  `SetForegroundWindow` devuelve «hecho» aunque solo parpadee el botón en la barra de tareas,
+  y eso se daba por bueno. Ahora se comprueba el resultado y, si hace falta, se insiste
+  enganchándose a la cola de entrada de la ventana que tiene el foco; si aun así Windows no
+  lo suelta, la ventana se sube en el orden Z para que al menos se vea.
+
+- **El menú del clic derecho de «ver todas las ventanas» no salía donde pulsabas y aparecía
+  cortado.** Lo primero, porque se colocaba al lado de la TARJETA y no del cursor. Lo segundo,
+  porque sus catorce opciones miden unos 488 px y el panel unos 320: solo se topaba el borde
+  de arriba, así que el menú empezaba dentro y se iba por abajo, y las dos últimas opciones
+  —«Cerrar» y «Forzar el cierre»— quedaban fuera y no se podían pulsar. Ahora sale en la punta
+  del cursor, se vuelca al otro lado cuando no cabe y se desplaza por dentro en vez de
+  cortarse. Con la tecla de menú contextual sigue saliendo al lado de la tarjeta, sin taparla:
+  por teclado no hay cursor que seguir.
+
+- **En el panel de red, la fila bajo el cursor daba un brinco.** El icono del wifi crecía un
+  8 % al pasar por encima. En una lista eso mueve el punto que el ojo usa para seguir dónde
+  está, y se lee como un fallo de dibujo. Ahora la fila solo se ilumina, que es lo que ya
+  hacía la plantilla por su cuenta.
+
+---
+
 ## v1.0.6
 
 ### Arreglado
