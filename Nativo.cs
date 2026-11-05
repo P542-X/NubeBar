@@ -124,13 +124,119 @@ public static class Nativo
         catch { return null; }
     }
 
-    public static void Activar(IntPtr h)
+    [DllImport("user32.dll")] static extern bool BringWindowToTop(IntPtr h);
+    [DllImport("user32.dll")] static extern bool AttachThreadInput(int hilo, int aQuien, bool juntar);
+    [DllImport("kernel32.dll")] static extern int GetCurrentThreadId();
+
+    static readonly IntPtr HWND_TOP = IntPtr.Zero;
+
+    // ---------- Traer una ventana delante, DE VERDAD ----------
+    //
+    // ---------- El fallo que esto arregla ----------
+    //
+    // Lo contó el usuario: «le doy en la barra de tareas de la nube para abrirlas y que se me
+    // muestren en pantalla pero no se muestran, y tengo que ir a ver todas las ventanas, clic
+    // derecho, y ponerla en un sitio específico del escritorio».
+    //
+    // Y ese rodeo es la pista que lo explica: colocar la ventana SÍ funciona. Colocar pasa por
+    // `SetWindowPos`, que cambia el orden Z y no pide permiso a nadie; traerla al frente pasa
+    // por `SetForegroundWindow`, que sí lo pide y a veces se lo niegan.
+    //
+    // Windows bloquea el cambio de primer plano cuando quien lo pide no acaba de recibir
+    // entrada del usuario. Y las ventanas de NubeBar son `WS_EX_NOACTIVATE`: al pulsar la isla,
+    // NubeBar NO pasa a primer plano, así que para Windows el proceso que pide el cambio es uno
+    // que el usuario no está tocando. De ahí que falle A VECES: depende de quién tuviera el
+    // foco y de hace cuánto.
+    //
+    // Lo peor es que no se notaba. `SetForegroundWindow` devuelve TRUE aunque lo único que haga
+    // sea parpadear el botón en la barra de tareas, y aquí ese TRUE se tomaba por bueno y se
+    // volvía con un `return`: ni se reintentaba, ni quedaba apuntado en el log. Cinco líneas más
+    // abajo, `ForzarPrimerPlano` ya lo hacía bien —`SetForegroundWindow(h) && GetForegroundWindow() == h`—
+    // pero solo se usaba para las ventanas de NubeBar; las ventanas de TUS apps iban por aquí.
+    //
+    // ---------- Lo que hace ahora ----------
+    //
+    // Cuatro intentos, de menos a más invasivo, comprobando después de cada uno. Se para en el
+    // primero que funcione:
+    //
+    //   1. A secas. Es lo que funciona cuando Windows no está bloqueando nada.
+    //   2. El toque de Alt. Simula entrada del usuario y levanta el bloqueo. Ya estaba.
+    //   3. Engancharse a la cola de entrada de quien tiene el foco. Con los hilos juntos,
+    //      Windows ve la petición como si viniera de la ventana que YA está delante, y la
+    //      concede. Es el camino fiable, y el que faltaba.
+    //   4. Subirla en el orden Z. Si ni así coge el foco, al menos se VE: es exactamente lo
+    //      que conseguía el usuario colocándola desde la vista general.
+    //
+    // Devuelve si llegó al primer plano. Nadie está obligado a mirarlo —`void` era antes y los
+    // que llamaban siguen sin comprobar— pero ahora el log sí lo dice, y la próxima vez que
+    // esto falle habrá un dato en vez de «a veces no va».
+    public static bool Activar(IntPtr h)
     {
+        if (h == IntPtr.Zero) return false;
+
+        // Minimizada primero: `SetForegroundWindow` sobre algo minimizado lo deja minimizado y
+        // con el foco, que es la peor combinación posible —tienes el teclado en una ventana que
+        // no ves.
         if (IsIconic(h)) ShowWindow(h, 9); // SW_RESTORE
-        if (SetForegroundWindow(h)) return;
+
+        if (SetForegroundWindow(h) && GetForegroundWindow() == h) return true;
+
         keybd_event(0x12, 0, 0, UIntPtr.Zero); // truco de Alt para que Windows permita cambiar el foco
         keybd_event(0x12, 0, 2, UIntPtr.Zero);
-        SetForegroundWindow(h);
+        if (SetForegroundWindow(h) && GetForegroundWindow() == h) return true;
+
+        if (ConLaColaDeQuienManda(h)) return true;
+
+        // ---------- Y si no hay foco, que al menos se vea ----------
+        //
+        // SWP_SHOWWINDOW además de subirla: una ventana que la app había escondido no se
+        // enseña sola por cambiar de orden Z.
+        SetWindowPos(h, HWND_TOP, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0040);  // NOSIZE|NOMOVE|SHOWWINDOW
+        BringWindowToTop(h);
+
+        bool delante = GetForegroundWindow() == h;
+        if (!delante)
+            Log.Info($"activar 0x{h.ToInt64():X6} (\"{TituloSinPreguntar(h)}\"): Windows no soltó el " +
+                     "primer plano; se ha subido en el orden Z para que al menos se vea");
+        return delante;
+    }
+
+    // Engancharse a la cola de entrada del hilo que tiene el foco ahora mismo. Con las dos colas
+    // juntas, Windows trata la petición como si la hiciera la propia ventana de delante.
+    //
+    // El `finally` NO es prolijidad: dejar dos hilos enganchados hace que el teclado de uno
+    // acabe en el otro, y eso no se arregla solo. Y si la ventana de destino está colgada,
+    // `AttachThreadInput` puede quedarse esperando: por eso solo se intenta cuando los dos
+    // hilos existen y son distintos, y todo va envuelto.
+    static bool ConLaColaDeQuienManda(IntPtr h)
+    {
+        int mio = 0, suyo = 0;
+        bool juntos = false;
+        try
+        {
+            var delante = GetForegroundWindow();
+            if (delante == IntPtr.Zero) return false;
+
+            suyo = GetWindowThreadProcessId(delante, out _);
+            mio = GetCurrentThreadId();
+            if (suyo == 0 || suyo == mio) return false;
+
+            juntos = AttachThreadInput(mio, suyo, true);
+            if (!juntos) return false;
+
+            BringWindowToTop(h);
+            SetForegroundWindow(h);
+            return GetForegroundWindow() == h;
+        }
+        catch (Exception ex)
+        {
+            Log.Error("engancharse a la cola de entrada para activar", ex);
+            return false;
+        }
+        finally
+        {
+            if (juntos) { try { AttachThreadInput(mio, suyo, false); } catch { } }
+        }
     }
 
     // ---------- Enseñar una ventana ESCONDIDA ----------
