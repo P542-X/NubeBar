@@ -1243,7 +1243,14 @@ public partial class MainWindow : Window
                    ancho, opciones.Count * altoFila + 12, encoger: true);
     }
 
-    FrameworkElement CrearMenuContextual((string Texto, Action Accion)[] opciones, double ancho, double altoFila)
+    // `topeAlto` solo lo usa el menú de la vista general, que es el único que se abre en una
+    // CAPA y no por `AbrirPanel`: los que van por el panel ya reciben de él su recorte y su
+    // desplazamiento, y meterles otro aquí dejaría dos scrolls encajados.
+    //
+    // Cuando llega, la lista se desplaza por dentro en vez de crecer. Es lo que convierte un
+    // menú de catorce opciones en un panel de 320 px de «cortado» en «desplazable».
+    FrameworkElement CrearMenuContextual((string Texto, Action Accion)[] opciones, double ancho, double altoFila,
+                                         double topeAlto = double.PositiveInfinity)
     {
         // Nada de anchos fijos aquí. La isla tiene su Padding y su filo, así que
         // una pila de "ancho" exacto se sale por los lados y el recorte del cajón
@@ -1287,7 +1294,21 @@ public partial class MainWindow : Window
         // Un menú contextual sin superficie propia es el único del programa que se apoyaba
         // entero en el fondo de la isla: sin filo que dijera dónde acaba, y con el escritorio
         // transparentándose al 10 % detrás de cada opción.
-        var concha = PanelShell(pila, 0);
+        // La barra que sale es la de la casa: `BarraDeScroll` es el estilo implícito de
+        // `ScrollBar` en toda la aplicación (ver `AplicarTema`), así que no hay que pedirla.
+        // Y visible, no escondida: en un menú recortado, una barra que no se ve es un menú
+        // al que le faltan opciones sin decirlo.
+        UIElement dentro = pila;
+        if (!double.IsPositiveInfinity(topeAlto))
+            dentro = new ScrollViewer
+            {
+                Content = pila,
+                MaxHeight = Math.Max(altoFila, topeAlto),
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            };
+
+        var concha = PanelShell(dentro, 0);
 
         // ---------- Y el gesto va en la CONCHA, no en la pila ----------
         //

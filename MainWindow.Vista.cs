@@ -1955,7 +1955,14 @@ public partial class MainWindow
         };
         // Clic derecho: el menú de la casa, el mismo que el del carrusel
         var ficha = v;
-        t.Boton.MouseRightButtonUp += (_, e) => { e.Handled = true; AbrirMenuDeVentana(ficha, t.Boton); };
+        t.Boton.MouseRightButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            // El punto del clic en coordenadas de la raíz de la vista, que es el lienzo donde
+            // se dibuja el menú. Pedírselo al propio botón daría coordenadas de la tarjeta.
+            AbrirMenuDeVentana(ficha, t.Boton,
+                               _raizVista is null ? null : e.GetPosition(_raizVista));
+        };
 
         // El ratón también elige: pasar por encima mueve la elección del teclado al mismo
         // sitio. Si no, el ratón y el teclado llevarían dos cursores distintos y pulsar
@@ -2187,7 +2194,10 @@ public partial class MainWindow
     // panel y eso cerraba la cuadrícula: los paneles de la isla son de uno en uno. Como
     // capa, la rejilla se queda detrás, visible y en su sitio, y el clic de fuera cierra
     // el menú sin cerrar la vista.
-    void AbrirMenuDeVentana(VentanaReal v, FrameworkElement ancla)
+    // `clic` es el punto donde pulsaste, en coordenadas de `_raizVista`. Cuando viene, el menú
+    // se abre ahí. Cuando no viene —tecla de menú contextual, Mayús+F10— no hay punto que
+    // usar y se cae al criterio de antes: al lado de la tarjeta, sin taparla.
+    void AbrirMenuDeVentana(VentanaReal v, FrameworkElement ancla, Point? clic = null)
     {
         var h = v.Hwnd;
         var opciones = new List<(string, Action)>
@@ -2236,6 +2246,40 @@ public partial class MainWindow
             .Select(o => (o.Item1, new Action(() => { CerrarMenuDeVista(); o.Item2(); })))
             .ToArray();
 
+        if (_capaMenuVista == null || _lienzoMenuVista == null || _raizVista == null) return;
+
+        // ---------- Primero se mide, después se construye ----------
+        //
+        // En este orden y no al revés, que es como estaba: el menú se montaba con su alto
+        // entero y solo después se miraba dónde ponerlo, así que cuando no cabía ya era tarde
+        // y lo único que quedaba era recortarlo. Sabiendo el sitio ANTES, la lista se puede
+        // construir con su tope y desplazarse por dentro.
+        var area = new NubeHypr.Rect(0, 0, _raizVista.ActualWidth, _raizVista.ActualHeight);
+
+        HyprVista.SitioMenu sitio;
+        string comoSeColoco;
+
+        if (clic is { } punto)
+        {
+            // En la punta del cursor, que es lo que pidió el usuario y lo que hace cualquier
+            // menú contextual. `MenuEnElPunto` lo vuelca al otro lado si no cabe y lo mete
+            // dentro del área POR LOS DOS BORDES — antes solo se topaba el de arriba, y por eso
+            // las últimas opciones («cerrar», «forzar el cierre») se quedaban fuera del recorte.
+            sitio = HyprVista.MenuEnElPunto(punto.X, punto.Y, area, ancho, alto);
+            comoSeColoco = $"en el cursor ({punto.X:0},{punto.Y:0})";
+        }
+        else
+        {
+            // Sin ratón —tecla de menú contextual, Mayús+F10— no hay punto que seguir, y sigue
+            // mandando la regla de D6: al lado de la tarjeta, sin taparla. Por teclado no hay
+            // forma de apartar el menú para volver a ver qué ventana estabas eligiendo.
+            var esquina = ancla.TranslatePoint(new Point(0, 0), _raizVista);
+            var dela = new NubeHypr.Rect(esquina.X, esquina.Y, ancla.ActualWidth, ancla.ActualHeight);
+            var alLado = HyprVista.DondeCabe(dela, area, ancho, alto);
+            sitio = HyprVista.MenuEnElPunto(alLado.Donde.X, alLado.Donde.Y, area, ancho, alto);
+            comoSeColoco = $"al {alLado.Lado}" + (alLado.Solapa ? " (no cabía: solapa)" : "");
+        }
+
         var tarjeta = new Border
         {
             CornerRadius = new CornerRadius(10),
@@ -2243,37 +2287,28 @@ public partial class MainWindow
             BorderBrush = _borde,
             BorderThickness = new Thickness(1),
             Width = ancho,
-            Child = CrearMenuContextual(envueltas, ancho, altoFila)
+            // Se recorta a su radio: sin esto, la lista desplazada por dentro asoma por las
+            // esquinas redondas al llegar al final.
+            ClipToBounds = true,
+            Child = CrearMenuContextual(envueltas, ancho, altoFila,
+                                        // El filo y el aire de la tarjeta no son de la lista:
+                                        // dárselos como alto disponible la dejaría asomando.
+                                        topeAlto: sitio.ConScroll ? sitio.Donde.Alto - 12
+                                                                  : double.PositiveInfinity),
         };
 
-        if (_capaMenuVista == null || _lienzoMenuVista == null || _raizVista == null) return;
         _lienzoMenuVista.Children.Clear();
         _lienzoMenuVista.Children.Add(tarjeta);
         _capaMenuVista.Visibility = Visibility.Visible;
 
-        // ---------- D6: al lado de la tarjeta, no encima ----------
-        //
-        // Antes el menú se ponía en la esquina de la tarjeta + 12 px y se recortaba para
-        // no salirse del panel. Con catorce opciones el menú mide casi 500 px de alto, así
-        // que lo que hacía era TAPAR la tarjeta: te quedabas eligiendo "mitad izquierda"
-        // sin ver de qué ventana. Es justo lo que el documento no quiere.
-        //
-        // Ahora el sitio lo elige `HyprVista.DondeCabe`: de los cuatro lados de la tarjeta,
-        // el que tenga hueco, y entre los que tengan, el que más. Si no cabe por ninguno
-        // —una tarjeta grande en un panel pequeño— devuelve el mejor sitio y avisa de que
-        // solapa; entonces se le baja un poco la opacidad, para que al menos se vea por
-        // dónde va la tarjeta de debajo.
-        var esquina = ancla.TranslatePoint(new Point(0, 0), _raizVista);
-        var dela = new NubeHypr.Rect(esquina.X, esquina.Y, ancla.ActualWidth, ancla.ActualHeight);
-        var area = new NubeHypr.Rect(0, 0, _raizVista.ActualWidth, _raizVista.ActualHeight);
+        Canvas.SetLeft(tarjeta, sitio.Donde.X);
+        Canvas.SetTop(tarjeta, sitio.Donde.Y);
+        if (sitio.ConScroll) tarjeta.Height = sitio.Donde.Alto;
 
-        var sitio = HyprVista.DondeCabe(dela, area, ancho, alto);
-        Canvas.SetLeft(tarjeta, Math.Max(2, sitio.Donde.X));
-        Canvas.SetTop(tarjeta, Math.Max(2, sitio.Donde.Y));
-        if (sitio.Solapa) tarjeta.Opacity = 0.96;
+        Log.Info($"vista menú de 0x{h.ToInt64():X6}: {ancho:0}x{alto:0} {comoSeColoco} → " +
+                 $"{sitio.Donde.X:0},{sitio.Donde.Y:0}" +
+                 (sitio.ConScroll ? $" (topado a {sitio.Donde.Alto:0}, se desplaza)" : ""));
 
-        Log.Info($"vista menú de 0x{h.ToInt64():X6}: {ancho:0}x{alto:0} al {sitio.Lado} " +
-                 $"en {sitio.Donde.X:0},{sitio.Donde.Y:0}" + (sitio.Solapa ? " (no cabía: solapa)" : ""));
     }
 
     static string Recortar(string t, int tope) =>

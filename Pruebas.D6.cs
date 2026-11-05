@@ -408,6 +408,91 @@ public static partial class Pruebas
         // ---------- Degenerados ----------
         var cero = HyprVista.DondeCabe(izq, area, 0, 0);
         Vale(cero.Donde.Ancho >= 1 && cero.Donde.Alto >= 1, "un tamaño cero se sube a uno");
+
+        MenuDeLaVistaEnElCursor();
+    }
+
+    // ================= El menú del clic derecho sale en el cursor y entero =================
+    //
+    // ---------- Los dos fallos que esto cierra ----------
+    //
+    // Los contó el usuario, y eran dos aunque sonaran a uno:
+    //
+    //   «el menú no sale donde se realiza el click»  → salía al lado de la TARJETA
+    //   «además sale cortado, siempre hay que adaptarlo» → 14 opciones (~488 px) en un panel
+    //                                                      de ~320, y solo se topaba el borde
+    //                                                      de ARRIBA
+    //
+    // El segundo es el que de verdad rompía algo: las últimas opciones de la lista son
+    // «Cerrar» y «Forzar el cierre», y quedaban fuera del recorte. No es que se vieran mal:
+    // es que no se podían pulsar.
+    static void MenuDeLaVistaEnElCursor()
+    {
+        Grupo("vista: el menú del clic derecho sale en el cursor, dentro y entero");
+
+        const double H = HyprVista.HuecoMenu;
+        var area = new NubeHypr.Rect(0, 0, 800, 600);
+
+        // ---------- Donde pulsas ----------
+        var normal = HyprVista.MenuEnElPunto(100, 90, area, 240, 300);
+        Igual(100.0, normal.Donde.X, "la esquina del menú es la del clic, en X");
+        Igual(90.0, normal.Donde.Y, "y en Y");
+        Vale(!normal.ConScroll, "con sitio de sobra no hace falta desplazar");
+
+        // ---------- Si no cabe hacia ese lado, se vuelca ----------
+        //
+        // Volcar y no arrastrar contra el borde: arrastrándolo, el cursor acabaría en mitad
+        // del menú con una opción debajo, lista para pulsarse sin querer.
+        var aLaDerecha = HyprVista.MenuEnElPunto(700, 90, area, 240, 300);
+        Igual(460.0, aLaDerecha.Donde.X, "pegado al borde derecho, el menú se vuelca a la izquierda");
+
+        var abajo = HyprVista.MenuEnElPunto(100, 500, area, 240, 300);
+        Igual(200.0, abajo.Donde.Y, "pegado al borde de abajo, se vuelca hacia arriba");
+
+        // ---------- Y el caso de verdad: no cabe de ninguna manera ----------
+        //
+        // El panel de la vista mide ~320 de alto y el menú de una ventana ~488. Antes esto
+        // dejaba las últimas opciones fuera; ahora el menú se topa al área y se desplaza.
+        var estrecha = new NubeHypr.Rect(0, 0, 800, 320);
+        var apretado = HyprVista.MenuEnElPunto(100, 200, estrecha, 240, 488);
+        Vale(apretado.ConScroll, "un menú más alto que el panel se desplaza por dentro");
+        Igual(320.0 - H * 2, apretado.Donde.Alto, "y su alto es el que de verdad cabe");
+        Igual(H, apretado.Donde.Y, "colocado desde arriba, que es por donde se empieza a leer");
+        Vale(apretado.Donde.Y + apretado.Donde.Alto <= estrecha.Alto + 0.001,
+             "sin pasarse por abajo: ESTE era el fallo");
+
+        // Más ancho que el área: se estrecha en vez de salirse.
+        var angosta = new NubeHypr.Rect(0, 0, 200, 600);
+        var estrechado = HyprVista.MenuEnElPunto(50, 50, angosta, 240, 300);
+        Igual(200.0 - H * 2, estrechado.Donde.Ancho, "un menú más ancho que el área se estrecha");
+        Igual(H, estrechado.Donde.X, "y se pega al margen");
+
+        // ---------- Dentro SIEMPRE, se pulse donde se pulse ----------
+        //
+        // La comprobación que de verdad contesta «¿puede quedarse algo fuera?». Se barren las
+        // cuatro esquinas y el centro, en un área holgada y en una apretada.
+        foreach (var a2 in new[] { area, estrecha, angosta, new NubeHypr.Rect(0, 0, 120, 100) })
+            foreach (var (px, py) in new[] { (0.0, 0.0), (a2.Ancho, 0.0), (0.0, a2.Alto),
+                                             (a2.Ancho, a2.Alto), (a2.Ancho / 2, a2.Alto / 2),
+                                             (-50.0, -50.0), (a2.Ancho + 999, a2.Alto + 999) })
+            {
+                var r = HyprVista.MenuEnElPunto(px, py, a2, 240, 488).Donde;
+                Vale(r.X >= a2.X - 0.001 && r.Y >= a2.Y - 0.001 &&
+                     r.X + r.Ancho <= a2.X + a2.Ancho + 0.001 &&
+                     r.Y + r.Alto <= a2.Y + a2.Alto + 0.001,
+                     $"[área {a2.Ancho:0}x{a2.Alto:0}, clic {px:0},{py:0}] el menú entero cae dentro " +
+                     $"({r.X:0},{r.Y:0} {r.Ancho:0}x{r.Alto:0})");
+            }
+
+        // ---------- Degenerados ----------
+        var nada = HyprVista.MenuEnElPunto(10, 10, area, 0, 0);
+        Vale(nada.Donde.Ancho >= 1 && nada.Donde.Alto >= 1, "un tamaño cero se sube a uno");
+
+        // Un área de cero no puede lanzar: pasa de verdad mientras la vista todavía no se ha
+        // medido, y un menú que revienta se lleva la vista por delante.
+        var vacia = HyprVista.MenuEnElPunto(10, 10, new NubeHypr.Rect(0, 0, 0, 0), 240, 488);
+        Vale(vacia.Donde.Ancho >= 1 && vacia.Donde.Alto >= 1,
+             "con un área de cero devuelve algo dibujable en vez de lanzar");
     }
 
     static void D6CuatroBordesYOrientaciones()

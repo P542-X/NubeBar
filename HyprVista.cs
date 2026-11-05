@@ -188,6 +188,83 @@ public static class HyprVista
         return new Sitio(mejor.Donde(), mejor.Lado, true);
     }
 
+    // ================= Y el menú contextual, en el cursor =================
+    //
+    // ---------- Por qué esto no usa `DondeCabe` ----------
+    //
+    // `DondeCabe` coloca al LADO de la tarjeta, y existe por una razón buena: la
+    // previsualización no puede tapar la ventana que estás colocando. Para el menú del clic
+    // derecho esa regla resultó ser la equivocada, y lo dijo el usuario: «el menú no sale
+    // donde se realiza el click».
+    //
+    // Tiene razón y es lo que hace todo lo demás. Un menú contextual sale en la punta del
+    // cursor —en Windows, en el escritorio, en el navegador— porque el cursor es donde está
+    // mirando el usuario y donde ya tiene la mano. Sacarlo a 300 px de allí obliga a buscarlo
+    // y a cruzar media rejilla para llegar a la primera opción.
+    //
+    // `DondeCabe` se queda para cuando NO hay cursor: con la tecla de menú contextual o
+    // Mayús+F10 no hay punto donde abrirlo, y entonces sí vale la regla vieja de ponerlo al
+    // lado de la tarjeta sin taparla.
+    //
+    // ---------- Y lo otro que fallaba: salía cortado ----------
+    //
+    // El menú de una ventana tiene catorce opciones: unos 488 px de alto. El panel de la
+    // vista mide ~320. No cabía por ningún sitio, y el código solo topaba el borde de
+    // ARRIBA (`Math.Max(2, …)`), así que el menú empezaba dentro y se iba por abajo: las
+    // últimas opciones —«cerrar» y «forzar el cierre»— quedaban fuera del recorte y no había
+    // forma de llegar a ellas. Por eso había que «adaptarlo» cada vez.
+    //
+    // Así que esto devuelve también el alto que de verdad cabe y si hay que desplazar por
+    // dentro. Un menú que no cabe se desplaza; lo que no hace nunca es cortarse.
+    public sealed record SitioMenu(NubeHypr.Rect Donde, bool ConScroll);
+
+    // El aire que se le deja al borde del área. Más pequeño que `HuecoMinimo`: aquí no se
+    // trata de no tapar nada, sino de que el filo del menú no se pegue al del panel.
+    public const double HuecoMenu = 4;
+
+    public static SitioMenu MenuEnElPunto(double clicX, double clicY, NubeHypr.Rect area,
+                                          double ancho, double alto)
+    {
+        ancho = Math.Max(1, ancho);
+        alto = Math.Max(1, alto);
+
+        // Lo que de verdad hay sitio para dibujar. Si el menú es más alto que el área, se
+        // queda con el área y se desplaza por dentro: es la diferencia entre «no cabe» y
+        // «no se puede usar».
+        double cabeAncho = Math.Max(1, area.Ancho - HuecoMenu * 2);
+        double cabeAlto = Math.Max(1, area.Alto - HuecoMenu * 2);
+
+        bool conScroll = alto > cabeAlto;
+        double anchoReal = Math.Min(ancho, cabeAncho);
+        double altoReal = Math.Min(alto, cabeAlto);
+
+        // Hacia la derecha y hacia abajo del cursor, que es la esquina por la que se lee un
+        // menú. Si por ese lado no cabe, se vuelca al otro —como hace Windows— en vez de
+        // arrastrarse contra el borde, que dejaría el cursor en mitad del menú y la primera
+        // opción debajo del puntero, lista para pulsarse sin querer.
+        double x = clicX;
+        if (x + anchoReal > area.X + area.Ancho - HuecoMenu) x = clicX - anchoReal;
+
+        double y = clicY;
+        if (y + altoReal > area.Y + area.Alto - HuecoMenu) y = clicY - altoReal;
+
+        // Y pase lo que pase, dentro. Los dos bordes, no solo el de arriba: ese era el fallo.
+        x = Dentro(x, area.X, area.Ancho, anchoReal);
+        y = Dentro(y, area.Y, area.Alto, altoReal);
+
+        return new SitioMenu(new NubeHypr.Rect(x, y, anchoReal, altoReal), conScroll);
+    }
+
+    // Mete un trozo dentro del área por los DOS lados. El `Math.Max` del tope no es
+    // prolijidad: con un área más pequeña que el trozo, el mínimo saldría mayor que el
+    // máximo y `Math.Clamp` lanza.
+    static double Dentro(double v, double inicio, double total, double mio)
+    {
+        double min = inicio + HuecoMenu;
+        double max = inicio + total - mio - HuecoMenu;
+        return Math.Clamp(v, min, Math.Max(min, max));
+    }
+
     // Centrar un trozo frente a otro sin salirse del área.
     static double Centrado(double inicio, double largo, double mio, double limite, double total)
     {
