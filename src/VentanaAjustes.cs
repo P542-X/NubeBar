@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -79,7 +79,7 @@ public sealed partial class VentanaAjustes : Window
         _arbol = ConfigArbol.Cargar();
         LeerColoresDelTema();
 
-        Title = "Ajustes de la nube";
+        Title = Textos.T("Ajustes de la nube");
         // Más ancha que antes porque ahora hay navegación lateral: con 760 el contenido se
         // quedaba en 570 y las tarjetas con dos columnas no caben. Y con mínimos, para que
         // una ventana estrecha no deje el pie encima del contenido ni recorte la lista.
@@ -431,7 +431,7 @@ public sealed partial class VentanaAjustes : Window
         var textos = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         textos.Children.Add(new TextBlock
         {
-            Text = "Ajustes de la nube",
+            Text = Textos.T("Ajustes de la nube"),
             FontSize = 19,
             FontWeight = FontWeights.SemiBold,
             Foreground = _texto,
@@ -583,7 +583,7 @@ public sealed partial class VentanaAjustes : Window
 
             _lateral.Children.Add(new TextBlock
             {
-                Text = catNombre.ToUpperInvariant(),
+                Text = Textos.T(catNombre).ToUpperInvariant(),
                 FontSize = 10,
                 FontWeight = FontWeights.SemiBold,
                 Foreground = _textoAtenuado,
@@ -618,7 +618,7 @@ public sealed partial class VentanaAjustes : Window
         });
         contenido.Children.Add(new TextBlock
         {
-            Text = d.Nombre,
+            Text = Textos.T(d.Nombre),
             FontSize = 13,
             Foreground = _texto,
             VerticalAlignment = VerticalAlignment.Center,
@@ -636,7 +636,7 @@ public sealed partial class VentanaAjustes : Window
             HorizontalContentAlignment = HorizontalAlignment.Left,
             Cursor = Cursors.Hand,
             Tag = d.Id,
-            ToolTip = Subtitulos.TryGetValue(d.Id, out var s) ? s : d.Nombre,
+            ToolTip = Textos.T(Subtitulos.TryGetValue(d.Id, out var s) ? s : d.Nombre),
         };
 
         // ---------- Y su nombre para quien no lo ve ----------
@@ -875,9 +875,9 @@ public sealed partial class VentanaAjustes : Window
         FundirPagina();
         var id = IdDeLaPaginaActual();
         if (_subtitulo != null)
-            _subtitulo.Text = Subtitulos.TryGetValue(id, out var s)
+            _subtitulo.Text = Textos.T(Subtitulos.TryGetValue(id, out var s)
                 ? s
-                : Categorias.FirstOrDefault(c => c.Id == CategoriaDe(id)).Sub ?? "";
+                : Categorias.FirstOrDefault(c => c.Id == CategoriaDe(id)).Sub ?? "");
 
         foreach (var (nid, b) in _navegacion)
         {
@@ -1021,7 +1021,7 @@ public sealed partial class VentanaAjustes : Window
         // Aquí quedan las dos globales, una vez cada una.
         var izquierda = new TextBlock
         {
-            Text = "Los cambios se guardan al pulsar Guardar",
+            Text = Textos.T("Los cambios se guardan al pulsar Guardar"),
             FontSize = 11,
             Foreground = _textoAtenuado,
             Opacity = 0.6,
@@ -1069,7 +1069,7 @@ public sealed partial class VentanaAjustes : Window
         });
         cab.Children.Add(new TextBlock
         {
-            Text = titulo,
+            Text = Textos.T(titulo),
             FontSize = 13.5,
             FontWeight = FontWeights.SemiBold,
             Foreground = _texto,
@@ -1110,7 +1110,7 @@ public sealed partial class VentanaAjustes : Window
         var col = new StackPanel { Margin = new Thickness(0, 0, 0, 16) };
         col.Children.Add(new TextBlock
         {
-            Text = titulo,
+            Text = Textos.T(titulo),
             FontSize = 17,
             FontWeight = FontWeights.SemiBold,
             Foreground = _texto,
@@ -1118,7 +1118,7 @@ public sealed partial class VentanaAjustes : Window
         if (descripcion.Length > 0)
             col.Children.Add(new TextBlock
             {
-                Text = descripcion,
+                Text = Textos.T(descripcion),
                 FontSize = 12,
                 Foreground = _textoAtenuado,
                 TextWrapping = TextWrapping.Wrap,
@@ -1306,7 +1306,7 @@ public sealed partial class VentanaAjustes : Window
         {
             bool hay = _arbol.HaCambiado();
             if (_sinGuardar != null)
-                _sinGuardar.Text = hay ? "Cambios sin guardar" : "";
+                _sinGuardar.Text = hay ? Textos.T("Cambios sin guardar") : "";
             if (_botonGuardar != null)
             {
                 _botonGuardar.IsEnabled = hay;
@@ -1384,7 +1384,7 @@ public sealed partial class VentanaAjustes : Window
     {
         var b = new Button
         {
-            Content = texto,
+            Content = Textos.T(texto),
             Margin = new Thickness(8, 0, 0, 0),
             Padding = new Thickness(18, 7, 18, 7),
             Foreground = destacado ? _roles.Pincel(ClavesBase.SobreAcento) : _texto,
@@ -1404,7 +1404,7 @@ public sealed partial class VentanaAjustes : Window
         fila.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         fila.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(56) });
 
-        var rot = new TextBlock { Text = etiqueta, Foreground = _texto, VerticalAlignment = VerticalAlignment.Center };
+        var rot = new TextBlock { Text = Textos.T(etiqueta), Foreground = _texto, VerticalAlignment = VerticalAlignment.Center };
         var desl = new Slider
         {
             Minimum = min, Maximum = max, Value = valor,
@@ -1571,11 +1571,33 @@ public sealed partial class VentanaAjustes : Window
     // que esto no inventa una técnica nueva — usa la de la casa.
     //
     // Y está en UN sitio para los tres: el día que el tema cambie, cambian los tres.
+    // El valor de un desplegable es lo que se guarda en el config —«isla», «barra»,
+    // «autoocultar»— así que la lista NO se traduce: traducirla escribiría «island» en el
+    // fichero y la siguiente carga no lo entendería. Lo que se traduce es lo que se ve, con
+    // una plantilla, y el elemento por debajo sigue siendo el de siempre.
+    sealed class TraducirAlVuelo : System.Windows.Data.IValueConverter
+    {
+        public object Convert(object v, Type t, object p, System.Globalization.CultureInfo c) =>
+            Textos.T(v as string ?? v?.ToString() ?? "");
+        public object ConvertBack(object v, Type t, object p, System.Globalization.CultureInfo c) => v;
+    }
+
+    static readonly TraducirAlVuelo ElTraductor = new();
+
+    static DataTemplate PlantillaTraducida()
+    {
+        var f = new FrameworkElementFactory(typeof(TextBlock));
+        f.SetBinding(TextBlock.TextProperty,
+                     new System.Windows.Data.Binding(".") { Converter = ElTraductor });
+        return new DataTemplate { VisualTree = f };
+    }
+
     ComboBox Desplegable(System.Collections.IEnumerable valores)
     {
         var c = new ComboBox
         {
             ItemsSource = valores,
+            ItemTemplate = PlantillaTraducida(),
             Foreground = _texto,
             Background = _superficieAlta,
             BorderBrush = new SolidColorBrush(_roles.Borde),

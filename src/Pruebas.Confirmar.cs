@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -102,8 +102,44 @@ public static partial class Pruebas
                 Vale(en != es, $"«{es}» está traducida de verdad, no copiada");
             }
 
-            Vale(Textos.Traducidas > 100,
-                 $"la tabla cubre la interfaz principal ({Textos.Traducidas} cadenas)");
+            // ---------- Y ahora la tabla ENTERA, no diez elegidas a mano ----------
+            //
+            // Diez cadenas escritas aquí comprueban diez cadenas. Lo que hace falta
+            // vigilar es la tabla, que son cientos y crece cada vez que se traduce una
+            // pantalla: una entrada con el inglés en blanco sale como un hueco, y una
+            // copiada del castellano sale como si se hubiera traducido cuando no.
+            // Ninguna de las dos da error, y por eso tiene que cazarlas una prueba.
+            //
+            // Las que SÍ se escriben igual en los dos idiomas se declaran aquí abajo con
+            // nombre: son nombres propios y palabras que el inglés tomó prestadas, y
+            // declararlas cuesta una línea y deja el resto vigilado.
+            var igualesAdrede = new HashSet<string>(StringComparer.Ordinal)
+            {
+                "NubeBar", "NubeHypr", "Nube", "Wallpaper", "Wallpaper Engine", "Dock",
+                "Monitor", "Neon", "Color", "Radio", "Gap", "Ping",
+                "Profesional", "Oficina", "Videojuegos", "Invierno", "Cyberpunk",
+                "Sakura", "Samurái", "Otoño", "Sad",
+                // Y las que el inglés escribe igual: siglas y palabras prestadas.
+                "CPU", "RAM", "Apps", "Normal", "Ping",
+                // Y dos valores de desplegable que en inglés se escriben igual.
+                "English", "auto",
+            };
+
+            int vacias = 0, copiadas = 0;
+            foreach (var (es, en) in Textos.Tabla)
+            {
+                if (string.IsNullOrWhiteSpace(en)) { vacias++; Vale(false, $"«{es}» se traduce a vacío"); }
+                else if (en == es && !igualesAdrede.Contains(es))
+                {
+                    copiadas++;
+                    Vale(false, $"«{es}» está copiada del castellano, no traducida");
+                }
+            }
+            Vale(vacias == 0, $"ninguna cadena de la tabla sale en blanco en inglés ({Textos.Traducidas} miradas)");
+            Vale(copiadas == 0, "ninguna está copiada del castellano sin declararlo");
+
+            Vale(Textos.Traducidas > 300,
+                 $"la tabla cubre la interfaz ({Textos.Traducidas} cadenas)");
         }
         finally
         {
