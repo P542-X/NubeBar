@@ -687,16 +687,38 @@ static class Entradas
 
     public static bool? YaSabemos => _hay;
 
+    // ---------- Y la respuesta se lleva en un LOCAL, no se relee del campo ----------
+    //
+    // Esto decía `_hay = ...` y después leía `_hay.Value` dos veces, y eso es una carrera
+    // con nombre y apellidos. Con dos monitores hay dos islas, las dos preguntan por su
+    // cuenta (MainWindow.ModuloMonitores) y un cambio de pantallas llama a `Replantear`,
+    // que pone el campo a null. Si eso cae entre la asignación y el `.Value`, salta
+    // `InvalidOperationException: Nullable object must have a value`, el trabajador se
+    // muere a medias y el módulo no se ofrece — aunque los monitores sí contesten.
+    //
+    // No es hipotético: está en el registro del usuario, 2026-11-07 12:51:56.221, con las
+    // dos islas preguntando a la vez.
+    //
+    //   ERROR en ver si hay monitores con entrada DDC/CI:
+    //   System.InvalidOperationException: Nullable object must have a value.
+    //      at NubeBar.Entradas.Disponible()
+    //
+    // El arreglo no es un lock: es no volver a preguntarle al campo lo que ya se sabe. El
+    // campo es solo la caché; la respuesta de ESTA llamada es la del local, y entonces da
+    // igual que otro hilo la invalide en medio — lo que devolvemos sigue siendo cierto de
+    // lo que acabamos de medir, y la siguiente llamada volverá a medir, que es justo lo
+    // que `Replantear` quería.
     public static bool Disponible()
     {
         if (_hay is { } ya) return ya;
         var p = Pantallas();
-        _hay = p.Any(x => x.GestionaEntrada);
+        bool hay = p.Any(x => x.GestionaEntrada);
+        _hay = hay;
         Log.Info($"entrada de vídeo por DDC/CI: " +
-                 (_hay.Value
+                 (hay
                     ? $"{p.Count(x => x.GestionaEntrada)} de {p.Count} monitor(es) la gestionan"
                     : "ningún monitor la gestiona, el módulo no se ofrece"));
-        return _hay.Value;
+        return hay;
     }
 
     // Cuando cambia la configuración de pantallas hay que volver a preguntarlo todo: capacidades,

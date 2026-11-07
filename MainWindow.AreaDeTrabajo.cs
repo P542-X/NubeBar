@@ -23,8 +23,13 @@ public partial class MainWindow
 
     // Lo que la barra se queda, en píxeles. Cero cuando flota: entonces las ventanas pasan
     // por debajo de la isla a propósito, que es como ha funcionado siempre.
-    double ReservaDeLaBarraPx =>
-        _cfg.Barra.ReservarEspacio ? (Grosor + _cfg.Barra.Margen * 2) * _monitor.Escala : 0;
+    //
+    // La pregunta es la MISMA que la de la appbar, así que se lee del mismo sitio
+    // (`ReservaHueco`) y no del interruptor en crudo. En crudo había dos respuestas para
+    // una sola cosa: con el autoocultar encendido, Windows no guardaba la franja —eso ya
+    // lo descartaba `ReservaHueco`— pero NubeHypr sí la descontaba, y repartía las
+    // ventanas dejando un hueco para una barra que no estaba.
+    double ReservaDeLaBarraPx => ReservaHueco ? (Grosor + _cfg.Barra.Margen * 2) * _monitor.Escala : 0;
 
     // ---------- Y los estorbos para los PANELES LATERALES ----------
     //
@@ -42,7 +47,7 @@ public partial class MainWindow
     internal List<NubeHypr.Estorbo> EstorbosParaLosLaterales()
     {
         var l = EstorbosDeAhora();
-        if (!_cfg.Barra.ReservarEspacio)
+        if (!ReservaHueco)
             l.Add(new NubeHypr.Estorbo(BordeDeLaBarra,
                                        (Grosor + _cfg.Barra.Margen * 2) * _monitor.Escala));
         return l;

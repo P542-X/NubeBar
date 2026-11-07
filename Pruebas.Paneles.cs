@@ -33,6 +33,108 @@ public static partial class Pruebas
         IconosOscurosSeReconocen();
         LaBarraDeScrollEsLaNuestra();
         ElHaloDelPanelLateralNoVaEnLoRecortado();
+        LaReservaNoDependeDelModo();
+        LaIslaCreceEnseguidaYEncogeConCalma();
+    }
+
+    // ================= El baile de los separadores =================
+    //
+    // ---------- De dónde sale esto ----------
+    //
+    // «Hay veces que los separadores se mueven mientras estoy jugando; la línea de los
+    // separadores parpadean y se mueven 1 o 2 px de lado a lado.»
+    //
+    // `RefrescarApps` vive en los actualizadores, o sea que el ancho se repregunta cada
+    // segundo, y el listón para rehacerlo era medio píxel. Medir texto da decimales, así
+    // que el reloj pasando de minuto bastaba para lanzar una animación de 280 ms de la
+    // isla entera; y como la isla va centrada, todo lo de dentro se corría esa pizca. En
+    // una raya de 1 px eso se ve como un parpadeo y un salto.
+    //
+    // Lo que se fija aquí es la asimetría, que es el arreglo entero: crecer no puede
+    // esperar —quedarse corto RECORTA el contenido— y encoger sí, porque sobrar tres
+    // píxeles no lo ve nadie y mover la isla para quitarlos lo ve todo el mundo.
+    static void LaIslaCreceEnseguidaYEncogeConCalma()
+    {
+        Grupo("el ancho de la isla: crecer y encoger");
+
+        // Crecer: siempre, hasta por poco. Lo medido es lo que el contenido necesita.
+        Vale(MainWindow.HayQueReajustarElAncho(580, 581), "un píxel más de contenido: se crece");
+        Vale(MainWindow.HayQueReajustarElAncho(580, 640), "y mucho más, también");
+
+        // Encoger: solo si sobra de verdad
+        Vale(!MainWindow.HayQueReajustarElAncho(580, 579), "uno menos: no se mueve la isla");
+        Vale(!MainWindow.HayQueReajustarElAncho(580, 578), "ni dos");
+        Vale(!MainWindow.HayQueReajustarElAncho(580, 577), "ni tres");
+        Vale(MainWindow.HayQueReajustarElAncho(580, 570), "diez menos sí: eso ya es hueco");
+
+        // Quieto es quieto: el caso de cada segundo cuando no ha pasado nada
+        Vale(!MainWindow.HayQueReajustarElAncho(580, 580), "sin cambios, no se toca nada");
+
+        // Y la primera vez hay que ponerle la medida sí o sí
+        Vale(MainWindow.HayQueReajustarElAncho(0, 580), "la isla aún sin medir: se ajusta");
+
+        // ---------- Lo que no puede volver a pasar ----------
+        //
+        // Un ciclo: que al encoger se cruce el listón, y al medir otra vez haya que
+        // crecer, y vuelta a empezar. Si eso fuera posible, la isla se movería sola para
+        // siempre — que es justo el síntoma del que venimos.
+        for (double ancho = 560; ancho <= 600; ancho += 1)
+        {
+            double pedido = ancho - MainWindow.MargenParaEncoger;   // justo en el filo
+            Vale(!MainWindow.HayQueReajustarElAncho(ancho, pedido),
+                 $"en el filo ({ancho:0} -> {pedido:0}) la isla se queda quieta");
+        }
+    }
+
+    // ================= Reservar espacio: una elección, no un modo =================
+    //
+    // ---------- De dónde sale esto ----------
+    //
+    // «Hay que hacer una opción para que la nube ocupe un espacio como barra de tareas
+    // normal, y opción como ahora, que sea una nube que flote.» La opción ya existía
+    // —`Paneles[].ReservarEspacio`, con su interruptor en Ajustes y su tri-estado— y en
+    // modo isla no hacía nada: `ReservaHueco` llevaba un `!EsIsla` delante. La
+    // encendías, se guardaba en el config, el log decía `reserva=no`, y desde donde el
+    // usuario mira eso es que no funciona.
+    //
+    // Lo que se fija aquí es que la respuesta dependa SOLO de lo que has elegido y del
+    // autoocultar. El modo no entra, y la firma de `ReservaLaFranja` es la prueba de que
+    // no puede entrar: no recibe ningún modo. Esto no deja volver el candado a
+    // escondidas, que es lo que pasó la primera vez.
+    static void LaReservaNoDependeDelModo()
+    {
+        Grupo("reservar espacio");
+
+        // El tri-estado, tal cual
+        Igual(false, PanelNube.ReservaEfectiva(null), "sin elegir: la nube flota");
+        Igual(true, PanelNube.ReservaEfectiva(true), "elegido sí: se reserva");
+        Igual(false, PanelNube.ReservaEfectiva(false), "elegido no: no se reserva");
+        Igual(false, PanelNube.ReservaPorDefecto, "el defecto es flotar");
+
+        // Y la regla final: lo elegido manda, el autoocultar manda sobre lo elegido
+        Igual(false, PanelNube.ReservaLaFranja(null, autoOculta: false), "sin elegir, visible: no");
+        Igual(true, PanelNube.ReservaLaFranja(true, autoOculta: false), "elegido sí, visible: sí");
+        Igual(false, PanelNube.ReservaLaFranja(true, autoOculta: true), "elegido sí, pero se autooculta: no");
+        Igual(false, PanelNube.ReservaLaFranja(false, autoOculta: false), "elegido no: no");
+
+        // La firma no tiene por dónde mirar el modo. Si alguien añade un parámetro para
+        // volver a distinguir isla de barra, esto se cae y hay que leer el comentario de
+        // arriba antes de seguir.
+        var f = typeof(PanelNube).GetMethod(nameof(PanelNube.ReservaLaFranja));
+        Vale(f != null, "ReservaLaFranja es pública y se puede probar en frío");
+        var nombres = f?.GetParameters().Select(x => x.Name).ToArray() ?? Array.Empty<string?>();
+        Igual(2, nombres.Length, "la reserva se decide con dos cosas y no con tres");
+        Vale(!nombres.Any(n => (n ?? "").Contains("modo", StringComparison.OrdinalIgnoreCase)),
+             "la reserva no mira el modo: la isla también puede ocupar su sitio");
+
+        // El borde que se le pide a Windows sí depende del modo, y eso está bien: una
+        // isla anclada a un lateral sigue siendo horizontal, así que reserva por arriba
+        // (ABE_TOP=1) y no por el lado. Una barra en ese mismo borde es vertical de
+        // verdad y reserva por la izquierda (ABE_LEFT=0).
+        Igual(1u, PanelNube.BordeAppBar("isla", "izquierda"), "isla a la izquierda: reserva por arriba");
+        Igual(0u, PanelNube.BordeAppBar("barra", "izquierda"), "barra a la izquierda: reserva por el lado");
+        Igual(1u, PanelNube.BordeAppBar("isla", "arriba"), "isla arriba: ABE_TOP");
+        Igual(3u, PanelNube.BordeAppBar("isla", "abajo"), "isla abajo: ABE_BOTTOM");
     }
 
     // ================= El halo del panel lateral =================

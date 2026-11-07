@@ -80,14 +80,29 @@ public partial class MainWindow : Window
 
     bool ArribaEfectivo => PanelNube.CuelgaDeArriba(PanelPrincipal.Posicion);
 
-    // ¿Le pedimos a Windows que nos guarde la franja? Solo el modo barra: la isla flota
-    // encima de las ventanas, como en el iPhone. Y una barra que se autooculta tampoco,
-    // que reservar sitio para algo que no está es lo que uno quiere evitar al
-    // encender el autoocultar (en Plasma pasa lo mismo).
-    // Barra.ReservarEspacio ya viene resuelto de la carga, con el defecto aplicado si
-    // no lo has elegido (ver PanelNube.ReservaEfectiva). Y la ISLA no reserva nunca,
-    // la elijas o no: flota encima de las ventanas, que es lo que es.
-    bool ReservaHueco => !EsIsla && _cfg.Barra.ReservarEspacio && !PanelAutoOculta;
+    // ¿Le pedimos a Windows que nos guarde la franja? Lo dice el interruptor y ya:
+    // `Barra.ReservarEspacio` viene resuelto de la carga, con el defecto aplicado si no
+    // lo has elegido (ver PanelNube.ReservaEfectiva).
+    //
+    // Aquí había un `!EsIsla` delante, y era una decisión de más. Lo que defendía —«la
+    // isla flota encima de las ventanas, como en el iPhone»— ya lo dice el DEFECTO: de
+    // serie no se reserva en ningún modo ni en ningún borde. Lo único que añadía el
+    // candado era apagarle el interruptor a quien lo había encendido a mano: lo pedías,
+    // Ajustes lo guardaba, el log decía `reserva=no` y no había forma de saber por qué.
+    // La isla y la barra son la misma nube con otra forma; si quieres que Windows te
+    // guarde su sitio, te lo guarda.
+    //
+    // Y una isla reserva la franja ENTERA de su borde aunque ella sea estrecha: una
+    // appbar de Windows solo entiende de bordes de pantalla, no de trozos. Es lo que se
+    // pide con esto —que las ventanas maximizadas se queden por debajo de la nube— y es
+    // también el motivo de que no venga puesto de serie.
+    //
+    // Lo que sigue mandando sobre el interruptor es el AUTOOCULTAR: reservar sitio para
+    // algo que no está es justo lo que uno quiere evitar al encenderlo (en Plasma pasa
+    // lo mismo). Y el grosor que se reserva es el de la nube RECOGIDA (ver el
+    // `grosorVentana` de Aplicar): expandirse al pasar el ratón no mueve las ventanas
+    // de todo el escritorio.
+    bool ReservaHueco => PanelNube.ReservaLaFranja(_cfg.Barra.ReservarEspacio, PanelAutoOculta);
 
     // Para el log de arranque: en una línea, qué panel ha salido de verdad. Antes solo
     // se apuntaba "Modo=isla", que a partir de B5 ya no dice casi nada.

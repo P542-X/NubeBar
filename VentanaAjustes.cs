@@ -1914,6 +1914,29 @@ public sealed partial class VentanaAjustes : Window
         pista.Opacity = 0.55;
         pista.Margin = new Thickness(0, 0, 0, 4);
         p.Mas(pista);
+        // ---------- Flotar o quedarse el sitio ----------
+        //
+        // Va aquí, pegado a «Modo», y no en Sistema, que es donde estaba. El usuario lo
+        // pidió como «una opción para que la nube ocupe un espacio como barra de tareas
+        // normal, y opción como ahora, que sea una nube que flote», y eso es la misma
+        // pregunta que contesta el desplegable de arriba: cuál de las dos formas quiero.
+        // Con el interruptor dos páginas más allá, la única manera visible de que la
+        // nube te guardase su sitio era cambiar de modo — que es otra decisión entera.
+        //
+        // De serie apagado, en los dos modos y en los cuatro bordes (la nube flota).
+        // Tocarlo lo convierte en una elección tuya y manda sobre el defecto, en los dos
+        // sentidos: ver PanelNube.ReservarEspacio, que es un tri-estado y no un bool.
+        p.Mas(Interruptor("Reservar espacio en pantalla, como la barra de tareas",
+                          _arbol.BanderaDelPanel(Principal, "ReservarEspacio", PanelNube.ReservaPorDefecto),
+                          v => _arbol.PonerDelPanel(Principal, "ReservarEspacio", v)));
+        p.Pista("Apagado —como viene de serie— la nube FLOTA: las ventanas pasan por debajo de " +
+                "ella y una ventana maximizada la tapa. Encendido, Windows le guarda su franja " +
+                "igual que a la barra de tareas, y las ventanas maximizadas llegan solo hasta " +
+                "donde empieza la nube.");
+        p.Pista("Vale en los dos modos. Una isla estrecha reserva la franja entera de su borde, " +
+                "porque Windows solo sabe guardar bordes de pantalla y no trozos. Con la " +
+                "visibilidad en «ocultar automáticamente» no se reserva nada, aunque esto esté " +
+                "encendido: guardar sitio para algo que no está es justo lo que se quiere evitar.");
         p.Mas(Opciones("Visibilidad", PanelNube.Visibilidades,
                                 _arbol.TextoDelPanel(Principal, "Visibilidad", "siempre"),
                                 v => _arbol.PonerDelPanel(Principal, "Visibilidad", v)));
@@ -3591,18 +3614,21 @@ public sealed partial class VentanaAjustes : Window
         p.Mas(Interruptor("Ocultarla mientras la nube esté abierta",
                                    _arbol.Bandera("Barra", "OcultarBarraWindows", true),
                                    v => _arbol.Poner("Barra", "OcultarBarraWindows", v)));
-        // De serie viene apagado en los cuatro bordes: la nube flota. Tocar este
-        // interruptor lo convierte en una elección tuya y manda sobre el defecto.
-        p.Mas(Interruptor("Reservar espacio en pantalla (solo en modo barra)",
-                                   _arbol.BanderaDelPanel(Principal, "ReservarEspacio", PanelNube.ReservaPorDefecto),
-                                   v => _arbol.PonerDelPanel(Principal, "ReservarEspacio", v)));
-        var pistaReserva = Rotulo(
-            "De serie viene apagado en los cuatro bordes: la nube flota por encima de las " +
-            "ventanas. Enciéndelo si prefieres que Windows le guarde su franja y las ventanas " +
-            "maximizadas no la tapen, como pasa con la barra de tareas.");
-        pistaReserva.TextWrapping = TextWrapping.Wrap;
-        pistaReserva.Opacity = 0.55;
-        p.Mas(pistaReserva);
+        // ---------- Y el sitio que se queda la NUESTRA: no está aquí ----------
+        //
+        // «Reservar espacio en pantalla» vivía en esta tarjeta, y era el sitio
+        // equivocado por dos motivos. Uno: una tarjeta titulada «Barra de tareas de
+        // Windows» con «reservar espacio» dentro se lee como si fuese cosa de la barra
+        // de Windows. Y dos, el que importa: es geometría de la nube —si flota o si
+        // ocupa su sitio— y toda la geometría de la nube se edita en Apariencia →
+        // Forma, al lado de «Modo». Quien quiere elegir entre isla flotante y barra que
+        // ocupa sitio mira ahí, no en Sistema. Allí está ahora.
+        //
+        // Lo que queda aquí es el puente, porque comparar la nube con la barra de
+        // tareas es justo lo que uno hace estando en esta tarjeta.
+        p.Pista("¿Prefieres que la nube ocupe su sitio en pantalla, como la barra de tareas, " +
+                "en vez de flotar por encima de las ventanas? Eso es «Reservar espacio en " +
+                "pantalla», y está en Apariencia → Forma, con lo demás de la geometría de la nube.");
 
         // ---------- El clima ----------
         //

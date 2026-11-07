@@ -1,8 +1,77 @@
-# Notas de versión
+﻿# Notas de versión
 
 Las versiones publicadas están en [Releases](../../releases). Cada una trae el
 instalador (`NubeBar-Setup.exe`) y el ejecutable suelto (`NubeBar.exe`), los dos
 construidos por el workflow de Release a partir de la etiqueta.
+
+---
+
+## v1.0.8
+
+### Cambiado
+
+- **La nube puede ocupar su sitio también en modo isla.** «Reservar espacio en pantalla»
+  existía desde hace versiones, pero solo hacía algo en modo barra: en modo isla lo
+  encendías, Ajustes lo guardaba en el `config.json` y no pasaba nada. Ahora el interruptor
+  vale en los dos modos y en los cuatro bordes.
+
+  Apagado —como viene de serie— la nube **flota**: las ventanas pasan por debajo y una
+  ventana maximizada la tapa. Encendido, Windows le guarda su franja igual que a la barra de
+  tareas y las ventanas maximizadas llegan solo hasta donde empieza la nube. Ya no hay que
+  cambiar de modo para elegir una cosa o la otra, que era la única forma que había.
+
+  Una isla, aunque sea estrecha y esté centrada, reserva la franja **entera** de su borde:
+  una appbar de Windows solo entiende de bordes de pantalla, no de trozos. Y lo que se
+  reserva es el grosor de la nube **recogida**, así que expandirse al pasar el ratón no mueve
+  las ventanas de todo el escritorio. Con «ocultar automáticamente» no se reserva nada,
+  aunque el interruptor esté encendido.
+
+  Y el interruptor **se ha mudado a donde se busca**: estaba en Sistema, dentro del grupo
+  «Barra de tareas de Windows» —donde se leía como si fuese cosa de la barra de Windows—, y
+  ahora está en **Apariencia → Forma**, pegado a «Modo» y «Posición», que es donde se decide
+  la geometría de la nube. En Sistema queda una línea que dice dónde encontrarlo.
+
+### Arreglado
+
+- **La entrada de vídeo desaparecía de la barra con dos monitores.** `Entradas.Disponible()`
+  guardaba la respuesta en un campo y después la **releía** para devolverla. Con dos
+  pantallas hay dos islas preguntando a la vez, y un cambio de monitores llama a
+  `Replantear()`, que pone ese campo a nulo: si caía justo en medio saltaba
+  `InvalidOperationException: Nullable object must have a value`, el trabajador se moría a
+  media comprobación y el módulo «Monitores» no se ofrecía — aunque los monitores sí
+  contestaran al DDC/CI. Ahora la respuesta de cada llamada va en un local y el campo es
+  solo la caché.
+
+- **Una app podía quedarse con su inicial en vez de su icono.** Abrías Discord y en la
+  barra salía una «D». El icono de una app abierta se le pide a su VENTANA
+  (`WM_GETICON`, con 50 ms de plazo), y una ventana recién creada todavía no lo ha puesto
+  —ni una app ocupada contesta a tiempo, por ejemplo con un juego comiéndose la máquina—.
+  Encima, la caché de iconos guardaba también los FALLOS, y para siempre: un tropiezo de
+  medio segundo condenaba a esa app a su letra hasta reiniciar NubeBar.
+
+  Ahora, si la ventana no contesta, el icono se le pide al shell a partir del ejecutable
+  —el mismo sitio del que ya salía el de una app fijada y cerrada—, y en la caché solo
+  entran los aciertos: los fallos se apuntan con la hora y se reintentan a los cinco
+  segundos. En cuanto la ventana conteste, se queda con el suyo.
+
+- **Los separadores parpadeaban y se movían un par de píxeles.** Se veía sobre todo
+  jugando. `RefrescarApps` vive en los actualizadores, así que el ancho de la isla se
+  repreguntaba **cada segundo**, y el listón para rehacerlo era medio píxel: como medir
+  texto da decimales, el reloj pasando de minuto bastaba para lanzar una animación de
+  280 ms de la isla entera. Y la isla va centrada, así que todo lo de dentro se corría esa
+  pizca. En una raya de 1 px eso se ve como un parpadeo y un salto de lado a lado.
+
+  Ahora **crecer se hace siempre** —quedarse corto recorta un icono o la hora— y **encoger
+  solo si sobran 3 px o más**, que es el lado barato: que sobre un pelo de isla no se ve, y
+  moverla entera para quitarlo sí. Además el ancho se redondea a píxel entero y la fila de
+  módulos cae en la rejilla de píxeles, que es lo que quita el parpadeo de las rayas de
+  1 px.
+
+- **NubeHypr dejaba hueco para una barra que no estaba.** Con «reservar espacio» encendido y
+  la visibilidad en «ocultar automáticamente», Windows no guardaba la franja (eso ya estaba
+  bien) pero el reparto de ventanas sí la descontaba, y los paneles laterales se metían
+  debajo de la nube. Eran dos respuestas distintas para la misma pregunta, leídas de dos
+  sitios; ahora las dos salen de `ReservaHueco`.
 
 ---
 

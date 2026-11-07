@@ -1,4 +1,4 @@
-# NubeBar
+﻿# NubeBar
 
 Una barra para Windows 11 con la forma y el genio de la Dynamic Island del iPhone:
 una nube negra que vive arriba del todo, se expande cuando le pasas el ratón por
@@ -17,8 +17,11 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
 - Modo *isla* (flotando, centrada) o modo *barra* (de lado a lado), arriba o abajo.
 - Esconde la barra de tareas de Windows, la principal y las secundarias, y las
   devuelve intactas al cerrarse.
-- En modo barra reserva su hueco como una appbar de verdad: las ventanas
-  maximizadas no la tapan.
+- **Flota o se queda su sitio, tú eliges.** De serie la nube flota y las ventanas
+  pasan por debajo. Con «reservar espacio en pantalla» Windows le guarda su franja
+  como a la barra de tareas y las ventanas maximizadas llegan solo hasta donde
+  empieza la nube — una appbar de verdad, y vale igual en modo isla que en modo
+  barra.
 - Módulos colocables en tres zonas (izquierda, centro, derecha): inicio, apps,
   reloj, fecha, CPU, RAM, batería, música, bandeja, control, escritorios,
   wallpaper, iconos, separador.
@@ -279,7 +282,7 @@ Windows: quien ya ha pedido menos movimiento ahí no tiene que volver a pedirlo 
 | `Barra.Alto` | `38` | Alto de la fila de módulos |
 | `Barra.Margen` | `8` | Separación con el borde de la pantalla |
 | `Barra.OcultarBarraWindows` | `true` | Esconde la barra de tareas de Windows mientras NubeBar esté abierta |
-| `Barra.ReservarEspacio` | `true` | Solo en modo barra: reserva su hueco para que no la tapen las ventanas |
+| `Paneles[].ReservarEspacio` | sin elegir (flota) | Reserva su franja, como la barra de tareas, para que no la tapen las ventanas maximizadas. Vale en los dos modos; con `autoocultar` no se reserva |
 | `Barra.MaxApps` | `10` | Iconos de apps visibles a la vez; el resto, con la rueda |
 | `Barra.AgruparApps` | `true` | Las ventanas del mismo programa, en un solo icono |
 | `Barra.AtajoVistaGeneral` | `"Ctrl+Alt+W"` | Atajo global de la vista general |
@@ -319,10 +322,15 @@ La lista sale del registro de widgets, así que es la misma en el config, en
 **Ajustes → Módulos** y en el log. `musica-caratula` y `musica-barras` son la carátula
 y las barras por separado, para quien no quiera las dos juntas.
 
-Hay además una clave `Paneles` reservada. **No se lee del fichero todavía**: se
-rellena sola a partir de `Barra` y `Modulos` cada vez que se carga la configuración, y
-existe para que añadir un segundo panel, o uno lateral, no obligue a cambiar el
-`config.json` de nadie. Editarla a mano no hace nada.
+Hay además una clave `Paneles`, y desde B5 es **la autoridad** de la geometría de la
+nube: borde, modo, grosor, margen, visibilidad, en qué monitores sale y si reserva
+espacio. Nace sola la primera vez a partir de `Barra` —nadie nota el cambio— y a
+partir de ahí `Barra.Modo`, `Posicion`, `Alto`, `Margen`, `ReservarEspacio` y
+`Monitores` se *derivan* de ella al cargar y no se escriben nunca en el fichero: están
+en la tabla de arriba porque las leen sesenta y pico sitios del código. Si editas esas
+claves a mano no pasará nada; lo que manda es `Paneles`. Existe en plural para que
+añadir un segundo panel, o uno lateral, no obligue a cambiar el `config.json` de
+nadie.
 
 La zona del **centro se ve siempre**, con la isla recogida o desplegada; la
 izquierda y la derecha solo al desplegarse. Por eso ahí viven las apps: `fijadas`

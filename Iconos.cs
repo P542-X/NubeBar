@@ -41,12 +41,34 @@ static class Iconos
 
     static readonly Dictionary<string, ImageSource?> _cache = new(StringComparer.OrdinalIgnoreCase);
 
+    // ---------- Un fallo NO se guarda para siempre ----------
+    //
+    // La caché guardaba también los nulos, y eso convertía un tropiezo de un momento en
+    // permanente. El shell no contesta siempre a la primera: una app que acaba de
+    // arrancar, un ejecutable en un disco que estaba dormido, o el shell ocupado mientras
+    // un juego se come la máquina. Preguntado medio segundo después habría contestado,
+    // pero ya nadie volvía a preguntar — la app se quedaba con su inicial de respaldo
+    // hasta reiniciar NubeBar. El usuario lo contó así: «cuando abro una app tipo Discord
+    // hay veces que se queda con la letra D y no identifica qué app es, es como si los
+    // iconos no se actualizaran».
+    //
+    // Así que en `_cache` solo entran los ACIERTOS, y los fallos van aparte con la hora:
+    // se reintenta pasado un rato. El rato existe para que un ejecutable que de verdad no
+    // tiene icono no cueste una llamada COM en cada repintado del carrusel —que es cada
+    // segundo—, y es corto porque lo que se está esperando es que una app termine de
+    // arrancar.
+    static readonly Dictionary<string, DateTime> _fallos = new(StringComparer.OrdinalIgnoreCase);
+
+    internal static readonly TimeSpan ReintentarTras = TimeSpan.FromSeconds(5);
+
     // Devuelve null si el shell no sabe qué es (no pasa nada: se enseña sin icono)
     public static ImageSource? De(string rutaOId, int tamano = 32)
     {
         if (string.IsNullOrWhiteSpace(rutaOId)) return null;
         var clave = tamano + "|" + rutaOId;
-        if (_cache.TryGetValue(clave, out var guardado)) return guardado;
+        if (_cache.TryGetValue(clave, out var guardado) && guardado != null) return guardado;
+        if (_fallos.TryGetValue(clave, out var fallo) && DateTime.UtcNow - fallo < ReintentarTras)
+            return null;
 
         ImageSource? img = null;
         IntPtr hbm = IntPtr.Zero;
@@ -69,7 +91,8 @@ static class Iconos
         catch { img = null; }
         finally { if (hbm != IntPtr.Zero) DeleteObject(hbm); }
 
-        _cache[clave] = img;
+        if (img != null) { _cache[clave] = img; _fallos.Remove(clave); }
+        else _fallos[clave] = DateTime.UtcNow;
         return img;
     }
 

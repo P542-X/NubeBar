@@ -674,6 +674,12 @@ public partial class MainWindow : Window
         {
             ColocarBarraHorizontal();
             Contenido.Height = b.Alto;      // la fila de los módulos no cambia aunque crezca el cajón
+            // Que lo de dentro caiga en píxeles enteros. El separador ya lo pedía para sí
+            // (`SnapsToDevicePixels`), pero eso solo decide cómo se PINTA: dónde se COLOCA
+            // lo dice su padre, y sin esto el padre lo dejaba a medio píxel. Una raya de
+            // 1 px a medio píxel es media raya en dos columnas: más clara, y parpadeando
+            // en cuanto algo se mueve.
+            Contenido.UseLayoutRounding = true;
             Contenido.Width = double.NaN;
             Isla.BeginAnimation(HeightProperty, null);
             Isla.Height = b.Alto;
@@ -858,7 +864,20 @@ public partial class MainWindow : Window
 
         Contenido.InvalidateMeasure();
         double maximo = ActualWidth > 0 ? ActualWidth : _monitor.Ancho / _monitor.Escala;
-        return Math.Clamp(ancho, Isla.MinWidth, Math.Max(Isla.MinWidth, maximo));
+
+        // ---------- Y se redondea ARRIBA, a píxel entero ----------
+        //
+        // Medir texto da decimales, y la isla va centrada: un ancho de 580,4 pone todo lo
+        // de dentro a medio píxel, y una raya de 1 px —los separadores— se reparte entre
+        // dos columnas de píxeles y se ve más clara. Al siguiente minuto el reloj mide
+        // 580,9, todo se corre esa pizca y la raya parpadea y salta de sitio. Lo contó el
+        // usuario: «la línea de los separadores parpadean y se mueven 1 o 2 px de lado a
+        // lado».
+        //
+        // Arriba y no al más cercano: redondear hacia abajo recortaría el último píxel de
+        // lo que acabamos de medir, y de eso ya hay media docena de párrafos en este
+        // fichero.
+        return Math.Ceiling(Math.Clamp(ancho, Isla.MinWidth, Math.Max(Isla.MinWidth, maximo)));
     }
 
     // El ancho real queda siempre fijado al valor final y la animación solo dibuja el
@@ -913,8 +932,35 @@ public partial class MainWindow : Window
         if (!EsIsla) return;
         if (_aplicando || _animandoAncho) { _anchoTrasAnimar = true; return; }
         double hasta = Math.Max(MedirAncho(), _panelAncho);   // con panel abierto manda el panel
-        if (Math.Abs(hasta - Isla.ActualWidth) < 0.5) return;
+        if (!HayQueReajustarElAncho(Isla.ActualWidth, hasta)) return;
         AnimarAncho(hasta, 280, Suave);
+    }
+
+    // ---------- Crecer siempre; encoger, solo si merece la pena ----------
+    //
+    // `RefrescarApps` está en los actualizadores, así que esto se pregunta CADA SEGUNDO.
+    // Con el listón en medio píxel, cualquier respiro de la medida —el reloj cambiando de
+    // minuto, un punto más en un grupo, una ventana de overlay que aparece y se va—
+    // lanzaba una animación de 280 ms de la isla entera. Jugando eso es un baile continuo.
+    //
+    // Las dos direcciones no valen lo mismo, y ahí está el arreglo:
+    //
+    //   CRECER   hay que hacerlo siempre. Lo que se ha medido es lo que el contenido
+    //            necesita; quedarse corto es recortar un icono o la hora.
+    //   ENCOGER  puede esperar. Sobrar tres píxeles de isla no se ve; moverla entera
+    //            para quitarlos, sí.
+    //
+    // No es un número mágico con histéresis por si acaso: es que un fallo (recortar) es
+    // peor que el otro (sobrar un poco), así que el listón solo se levanta del lado
+    // barato. Y con el ancho ya redondeado a píxel entero (ver MedirAncho), lo que llega
+    // aquí son saltos de verdad y no decimales.
+    internal const double MargenParaEncoger = 3;
+
+    internal static bool HayQueReajustarElAncho(double ahora, double pedido)
+    {
+        if (ahora <= 0) return true;                       // aún no hay isla: ponle la medida
+        if (pedido > ahora + 0.5) return true;             // crecer: siempre
+        return pedido < ahora - MargenParaEncoger;         // encoger: solo si sobra de verdad
     }
 
     // Lo que se quedó sin medir mientras la isla se desplegaba o se aplicaba el config.

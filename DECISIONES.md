@@ -1,4 +1,4 @@
-# Decisiones
+﻿# Decisiones
 
 Lo que fui decidiendo por mi cuenta, con el motivo. Cada entrada es algo que no
 estaba previsto en el encargo o que cambió sobre la marcha.
@@ -1592,7 +1592,9 @@ completa". El motivo solo va al log.
 - **Reservar hueco para algo que no está.** Una barra con autoocultar registraba la
   appbar igual, así que Windows le guardaba su franja y las ventanas maximizadas no la
   usaban: justo lo que uno quiere evitar al encender el autoocultar. Ahora
-  `!EsIsla && ReservarEspacio && !PanelAutoOculta`. En Plasma pasa lo mismo.
+  `ReservarEspacio && !PanelAutoOculta`. En Plasma pasa lo mismo. (Entonces llevaba
+  además un `!EsIsla` delante; se quitó después: ver «Flotar o quedarse el sitio es una
+  elección, no un modo».)
 - **La animación de entrada deshacía la recogida.** `AnimarAparicion` hace caer la isla
   desde fuera con rebote y **deja `_mover.Y` en 0**. Con autoocultar encendido,
   `AplicarVisibilidad` ya la había recogido antes, y la caída la devolvía a la vista
@@ -2139,7 +2141,10 @@ Dos reglas que siguen por encima de tu elección, y las dos son de antes:
 - **El autoocultar nunca reserva**, aunque lo hayas encendido: guardar sitio para algo
   que no está es justo lo que se quiere evitar al autoocultar.
 - **La isla no reserva nunca**, la elijas o no. Flota encima de las ventanas, que es lo
-  que es.
+  que es. — **Esto duró hasta la v1.0.8 y se dio la vuelta**: el defecto ya protege lo
+  que esta regla protegía, y lo único que hacía de más era tragarse la elección de quien
+  encendía el interruptor en modo isla. Ver «Flotar o quedarse el sitio es una elección,
+  no un modo».
 
 Medido, los doce casos del cuadro más los cuatro de las excepciones:
 
@@ -2151,8 +2156,12 @@ true   izquierda                        área (54,0)-(2560,1440)
 true   derecha                          área (0,0)-(2506,1440)
 false  los cuatro                       área (0,0)-(2560,1440)   libre
 true + autoocultar                      área (0,0)-(2560,1440)   libre
-true + modo isla                        área (0,0)-(2560,1440)   libre
+true + modo isla                        área (0,0)-(2560,1440)   libre   ← ya no: reserva
 ```
+
+(La última línea es de cuando la isla tenía el candado. Desde la v1.0.8, `true` + modo
+isla reserva como cualquier otro borde: el cuadro de arriba vale igual para los dos
+modos.)
 
 Los cuatro bordes de la appbar quedan así probados contra el área de trabajo que publica
 Windows, cada uno recortando por su lado.
@@ -4028,3 +4037,181 @@ treinta que no dicen nada.
 El precio es que un tema tuyo depende de que su tema de partida siga existiendo. Se paga con
 lo de siempre: un id desconocido cae en Profesional, no en una excepción.
 
+## Flotar o quedarse el sitio es una elección, no un modo
+
+«Reservar espacio en pantalla» llevaba versiones con un candado escrito dentro de la ventana:
+
+```
+bool ReservaHueco => !EsIsla && _cfg.Barra.ReservarEspacio && !PanelAutoOculta;
+```
+
+Lo que defendía ese `!EsIsla` está bien escrito tres párrafos más arriba en este mismo
+documento: *esto no es un panel de Plasma, es una isla que flota*. Y es verdad. Pero eso ya
+lo dice el **defecto** —`ReservaPorDefecto = false`, en los dos modos y en los cuatro
+bordes—, y el candado no estaba protegiendo el defecto: estaba **tragándose la elección**.
+
+El usuario lo pidió con estas palabras: «una opción para que la nube ocupe un espacio como
+barra de tareas normal, y opción como ahora, que sea una nube que flote». Las dos existían.
+Lo que no existía era poder elegir **sin cambiar de modo**: para que la nube te guardase su
+sitio había que pasarla a barra de lado a lado, que es otra decisión entera y además la que
+el usuario no quería. Y en modo isla el interruptor seguía ahí, se encendía, se escribía en
+el `config.json`, el log apuntaba `reserva=no`, y nadie podía saber por qué.
+
+Es el fallo de siempre en este proyecto, el que ya tiene su párrafo en la sección del brillo:
+**la pieza buena existe y hay una superficie que no la llama**. Aquí era peor, porque la
+superficie sí la llamaba y había un `&&` invisible desde Ajustes y desde el fichero
+decidiendo que no.
+
+### Lo que se ha hecho
+
+La regla sale de la ventana y se vuelve pura, en `PanelNube`:
+
+```
+public static bool ReservaLaFranja(bool? elegido, bool autoOculta) =>
+    ReservaEfectiva(elegido) && !autoOculta;
+```
+
+Lo que importa de esa firma es **lo que no recibe**: no hay `modo`. No es una comodidad para
+poder probarla en frío (aunque también); es que un candado por modo no puede volver a
+colarse ahí sin cambiar la firma, y hay una prueba que lo exige por reflexión —cuenta los
+parámetros y mira que ninguno se llame como un modo—. Un comentario no impidió la primera
+vez; la firma sí.
+
+El tri-estado no cambia. Sigue siendo `null` / `true` / `false`, y sigue siendo necesario por
+el mismo motivo que lo fue al nacer: un bool no sabe distinguir «lo quiero» de «venía
+puesto».
+
+### Y estaba en la página equivocada
+
+El interruptor existía, pero vivía en **Sistema**, dentro de la tarjeta «Barra de tareas de
+Windows». Dos cosas mal de un sitio: ahí se lee como si fuese un ajuste *de la barra de
+Windows*, y sobre todo, no es donde nadie lo va a buscar. «¿Mi nube flota o ocupa sitio?» es
+la misma pregunta que contesta el desplegable **Modo**, y Modo está en Apariencia → Forma con
+el resto de la geometría del panel: posición, visibilidad, grosor, margen.
+
+Puesto en Sistema, la única forma *visible* de que la nube te guardase su sitio era cambiar
+de modo. Es decir: la opción que faltaba no faltaba — estaba escondida detrás de otra
+decisión. Ahora está debajo de «Modo» y «Posición», y en Sistema queda una línea que dice
+dónde ha ido, porque comparar la nube con la barra de tareas es justo lo que uno está
+haciendo cuando mira esa tarjeta.
+
+Y no se ha dejado una copia en los dos sitios. Dos superficies para el mismo valor es la
+forma más cómoda de que una se quede sin rehacer y enseñe lo contrario que la otra; de eso
+este proyecto ya tiene párrafos escritos.
+
+### Lo que una isla reserva, y por qué no es raro
+
+Una appbar de Windows solo entiende de **bordes de pantalla**. No hay forma de pedir «guárdame
+estos 600 px del centro de arriba»: se reserva la franja entera de ese borde, o nada. Así que
+una isla estrecha y centrada con la reserva encendida se queda la franja completa.
+
+Parece desproporcionado hasta que se mira qué es lo que uno pide con ese interruptor: que una
+ventana maximizada no le tape la nube. Eso es exactamente la franja entera. Y es también el
+motivo de que no venga puesto de serie: reservar empuja las ventanas de todo el escritorio,
+que es una decisión demasiado grande para tomarla por el usuario.
+
+Lo que se reserva es el grosor de la nube **recogida** (el `grosorVentana` de `Aplicar`, que
+sale del config y no de lo que mida la isla ahora mismo). La appbar no se vuelve a registrar
+al expandirse: si lo hiciera, pasar el ratón por encima de la isla recolocaría todas las
+ventanas de la pantalla, y quitarlo las devolvería. Mirar la hora no mueve el escritorio.
+
+El borde que se le pide a Windows sí depende del modo, y eso está bien: una isla anclada a un
+lateral sigue siendo horizontal, así que reserva por arriba (`ABE_TOP`), no por el lado. Una
+barra en ese mismo borde es vertical de verdad y reserva por la izquierda. Ya lo decidía
+`BordeAppBar`; ahora hay pruebas de los cuatro casos.
+
+### Y una pregunta con dos respuestas
+
+Quitar el candado dejó a la vista algo que llevaba ahí desde E5. `ReservaHueco` decidía la
+appbar; `ReservaDeLaBarraPx` —el hueco que NubeHypr descuenta al repartir ventanas— leía el
+interruptor **en crudo**. Con «ocultar automáticamente» encendido las dos no coincidían:
+Windows no guardaba la franja (bien) y NubeHypr sí la descontaba, repartiendo las ventanas
+alrededor de una barra que no estaba. De paso, `EstorbosParaLosLaterales` daba la barra por
+reservada y los paneles laterales se metían por debajo de ella.
+
+Es la misma pregunta, así que ahora hay un solo sitio donde se contesta. La regla general que
+deja esto: cuando dos piezas hacen la misma pregunta y una la lee del config y la otra de una
+propiedad resuelta, no hay dos lecturas — hay un fallo esperando a que alguien cambie el
+defecto.
+
+
+## Una caché que guarda los fracasos los vuelve permanentes
+
+«Cuando abro una app tipo Discord hay veces que se queda con la letra D y no identifica qué
+app es, es como si los iconos no se actualizaran.»
+
+El icono de una app abierta sale de su ventana, con `WM_GETICON` y 50 ms de plazo. Eso está
+bien: es el icono que la app ha elegido enseñar *ahora*, y en las que lo cambian —un
+reproductor, un instalador— es el bueno. Lo que no está bien es lo que pasaba cuando no
+contestaba: se pintaba la inicial del título, y ahí se quedaba.
+
+Porque había una segunda capa, y es la que convertía un tropiezo en una condena.
+`Iconos.De` guardaba en su caché **también los nulos**:
+
+```
+_cache[clave] = img;      // img podía ser null
+...
+if (_cache.TryGetValue(clave, out var guardado)) return guardado;   // y lo devolvía
+```
+
+Una app que acaba de arrancar, un ejecutable en un disco dormido, el shell ocupado mientras
+un juego se come la máquina: cualquiera de esas devuelve null una vez. Medio segundo
+después habría contestado — pero ya nadie volvía a preguntar.
+
+**Una caché de resultados no debe guardar los fracasos como si fueran resultados.** Un
+acierto es permanente: el icono de un ejecutable no cambia. Un fallo es una foto del
+momento, y guardarlo con la misma autoridad es afirmar algo que no se ha comprobado. Ahora
+en `_cache` solo entran los aciertos y los fallos van aparte con la hora, para reintentarlos
+a los cinco segundos — bastante para que una app termine de arrancar, y suficiente para que
+un ejecutable que de verdad no tiene icono no cueste una llamada COM en cada repintado del
+carrusel, que es cada segundo.
+
+Y el respaldo: si la ventana no contesta, se le pregunta al shell por el ejecutable, que es
+el mismo sitio del que ya salía el icono de una app fijada y cerrada. Nunca está peor que
+una letra. La letra era correcta como último recurso y equivocada como primera respuesta.
+
+## Los dos errores de medir una isla no cuestan lo mismo
+
+«Hay veces que los separadores se mueven mientras estoy jugando; la línea de los separadores
+parpadean y se mueven 1 o 2 px de lado a lado.»
+
+`RefrescarApps` está en los actualizadores, o sea que el ancho de la isla se repregunta cada
+segundo. Y el listón para rehacerlo era simétrico:
+
+```
+if (Math.Abs(hasta - Isla.ActualWidth) < 0.5) return;
+AnimarAncho(hasta, 280, Suave);
+```
+
+Medir texto da decimales. El reloj pasando de `14:09` a `14:10` mueve la medida seis
+décimas, eso cruza el listón, y la isla entera se anima 280 ms. Como va centrada, todo lo de
+dentro se corre esa pizca. Jugando hay además ventanas de overlay que aparecen y se van y
+puntitos que cambian, así que el baile es continuo.
+
+Lo que estaba mal era la **simetría**. Las dos direcciones parecen el mismo problema y no lo
+son:
+
+```
+CRECER   hay que hacerlo siempre. Lo medido es lo que el contenido necesita,
+         y quedarse corto RECORTA: un icono a medias, la hora fuera.
+ENCOGER  puede esperar. Sobrar tres píxeles de isla no lo ve nadie;
+         mover la isla entera para quitarlos lo ve todo el mundo.
+```
+
+Así que el listón solo se levanta del lado barato. No es histéresis «por si acaso», que es
+como se suele justificar un número así: es que un fallo cuesta mucho más que el otro, y el
+umbral tiene que reflejarlo.
+
+Hay una prueba que recorre cuarenta y un anchos y exige que **en el filo exacto la isla se
+quede quieta**. Si encoger pudiera cruzar el listón y obligar a crecer otra vez, la isla se
+movería sola para siempre — que es el síntoma del que venimos, con otra causa.
+
+### Y por qué se veía en los separadores
+
+Porque son rayas de 1 px. El separador ya pedía `SnapsToDevicePixels` para sí, pero eso solo
+decide cómo se **pinta**; dónde se **coloca** lo dice su padre, y el padre lo dejaba a medio
+píxel. Una raya de un píxel a medio píxel es media raya en dos columnas: más clara, y
+cambiando de columna en cuanto algo se mueve. Ahora el ancho se redondea arriba a píxel
+entero y la fila de módulos lleva `UseLayoutRounding`.
+
+Los iconos de 18 px se movían exactamente igual. Nadie lo notó nunca.

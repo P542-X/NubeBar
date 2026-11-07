@@ -249,6 +249,8 @@ public static class Textos
         ["Arranque"] = "Startup",
         ["Bandeja del sistema"] = "System tray",
         ["Barra de tareas de Windows"] = "Windows taskbar",
+        ["Reservar espacio en pantalla, como la barra de tareas"] =
+            "Reserve screen space, like the taskbar",
         ["Halo del neón"] = "Neon glow",
         ["Preajuste"] = "Preset",
         ["Intensidad del halo"] = "Glow intensity",

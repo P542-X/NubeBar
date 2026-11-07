@@ -412,7 +412,25 @@ public partial class MainWindow
         // se lo pedimos al shell a partir de su ruta o de su AppUserModelId.
         bool cerrada = g.Ventanas.Count == 0;
         var titulo = cerrada ? NombreDeClave(g.Exe) : Nativo.Titulo(g.Ventanas[0]);
-        g.Icono = cerrada ? Iconos.De(g.Lanzar, 32) : Nativo.Icono(g.Ventanas[0]);
+
+        // ---------- Y si la ventana no contesta, se le pregunta al shell ----------
+        //
+        // El icono de una app abierta sale de su VENTANA (`WM_GETICON`, con 50 ms de
+        // plazo), que es lo correcto: es el icono que la app ha elegido enseñar ahora, y
+        // en las que cambian de icono —un reproductor, un instalador— es el bueno.
+        //
+        // Pero una ventana recién creada todavía no lo ha puesto, y una app ocupada no
+        // contesta en 50 ms. Entonces esto devolvía null y el botón se quedaba con la
+        // INICIAL del título: la «D» de Discord. Para el usuario eso no es «aún no sé el
+        // icono», es «NubeBar no reconoce mi app».
+        //
+        // El respaldo es el mismo sitio del que ya salía el icono de una app fijada y
+        // cerrada: el shell, a partir del ejecutable. Nunca está peor que una letra, y
+        // llega siempre. Y como `RefrescarApps` vuelve a pasar cada segundo, en cuanto la
+        // ventana conteste se queda con el suyo.
+        g.Icono = cerrada
+            ? Iconos.De(g.Lanzar, 32)
+            : Nativo.Icono(g.Ventanas[0]) ?? Iconos.De(g.Lanzar, 32) ?? Iconos.De(g.Exe, 32);
         UIElement visual = g.Icono != null
             ? Legible(new Image { Source = g.Icono, Width = 18, Height = 18 })
             : Texto(titulo.Length > 0 ? titulo[..1] : "?", 14);

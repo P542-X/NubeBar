@@ -199,7 +199,12 @@ public class Barra
     public string Posicion { get; set; } = "arriba";  // los cuatro bordes: ver PanelNube.Posiciones
     public double Alto { get; set; } = 38;            // el "Grosor" del panel
     public double Margen { get; set; } = 8;
-    public bool ReservarEspacio { get; set; } = true;  // las ventanas maximizadas no la tapan
+    // Resuelto en la carga desde PanelNube.ReservarEspacio (bool?) con
+    // PanelNube.ReservaEfectiva. El valor de aquí es solo el respaldo por si la
+    // derivación no llega a correr, y por eso es el MISMO que ReservaPorDefecto: valía
+    // `true`, y con la isla reservando ya de verdad, un fallo al derivar le habría
+    // guardado la franja a quien no la pidió.
+    public bool ReservarEspacio { get; set; } = PanelNube.ReservaPorDefecto;
     // ---------- Y de aquí abajo, lo que sí es suyo ----------
     public bool OcultarBarraWindows { get; set; } = true;
     public int MaxApps { get; set; } = 10;             // iconos de apps visibles a la vez; el resto, con la rueda
@@ -447,6 +452,13 @@ public class PanelNube
     // no hacía nada: llevaba ahí sin efecto desde siempre, y al pasar a barra se
     // activó solo y convirtió la nube en una barra de tareas que nadie había pedido.
     // Un bool no sabe distinguir "lo quiero" de "venía puesto".
+    //
+    // Y desde la v1.0.8 vale en los DOS MODOS. Que la isla no reservara nunca era un
+    // candado aparte (`ReservaHueco`), y lo que conseguía era tragarse la elección del
+    // usuario: encendías esto en modo isla, se guardaba en el config, y no pasaba nada.
+    // Quien quiere que la nube ocupe su sitio como una barra de tareas normal ya tiene
+    // cómo pedirlo sin cambiar de modo; quien la quiere flotando no toca nada, porque
+    // flotar es el defecto.
     public bool? ReservarEspacio { get; set; }
 
     // Y el valor de serie es NO RESERVAR, en los cuatro bordes.
@@ -459,9 +471,26 @@ public class PanelNube
     //
     // Ya no depende de nada, y por eso no recibe nada: una función con dos parámetros
     // que no mira invita a pensar que aún hay una regla escondida.
+    //
+    // Este defecto es también lo que hace que la isla pueda reservar sin sustos: lo que
+    // protegía el candado `!EsIsla` —que nadie acabe con una barra de tareas que no ha
+    // pedido— lo protege ya el "false" de serie, y sin quitarle el interruptor a quien
+    // sí la pide.
     public const bool ReservaPorDefecto = false;
 
     public static bool ReservaEfectiva(bool? elegido) => elegido ?? ReservaPorDefecto;
+
+    // ¿Se reserva la franja, al final? Dos cosas y ninguna más: lo que has elegido (con
+    // su defecto) y si el panel se autooculta. Reservar sitio para algo que no está es
+    // justo lo que uno quiere evitar al encender el autoocultar.
+    //
+    // Está aquí, pura, por lo que NO recibe: no hay `modo`. Lo de antes era un `!EsIsla`
+    // escrito dentro de la ventana, invisible desde Ajustes y desde el config, y lo que
+    // hacía era tragarse el interruptor de quien pedía que la isla ocupase su sitio.
+    // Una función sin parámetro de modo no puede volver a mirarlo, y hay una prueba que
+    // lo exige (ver Pruebas.LaReservaNoDependeDelModo).
+    public static bool ReservaLaFranja(bool? elegido, bool autoOculta) =>
+        ReservaEfectiva(elegido) && !autoOculta;
 
     public string Monitores { get; set; } = "todos";      // "todos" | "principal"
 
