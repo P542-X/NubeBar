@@ -58,7 +58,7 @@ Cambiar la salida de audio, conectarse a una wifi y encender o apagar el
 bluetooth están implementados pero sin probar: tocarlos de verdad cambiaría la
 configuración del equipo. `IPolicyConfig` sí se comprueba (responde en este
 Windows), y si no respondiera la opción no aparecería. Los pasos para probarlo
-a mano están en PRUEBAS-PARA-PAULO.md.
+a mano están en el cuaderno de pruebas manuales.
 
 ### Fase 1 (corregido) · Sí funciona: faltaba el truco del orden Z
 
@@ -282,7 +282,7 @@ problema es que un juego o un vídeo en ventana maximizada tampoco la echaban,
 y ahí sí estorba.
 
 Clave `Barra.OcultarConMaximizada`, con su interruptor en Ajustes > Isla.
-Nació en `false` para no cambiarle el comportamiento a nadie, pero Paulo
+Nació en `false` para no cambiarle el comportamiento a nadie, pero el usuario
 pidió que fuera `true` de serie con un argumento que es el bueno: quien está
 jugando o viendo un vídeo a pantalla completa no tiene por qué ver la isla
 encima, y eso no se descubre si hay que ir a buscarlo a los ajustes. Es la
@@ -904,7 +904,7 @@ En el log aparecían siete intentos de abrir cosas que acababan en "el sistema n
 puede encontrar el archivo", y todas tenían la misma pinta:
 
 ```
-ERROR en abrir C:\Usuarios\Spcar\Documentos\ola\IP Switcher Setup 1.0.0.exe
+ERROR en abrir C:\Usuarios\usuario\Documentos\ola\IP Switcher Setup 1.0.0.exe
 ERROR en abrir C:\ProgramData\Microsoft\Windows\Menú Inicio\Programas\…
 ```
 
@@ -916,8 +916,8 @@ pedía `System.ItemPathDisplay`, que es justo eso: la ruta para enseñar.
 La buena es `System.ItemUrl`. Comprobado contra el índice de este equipo:
 
 ```
-mostrada : C:\Usuarios\Spcar\Documentos\ola\IP Switcher Setup 1.0.0.exe   (no existe)
-itemurl  : file:C:/Users/Spcar/Documents/ola/IP Switcher Setup 1.0.0.exe  (sí existe)
+mostrada : C:\Usuarios\usuario\Documentos\ola\IP Switcher Setup 1.0.0.exe   (no existe)
+itemurl  : file:C:/Users/usuario/Documents/ola/IP Switcher Setup 1.0.0.exe  (sí existe)
 ```
 
 Ahora se piden las dos: la traducida se sigue enseñando debajo del resultado
@@ -957,7 +957,7 @@ exactamente lo que pasa cada vez que alguien actualiza el config antes que el ex
 Daba esto, del log de verdad:
 
 ```
-ERROR en abrir C:\Usuarios\Spcar\Documentos\p5\node_modules\.bin\semver.cmd
+ERROR en abrir C:\Usuarios\usuario\Documentos\p5\node_modules\.bin\semver.cmd
 ```
 
 Tres cosas a la vez:
