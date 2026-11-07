@@ -123,6 +123,8 @@ public static partial class Pruebas
                 "CPU", "RAM", "Apps", "Normal", "Ping",
                 // Y dos valores de desplegable que en inglés se escriben igual.
                 "English", "auto",
+                // Palabras que el inglés tomó prestadas o nos prestó a nosotros.
+                "Anime", "Layout", "layout",
             };
 
             int vacias = 0, copiadas = 0;
