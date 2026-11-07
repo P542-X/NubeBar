@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -78,49 +78,66 @@ public static class HyprGuia
     // Es la pieza que convierte el formulario en algo que se puede revisar. Un campo relleno
     // no dice si has entendido bien lo que hace; una frase entera sí, porque se lee y se
     // compara con lo que querías.
+    // ---------- Y por qué esto va por PLANTILLAS y no por trozos ----------
+    //
+    // La frase se arma juntando pedazos, y mientras solo hubo castellano eso daba igual:
+    // «Cuando aparezca » + «una ventana de Discord». En inglés el verbo va detrás —«When a
+    // Discord window appears»— así que pegar trozos traducidos uno a uno da una frase que
+    // no es inglés, es castellano con palabras inglesas.
+    //
+    // Así que lo que se traduce es la PLANTILLA entera, con su hueco: `T("Cuando aparezca
+    // {0}")` da `"When {0} appears"` y el orden lo decide cada idioma. Lo mismo con «una
+    // ventana de {0}», que en inglés es «a {0} window»: el dato va en otro sitio.
+    //
+    // En castellano `T()` devuelve la clave tal cual, así que `string.Format` reconstruye
+    // exactamente la frase de antes. Hay pruebas que la comparan letra a letra.
+    static string F(string plantilla, params object[] datos) =>
+        string.Format(Textos.T(plantilla), datos);
+
     public static string EnPalabras(HyprReglas.Regla r)
     {
         string cuando = Cuando(r);
         var hace = Acciones(r);
 
         if (hace.Count == 0)
-            return $"{cuando}, no hacer nada todavía: falta decir qué quieres que pase.";
+            return F("{0}, no hacer nada todavía: falta decir qué quieres que pase.", cuando);
 
-        return $"{cuando}, {Juntar(hace)}." +
-               (r.Activa ? "" : " (Ahora mismo está apagada, así que no se evalúa.)");
+        return F("{0}, {1}.", cuando, Juntar(hace)) +
+               (r.Activa ? "" : Textos.T(" (Ahora mismo está apagada, así que no se evalúa.)"));
     }
 
     // ---------- La mitad del «cuándo» ----------
     static string Cuando(HyprReglas.Regla r)
     {
         var trozos = new List<string>();
-        if (r.Proceso is { Length: > 0 } p) trozos.Add($"una ventana de {p}");
-        if (r.Clase is { Length: > 0 } c) trozos.Add($"cuya clase sea «{c}»");
-        if (r.Titulo is { Length: > 0 } t) trozos.Add($"cuyo título contenga «{t}»");
-        if (r.Ruta is { Length: > 0 } ru) trozos.Add($"cuya ruta contenga «{ru}»");
+        if (r.Proceso is { Length: > 0 } p) trozos.Add(F("una ventana de {0}", p));
+        if (r.Clase is { Length: > 0 } c) trozos.Add(F("cuya clase sea «{0}»", c));
+        if (r.Titulo is { Length: > 0 } t) trozos.Add(F("cuyo título contenga «{0}»", t));
+        if (r.Ruta is { Length: > 0 } ru) trozos.Add(F("cuya ruta contenga «{0}»", ru));
 
         if (trozos.Count == 0)
-            return "Esta regla no dice a qué ventanas se aplica, así que nunca se activará";
+            return Textos.T("Esta regla no dice a qué ventanas se aplica, así que nunca se activará");
 
         // Si no hay proceso, la frase empieza por el criterio que haya, y hay que darle un
         // sujeto: «cuyo título contenga X» a secas no es una frase.
-        if (r.Proceso == null) trozos[0] = "una ventana " + trozos[0];
+        if (r.Proceso == null) trozos[0] = F("una ventana {0}", trozos[0]);
 
-        return "Cuando aparezca " + Juntar(trozos);
+        return F("Cuando aparezca {0}", Juntar(trozos));
     }
 
     // ---------- La mitad del «qué hace» ----------
     static List<string> Acciones(HyprReglas.Regla r)
     {
         var l = new List<string>();
-        if (r.Espacio is { } e) l.Add($"enviarla al Escritorio {e}");
-        if (r.Monitor is { } m) l.Add($"llevarla al monitor {m}{(m == 0 ? " (el principal)" : "")}");
-        if (r.Flotante == true) l.Add("dejarla flotante, fuera del reparto");
-        if (r.Flotante == false) l.Add("meterla en el reparto aunque flotara");
-        if (r.Layout is { } la) l.Add($"repartir la pantalla en {NombreDeLayout(la)}");
-        if (r.Ancho != null || r.Alto != null) l.Add("darle el tamaño " + Tamano(r.Ancho, r.Alto));
-        if (r.Foco == true) l.Add("traerla delante");
-        if (r.Foco == false) l.Add("dejarla detrás, sin robar el foco");
+        if (r.Espacio is { } e) l.Add(F("enviarla al Escritorio {0}", e));
+        if (r.Monitor is { } m)
+            l.Add(F("llevarla al monitor {0}", m) + (m == 0 ? Textos.T(" (el principal)") : ""));
+        if (r.Flotante == true) l.Add(Textos.T("dejarla flotante, fuera del reparto"));
+        if (r.Flotante == false) l.Add(Textos.T("meterla en el reparto aunque flotara"));
+        if (r.Layout is { } la) l.Add(F("repartir la pantalla en {0}", NombreDeLayout(la)));
+        if (r.Ancho != null || r.Alto != null) l.Add(F("darle el tamaño {0}", Tamano(r.Ancho, r.Alto)));
+        if (r.Foco == true) l.Add(Textos.T("traerla delante"));
+        if (r.Foco == false) l.Add(Textos.T("dejarla detrás, sin robar el foco"));
         return l;
     }
 
@@ -129,19 +146,19 @@ public static class HyprGuia
     public static string Tamano(double? ancho, double? alto)
     {
         string? a = Fraccion(ancho), b = Fraccion(alto);
-        if (a != null && b != null) return $"{a} de ancho y {b} de alto";
-        if (a != null) return $"{a} de ancho (el alto, como estuviera)";
-        if (b != null) return $"{b} de alto (el ancho, como estuviera)";
-        return "el de siempre";
+        if (a != null && b != null) return F("{0} de ancho y {1} de alto", a, b);
+        if (a != null) return F("{0} de ancho (el alto, como estuviera)", a);
+        if (b != null) return F("{0} de alto (el ancho, como estuviera)", b);
+        return Textos.T("el de siempre");
     }
 
     static string? Fraccion(double? v) => v switch
     {
         null => null,
-        <= 0.3 => "un tercio de pantalla o menos",
-        <= 0.55 => "media pantalla",
-        <= 0.8 => "unos dos tercios de pantalla",
-        _ => "casi toda la pantalla",
+        <= 0.3 => Textos.T("un tercio de pantalla o menos"),
+        <= 0.55 => Textos.T("media pantalla"),
+        <= 0.8 => Textos.T("unos dos tercios de pantalla"),
+        _ => Textos.T("casi toda la pantalla"),
     };
 
     // ---------- Cuidado con los dos nombres que engañan ----------
@@ -152,19 +169,22 @@ public static class HyprGuia
     // imagina al leerlo. Aquí se dice lo que hace, no solo cómo se llama.
     public static string NombreDeLayout(NubeHypr.Layout l) => l switch
     {
-        NubeHypr.Layout.Principal => "principal: una grande a un lado y las demás apiladas al otro",
-        NubeHypr.Layout.Horizontal => "horizontal: columnas una al lado de otra, de izquierda a derecha",
-        NubeHypr.Layout.Vertical => "vertical: filas una encima de otra, de arriba abajo",
-        NubeHypr.Layout.Flotante => "flotante: no se reparte nada, cada ventana donde esté",
+        NubeHypr.Layout.Principal => Textos.T("principal: una grande a un lado y las demás apiladas al otro"),
+        NubeHypr.Layout.Horizontal => Textos.T("horizontal: columnas una al lado de otra, de izquierda a derecha"),
+        NubeHypr.Layout.Vertical => Textos.T("vertical: filas una encima de otra, de arriba abajo"),
+        NubeHypr.Layout.Flotante => Textos.T("flotante: no se reparte nada, cada ventana donde esté"),
         _ => l.ToString(),
     };
 
+    // La «y» final también se traduce, y va como plantilla y no como palabra suelta: una
+    // conjunción con sus espacios alrededor es una clave frágil, y además hay idiomas
+    // donde la coma de antes cambia.
     static string Juntar(IReadOnlyList<string> trozos) => trozos.Count switch
     {
         0 => "",
         1 => trozos[0],
-        2 => $"{trozos[0]} y {trozos[1]}",
-        _ => string.Join(", ", trozos.Take(trozos.Count - 1)) + " y " + trozos[^1],
+        2 => F("{0} y {1}", trozos[0], trozos[1]),
+        _ => F("{0} y {1}", string.Join(", ", trozos.Take(trozos.Count - 1)), trozos[^1]),
     };
 
     // ================= Qué va mal, dicho en claro =================
