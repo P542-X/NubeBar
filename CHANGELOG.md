@@ -6,6 +6,31 @@ construidos por el workflow de Release a partir de la etiqueta.
 
 ---
 
+## v1.0.0 — la primera pública
+
+NubeBar sale de casa. Es la misma barra que llevaba meses funcionando en una sola
+máquina, con la diferencia de que ahora se puede instalar sin conocer a quien la
+escribió: licencia, instalador firmado por el workflow a partir de la etiqueta,
+README en español y en inglés, y la interfaz entera en los dos idiomas con una
+pregunta la primera vez que la abres.
+
+Lo que trae, en una línea: una barra para Windows 11 con la forma de la Dynamic
+Island, que sustituye a la de Windows, se configura con un solo `config.json` y
+trae su propio menú Inicio, centro de control, bandeja, vista general de
+ventanas, nueve temas, dock, paneles laterales, fondos de escritorio, perfiles,
+cambio de entrada de vídeo por DDC/CI y un organizador de ventanas al estilo de
+los gestores de mosaico de Linux.
+
+Y un guardián que te devuelve la barra de Windows si algo va mal, que es lo
+mínimo que se le puede pedir a un programa que te la esconde.
+
+---
+
+Lo de aquí abajo es el historial de desarrollo, de antes de publicarlo. Se queda
+porque explica por qué las cosas son como son, no porque haga falta leerlo.
+
+---
+
 ## v1.0.9
 
 ### Cambiado
@@ -351,8 +376,8 @@ Arreglos de paneles, pantallas pequeñas y dos monitores.
 ## v1.3.0 — sin publicar
 
 **Esta versión NO está publicada.** Está preparada: compilada, probada y empaquetada en
-carpetas de fase, con los hashes en `NUBEHYPR.md`. Lo que falta es la tanda de pruebas que
-necesitan ojos, ratón y teclado, enumerada en `NUBEHYPR.md`.
+carpetas de fase. Lo que falta es la tanda de pruebas que necesitan ojos, ratón y
+teclado.
 
 NubeHypr: una capa de organización de ventanas dentro de NubeBar. **Nace apagada, y
 encendida nace en simulación**: calcula, explica en el registro lo que haría y no mueve
