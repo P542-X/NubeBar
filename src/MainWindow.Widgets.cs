@@ -333,6 +333,39 @@ public partial class MainWindow : Window, IAnfitrionWidget
     // Proporción, no número mágico: 16 px con la barra de 38 (lo de siempre), y de ahí
     // escala. El mínimo es para que no desaparezca con una barra muy fina; el máximo,
     // para que siempre quepa con holgura dentro de la fila.
+    // ================= Dónde se separa un módulo de sus vecinos =================
+    //
+    // Un módulo se separa de los de al lado, y «al lado» no es lo mismo en las dos
+    // orientaciones: en horizontal los vecinos están a izquierda y derecha, y en vertical
+    // arriba y abajo. Escrito a pelo como `Thickness(4, 0, 4, 0)` queda bien en
+    // horizontal y en vertical hace dos cosas mal a la vez: gasta ocho píxeles de ancho
+    // en una columna de cuarenta, y deja a los módulos pegados unos a otros.
+    //
+    // Y hay una segunda mitad que no se ve leyendo. En una pila VERTICAL, un elemento con
+    // `Width` fijo y sin alineación no queda centrado: WPF lo pega al filo izquierdo de
+    // la columna. Así que la carátula del disco salía descolgada a un lado mientras el
+    // resto de iconos iba centrado.
+    //
+    // Juntas las dos, es lo que contó el usuario con la barra a la izquierda y música
+    // sonando: «hay huecos que no se completan, como que no van juntos».
+    //
+    // El separador ya lo hacía bien, pero con un `?:` suyo escrito a mano: la regla
+    // estaba APLICADA en un sitio y no escrita en ninguno, así que el módulo siguiente
+    // volvió a nacer sin ella. Aquí está escrita, y `EnLaZona` la aplica entera.
+    internal static Thickness SeparacionDeModulo(bool vertical, double antes, double despues) =>
+        vertical ? new Thickness(0, antes, 0, despues)
+                 : new Thickness(antes, 0, despues, 0);
+
+    // Coloca un módulo dentro de su zona: la separación en el eje en que se apila, y en
+    // vertical además centrado en la columna. Devuelve el mismo elemento para poder
+    // encadenarlo donde se construye.
+    T EnLaZona<T>(T e, double antes, double despues) where T : FrameworkElement
+    {
+        e.Margin = SeparacionDeModulo(Vertical, antes, despues);
+        if (Vertical) e.HorizontalAlignment = HorizontalAlignment.Center;
+        return e;
+    }
+
     internal static double AltoSeparador(double altoBarra)
     {
         double alto = Math.Round(altoBarra * 0.42);

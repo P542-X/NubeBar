@@ -36,6 +36,58 @@ public static partial class Pruebas
         LaReservaNoDependeDelModo();
         LaIslaCreceEnseguidaYEncogeConCalma();
         ElCirculoDelDeslizadorNoSeSale();
+        LosModulosSeSeparanEnElEjeQueSeApilan();
+    }
+
+    // ================= La separación de un módulo, en los dos lados =================
+    //
+    // ---------- De dónde sale esto ----------
+    //
+    // «Cuando está sonando la música hay huecos que no se completan, como que no van
+    // juntos» — con la barra a la izquierda y en modo barra, o sea en vertical.
+    //
+    // Los dos módulos de música llevaban su separación escrita a pelo como
+    // `Thickness(4, 0, 4, 0)`: izquierda y derecha. En horizontal es lo correcto y en
+    // vertical es el eje equivocado, así que gastaba ancho en una columna estrecha y
+    // dejaba a los módulos pegados unos a otros.
+    //
+    // Lo que se exige aquí es que la separación caiga SIEMPRE en el eje en que se apila,
+    // y que valga lo mismo en los dos: un módulo no se separa más ni menos por que la
+    // nube esté de pie.
+    static void LosModulosSeSeparanEnElEjeQueSeApilan()
+    {
+        Grupo("la separación de un módulo");
+
+        var h = MainWindow.SeparacionDeModulo(false, 4, 4);
+        var v = MainWindow.SeparacionDeModulo(true, 4, 4);
+
+        // Horizontal: los vecinos están a los lados
+        Igual(4.0, h.Left, "horizontal: separa por la izquierda");
+        Igual(4.0, h.Right, "horizontal: y por la derecha");
+        Igual(0.0, h.Top + h.Bottom, "horizontal: y nada arriba ni abajo");
+
+        // Vertical: los vecinos están arriba y abajo
+        Igual(4.0, v.Top, "vertical: separa por arriba");
+        Igual(4.0, v.Bottom, "vertical: y por abajo");
+        Igual(0.0, v.Left + v.Right, "vertical: y nada a los lados — ahí no hay nadie");
+
+        // Lo mismo en los dos: la nube de pie no aprieta ni suelta los módulos
+        foreach (var (antes, despues) in new[] { (4.0, 4.0), (0.0, 7.0), (6.0, 6.0), (0.0, 0.0) })
+        {
+            var a = MainWindow.SeparacionDeModulo(false, antes, despues);
+            var b = MainWindow.SeparacionDeModulo(true, antes, despues);
+            Igual(a.Left + a.Right, b.Top + b.Bottom,
+                  $"({antes:0},{despues:0}) separa lo mismo apilando en un eje que en el otro");
+            Igual(0.0, a.Top + a.Bottom + b.Left + b.Right,
+                  $"({antes:0},{despues:0}) y nada en el eje que no toca");
+        }
+
+        // El orden importa: «antes» es el vecino de arriba en vertical y el de la
+        // izquierda en horizontal. Un módulo con 0 delante y 7 detrás tiene que quedar
+        // pegado a lo anterior en los dos casos, no al revés en uno de ellos.
+        var r = MainWindow.SeparacionDeModulo(true, 0, 7);
+        Igual(0.0, r.Top, "con (0,7) en vertical no se separa de lo de arriba");
+        Igual(7.0, r.Bottom, "y sí de lo de abajo");
     }
 
     // ================= El círculo del deslizador =================

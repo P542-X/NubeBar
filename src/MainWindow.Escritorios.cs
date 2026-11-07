@@ -209,12 +209,11 @@ public partial class MainWindow : Window
     FrameworkElement RotuloDelEscritorio(HyprIndicador.Ficha actual, int total,
                                          HyprIndicador.Talla talla)
     {
-        var caja = new StackPanel
+        var caja = EnLaZona(new StackPanel
         {
             Orientation = Orientation.Horizontal,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 7, 0),
-        };
+        }, 0, 7);
 
         // La nube, pequeña: es la identidad de NubeHypr y la marca de que esto es suyo. El
         // tamaño lo decide `HyprPinta`, con topes, para que no pueda convertirse en una

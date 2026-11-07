@@ -37,16 +37,15 @@ public partial class MainWindow
     // ---------- Módulos de la isla ----------
     UIElement ModuloCaratula()
     {
-        var marco = new Border
+        var marco = EnLaZona(new Border
         {
             Width = 20,
             Height = 20,
             CornerRadius = new CornerRadius(5),
             ClipToBounds = true,
-            Margin = new Thickness(4, 0, 4, 0),
             VerticalAlignment = VerticalAlignment.Center,
             Visibility = Visibility.Collapsed
-        };
+        }, 4, 4);
         var img = new Image { Stretch = Stretch.UniformToFill };
         marco.Child = img;
 
@@ -68,14 +67,16 @@ public partial class MainWindow
 
     UIElement ModuloBarras()
     {
-        var pila = new StackPanel
+        // Las cuatro barritas se quedan en fila aunque la nube esté de pie: un
+        // ecualizador se lee igual en los dos lados, y veinticuatro píxeles caben de
+        // sobra en la columna. Lo que sí cambia es cómo se separa del módulo de al lado.
+        var pila = EnLaZona(new StackPanel
         {
             Orientation = Orientation.Horizontal,
             VerticalAlignment = VerticalAlignment.Center,
             Height = 16,
-            Margin = new Thickness(4, 0, 4, 0),
             Visibility = Visibility.Collapsed
-        };
+        }, 4, 4);
 
         _barras.Clear();
         for (int i = 0; i < CuantasBarras; i++)
