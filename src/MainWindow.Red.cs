@@ -388,7 +388,7 @@ public partial class MainWindow : Window
 
     TextBlock Tenue(string texto) => new()
     {
-        Text = texto, Foreground = _textoAtenuado, FontSize = 11,
+        Text = Textos.T(texto), Foreground = _textoAtenuado, FontSize = 11,
         TextTrimming = TextTrimming.CharacterEllipsis
     };
 
@@ -831,7 +831,7 @@ public partial class MainWindow : Window
             g.FontSize = 10;
             g.Margin = new Thickness(0, 0, 4, 0);
             cab.Children.Add(g);
-            cab.Children.Add(new TextBlock { Text = titulo, Foreground = _texto, FontSize = 11 });
+            cab.Children.Add(new TextBlock { Text = Textos.T(titulo), Foreground = _texto, FontSize = 11 });
             c.Children.Add(cab);
             var valor = new TextBlock { Text = "—", Foreground = _texto, FontSize = 20, FontWeight = FontWeights.SemiBold };
             Typography.SetNumeralAlignment(valor, FontNumeralAlignment.Tabular);

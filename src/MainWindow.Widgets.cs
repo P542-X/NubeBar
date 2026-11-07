@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -90,8 +90,9 @@ public partial class MainWindow : Window, IAnfitrionWidget
           zona: "Centro");
 
         R("fecha", "Fecha", "El día de la semana, el día y el mes", Calendario, CategoriaWidget.Reloj,
-          i => i.Etiqueta(() => DateTime.Now.ToString("ddd d MMM"), animar: true,
-                          vertical: () => DateTime.Now.ToString("ddd") + Salto + DateTime.Now.ToString("d MMM")));
+          i => i.Etiqueta(() => DateTime.Now.ToString("ddd d MMM", Textos.Cultura), animar: true,
+                          vertical: () => DateTime.Now.ToString("ddd", Textos.Cultura) + Salto +
+                                          DateTime.Now.ToString("d MMM", Textos.Cultura)));
 
         // ---------- Apps ----------
         R("inicio", "Inicio", "Abre el menú de aplicaciones", "", CategoriaWidget.Apps,

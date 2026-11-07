@@ -94,7 +94,7 @@ public partial class MainWindow : Window
                 dentro.Children.Add(g);
                 dentro.Children.Add(new TextBlock
                 {
-                    Text = nombre, Foreground = es ? _acentoLegible : _texto,
+                    Text = Textos.T(nombre), Foreground = es ? _acentoLegible : _texto,
                     FontWeight = es ? FontWeights.SemiBold : FontWeights.Normal, FontSize = 12
                 });
                 var b = Boton(dentro, es ? $"{nombre} (puesto)" : $"Pasar a {nombre.ToLowerInvariant()}", () =>

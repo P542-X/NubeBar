@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -557,7 +557,7 @@ public partial class MainWindow
         // TextBox porque eso serían dos formas de poner una pista en la misma aplicación.
         var pistaDeLaCaja = new TextBlock
         {
-            Text = "Buscar aplicaciones, archivos y en la web…",
+            Text = Textos.T("Buscar aplicaciones, archivos y en la web…"),
             Foreground = _texto,
             Opacity = 0.45,
             FontSize = FontSize + 3,
@@ -849,7 +849,7 @@ public partial class MainWindow
 
         var t = new TextBlock
         {
-            Text = texto,
+            Text = Textos.T(texto),
             // Grande y medio salida por la esquina. Con la primera medida (-42 abajo) solo
             // asomaban los trazos de arriba y se leía como un kanji CORTADO, que es otra cosa:
             // una filigrana se reconoce porque la ves entera y apagada, no porque adivines un

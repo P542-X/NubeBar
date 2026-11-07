@@ -42,6 +42,24 @@ public static class Textos
 
     public static bool HayQueTraducir => EnUso == Lengua.Ingles;
 
+    // ---------- Y las fechas también ----------
+    //
+    // Una fecha no pasa por la tabla: la monta .NET con una cultura. Si esa cultura es la
+    // de Windows, alguien con el sistema en español y NubeBar en inglés lee «Appearance»
+    // encima de «sábado, 7 de noviembre». La mitad de una frase en cada idioma se lee como
+    // un fallo, y además es que no es lo que ha pedido: ha elegido el idioma del programa.
+    //
+    // Así que la cultura sale del idioma elegido. en-GB y no en-US porque el resto de la
+    // traducción es británica («colours», «personalisation»), y porque un «7 November»
+    // al lado de un «November 7» canta.
+    public static CultureInfo Cultura =>
+        EnUso == Lengua.Ingles ? CultureInfo.GetCultureInfo("en-GB") : CultureInfo.GetCultureInfo("es-ES");
+
+    // El «de» de «7 de noviembre» es una palabra, no un separador: va escrita dentro del
+    // formato y por eso el formato tiene que cambiar con el idioma, no solo la cultura.
+    public static string FormatoFechaLarga =>
+        EnUso == Lengua.Ingles ? "dddd, d MMMM" : "dddd, d 'de' MMMM";
+
     // «auto» pregunta a Windows. Quien tenga el sistema en español ve NubeBar en español sin
     // tocar nada; quien lo tenga en cualquier otro idioma ve inglés, que es el que entiende
     // más gente. No se inventa una tercera opción: o es español o es inglés.
@@ -83,8 +101,38 @@ public static class Textos
     public static string T(string? texto)
     {
         if (string.IsNullOrEmpty(texto) || !HayQueTraducir) return texto ?? "";
-        return En.TryGetValue(texto, out var t) ? t : texto;
+        if (En.TryGetValue(texto, out var t)) return t;
+        Apuntar(texto);
+        return texto;
     }
+
+    // ---------- Lo que pasa por aquí y no está ----------
+    //
+    // Traducir una interfaz tiene dos huecos, y el segundo no se ve leyendo el código: una
+    // cadena puede faltar en la tabla, o estar en la tabla y no pasar por `T()`. El primero
+    // se puede contar con un extractor; el segundo solo sale mirando capturas, y así se
+    // encontraron seis sitios que dibujaban sin traducir.
+    //
+    // Esto cubre el primero sin extractores: cada cadena que llega hasta aquí y no se
+    // encuentra se apunta UNA vez en el registro, con prefijo. Recorrer la interfaz en
+    // inglés y leer el log da la lista exacta de lo que falta, sin adivinar qué ayudante
+    // la dibujó ni en qué fichero vive.
+    //
+    // Solo en inglés —en español no se traduce nada— y solo una vez por cadena, así que
+    // no ensucia: lo que sale es un inventario, no un chorro.
+    static readonly HashSet<string> _apuntadas = new(StringComparer.Ordinal);
+
+    static void Apuntar(string texto)
+    {
+        lock (_apuntadas)
+        {
+            if (!_apuntadas.Add(texto)) return;
+        }
+        try { Log.Info($"[i18n] sin traducir: {texto}"); } catch { }
+    }
+
+    // Cuántas van. Para poder decir «faltan N» sin leerse el registro entero.
+    public static int SinTraducir { get { lock (_apuntadas) return _apuntadas.Count; } }
 
     // Cuántas hay y cuántas faltan, para poder medir el avance sin contarlas a mano.
     public static int Traducidas => En.Count;
@@ -95,6 +143,15 @@ public static class Textos
 
     static readonly Dictionary<string, string> En = new(StringComparer.Ordinal)
     {
+        // ---------- El saludo del menú Inicio ----------
+        ["Buenos días"] = "Good morning",
+        ["Buenas tardes"] = "Good afternoon",
+        ["Buenas noches"] = "Good evening",
+        ["No hay nada sonando"] = "Nothing is playing",
+        ["Pon música y aparecerá aquí con sus controles"] =
+            "Put some music on and it will show up here with its controls",
+        ["Teclado"] = "Keyboard",
+
         // ---------- Ajustes: descripciones de grupo y valores de desplegable ----------
         //
         // Un VALOR de desplegable («isla», «barra», «auto») es lo que se guarda en el

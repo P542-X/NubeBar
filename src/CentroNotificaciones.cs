@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -29,7 +29,7 @@ public sealed class Anotacion
         if (va.TotalMinutes < 60) return $"hace {(int)va.TotalMinutes} min";
         if (Cuando.Date == ahora.Date) return Cuando.ToString("HH:mm");
         if (Cuando.Date == ahora.Date.AddDays(-1)) return "ayer " + Cuando.ToString("HH:mm");
-        return Cuando.ToString("d MMM HH:mm");
+        return Cuando.ToString("d MMM HH:mm", Textos.Cultura);
     }
 }
 

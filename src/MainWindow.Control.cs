@@ -332,14 +332,15 @@ public partial class MainWindow : Window
 
         var izq = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         int h = DateTime.Now.Hour;
-        var saludo = h < 6 ? "Buenas noches" : h < 13 ? "Buenos días" : h < 21 ? "Buenas tardes" : "Buenas noches";
+        var saludo = Textos.T(h < 6 ? "Buenas noches" : h < 13 ? "Buenos días"
+                                    : h < 21 ? "Buenas tardes" : "Buenas noches");
         izq.Children.Add(new TextBlock
         {
             Text = saludo, FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = _texto,
         });
         izq.Children.Add(new TextBlock
         {
-            Text = DateTime.Now.ToString("dddd, d 'de' MMMM"),
+            Text = DateTime.Now.ToString(Textos.FormatoFechaLarga, Textos.Cultura),
             FontSize = 10.5, Foreground = _textoAtenuado, Margin = new Thickness(0, 1, 0, 0),
         });
         var perfil = Perfiles.LeerEstado().Activo;
@@ -992,7 +993,7 @@ public partial class MainWindow : Window
         g.Children.Add(ic);
 
         var col = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        col.Children.Add(new TextBlock { Text = titulo, FontSize = 11.5, Foreground = _texto });
+        col.Children.Add(new TextBlock { Text = Textos.T(titulo), FontSize = 11.5, Foreground = _texto });
         if (!string.IsNullOrWhiteSpace(sub))
             col.Children.Add(new TextBlock { Text = sub!, FontSize = 10, Foreground = _textoAtenuado });
         Grid.SetColumn(col, 1);
@@ -1216,7 +1217,7 @@ public partial class MainWindow : Window
 
     TextBlock Titulito(string texto) => new()
     {
-        Text = texto, Foreground = _acentoLegible, FontSize = 11, Opacity = 0.9,
+        Text = Textos.T(texto), Foreground = _acentoLegible, FontSize = 11, Opacity = 0.9,
         Margin = new Thickness(0, 8, 0, 2)
     };
 

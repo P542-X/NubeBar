@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -66,7 +66,7 @@ public partial class MainWindow
         {
             var ahora = DateTime.Now;
             saludo.Text = $"{Saludo(ahora)}, {Environment.UserName}";
-            fecha.Text = Mayuscula(ahora.ToString("dddd, d 'de' MMMM", CultureInfo.CurrentCulture));
+            fecha.Text = Mayuscula(ahora.ToString(Textos.FormatoFechaLarga, Textos.Cultura));
             reloj.Text = ahora.ToString("HH:mm");
         }
         Act();
@@ -76,12 +76,15 @@ public partial class MainWindow
         return Tarjeta(caja);
     }
 
-    static string Saludo(DateTime t) => t.Hour switch
+    // Se traduce aquí y no donde se dibuja: el saludo se junta con el nombre de quien
+    // usa el equipo («Buenas tardes, Ana») y lo que hay que traducir es el saludo, no la
+    // frase entera — el nombre no está en ninguna tabla.
+    static string Saludo(DateTime t) => Textos.T(t.Hour switch
     {
         >= 6 and < 13 => "Buenos días",
         >= 13 and < 21 => "Buenas tardes",
         _ => "Buenas noches"
-    };
+    });
 
     static string Mayuscula(string s) => s.Length == 0 ? s : char.ToUpper(s[0]) + s[1..];
 

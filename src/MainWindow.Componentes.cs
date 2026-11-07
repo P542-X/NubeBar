@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -1013,7 +1013,7 @@ public partial class MainWindow
         var textos = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         textos.Children.Add(new TextBlock
         {
-            Text = etiqueta, FontSize = 12, Foreground = _texto, TextWrapping = TextWrapping.Wrap,
+            Text = Textos.T(etiqueta), FontSize = 12, Foreground = _texto, TextWrapping = TextWrapping.Wrap,
         });
         if (!string.IsNullOrWhiteSpace(ayuda))
             textos.Children.Add(new TextBlock
@@ -1491,7 +1491,7 @@ public partial class MainWindow
         col.Children.Add(ic);
         col.Children.Add(new TextBlock
         {
-            Text = etiqueta,
+            Text = Textos.T(etiqueta),
             FontSize = 10,
             Foreground = activo ? _acentoLegible : _textoAtenuado,
             HorizontalAlignment = HorizontalAlignment.Center,
@@ -1530,7 +1530,7 @@ public partial class MainWindow
         col.Children.Add(ic);
         col.Children.Add(new TextBlock
         {
-            Text = etiqueta, FontSize = 10,
+            Text = Textos.T(etiqueta), FontSize = 10,
             Foreground = PincelSolido(_roles.NegativoTinta),
             HorizontalAlignment = HorizontalAlignment.Center,
             Margin = new Thickness(0, 4, 0, 0),
@@ -1566,7 +1566,7 @@ public partial class MainWindow
         });
         fila.Children.Add(new TextBlock
         {
-            Text = texto, FontSize = 10.5, Foreground = _textoAtenuado,
+            Text = Textos.T(texto), FontSize = 10.5, Foreground = _textoAtenuado,
             VerticalAlignment = VerticalAlignment.Center,
         });
         return new Border
@@ -1597,14 +1597,14 @@ public partial class MainWindow
         col.Children.Add(ic);
         col.Children.Add(new TextBlock
         {
-            Text = titulo, FontSize = 12, Foreground = _texto,
+            Text = Textos.T(titulo), FontSize = 12, Foreground = _texto,
             HorizontalAlignment = HorizontalAlignment.Center,
             Margin = new Thickness(0, 8, 0, 0), TextAlignment = TextAlignment.Center,
         });
         if (!string.IsNullOrWhiteSpace(queHacer))
             col.Children.Add(new TextBlock
             {
-                Text = queHacer, FontSize = 10.5, Foreground = _textoAtenuado,
+                Text = Textos.T(queHacer), FontSize = 10.5, Foreground = _textoAtenuado,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 Margin = new Thickness(0, 3, 0, 0), TextAlignment = TextAlignment.Center,
                 TextWrapping = TextWrapping.Wrap, Opacity = 0.8,
@@ -1655,7 +1655,7 @@ public partial class MainWindow
         var col = new StackPanel();
         col.Children.Add(new TextBlock
         {
-            Text = titulo, FontSize = 12.5, FontWeight = FontWeights.SemiBold,
+            Text = Textos.T(titulo), FontSize = 12.5, FontWeight = FontWeights.SemiBold,
             Foreground = _texto, TextTrimming = TextTrimming.CharacterEllipsis,
         });
         if (!string.IsNullOrWhiteSpace(artista))
@@ -1843,7 +1843,7 @@ public partial class MainWindow
         var fila = new StackPanel { Orientation = Orientation.Horizontal };
         fila.Children.Add(new TextBlock
         {
-            Text = texto,
+            Text = Textos.T(texto),
             FontSize = 11,
             Foreground = elegida ? _acentoLegible : _texto,
             FontWeight = elegida ? FontWeights.SemiBold : FontWeights.Normal,
