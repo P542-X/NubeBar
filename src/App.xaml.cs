@@ -289,6 +289,27 @@ public partial class App : Application
             return;
         }
 
+        // ---------- Lo primero que se pregunta, y solo una vez ----------
+        //
+        // Va aquí y no más tarde por dos motivos. Uno: tiene que estar ANTES de que se
+        // dibuje nada —la escena de entrada, las islas, el saludo del menú Inicio—, o la
+        // primera cosa que vea alguien con Windows en inglés estaría en español. Y dos:
+        // va DESPUÉS del cerrojo de instancia única, para que no salgan dos ventanas
+        // preguntando lo mismo si se abre el programa dos veces.
+        //
+        // Solo en el arranque normal. Un diagnóstico no puede escribir el config (ver
+        // Config.PuedeEscribir), así que preguntar sería pedirle al usuario una respuesta
+        // que después se tira: mejor no preguntar.
+        try
+        {
+            if (!Config.SoloLectura)
+            {
+                var cfg = Config.Cargar();
+                if (cfg != null && ElegirIdioma.HayQuePreguntar(cfg)) ElegirIdioma.Preguntar(cfg);
+            }
+        }
+        catch (Exception ex) { Log.Error("preguntar el idioma al arrancar", ex); }
+
         // La escena de entrada va ANTES de montar las islas: lo que tapa es justamente
         // el rato feo del arranque (Explorer recalculando el área de trabajo, la barra
         // de Windows escondiéndose, el carrusel llenándose). Si no toca mostrarla, no

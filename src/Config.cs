@@ -86,6 +86,13 @@ public class Tema
     // lo que decide cómo se ve. El registro NO se traduce — ver `Textos`.
     public string Idioma { get; set; } = "auto";
 
+    // ¿Ya se preguntó el idioma la primera vez? Hace falta una bandera aparte porque
+    // "auto" no distingue «he elegido automático» de «nadie me ha preguntado», y sin ella
+    // a quien elige automático a propósito se le volvería a preguntar en cada arranque.
+    // Es el mismo tri-estado disfrazado que hizo falta en ReservarEspacio.
+    // Lo escribe ElegirIdioma, una sola vez.
+    public bool IdiomaPreguntado { get; set; } = false;
+
     // ---------- Roles de color (todos opcionales) ----------
     // Un tema puede seguir siendo tres colores: lo que no se ponga aquí, Roles lo
     // deriva del fondo y del texto. Así los seis temas de serie y los que ya tenga

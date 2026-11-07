@@ -37,6 +37,56 @@ public static partial class Pruebas
         LaIslaCreceEnseguidaYEncogeConCalma();
         ElCirculoDelDeslizadorNoSeSale();
         LosModulosSeSeparanEnElEjeQueSeApilan();
+        ElIdiomaSePreguntaUnaVezYSoloUna();
+    }
+
+    // ================= La pregunta del idioma =================
+    //
+    // «Cuando ejecuten el exe que les dé a elegir si inglés o español.»
+    //
+    // Lo que se fija aquí es lo que convierte una buena idea en una molestia si se hace
+    // mal: que se pregunte UNA vez. `Tema.Idioma` vale "auto" de serie y no puede hacer
+    // de respuesta —no distingue «he elegido automático» de «nadie me ha preguntado»—,
+    // así que la memoria es una bandera aparte. Es el mismo tri-estado disfrazado que
+    // hizo falta en ReservarEspacio esta misma versión.
+    static void ElIdiomaSePreguntaUnaVezYSoloUna()
+    {
+        Grupo("el idioma de la primera vez");
+
+        var recien = new Config();
+        Vale(ElegirIdioma.HayQuePreguntar(recien), "config recién nacido: se pregunta");
+        Igual("auto", recien.Tema.Idioma, "y hasta que conteste, manda lo que diga Windows");
+
+        // Elija lo que elija, incluido «automático», no se vuelve a preguntar
+        foreach (var respuesta in new[] { "es", "en", "auto" })
+        {
+            var c = new Config();
+            c.Tema.Idioma = respuesta;
+            c.Tema.IdiomaPreguntado = true;
+            Vale(!ElegirIdioma.HayQuePreguntar(c), $"tras contestar «{respuesta}», no se vuelve a preguntar");
+        }
+
+        // Y el caso que una bandera mal pensada se habría comido: quien elige automático
+        // a propósito. Sin la bandera, su config es idéntico al de alguien a quien nadie
+        // ha preguntado, y le saldría la ventana en cada arranque.
+        var automatico = new Config();
+        automatico.Tema.Idioma = "auto";
+        automatico.Tema.IdiomaPreguntado = true;
+        Vale(!ElegirIdioma.HayQuePreguntar(automatico),
+             "elegir «automático» es una respuesta, no la falta de una");
+
+        // Lo que se guarda se lee igual: las tres claves van y vuelven
+        var antes = Textos.Elegida;
+        try
+        {
+            foreach (var (clave, esperado) in new[]
+                     { ("es", Textos.Lengua.Espanol), ("en", Textos.Lengua.Ingles), ("auto", Textos.Lengua.Auto) })
+            {
+                Textos.Elegir(clave);
+                Igual(esperado, Textos.Elegida, $"«{clave}» se guarda y se lee igual");
+            }
+        }
+        finally { Textos.Elegir(Textos.Clave(antes)); }
     }
 
     // ================= La separación de un módulo, en los dos lados =================
