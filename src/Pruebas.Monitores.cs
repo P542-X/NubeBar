@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 
 namespace NubeBar;
@@ -8,7 +8,7 @@ namespace NubeBar;
 // ---------- Qué se puede probar y qué no ----------
 //
 // Mandarle un comando a un monitor no se puede probar aquí: necesita el monitor, el cable, y
-// DDC/CI activado en su menú. Eso es una prueba manual y está en `PRUEBAS-PARA-PAULO.md`.
+// DDC/CI activado en su menú. Eso es una prueba manual y está en el cuaderno de pruebas manuales.
 //
 // Lo que SÍ se puede probar —y es justo donde se rompen estas cosas— son los dos descifradores:
 //

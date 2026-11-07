@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -8,7 +8,7 @@ namespace NubeBar;
 // El editor de módulos: qué se enseña de cada uno y qué se deja hacer.
 //
 // Esto es la mitad que se puede comprobar sin abrir Ajustes. La otra —que arrastrar un
-// chip funcione con el ratón de verdad— está en `PRUEBAS-PARA-PAULO.md`, porque un
+// chip funcione con el ratón de verdad— está en el cuaderno de pruebas manuales, porque un
 // arrastre no se comprueba sin manos y decir lo contrario sería mentir.
 public static partial class Pruebas
 {

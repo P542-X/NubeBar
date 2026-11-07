@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 namespace NubeBar;
 
@@ -7,7 +7,7 @@ namespace NubeBar;
 //
 // ---------- Por qué esto faltaba, y por qué ahora se puede ----------
 //
-// D9.6 llevaba desde que se escribió marcado así en `PRUEBAS-PARA-PAULO.md`:
+// D9.6 llevaba desde que se escribió marcado así en el cuaderno de pruebas manuales:
 //
 //   «⚠️ esto NO lo he probado moviendo ventanas. Es la única parte que mueve ventanas que
 //    ninguna regla ha nombrado (repartir un escritorio es, por definición, moverlas todas),

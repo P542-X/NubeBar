@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -467,7 +467,7 @@ public static class Fuentes
             var cadena = "Provider=Search.CollatorDSO;Extended Properties='Application=Windows'";
             var escapada = consulta.Replace("'", "''");
             // OJO con las columnas: System.ItemPathDisplay es la ruta PARA ENSEÑAR, y
-            // viene traducida al idioma de Windows ("C:\Usuarios\Spcar\Documentos\…",
+            // viene traducida al idioma de Windows ("C:\Usuarios\usuario\Documentos\…",
             // "…\Menú Inicio\Programas\…"). Esos nombres son de cara a la galería: en
             // disco las carpetas se llaman Users, Documents y Start Menu, así que
             // abrir con esa ruta fallaba con "no se encuentra el archivo". La ruta de
