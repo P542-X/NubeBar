@@ -72,8 +72,12 @@ public static partial class Pruebas
         var sueltos = new List<string>();
         int mirados = 0;
 
+        // Recursivo desde que el codigo vive en `src/`. Con la busqueda plana esto
+        // encontraba CERO ficheros el dia que se movieron, y lo unico que avisaba era el
+        // `mirados >= 20` de abajo. Una guarda que se queda sin nada que mirar no dice
+        // «todo bien»: dice que ha dejado de mirar, y eso tiene que notarse.
         foreach (var patron in EnLaMira)
-            foreach (var ruta in Directory.EnumerateFiles(raiz, patron))
+            foreach (var ruta in Directory.EnumerateFiles(raiz, patron, SearchOption.AllDirectories))
             {
                 var nombre = Path.GetFileName(ruta);
                 if (nombre.StartsWith("MainWindow.Diag", StringComparison.OrdinalIgnoreCase)) continue;

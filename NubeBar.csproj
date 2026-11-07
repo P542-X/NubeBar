@@ -41,6 +41,21 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- ================= El codigo vive en src/ =================
+
+         Los 237 ficheros estaban en la raiz y la portada del repositorio en GitHub era
+         una lista de doscientos nombres antes de llegar al README. El SDK los encuentra
+         igual esten donde esten (`**/*.cs`), asi que mover no cuesta nada... salvo esto:
+
+         `App.xaml` se marca como ApplicationDefinition —el fichero que genera el Main—
+         por un glob que SOLO mira la raiz del proyecto. Fuera de ella pasa a ser un Page
+         mas, y entonces el programa se queda sin punto de entrada. Hay que decirlo a
+         mano, y quitarlo de los Page para que no entre dos veces. -->
+    <ApplicationDefinition Include="src\App.xaml" />
+    <Page Remove="src\App.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Las letras de los temas (fase 6 del rediseno).
          Van como `Resource` y no como `EmbeddedResource`: WPF solo sabe cargar una
          familia desde un `pack://application:,,,/` si esta puesta asi.
