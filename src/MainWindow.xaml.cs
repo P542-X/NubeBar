@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -958,8 +958,50 @@ public partial class MainWindow : Window
         }), System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
+    // ================= Quién respira =================
+    //
+    // El ancho de la isla se repregunta cada segundo, y cuando cambia se mueve todo lo de
+    // dentro. Con el escalón de cuatro píxeles la isla casi no se entera, pero un módulo
+    // que cambia de ancho mueve igualmente a sus vecinos dentro de la zona.
+    //
+    // Saber CUÁL no se puede a ojo: son veinticinco y cambian a destiempo. Esto apunta en
+    // el registro cada módulo que cambia de ancho, con lo que medía antes y lo que mide
+    // ahora. Se enciende con `NUBEBAR_DIAG_ANCHOS=1` y por eso no cuesta nada el resto
+    // del tiempo: sin la variable no se recorre ni una vez.
+    static readonly bool DiagAnchos =
+        Environment.GetEnvironmentVariable("NUBEBAR_DIAG_ANCHOS") == "1";
+
+    readonly Dictionary<string, double> _anchosDeAntes = new();
+
+    void ApuntarQuienRespira()
+    {
+        if (!DiagAnchos) return;
+        try
+        {
+            foreach (var (zona, nombre) in new[] { (Izq, "Izq"), (Cen, "Cen"), (Der, "Der") })
+            {
+                for (int i = 0; i < zona.Children.Count; i++)
+                {
+                    if (zona.Children[i] is not FrameworkElement e) continue;
+                    double w = e.DesiredSize.Width;
+                    if (w <= 0) continue;
+                    // El nombre que se puede reconocer después: zona, sitio y tipo.
+                    var clave = $"{nombre}[{i}] {e.GetType().Name}";
+                    if (_anchosDeAntes.TryGetValue(clave, out var antes))
+                    {
+                        if (Math.Abs(antes - w) > 0.05)
+                            Log.Info($"[anchos] {clave}: {antes:0.0} -> {w:0.0}");
+                    }
+                    _anchosDeAntes[clave] = w;
+                }
+            }
+        }
+        catch { }
+    }
+
     void AjustarAnchoYa()
     {
+        ApuntarQuienRespira();
         if (!EsIsla) return;
         if (_aplicando || _animandoAncho) { _anchoTrasAnimar = true; return; }
         double hasta = Math.Max(MedirAncho(), _panelAncho);   // con panel abierto manda el panel
@@ -974,6 +1016,11 @@ public partial class MainWindow : Window
 
     internal static double ARejilla(double ancho) =>
         Math.Ceiling(ancho / RejillaDelAncho) * RejillaDelAncho;
+
+    // Al par siguiente. Lo que se centra tiene que medir par: lo que se reparte a los dos
+    // lados es la diferencia de anchos, y una diferencia impar deja medio píxel por lado.
+    internal static double APar(double ancho) =>
+        Math.Ceiling(Math.Max(0, ancho) / 2) * 2;
 
     // ---------- Crecer siempre; encoger, solo si merece la pena ----------
     //

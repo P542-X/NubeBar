@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 
 namespace NubeBar;
@@ -35,6 +35,7 @@ public static partial class Pruebas
         ElHaloDelPanelLateralNoVaEnLoRecortado();
         LaReservaNoDependeDelModo();
         LaIslaCreceEnseguidaYEncogeConCalma();
+        LoQueSeCentraMidePar();
         ElCirculoDelDeslizadorNoSeSale();
         LosModulosSeSeparanEnElEjeQueSeApilan();
         ElIdiomaSePreguntaUnaVezYSoloUna();
@@ -138,6 +139,46 @@ public static partial class Pruebas
         var r = MainWindow.SeparacionDeModulo(true, 0, 7);
         Igual(0.0, r.Top, "con (0,7) en vertical no se separa de lo de arriba");
         Igual(7.0, r.Bottom, "y sí de lo de abajo");
+    }
+
+    // ================= Lo que se centra mide par =================
+    //
+    // ---------- De dónde sale esto ----------
+    //
+    // El píxel que quedaba del temblor de los separadores, después de poner el ancho de la
+    // isla a múltiplos de cuatro. La zona central va centrada, así que su filo izquierdo
+    // cae en `(hueco - ancho) / 2`. Con el ancho fraccionario —medir texto siempre lo es—
+    // ese filo cae a medio píxel y el entero al que se ajusta cambia en cuanto la medida
+    // se mueve una décima.
+    //
+    // Se midió con capturas cada segundo: 391 530 627 794 -> 390 530 627 795. La de la
+    // izquierda para un lado y la de la derecha para el otro, que es la firma de un
+    // centrado y no de un módulo creciendo.
+    static void LoQueSeCentraMidePar()
+    {
+        Grupo("lo que se centra mide par");
+
+        // Nunca por debajo de lo medido: recortar es el error caro
+        for (double w = 0; w < 400; w += 0.5)
+            Vale(MainWindow.APar(w) >= w, $"{w:0.#} no se recorta al subir al par");
+
+        // Y siempre par, que es lo único que hace entera la mitad
+        foreach (double w in new[] { 0.0, 0.1, 1.0, 1.9, 2.0, 2.1, 579.4, 580.0, 580.6 })
+            Vale(MainWindow.APar(w) % 2 == 0, $"{w:0.#} sube a un ancho par");
+
+        // Lo que de verdad se exige: centrado en un hueco par, el filo cae en un entero.
+        // El hueco es el interior de la isla, que ya es par (ver ARejilla).
+        foreach (double hueco in new[] { 560.0, 580.0, 996.0, 2560.0 })
+            for (double w = 100; w < 500; w += 3.7)
+            {
+                double filo = (hueco - MainWindow.APar(w)) / 2;
+                Vale(filo % 1 == 0, $"zona de {MainWindow.APar(w):0} en hueco de {hueco:0}: filo entero");
+            }
+
+        // Y el caso que lo explica: dos medidas que solo se diferencian en una décima
+        // tienen que dar el MISMO ancho, o el centro vuelve a saltar.
+        Igual(MainWindow.APar(579.4), MainWindow.APar(579.9), "579,4 y 579,9 dan el mismo ancho");
+        Igual(MainWindow.APar(580.0), MainWindow.APar(579.9), "y 580,0 también");
     }
 
     // ================= El círculo del deslizador =================
