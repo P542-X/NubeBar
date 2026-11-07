@@ -1,16 +1,14 @@
 ﻿# How NubeBar works
 
-*[Las decisiones, en español](DECISIONES.md)*
-
 This is the guided tour: what each part of the program is, where it lives and why
 it is built that way. It is meant to be read before touching the code — 236 files
 and 85,000 lines are a lot to meet all at once, and almost all of it falls into a
 dozen pieces that make sense on their own.
 
 If what you want is to *use* NubeBar, the [README](README.en.md) is the place.
-If what you want is the reasoning behind a particular decision — what was tried
-first, what broke, what was chosen instead — that is in `DECISIONES.md`, in
-Spanish, written as things happened.
+The reasoning behind individual decisions — what was tried first, what broke,
+what was chosen instead — lives in the code, in the comment next to the thing it
+explains. There is a lot of it, and it is there on purpose.
 
 ---
 

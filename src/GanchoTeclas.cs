@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -181,7 +181,7 @@ public sealed class GanchoTeclas : IDisposable
         uint vk = info.vkCode;
 
         // 0) Las teclas de volumen. En Windows 11 el aviso de volumen del sistema no
-        //    se puede esconder (lo pinta el compositor, ver DECISIONES.md), así que
+        //    se puede esconder —lo pinta el compositor— así que
         //    la única forma de que salga solo el de la isla es que la tecla no llegue
         //    a Windows: nos la quedamos y el volumen lo cambiamos nosotros. Se trague
         //    también la de soltar, o Windows vería un "soltar" sin su "pulsar". Si

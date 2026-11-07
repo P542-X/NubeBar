@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -899,7 +899,7 @@ public static class Nativo
     // `PrintWindow` con PW_RENDERFULLCONTENT (2) le pide a la ventana que se dibuje en
     // un lienzo nuestro. Es la única vía que sirve aquí: las miniaturas de DWM no se
     // componen dentro de ventanas por capas, y TODAS las de NubeBar lo son (la isla es
-    // redondeada y translúcida). Ver DECISIONES.md.
+    // redondeada y translúcida).
     //
     // Devuelve null si no se puede, y quien llama enseña la tarjeta con icono y título.
     [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint flags);

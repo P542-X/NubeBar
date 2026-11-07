@@ -1,4 +1,4 @@
-# Rediseño visual de NubeBar
+﻿# Rediseño visual de NubeBar
 
 Plan para llevar a la app el aspecto de la maqueta aprobada el 28/10/2026. Está escrito
 para que una sesión nueva pueda empezar por aquí sin más contexto: qué se quiere, qué se
@@ -547,7 +547,7 @@ Construido y con las pruebas en verde (`NubeBar.exe --pruebas`: 10 583 comprobac
 |---|---|---|
 | El valor «color» | `Relleno.cs` | Un color liso o un degradado lineal, en el formato de la maqueta (`rgba()`, `linear-gradient()`). Se lee, se escribe, se mide y se convierte en pincel de WPF |
 | El tema como paquete | `TemaBase.cs` | Un tema son datos: 19 colores, letra, radios, esquinas y decoraciones. Ni un `switch` por tema |
-| Los nueve de serie | `temas-de-serie.json` | Copia del objeto `temas` de la maqueta, incrustada en el exe. Una sola desviación, apuntada dentro (ver `DECISIONES.md`) |
+| Los nueve de serie | `temas-de-serie.json` | Copia del objeto `temas` de la maqueta, incrustada en el exe. Una sola desviación, apuntada dentro del propio fichero |
 | El catálogo | `Catalogo.cs` | ~130 claves con nombre, zona, papel y de dónde salen. Las 19 base son claves como las demás |
 | La cascada | `Pintura.cs` | Usuario → tema → derivación, con caché, corte de ciclos, medida de contraste y la regla de seguridad de Ajustes (`ParaAjustes()`) |
 | Las pruebas | `Pruebas.Temas.cs` | Que los nueve temas declaren las 19 claves, que las ~130 resuelvan en todos, que ninguna derivación dé vueltas y que todo lo que hace de texto o de icono se lea |
@@ -606,7 +606,7 @@ del tema nuevo sobre una concha del viejo. Medido en Sakura: concha `#0F0F16` co
 
 1. **La fachada `Roles`** se va quedando sin consumidores a medida que las fases 1 a 8 pasen
    cada pieza a preguntar por su clave. Mientras tenga alguno, ahí está.
-2. **De Ajustes > Colores**: editar degradados y «Elegir en pantalla» (ver `DECISIONES.md`
+2. **De Ajustes > Colores**: editar degradados y «Elegir en pantalla» (ver
    para por qué los dos esperan al Estudio y a las fases 1-8).
 3. **El chaflán** de Videojuegos y Cyberpunk es hoy un radio 0, o sea una esquina recta. La
    esquina CORTADA en diagonal es de la fase 7, y hasta entonces esos dos temas se ven más
