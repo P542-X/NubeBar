@@ -1,6 +1,7 @@
-# NubeBar
+﻿# NubeBar
 
 *[Léeme en español](README.md)*
+*[How it works, part by part](ARCHITECTURE.md)*
 
 A bar for Windows 11 with the shape and the temperament of the iPhone's Dynamic
 Island: a black cloud that lives at the very top, expands when you hover it and

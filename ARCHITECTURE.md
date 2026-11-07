@@ -1,0 +1,295 @@
+﻿# How NubeBar works
+
+*[Las decisiones, en español](DECISIONES.md)*
+
+This is the guided tour: what each part of the program is, where it lives and why
+it is built that way. It is meant to be read before touching the code — 236 files
+and 85,000 lines are a lot to meet all at once, and almost all of it falls into a
+dozen pieces that make sense on their own.
+
+If what you want is to *use* NubeBar, the [README](README.en.md) is the place.
+If what you want is the reasoning behind a particular decision — what was tried
+first, what broke, what was chosen instead — that is in `DECISIONES.md`, in
+Spanish, written as things happened.
+
+---
+
+## The shape of the thing
+
+One process. Inside it, **one window per monitor** — the `MainWindow` class — and
+the one on the primary screen is *la jefa*, "the boss": it carries whatever has
+to exist exactly once (the keyboard hook, the tray, the global shortcuts) so the
+others don't duplicate it.
+
+Each of those windows is a transparent strip across its monitor, and the island
+is a rounded `Border` inside it. That is the first thing worth knowing, because
+it explains a lot of the rest: **the island is not a window**. It is a shape
+drawn inside a window that is bigger than it, and that is what lets it grow, slide
+away, and open panels out of itself without any of it being a new window that
+Windows has to manage.
+
+`MainWindow` is split across 62 `MainWindow.*.cs` files — one per
+subject: `MainWindow.Apps.cs`, `MainWindow.Paneles.cs`, `MainWindow.Red.cs`. They
+are all the same class. The split is for reading, not for structure.
+
+---
+
+## Configuration
+
+Everything the user can change lives in one file, `%APPDATA%\NubeBar\config.json`,
+and the program **reloads it while running**: save the file and the island adapts.
+There is no "apply" step anywhere.
+
+Three things about it are worth knowing before you touch it:
+
+**Keys it doesn't recognise are kept.** Config is read into a tree
+(`ConfigArbol`) that preserves what it doesn't understand, so a file written by a
+newer version doesn't lose anything when an older one opens it.
+
+**`Paneles` is the authority on geometry.** Mode, edge, thickness, margin,
+visibility, which monitors, whether it reserves space — all of it lives in
+`Paneles[0]`. The old `Barra.*` keys are still read by sixty-odd places in the
+code, so they are *derived* from `Paneles` at load time and never written back.
+Editing them by hand does nothing.
+
+**Not everyone may write it.** `Config.PuedeEscribir` is inverted on purpose:
+only the bar with no arguments and the guardian can write. Every diagnostic is
+read-only by construction, so a new one is born protected without anyone having to
+remember. That rule exists because the opposite cost four separate accidents where
+a development build migrated a real config to a schema the installed version
+couldn't read.
+
+Schema changes go through `Esquema.cs`, which migrates forward and refuses to read
+a file from the future rather than reading it halfway.
+
+---
+
+## The island, zone by zone
+
+The island has **three zones** — left, centre, right — and each one is a stack of
+modules. The layout is a `* Auto *` grid, which has one consequence you will see
+in the code: the two star columns always get the same width, so the centre is
+genuinely centred, and the narrower side gets padding. That is deliberate.
+
+**The centre zone is always visible.** The left and right ones only appear when
+the island expands under the pointer. That is why the apps live in the centre: so
+they are one click away without having to approach the island first.
+
+When the bar is **vertical** (bar mode on a side edge), the same three zones stack
+downwards instead, and the modules separate on the other axis. There is one helper
+for that, `SeparacionDeModulo`, and the reason it exists is that the rule used to
+be applied in one place and written nowhere, so every new module was born without
+it.
+
+Below the module row sits **the drawer** (`Cajon`): an empty row that panels grow
+into. Opening the network panel doesn't create a window — it puts content in the
+drawer, grows the island's height, and clips the result to look like a card
+hanging from the icon you clicked. In vertical mode there is nowhere to grow, so
+panels do get their own window (`VentanaSuperpuesta`).
+
+---
+
+## Modules
+
+A module is a widget: a small piece with a registered id (`reloj`, `apps`,
+`bateria`…). `RegistroWidgets` holds them, which is why the same list appears in
+the config file, in **Settings → Modules** and in the log — there is only one.
+
+A widget receives `IAnfitrionWidget`: the resolved theme colours, the animation
+level, the row thickness, a once-a-second refresh, and four construction helpers
+(a button, a glyph, a label, a text). Deliberately not the whole window.
+
+The label helper is worth a mention: `Etiqueta` can reserve the width of its
+longest value, so the clock doesn't make the island breathe every minute.
+
+---
+
+## Apps
+
+`Nativo.VentanasAbiertas` enumerates top-level windows and filters out everything
+that isn't a real application window — and `NubeBar.exe --ventanas` prints why each
+one was discarded, because "my app is missing" is otherwise impossible to debug.
+
+Windows are **grouped by executable** into one icon with a dot per window. Pinned
+apps (`Barra.AppsFijadas`) appear whether they are open or not. The order is
+whatever you dragged them into, and it is written back to the config.
+
+With several monitors, each island shows the apps on its own screen, and moving a
+window from one monitor to the other makes its icon travel with an animation.
+
+Bringing a window to the front is `Nativo.TraerAlFrente`, and it is longer than
+you would expect: Windows refuses `SetForegroundWindow` to a process that hasn't
+just received input, and NubeBar's windows are `WS_EX_NOACTIVATE`, so clicking the
+island doesn't count. The workaround is in the code with its explanation.
+
+---
+
+## Panels
+
+Network, audio, battery, notifications, the Start menu, the window overview, the
+tray flyout, monitors. They are all built the same way: content into the drawer,
+height animated, clipped as a card.
+
+Two rules they share:
+
+- **A click outside closes the one that is open**, whatever it is. That used to be
+  a list of four panels and it is now the default, with a list of exceptions that
+  has one entry.
+- **How much a panel really needs is asked to its content, not to its container.**
+  The drawer sits in a `Star` row, so the container's `DesiredSize` is whatever it
+  was given — asking it is a circular conversation. `AltoQueDeVerdadPide` asks the
+  content instead.
+
+---
+
+## Themes
+
+A theme is not a palette. It brings its **shape** (how much each piece is rounded,
+or whether it goes chamfered), its **typeface**, its glow, and its decorations.
+Nine ship with the program, in `temas-de-serie.json`.
+
+Colours are **roles**, about 130 of them with names like `isla.fondo`,
+`panel.filo`, `icono.halo`. What a theme doesn't declare is derived from the
+background and the text, so a theme can still be three colours. Every accent also
+has a *text* version that is not configurable: the same colour corrected until it
+can be read against the real background (WCAG, 3.5:1 over the island).
+
+**A theme of yours stores the recipe, not the result**: which theme you started
+from and what you changed, not the 130 resolved colours. If the base theme
+improves, yours improves with it.
+
+There is a test that forbids writing a colour by hand anywhere in the interface
+files. It reads the source and fails on literals.
+
+---
+
+## Talking to Windows
+
+This is the part that is mostly P/Invoke, and the part most likely to surprise:
+
+- **Hiding the taskbar** is `SHAppBarMessage` with auto-hide, plus hiding the
+  window. The original state is saved to a file, because a crash would otherwise
+  leave the taskbar hidden forever and the next start would read *that* as the
+  original state.
+- **Reserving space** is a real appbar registration, one per island, each against
+  its own monitor's rectangle. Windows only understands screen edges, so a narrow
+  island reserves its whole edge.
+- **The tray** comes from [ManagedShell](https://github.com/cairoshell/ManagedShell):
+  NubeBar becomes the shell's tray host, and gives the icons back on exit.
+- **Virtual desktops** through `Slions.VirtualDesktop`.
+- **Notifications** are read from the database where Windows stores them, with
+  SQLite. The official route would mean packaging and signing the app, so NubeBar
+  finds out *after* Windows has shown its own banner — which is why they can appear
+  twice, and why the README explains how to turn one off.
+- **Monitor inputs** are DDC/CI over the cable (`dxva2.dll`, VCP `0x60`), with the
+  monitor's real model read from its EDID.
+- **File search** uses the Windows Search index through OleDb.
+- **Wallpaper Engine**, if installed, can be started, paused, and read for a colour
+  palette.
+
+---
+
+## NubeHypr
+
+A window arranger in the style of the Linux tiling managers, built into the bar.
+It **ships off**, and when on it has two modes: *simulation*, which works out what
+it would do and writes it to the log without moving anything, and *apply*.
+
+Four layouts — floating, horizontal (columns), vertical (rows) and main — plus
+**rules** matched on process, class, title or path. Rules don't override one
+another: they combine field by field, and whatever a rule leaves blank is left for
+another rule or for Windows.
+
+It respects the work area: it subtracts the bar if the bar reserves space, and the
+dock if the dock is visible. That calculation lives in one place
+(`MainWindow.AreaDeTrabajo.cs`) because the engine, the preview and the
+diagnostics all need the same answer.
+
+The sentence that explains a rule in plain language (`HyprGuia.EnPalabras`) is
+built from translated **templates with a placeholder**, not from concatenated
+pieces — because in English the verb goes after the subject and gluing translated
+fragments gives Spanish with English words.
+
+---
+
+## The dock and the side panels
+
+Both are separate always-on-top windows, independent of the bar: you can have one,
+both, or neither. They open always, never, or when the mouse reaches the edge of
+the screen — the same gesture and the same reader for both, on purpose.
+
+---
+
+## Not leaving you without a shell
+
+NubeBar hides your taskbar. Everything in this section exists because of that one
+sentence.
+
+- **One instance at a time**, enforced with a named mutex.
+- **A guardian process** — the same executable with `--guardian` — watches the bar.
+  If it is killed from Task Manager or hangs, the guardian gives both taskbars back
+  in under half a second without restarting Explorer.
+- **Panic mode** (`Panico.cs`) decides when the program should give up and hand the
+  desktop back. The two mistakes it avoids are symmetrical: surrendering over a
+  harmless error, and not surrendering with a broken bar.
+- **An unknown `--flag` exits with code 2** instead of starting the bar. Asking an
+  old binary for a diagnostic it doesn't have used to mount the whole bar and
+  migrate the config.
+- **A binary in a phase folder refuses to start as a bar at all.**
+
+---
+
+## Two languages
+
+Spanish and English, chosen the first time you open it and changeable in Settings.
+`Textos.T(text)` looks the Spanish string up in a table and returns it unchanged
+when there is no entry — which is what allows the translation to be completed
+gradually without any intermediate version being broken.
+
+Two things are easy to get wrong here and both have been:
+
+- A string can be **missing from the table**, or **in the table and not routed
+  through `T()`**. The second one doesn't show up in any count. `T()` now logs every
+  string that reaches it and isn't found, so walking the interface in English and
+  reading the log gives the exact list.
+- **Dates don't go through the table** — .NET builds them from a culture. That
+  culture follows the chosen *language*, not Windows, or you get half a sentence in
+  each language.
+
+---
+
+## How it is tested
+
+The test suite lives **inside the executable**: `NubeBar.exe --pruebas report.txt`
+runs some thirteen thousand checks and opens no window. It is there and not in a
+separate harness because what it protects are rules that have to still be true in
+six months.
+
+Alongside it are 29 command-line flags, almost all of them diagnostics — `--capturas` photographs every surface,
+`--diagpaneles` measures panels, `--vigilia` runs the bar for a while measuring
+itself — all read-only, all unable to touch your config.
+
+The pattern worth copying: when something can only be verified by looking,
+**measure it instead**. The separators that shimmered were diagnosed by
+screenshotting them once a second and comparing pixel positions, not by staring at
+the bar.
+
+---
+
+## Where things are
+
+The file name is the map:
+
+| | |
+|---|---|
+| `MainWindow.*.cs` | the island, one file per subject |
+| `VentanaAjustes*.cs` | the settings window, one file per page |
+| `Hypr*.cs`, `NubeHypr.cs` | the window arranger |
+| `Diag*.cs`, `MainWindow.Diag*.cs` | diagnostics |
+| `Pruebas*.cs` | the test suite |
+| `Tema*.cs`, `Roles.cs`, `Catalogo.cs`, `Paleta.cs` | theming |
+| `Nativo.cs`, `Monitores.cs`, `AppBar.cs` | talking to Windows |
+| `Config.cs`, `ConfigArbol.cs`, `Esquema.cs` | configuration |
+
+Everything is under `src/`. The project file, the fonts, the stock themes and the
+installer script stay at the root.

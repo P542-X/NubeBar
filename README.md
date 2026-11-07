@@ -1,6 +1,7 @@
 ﻿# NubeBar
 
 *[Read this in English](README.en.md)*
+*[Cómo funciona, parte por parte](ARCHITECTURE.md)* (en inglés)
 
 Una barra para Windows 11 con la forma y el genio de la Dynamic Island del iPhone:
 una nube negra que vive arriba del todo, se expande cuando le pasas el ratón por
