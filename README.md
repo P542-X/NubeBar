@@ -22,9 +22,13 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
   como a la barra de tareas y las ventanas maximizadas llegan solo hasta donde
   empieza la nube — una appbar de verdad, y vale igual en modo isla que en modo
   barra.
-- Módulos colocables en tres zonas (izquierda, centro, derecha): inicio, apps,
-  reloj, fecha, CPU, RAM, batería, música, bandeja, control, escritorios,
-  wallpaper, iconos, separador.
+- **Veinticinco módulos** colocables en tres zonas (izquierda, centro, derecha):
+  `inicio`, `apps`, `fijadas`, `reloj`, `fecha`, `cpu`, `ram`, `bateria`, `pila`,
+  `bandeja`, `control`, `red`, `volumen`, `teclado`, `escritorios`, `monitores`,
+  `notificaciones`, `musica` (o solo su carátula, o solo sus barras), `wallpaper`
+  (o solo el título del fondo), `iconos`, `nube`, `separador`. Se eligen y se
+  ordenan arrastrando en **Ajustes → Módulos**, y los que no quieras ver se
+  guardan en la biblioteca en vez de borrarse.
 - Borde y halo del color de acento, con animaciones de muelle a la velocidad de
   refresco del monitor.
 - **Se aparta cuando molesta**: la coges y la arrastras donde quieras. Mientras
@@ -51,6 +55,8 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
 - **Esconder la isla**: clic derecho en la isla → «Esconder la isla» y se va de
   todas las pantallas. Vuelve al pulsar la tecla Windows.
 - Vista general tipo Exposé con todas las ventanas, con atajo global.
+
+  ![La vista general](docs/vista-general.png)
 - **Ajustar ventanas a los bordes**: arrastra una ventana al borde izquierdo o
   derecho y se queda en media pantalla; a una esquina, en un cuarto; arriba,
   maximizada. Antes de soltar se ve dónde va a caer, y lo que se ve es lo que
@@ -135,6 +141,10 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
 - Lo que tu equipo no admite no aparece: sin batería no hay icono de batería, y
   si el monitor no contesta a DDC/CI no hay deslizador de brillo.
 
+![El panel de red](docs/panel-red.png)
+
+*(los nombres de las redes y la IP van pixelados en esta captura, no en el programa)*
+
 ![El centro de control](docs/centro-control.png)
 
 **Avisos en la isla**
@@ -149,6 +159,78 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
 - Clic para cambiar, rueda para ir al siguiente o al anterior y `+` para crear.
 - Opcionalmente, el carrusel enseña solo las apps del escritorio actual.
 
+**Monitores: cambiar la entrada de vídeo**
+- El módulo `monitores` habla con cada pantalla **por el cable** (DDC/CI, VCP `0x60`)
+  y le dice a qué conector ponerse: pasar el monitor a HDMI para jugar en la consola
+  y devolverlo a DisplayPort sin agacharte a buscar el botón de debajo.
+- Enseña el modelo de verdad de cada monitor —leído de su EDID, no el «Generic PnP
+  Monitor» de Windows—, si responde a DDC/CI, en qué entrada está, y un botón por
+  cada entrada **que el monitor anuncia**: si no las anuncia, no se inventa ninguna.
+- Puedes ponerle un mote a cada pantalla («PS5», «El grande»), guardado contra su
+  identidad del EDID y no contra `DISPLAY1`, que Windows reordena al reiniciar.
+- **No es una capturadora**: cambia el canal del monitor, no trae la imagen del HDMI
+  a una ventana. El icono solo sale si algún monitor de tu equipo gestiona su entrada.
+
+**Temas**
+- Nueve temas de serie —Profesional, Oficina, Videojuegos, Invierno, Cyberpunk,
+  Sakura, Samurái, Otoño y Sad— y un tema no es solo una paleta: trae su **forma**
+  (cuánto se redondea cada pieza, o si va en chaflán), su **tipografía**, su halo y
+  sus decoraciones.
+- Editor de color por roles con selector HSV: el tema define ~130 colores con
+  nombre (`isla.fondo`, `panel.filo`, `icono.halo`…) y puedes cambiar los que
+  quieras sin tocar el resto.
+- **Tus temas guardan la receta, no el resultado**: se apunta de qué tema partes y
+  qué le cambiaste, no los 130 colores ya resueltos. Así, si el tema de partida
+  mejora, el tuyo mejora con él — y el fichero se lee, son treinta líneas que dicen
+  qué decidiste en vez de ciento treinta que no dicen nada.
+- Se exportan e importan como ficheros sueltos.
+
+| Cyberpunk | Invierno |
+|---|---|
+| ![Tema Cyberpunk](docs/tema-cyberpunk.png) | ![Tema Invierno](docs/tema-invierno.png) |
+
+**El dock y los paneles laterales**
+- **Dock**: una fila de iconos flotando sobre el escritorio con las apps fijadas y
+  las abiertas. Es independiente de la barra: puedes tener las dos cosas, o solo una.
+
+  ![El dock](docs/dock.png)
+
+- **Paneles laterales**: el izquierdo trae tu perfil, las acciones rápidas, volumen,
+  brillo, carpetas y el estado de la máquina; el derecho, las notificaciones, el
+  calendario y el escritorio actual.
+- Los dos se abren igual: siempre, nunca, o **al acercar el ratón** al filo de la
+  pantalla. El mismo gesto de borde para los dos, a propósito: dos vocabularios
+  para lo mismo serían dos cosas que aprender para un solo concepto.
+
+| Panel izquierdo | Panel derecho |
+|---|---|
+| ![Panel izquierdo](docs/panel-izquierdo.png) | ![Panel derecho](docs/panel-derecho.png) |
+
+**NubeHypr: organizar ventanas**
+- Un organizador de ventanas al estilo de los gestores de mosaico de Linux, dentro
+  de NubeBar. **Viene apagado**, y encendido tiene dos modos: *simulación* —calcula
+  y apunta en el registro lo que haría, sin mover nada— y *aplicar*.
+- Cuatro repartos: **flotante** (nadie se mueve), **horizontal** (columnas),
+  **vertical** (filas) y **principal** (una grande a un lado y el resto apiladas
+  al otro), con su separación y su margen configurables.
+- **Reglas** por proceso, clase, título o ruta de la ventana: a dónde va, en qué
+  escritorio, si se ignora. Con buscador, y una guía con ocho ejemplos de
+  aplicaciones reales que rellenan el formulario de un clic.
+- Respeta el área de trabajo: descuenta la barra si reserva espacio, y el dock.
+- Atajos propios, y un módulo (`nube`) que dice de un vistazo si está apagado,
+  simulando o aplicando.
+
+![NubeHypr](docs/nubehypr.png)
+
+**El fondo del escritorio**
+- NubeBar puede poner el fondo: color sólido, degradado o imagen, **y distinto por
+  monitor**. Con imagen, elige cómo encaja (rellenar recorta; ajustar deja la imagen
+  entera; ninguno de los dos la deforma).
+
+**Perfiles**
+- Guarda configuraciones enteras y cambia entre ellas: una para trabajar, otra para
+  jugar, otra para cuando conectas el proyector.
+
 **Si la matan, el shell vuelve igual**
 - Un proceso guardián (el mismo ejecutable con `--guardian`) vigila a NubeBar.
   Si la cierras desde el Administrador de tareas, o se cuelga, devuelve las dos
@@ -161,10 +243,32 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
 - Puede mandarle tu color de acento al propio wallpaper.
 
 **Ventana de ajustes**
-- Todo lo anterior se configura con ratón y con vista previa en vivo.
-- Temas listos, selector de color HSV, exportar e importar temas.
 
-![La ventana de ajustes](docs/ajustes.png)
+Todo lo anterior se configura con el ratón y con vista previa en vivo, en trece
+páginas:
+
+| Página | |
+|---|---|
+| **Apariencia** | el tema, la forma y cuánto se mueve todo |
+| **Colores** | los colores del tema y sus roles |
+| **Fondo** | el fondo del escritorio, por tipo y por monitor |
+| **Wallpaper** | Wallpaper Engine y su integración con la escena de inicio |
+| **Perfiles** | configura tu perfil actual |
+| **Módulos** | qué widgets hay en cada zona de la nube |
+| **Biblioteca** | añade, oculta o quita widgets |
+| **Apps** | el carrusel de aplicaciones y las fijadas |
+| **Escritorio** | el dock y los paneles laterales |
+| **Atajos** | las combinaciones de teclado |
+| **NubeHypr** | organizar ventanas: reglas, atajos y estado |
+| **Inicio** | el menú Inicio propio y su buscador |
+| **Sistema** | arranque, notificaciones y diagnóstico |
+
+Y está en **español e inglés**: con el sistema en español lo ves en español, y en
+cualquier otro idioma, en inglés.
+
+| Apariencia | Módulos |
+|---|---|
+| ![Ajustes: apariencia](docs/ajustes.png) | ![Ajustes: módulos](docs/ajustes-modulos.png) |
 
 ## Instalar
 
