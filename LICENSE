@@ -1,0 +1,116 @@
+LICENCIA DE NUBEBAR
+===================
+
+Copyright (c) 2026 P542-X. Todos los derechos reservados.
+
+NubeBar es gratis. No lo es «de código abierto»: el código está a la vista para
+que puedas leerlo y comprobar qué hace con tu equipo —que es lo mínimo que se le
+puede pedir a un programa que sustituye a tu barra de tareas— pero los derechos
+sobre él siguen siendo de su autor.
+
+
+LO QUE PUEDES HACER
+-------------------
+
+1. USARLO, gratis, en todos los equipos que quieras, en casa o en el trabajo,
+   sin pagar nada y sin pedir permiso.
+
+2. COPIARLO Y COMPARTIRLO tal y como viene, sin cobrar por ello. Si se lo pasas
+   a alguien, pásale también esta licencia.
+
+3. LEER EL CÓDIGO, estudiarlo y compilarlo para ti.
+
+
+LO QUE NO PUEDES HACER
+----------------------
+
+4. VENDERLO. Ni el programa, ni una copia suya, ni dentro de un producto, un
+   pack o un servicio de pago. Tampoco cobrar por instalarlo o distribuirlo.
+
+5. MODIFICARLO NI PUBLICAR VERSIONES CAMBIADAS. Puedes compilarlo y trastear con
+   él en tu máquina; lo que no puedes es distribuir el resultado, ni publicar
+   una versión modificada, ni una obra derivada, ni un «fork» con cambios.
+
+6. QUITARLE LA AUTORÍA. El nombre, los avisos de copyright y esta licencia
+   viajan con el programa.
+
+
+SIN GARANTÍA
+------------
+
+El programa se entrega TAL CUAL, sin garantía de ningún tipo. Su autor no
+responde de ningún daño, pérdida de datos ni problema derivado de usarlo.
+NubeBar esconde la barra de tareas de Windows mientras está en marcha: aunque
+trae un vigilante que te la devuelve si algo va mal, lo usas bajo tu
+responsabilidad.
+
+
+COMPONENTES DE TERCEROS
+-----------------------
+
+Esta licencia cubre el código de NubeBar. Lo que viene de fuera conserva la
+suya, que es más permisiva que esta, y esos componentes puedes seguir usándolos
+bajo sus propios términos:
+
+  ManagedShell                  Apache-2.0   github.com/cairoshell/ManagedShell
+  Microsoft.Data.Sqlite         MIT
+  Slions.VirtualDesktop         MIT          github.com/Slion/VirtualDesktop
+  System.Data.OleDb             MIT
+
+  Tipografías (carpeta Fuentes/), todas bajo SIL Open Font License 1.1, con su
+  licencia al lado en Fuentes/OFL-*.txt:
+      M PLUS Rounded 1c · Nunito · Orbitron · Rajdhani ·
+      Shippori Mincho · Zen Maru Gothic
+
+Las tipografías OFL no se pueden vender por separado, y su licencia tiene que
+acompañarlas siempre que se redistribuyan.
+
+
+Para cualquier otro uso —vender, modificar, redistribuir con cambios, incluirlo
+en otro producto— hace falta permiso por escrito del autor. Se pide abriendo una
+issue en github.com/P542-X/NubeBar.
+
+
+================================================================================
+ENGLISH TRANSLATION (for convenience; the Spanish text above is the one that
+governs)
+================================================================================
+
+NUBEBAR LICENCE
+
+Copyright (c) 2026 P542-X. All rights reserved.
+
+NubeBar is free of charge. It is not open source: the code is visible so you can
+read it and check what it does to your machine — the least you can ask of a
+program that replaces your taskbar — but its author keeps the rights to it.
+
+YOU MAY
+  1. USE it, free of charge, on as many machines as you like, at home or at
+     work, without paying and without asking.
+  2. COPY AND SHARE it as it comes, at no charge. If you pass it on, pass this
+     licence on with it.
+  3. READ the source, study it, and build it for yourself.
+
+YOU MAY NOT
+  4. SELL it: not the program, not a copy of it, not inside a paid product,
+     bundle or service. No charging for installing or distributing it either.
+  5. MODIFY IT OR PUBLISH CHANGED VERSIONS. You may build it and tinker with it
+     on your own machine; what you may not do is distribute the result, publish
+     a modified version, a derivative work, or a changed fork.
+  6. REMOVE THE ATTRIBUTION. The name, the copyright notices and this licence
+     travel with the program.
+
+NO WARRANTY
+  The program is provided AS IS, without warranty of any kind. The author is not
+  liable for any damage, data loss or trouble arising from its use. NubeBar
+  hides the Windows taskbar while it runs: although it ships a watchdog that
+  gives it back if something goes wrong, you use it at your own risk.
+
+THIRD-PARTY COMPONENTS
+  This licence covers NubeBar's own code. Third-party components keep their own
+  licences (listed above), which are more permissive than this one, and you may
+  keep using those components under their own terms.
+
+For any other use — selling, modifying, redistributing with changes, including
+it in another product — written permission from the author is required. Ask by
+opening an issue at github.com/P542-X/NubeBar.

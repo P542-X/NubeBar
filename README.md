@@ -185,6 +185,38 @@ En los dos casos, la primera vez se crea `%APPDATA%\NubeBar\config.json` con los
 valores por defecto, y el instalador no lo toca ni al actualizar ni al
 desinstalar.
 
+### Windows va a avisarte, y conviene saber por qué
+
+La primera vez saldrá una pantalla azul a pantalla completa:
+
+> **Windows protegió su PC**
+> Microsoft Defender SmartScreen impidió el inicio de una aplicación no reconocida.
+
+No es un virus ni un error: es que el instalador **no lleva firma digital**. Una
+firma es un certificado que hay que comprarle a una autoridad cada año, y este
+proyecto no tiene ninguna. Sin ella, Windows no sabe quién hizo el programa, y a
+todo lo que no reconoce le pone ese cartel — le pasa a cualquier programa
+pequeño el día que sale.
+
+Para continuar: **Más información** → **Ejecutar de todas formas**. El botón de
+«Más información» es el que hace aparecer el de ejecutar; si no lo pulsas, solo
+verás «No ejecutar».
+
+Y ya que estás confiando en un programa que **esconde tu barra de tareas**, lo
+honesto es decirte cómo comprobarlo tú en vez de pedirte que te fíes:
+
+- El código está entero en este repositorio. Ningún binario se sube a mano: el
+  `NubeBar.exe` y el `NubeBar-Setup.exe` de cada Release los compila
+  [el workflow de GitHub](.github/workflows/release.yml) a partir de la etiqueta,
+  en una máquina limpia, y se puede ver el registro de cada compilación.
+- Puedes compilarlo tú (ver [Compilar](#compilar)) y usar tu propio ejecutable.
+- NubeBar no se instala como administrador, no toca el registro de Windows más
+  allá de su propia desinstalación, y lo único que escribe fuera de su carpeta
+  es `%APPDATA%\NubeBar`.
+- Si algo va mal y te quedas sin barra, lee
+  [Si te quedas sin barra de tareas](#si-te-quedas-sin-barra-de-tareas): hay un
+  vigilante que te la devuelve, y una forma de recuperarla a mano.
+
 Para que arranque con Windows (o para que deje de hacerlo):
 **Ajustes → Sistema → Arrancar con Windows**.
 
@@ -411,4 +443,38 @@ notificaciones.
 
 ## Licencia
 
-Sin licencia por ahora. Todos los derechos reservados.
+**NubeBar es gratis, pero no es de código abierto.** El texto completo está en
+[LICENSE](LICENSE); en corto:
+
+| | |
+|---|---|
+| ✅ Usarlo gratis | en los equipos que quieras, en casa o en el trabajo |
+| ✅ Copiarlo y compartirlo | tal cual viene, sin cobrar |
+| ✅ Leer el código y compilarlo | para ti |
+| ❌ Venderlo | ni suelto, ni dentro de un pack o un servicio de pago |
+| ❌ Publicar versiones modificadas | puedes trastear en tu máquina; distribuir el resultado, no |
+| ❌ Quitarle la autoría | el nombre y los avisos viajan con el programa |
+
+El código está a la vista por un motivo concreto, y es el de la sección de
+arriba: un programa que sustituye a tu barra de tareas tiene que poder
+auditarse. Que se pueda leer no significa que se pueda revender ni republicar
+con cambios.
+
+Para cualquier otro uso, pídelo abriendo una issue.
+
+### Lo que viene de fuera
+
+Esa licencia cubre el código de NubeBar. Los componentes de terceros conservan
+la suya, más permisiva, y puedes seguir usándolos por tu cuenta bajo sus propios
+términos:
+
+| Componente | Licencia |
+|---|---|
+| [ManagedShell](https://github.com/cairoshell/ManagedShell) | Apache-2.0 |
+| Microsoft.Data.Sqlite | MIT |
+| [Slions.VirtualDesktop](https://github.com/Slion/VirtualDesktop) | MIT |
+| System.Data.OleDb | MIT |
+| M PLUS Rounded 1c · Nunito · Orbitron · Rajdhani · Shippori Mincho · Zen Maru Gothic | SIL Open Font License 1.1 |
+
+Las tipografías viajan con su licencia al lado, en `Fuentes/OFL-*.txt`, que es
+lo que la OFL pide.
