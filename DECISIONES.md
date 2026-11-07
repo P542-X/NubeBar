@@ -4215,3 +4215,84 @@ cambiando de columna en cuanto algo se mueve. Ahora el ancho se redondea arriba 
 entero y la fila de módulos lleva `UseLayoutRounding`.
 
 Los iconos de 18 px se movían exactamente igual. Nadie lo notó nunca.
+
+
+## Lo que se sale de un contenedor que recorta no se ve «un poco peor»
+
+Dos fallos de esta tanda son el mismo fallo, y merecen quedar juntos porque la forma de
+verlos venir es idéntica.
+
+**El círculo del deslizador**, al 100 %, se cortaba por la mitad. Estaba en `w * k - 7`:
+centrado sobre el punto del porcentaje. Suena bien y es lo que uno escribe a la primera,
+pero con `k = 1` el centro cae en el filo de la barra y la mitad del círculo queda fuera.
+
+**Las filas de redes wifi** salían redondeadas por la derecha y cuadradas por la izquierda.
+La fila llevaba `Margin = -6,0,0,0` para que el fondo del ratón llegara al filo de la
+tarjeta, y eso la sacaba 6 px por fuera del `ScrollViewer`, que recorta.
+
+En los dos casos el código decía algo razonable y el contenedor lo recortaba en silencio.
+No hay excepción, no hay nada en el log, no hay un píxel mal pintado que se vea en una
+revisión: hay una forma que aparece **incompleta**, y el ojo lo lee como «está mal
+dibujado» y no como «se sale».
+
+Y las dos veces lo primero que se pierde son **las esquinas y los extremos**, porque es lo
+que está más lejos del centro. Por eso el síntoma que llega es siempre el mismo —«se corta
+por la mitad», «los bordes izquierdos no están redondeados»— y por eso la pregunta útil
+cuando llega no es «¿qué se dibuja mal?» sino **«¿qué se está saliendo de dónde?»**.
+
+### Y los dos tenían medio arreglo puesto
+
+Esto es lo que más vale de los dos casos juntos. El deslizador llevaba un
+`Math.Max(0, …)` sujetando el borde izquierdo: alguien ya se había encontrado el
+desbordamiento por un lado y lo había tapado **ahí**. El tope existía, funcionaba, y el otro
+extremo seguía suelto porque nunca se escribió la regla, solo el parche.
+
+Un tope en un lado no es medio problema resuelto: es la señal de que falta la regla. La
+regla, cuando se escribe, resuelve los dos lados y además los casos que nadie probó —un
+porcentaje fuera de rango, una barra más estrecha que el propio círculo— y se puede exigir
+en una prueba, que es lo que se ha hecho: 123 comprobaciones recorriendo cinco anchos de
+barra en pasos del 5 %.
+
+## Una lista de invitados convierte cada cosa nueva en una excepción callada
+
+El clic fuera cerraba cuatro paneles:
+
+```
+static readonly HashSet<string> SeCierranConClicFuera = new()
+    { PanelRed, PanelBandeja, PanelBateria, PanelNotas };
+```
+
+Los otros seis se quedaban abiertos hasta volver a pulsar su icono. Y no porque alguien lo
+decidiera: porque nacieron después de la lista y nadie los dio de alta.
+
+Ese es el fallo de las listas de altas, y no es un descuido que se arregle añadiendo lo que
+falta — es la **forma** de la lista. Cada panel nuevo nace fuera de la regla por omisión, y
+el día que se note llevará meses comportándose distinto que sus vecinos. Desde fuera eso no
+se lee como «al panel X le falta una línea»: se lee como «esta barra unas veces se cierra y
+otras no», que es mucho peor que cualquiera de las dos conductas por separado.
+
+Dada la vuelta —cierran todos, y hay una lista de EXCEPCIONES— el defecto pasa a ser la
+regla, y lo que hay que justificar es salirse. Hoy la lista tiene una entrada, el menú
+Inicio, y la justificación cabe en una línea: ya tiene su propio vigilante con las mismas
+reglas, atenderlo dos veces sería cerrarlo dos veces.
+
+## Las partículas: el motor se queda, los temas de serie no
+
+Siete de los nueve temas soltaban cosas cayendo por el menú Inicio. «Es como si llovieran
+cosas; eso quítalo, es feísimo. Solo deja la animación como en el tema profesional pero
+adaptado a cada tema con su color.»
+
+Quitarlas es quitar siete líneas de `temas-de-serie.json`, y lo que queda en los siete es
+exactamente lo que tiene Profesional: `halo` y `destello-filo`, que ya se pintan con el
+acento de cada tema. No hubo que inventar nada «adaptado a cada tema» — ya lo estaba.
+
+Lo que **no** se ha borrado es el motor. `Particulas.Para` sigue ahí y el argumento
+`particulas:` se sigue leyendo, así que un tema del usuario puede ponerlas. Borrar el
+código habría sido confundir dos cosas: que una decoración no guste de serie no la
+convierte en una capacidad que nadie pueda querer. El coste de dejarlo es un fichero que ya
+estaba escrito y probado; el de borrarlo, no poder volver atrás sin rehacerlo.
+
+Y la prueba se escribió sobre los **nueve** temas, no sobre los siete que las llevaban. Un
+tema futuro que añada `particulas:` se cae por la prueba en vez de descubrirse en una
+captura seis meses después. Arreglar los siete casos es un arreglo; exigirlo de todos es
+una regla.

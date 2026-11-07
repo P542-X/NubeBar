@@ -185,7 +185,10 @@ public partial class MainWindow : Window
             MaxHeight = AltoListaWifi(),
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            Content = _redLista
+            Content = _redLista,
+            // Los 6 px que antes llevaba cada fila. Aquí el que se corre es el contenedor,
+            // así que las filas empiezan en su filo y conservan sus esquinas (ver FilaWifi).
+            Margin = new Thickness(-SangradoDeLaLista, 0, 0, 0),
         };
         // La rueda se atiende a mano. El ScrollViewer ya lo haría solo, pero cada fila
         // es un Button dentro de un panel que la isla también vigila, y bastaba con que
@@ -655,7 +658,24 @@ public partial class MainWindow : Window
         // «el fondo del hover ya avisa de que estás encima».
         var fila = Boton(g, tip, () => PulsarWifi(w), levantar: false);
         fila.Height = AltoFilaWifi;
-        fila.Margin = new Thickness(-6, 0, 0, 0);
+        // ---------- Y el desplazamiento de 6 px NO va aquí ----------
+        //
+        // Estaba puesto en la fila (`Margin = -6,0,0,0`) para que el fondo del ratón
+        // llegara al filo de la tarjeta en vez de empezar sangrado. Hacía su trabajo, y de
+        // paso uno que no se pretendía: sacaba la fila 6 px por fuera del `ScrollViewer`
+        // de la lista, que RECORTA. Lo que se quedaba fuera del recorte eran justo las
+        // esquinas redondeadas del lado izquierdo del fondo —radio 8, ver la plantilla de
+        // `Boton`—, así que la fila salía redondeada por la derecha y cuadrada por la
+        // izquierda. El usuario lo vio: «en la selección de redes wifi los bordes derechos
+        // están redondeados pero los izquierdos no».
+        //
+        // El desplazamiento se mueve a la LISTA entera (ver `_redScroll`): el conjunto se
+        // corre los mismos 6 px, cada fila empieza exactamente en el filo de su viewport y
+        // ya no hay nada que recortar. Se ve igual que antes y con las cuatro esquinas.
+        //
+        // La regla, por si vuelve a aparecer: lo que asoma por fuera de un contenedor que
+        // recorta no se dibuja «un poco peor», se dibuja CORTADO — y lo primero que se
+        // pierde de una caja redondeada son sus esquinas.
         // Estirada, y con su contenido estirado también: `Boton` centra lo que le pones, y
         // era por eso por lo que la fila necesitaba un ancho a mano. Con las dos cosas
         // estiradas, la rejilla recibe el ancho que haya y cada columna cae donde debe.
@@ -667,6 +687,10 @@ public partial class MainWindow : Window
     }
 
     const string FilaWifiTag = "filawifi";
+
+    // Lo que la lista de redes se corre hacia la izquierda para que el fondo del ratón
+    // llegue al filo de la tarjeta. Vivía en cada fila y recortaba sus esquinas.
+    const double SangradoDeLaLista = 6;
 
     // ---------- Lo que mide una fila de wifi ----------
     //

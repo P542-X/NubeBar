@@ -6,6 +6,63 @@ construidos por el workflow de Release a partir de la etiqueta.
 
 ---
 
+## v1.0.9
+
+### Cambiado
+
+- **Ya no llueve nada en el menú Inicio.** Siete de los nueve temas de serie soltaban
+  partículas cayendo por dentro del menú: pétalos en Sakura, pétalos rojos en Samurái,
+  copos en Invierno, hojas de arce en Otoño, lluvia en Sad, lluvia de neón en Cyberpunk y
+  píxeles subiendo en Videojuegos. Fuera los siete. Los temas se quedan con la misma
+  animación que Profesional —el halo y el destello del filo, que ya se pintan con el color
+  de cada uno— más lo suyo que no cae: la mascota, la marca de agua del Samurái, el glitch
+  del reloj y las líneas de barrido de Cyberpunk.
+
+  El motor sigue estando: si quieres partículas en un tema **tuyo**, el argumento
+  `particulas:` se sigue leyendo. Lo que no las lleva es ninguno de los de serie.
+
+- **Un clic fuera cierra cualquier panel, no cuatro.** Esto era una lista de altas —red,
+  bandeja, batería, notificaciones— y los otros seis se quedaban abiertos hasta volver a
+  pulsar su icono. El problema de una lista así es que cada panel nuevo nace fuera sin que
+  nadie lo decida, y desde fuera no se ven cuatro paneles con una regla y seis sin ella: se
+  ve una barra que unas veces se cierra y otras no.
+
+  Ahora cierran todos, y la excepción es una sola: el menú Inicio, que ya tiene su propio
+  vigilante con las mismas reglas. Y al cerrarse así, la isla se recoge si el ratón sigue
+  fuera — antes se quedaba desplegada hasta que volvías a pasar por encima y salir.
+
+### Arreglado
+
+- **El círculo de los deslizadores se cortaba por la mitad al 100 %.** El brillo, el
+  volumen, el mezclador por aplicación y los deslizadores de los paneles laterales: todos
+  salen del mismo componente. El círculo mide 14 px y se colocaba centrado sobre el punto
+  del porcentaje, así que al 100 % su centro caía en el filo de la barra y la mitad derecha
+  quedaba fuera, donde la recortan. El extremo izquierdo no fallaba porque tenía un tope
+  puesto a mano — un lado sujeto y el otro suelto.
+
+  Ahora lo que el círculo recorre no es la barra entera sino la barra menos su propio
+  diámetro, que es como funciona cualquier deslizador: al 0 % empieza en el filo, al 100 %
+  termina en el filo, y al 50 % su centro sigue cayendo en la mitad exacta.
+
+- **Las filas de redes wifi salían redondeadas por la derecha y cuadradas por la izquierda.**
+  La fila llevaba un margen de −6 px para que el fondo del ratón llegara al filo de la
+  tarjeta, y eso la sacaba por fuera del `ScrollViewer` de la lista, que recorta. Lo primero
+  que se pierde de una caja redondeada al recortarla son sus esquinas. El desplazamiento se
+  ha movido a la lista entera: se ve en el mismo sitio y con las cuatro esquinas.
+
+- **Los separadores ya casi no tiemblan.** Medido con capturas cada segundo sobre la
+  pantalla vertical, las rayas se movían en 5 de cada 14 muestras; ahora, en 1. El ancho de
+  la isla sube a múltiplos de cuatro, así que un respiro de uno, dos o tres píxeles cae en
+  el mismo escalón y la isla ni se entera — y de paso el centrado deja de caer a medio
+  píxel, que era lo que además las desdibujaba.
+
+  **No está cerrado del todo.** Lo que queda no es la isla: son dos módulos que respiran un
+  píxel por su cuenta —`fijadas` y el grupo `batería · control · monitores`— y como la zona
+  central va centrada, esos 2 px se reparten uno a cada lado. Se arreglará donde está, en
+  el módulo.
+
+---
+
 ## v1.0.8
 
 ### Cambiado

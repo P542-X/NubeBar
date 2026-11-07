@@ -865,7 +865,7 @@ public partial class MainWindow : Window
         Contenido.InvalidateMeasure();
         double maximo = ActualWidth > 0 ? ActualWidth : _monitor.Ancho / _monitor.Escala;
 
-        // ---------- Y se redondea ARRIBA, a píxel entero ----------
+        // ---------- Y se redondea ARRIBA, a la rejilla ----------
         //
         // Medir texto da decimales, y la isla va centrada: un ancho de 580,4 pone todo lo
         // de dentro a medio píxel, y una raya de 1 px —los separadores— se reparte entre
@@ -877,7 +877,38 @@ public partial class MainWindow : Window
         // Arriba y no al más cercano: redondear hacia abajo recortaría el último píxel de
         // lo que acabamos de medir, y de eso ya hay media docena de párrafos en este
         // fichero.
-        return Math.Ceiling(Math.Clamp(ancho, Isla.MinWidth, Math.Max(Isla.MinWidth, maximo)));
+        //
+        // ---------- Y a múltiplos de cuatro, que es lo que para el temblor ----------
+        //
+        // Redondear a píxel entero quitaba la BORROSIDAD, pero no el movimiento, y lo que
+        // el usuario veía era movimiento: «los separadores de la pantalla vertical se
+        // mueven, es como si temblasen». Medido con capturas cada segundo, las cuatro
+        // rayas de su isla vertical:
+        //
+        //     1- 9:  391   530   627   794
+        //    10-12:  390   530   627   795      la isla ha crecido 2 px
+        //    13:     390   530   628   796
+        //    14:     391   530   627   794      y vuelve
+        //
+        // La del centro quieta y las de los extremos separándose en direcciones opuestas
+        // es la firma de una isla CENTRADA cambiando de ancho: cada píxel de ancho reparte
+        // medio a cada lado. Y el listón de `HayQueReajustarElAncho` no lo frena, porque
+        // frena los encogimientos pequeños y esto es crecer — y crecer se hace siempre,
+        // que para eso lo medido es lo que el contenido necesita.
+        //
+        // Así que el ancho no puede TENER valores intermedios. Subiendo a múltiplos de
+        // cuatro, un respiro de uno, dos o tres píxeles cae en el mismo escalón y la isla
+        // ni se entera: no hay animación, no hay recolocación, no hay temblor. Cuando el
+        // contenido crece de verdad —una app más— el salto llega igual, cuatro píxeles
+        // tarde como mucho. Tres píxeles de más en una isla no los ve nadie; tres rayas
+        // de un píxel moviéndose cada pocos segundos, sí.
+        //
+        // De regalo, el centrado deja de caer a medio píxel: con un ancho par y la ventana
+        // par —el ancho del monitor—, el filo izquierdo es `(ventana - isla) / 2`, y eso
+        // es entero. Que una raya de 1 px a medio píxel se reparta entre dos columnas era
+        // el otro medio problema.
+        double tope = Math.Max(Isla.MinWidth, maximo);
+        return Math.Min(tope, ARejilla(Math.Clamp(ancho, Isla.MinWidth, tope)));
     }
 
     // El ancho real queda siempre fijado al valor final y la animación solo dibuja el
@@ -935,6 +966,14 @@ public partial class MainWindow : Window
         if (!HayQueReajustarElAncho(Isla.ActualWidth, hasta)) return;
         AnimarAncho(hasta, 280, Suave);
     }
+
+    // El escalón del ancho de la isla. Cuatro y no dos: con dos, un respiro de dos
+    // píxeles —el que se midió— seguiría saltando. Y no más alto porque el escalón es
+    // también lo que se tarda en reaccionar a un icono nuevo.
+    internal const double RejillaDelAncho = 4;
+
+    internal static double ARejilla(double ancho) =>
+        Math.Ceiling(ancho / RejillaDelAncho) * RejillaDelAncho;
 
     // ---------- Crecer siempre; encoger, solo si merece la pena ----------
     //

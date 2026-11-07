@@ -1062,6 +1062,29 @@ public partial class MainWindow
         public GestoDeslizador? Gesto;      // para poder comprobar que no queda nada agarrado
     }
 
+    // ---------- Dónde se pone el círculo del deslizador ----------
+    //
+    // Esto era `w * k - 7`: el círculo centrado sobre el punto del porcentaje. Suena bien
+    // y es lo que uno escribe a la primera, pero al 100 % pone su CENTRO en el filo de la
+    // barra, así que la mitad derecha del círculo cae fuera y lo que haya alrededor la
+    // recorta. El usuario lo describió exactamente: «cuando está al 100 % es como si se
+    // cortara por la mitad, como si el círculo no estuviera por encima de la barra».
+    //
+    // Al 0 % no se veía porque había un `Math.Max(0, …)` sujetando el borde izquierdo —o
+    // sea que ese extremo ya estaba arreglado a mano, y sin la regla general el otro
+    // quedaba suelto. Un tope en un lado es media solución, siempre.
+    //
+    // La regla, que es la de cualquier deslizador de verdad: lo que recorre el círculo no
+    // es la barra entera, es la barra MENOS su propio diámetro. Así su centro va de `r` a
+    // `w - r`, nunca se sale por ninguno de los dos lados, y en la mitad del recorrido
+    // cae justo en la mitad de la barra —que es lo único que el ojo comprueba—.
+    //
+    //     k=0,0  ->  izquierda 0        el círculo empieza en el filo
+    //     k=0,5  ->  centro w/2         (r + (w-2r)/2 = w/2, exacto)
+    //     k=1,0  ->  derecha w          el círculo termina en el filo
+    internal static double IzquierdaDelAgarre(double ancho, double diametro, double k) =>
+        Math.Max(0, ancho - diametro) * Math.Clamp(k, 0, 1);
+
     // `nombre` es para el lector de pantalla, y es un parámetro y no un texto deducido
     // porque solo quien lo crea sabe de qué deslizador se trata: el volumen general, el
     // brillo de una pantalla concreta, el de una aplicación del mezclador.
@@ -1118,7 +1141,7 @@ public partial class MainWindow
             if (w <= 1) return;
             double k = (v - min) / Math.Max(0.0001, max - min);
             lleno.Width = Math.Max(0, w * k);
-            agarre.Margin = new Thickness(Math.Max(0, w * k - 7), 0, 0, 0);
+            agarre.Margin = new Thickness(IzquierdaDelAgarre(w, agarre.Width, k), 0, 0, 0);
         }
         capa.SizeChanged += (_, _) => Pintar();
         mando.Poner = nv => { v = Math.Clamp(nv, min, max); Pintar(); };

@@ -1,4 +1,4 @@
-{
+﻿{
   "origen": "Copia literal del objeto \"temas\" de docs/maqueta-rediseno/temas.json (la maqueta aprobada el 28/10/2026). Este fichero SI se compila: es el recurso del que salen los 9 temas de serie. El de docs/ es referencia y no se publica.",
   "correcciones": [
     "sakura.sobre-acento: #FFFFFF -> #4A3B5C (su propia tinta ciruela). El blanco de la maqueta sobre el acento sakura #FF8FB8 da 2,13:1, por debajo incluso del 3:1 que se exige a la etiqueta de un control relleno; la tinta ciruela da 4,77:1 y ya estaba en la paleta del tema. Es la UNICA desviacion respecto a docs/maqueta-rediseno/temas.json. Decidido el 28/10/2026."
@@ -117,7 +117,6 @@
         "halo",
         "destello-filo",
         "modo-rgb",
-        "particulas:pixel-sube",
         "mascota:auriculares"
       ]
     },
@@ -158,7 +157,6 @@
       "decoraciones": [
         "halo",
         "destello-filo",
-        "particulas:copo",
         "mascota:gorro"
       ]
     },
@@ -201,7 +199,6 @@
         "destello-filo",
         "reloj-glitch",
         "lineas-de-barrido",
-        "particulas:lluvia-neon",
         "mascota:visor"
       ]
     },
@@ -243,7 +240,6 @@
         "halo",
         "destello-filo",
         "destellos-reloj",
-        "particulas:petalo",
         "mascota:coloretes"
       ]
     },
@@ -284,7 +280,6 @@
       "decoraciones": [
         "halo",
         "destello-filo",
-        "particulas:petalo-rojo",
         "mascota:hachimaki",
         "marca-de-agua:侍"
       ]
@@ -326,7 +321,6 @@
       "decoraciones": [
         "halo",
         "destello-filo",
-        "particulas:hoja-de-arce",
         "mascota:bufanda"
       ]
     },
@@ -367,7 +361,6 @@
       "decoraciones": [
         "halo",
         "destello-filo",
-        "particulas:lluvia",
         "mascota:triste-con-lagrima"
       ],
       "textos": {

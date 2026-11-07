@@ -124,7 +124,6 @@ public static partial class Pruebas
         Igual(Esquinas.Chaflan, juegos.Esquinas, "Videojuegos va en chaflán");
         Igual(0.0, juegos.Radio(Piezas.Isla, 99), "y con radio 0");
         Vale(juegos.Lleva("modo-rgb"), "Videojuegos lleva el modo RGB");
-        Igual("pixel-sube", juegos.Argumento("particulas"), "y sus partículas son píxeles que suben");
         Igual("Rajdhani", juegos.Fuente, "con la letra Rajdhani");
 
         var cyber = TemasDeSerie.De("cyberpunk");
@@ -138,7 +137,26 @@ public static partial class Pruebas
 
         var sad = TemasDeSerie.De("sad");
         Vale(sad.Texto("saludo")?.EndsWith("…") == true, "Sad: el saludo acaba en puntos suspensivos");
-        Igual("lluvia", sad.Argumento("particulas"), "y le llueve");
+
+        // ---------- Y a NINGUNO le llueve ----------
+        //
+        // Siete de los nueve temas tenían partículas cayendo por el menú Inicio: pétalos,
+        // copos, hojas de arce, lluvia, lluvia de neón, píxeles subiendo. Las quitó el
+        // usuario de un plumazo: «hay veces que dependiendo del tema es como si llovieran
+        // cosas; eso quítalo, es feísimo. Solo deja la animación como en el tema
+        // profesional pero adaptado a cada tema con su color».
+        //
+        // Esto se comprueba sobre TODOS los temas y no sobre los siete que las llevaban,
+        // que es la diferencia entre arreglar un caso y fijar una regla: un tema nuevo con
+        // `particulas:` nace cayéndose por esta prueba y no por una captura que alguien
+        // mire seis meses después.
+        //
+        // El motor sigue en su sitio (`Particulas.Para`) y el argumento sigue leyéndose:
+        // un tema TUYO puede ponerlas si las quieres. Lo que no las lleva es ninguno de
+        // los que vienen de serie.
+        foreach (var (id, t) in TemasDeSerie.Todos)
+            Vale(string.IsNullOrEmpty(t.Argumento("particulas")),
+                 $"«{id}» no tiene nada cayendo por el menú Inicio");
 
         // ---------- La única desviación respecto a la maqueta ----------
         //

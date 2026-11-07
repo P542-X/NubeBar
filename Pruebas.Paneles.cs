@@ -35,6 +35,60 @@ public static partial class Pruebas
         ElHaloDelPanelLateralNoVaEnLoRecortado();
         LaReservaNoDependeDelModo();
         LaIslaCreceEnseguidaYEncogeConCalma();
+        ElCirculoDelDeslizadorNoSeSale();
+    }
+
+    // ================= El círculo del deslizador =================
+    //
+    // ---------- De dónde sale esto ----------
+    //
+    // «En la barra donde se puede cambiar el brillo y el sonido, el circulito que
+    // representa la posición del porcentaje, cuando está completo al cien por cien, es
+    // como si se cortara por la mitad.»
+    //
+    // Estaba puesto en `w * k - 7`, o sea centrado sobre el punto del porcentaje. Al 100 %
+    // eso deja su centro en el filo de la barra y la mitad del círculo fuera, donde la
+    // recortan. El extremo izquierdo no fallaba porque tenía un `Math.Max(0, …)` sujetando
+    // el borde — un tope a mano en un lado y nada en el otro.
+    //
+    // Lo que se fija aquí es que el círculo QUEPA SIEMPRE, en los dos extremos y con
+    // cualquier ancho de barra, y que a media barra siga cayendo en el medio: si se
+    // corrigiera el desbordamiento empujando el recorrido sin más, el 50 % dejaría de
+    // coincidir con la mitad y eso se ve a simple vista.
+    static void ElCirculoDelDeslizadorNoSeSale()
+    {
+        Grupo("el círculo del deslizador");
+
+        const double d = 14;     // el diámetro del agarre
+
+        foreach (double w in new[] { 60.0, 120.0, 180.0, 240.0, 317.0 })
+        {
+            double izq0 = MainWindow.IzquierdaDelAgarre(w, d, 0);
+            double izq1 = MainWindow.IzquierdaDelAgarre(w, d, 1);
+
+            Igual(0.0, izq0, $"barra de {w:0}: al 0 % el círculo arranca en el filo");
+            Igual(w, izq1 + d, $"barra de {w:0}: al 100 % el círculo TERMINA en el filo");
+
+            // Y el medio sigue siendo el medio: centro = izquierda + radio
+            double centroMedio = MainWindow.IzquierdaDelAgarre(w, d, 0.5) + d / 2;
+            Igual(w / 2, centroMedio, $"barra de {w:0}: al 50 % el centro cae en la mitad");
+
+            // Lo que no puede pasar nunca, en todo el recorrido
+            for (double k = 0; k <= 1.0001; k += 0.05)
+            {
+                double izq = MainWindow.IzquierdaDelAgarre(w, d, k);
+                Vale(izq >= 0 && izq + d <= w + 0.001,
+                     $"barra de {w:0} al {k * 100:0} %: el círculo cabe entero");
+            }
+        }
+
+        // Un valor fuera de rango no puede sacarlo de la barra (el gesto lo acota, pero
+        // esta función no puede depender de que alguien se acuerde)
+        Igual(0.0, MainWindow.IzquierdaDelAgarre(120, d, -3), "un porcentaje negativo se queda en el filo");
+        Igual(106.0, MainWindow.IzquierdaDelAgarre(120, d, 9), "y uno pasado, en el otro filo");
+
+        // Una barra más estrecha que el propio círculo no puede dar un margen negativo
+        Igual(0.0, MainWindow.IzquierdaDelAgarre(10, d, 1), "barra más estrecha que el círculo: sin margen negativo");
     }
 
     // ================= El baile de los separadores =================
@@ -56,6 +110,36 @@ public static partial class Pruebas
     static void LaIslaCreceEnseguidaYEncogeConCalma()
     {
         Grupo("el ancho de la isla: crecer y encoger");
+
+        // ---------- El escalón: lo que de verdad paró el temblor ----------
+        //
+        // El listón de arriba frena los encogimientos pequeños, pero CRECER se hace
+        // siempre —lo medido es lo que el contenido necesita— así que un respiro de dos
+        // píxeles seguía moviendo la isla entera. Medido en la pantalla vertical del
+        // usuario, con capturas cada segundo, las rayas iban 391 → 390 → 391.
+        //
+        // Con el ancho subido a múltiplos de cuatro, uno, dos y tres píxeles de respiro
+        // caen en el mismo escalón y no pasa nada. Eso es lo que se exige aquí.
+        Igual(584.0, MainWindow.ARejilla(581), "581 sube al escalón de 584");
+        Igual(584.0, MainWindow.ARejilla(582), "582 también");
+        Igual(584.0, MainWindow.ARejilla(583), "y 583");
+        Igual(584.0, MainWindow.ARejilla(584), "584 ya está en el escalón y no se mueve");
+        Igual(588.0, MainWindow.ARejilla(584.1), "y una décima más ya salta al siguiente");
+
+        // Nunca hacia abajo: recortar el contenido es el error caro
+        for (double w = 100; w < 400; w += 0.5)
+            Vale(MainWindow.ARejilla(w) >= w, $"{w:0.#} no se recorta al subir a la rejilla");
+
+        // Y el escalón es par, que es lo que mantiene el centrado en píxel entero:
+        // la isla va centrada, y (ventana - isla) / 2 con los dos pares da un entero.
+        Vale(MainWindow.RejillaDelAncho % 2 == 0, "el escalón es par: el centrado no cae a medio píxel");
+        foreach (double ventana in new[] { 1080.0, 1920.0, 2560.0, 3440.0 })
+            for (double w = 200; w < 900; w += 7)
+            {
+                double isla = MainWindow.ARejilla(w);
+                Vale((ventana - isla) / 2 % 1 == 0,
+                     $"isla de {isla:0} centrada en {ventana:0}: filo en píxel entero");
+            }
 
         // Crecer: siempre, hasta por poco. Lo medido es lo que el contenido necesita.
         Vale(MainWindow.HayQueReajustarElAncho(580, 581), "un píxel más de contenido: se crece");

@@ -864,18 +864,32 @@ public partial class MainWindow
     }
 
     // ---------- Clic fuera ----------
-    // Los paneles que se abren desde un icono (red, centro de control, bandeja) se
-    // cierran con un clic fuera de la isla, como los menús de Windows. Antes solo lo
-    // hacía el menú Inicio y estos se quedaban abiertos hasta volver a pulsar el icono.
-    // Se mira igual que en el menú (VigilarClicFueraDelMenu): a pelo cada 150 ms, que
-    // funciona aunque el clic caiga en otra aplicación y no nos llegue.
-    static readonly HashSet<string> SeCierranConClicFuera = new()
-        { PanelRed, PanelBandeja, PanelBateria, PanelNotas };
+    // Un clic fuera de la isla cierra el panel que tengas abierto, sea cual sea, como los
+    // menús de Windows. Se mira igual que en el menú Inicio (VigilarClicFueraDelMenu): a
+    // pelo cada 150 ms, que funciona aunque el clic caiga en otra aplicación y no nos
+    // llegue.
+    //
+    // ---------- Era una lista de invitados, y ahora es la regla ----------
+    //
+    // Esto nació como un conjunto de cuatro paneles —red, bandeja, batería,
+    // notificaciones— y los demás se quedaban abiertos hasta volver a pulsar su icono. Ser
+    // una lista de altas tenía el fallo que tienen todas: cada panel nuevo nacía fuera sin
+    // que nadie lo decidiera, y el usuario no ve cuatro paneles con una regla y seis sin
+    // ella, ve una barra que unas veces se cierra y otras no. Lo pidió así: «si abro
+    // cualquier panel y doy un clic fuera de la nube, que ese panel se cierre y la nube
+    // vuelva a su estado».
+    //
+    // Dado la vuelta: cierran TODOS, y lo que hay es una lista de excepciones, que es corta
+    // y además se puede justificar entera. Hoy solo el menú Inicio, y no porque sea
+    // especial sino porque YA tiene su propio vigilante con las mismas reglas
+    // (`VigilarClicFueraDelMenu`, que además sabe de su buscador): atenderlo dos veces sería
+    // cerrarlo dos veces.
+    static readonly HashSet<string> NoSeCierranConClicFuera = new() { PanelInicio };
     bool _clicFueraContado;
 
     void VigilarClicFueraDelPanel()
     {
-        if (_panelAbierto == null || !SeCierranConClicFuera.Contains(_panelAbierto)) { _clicFueraContado = false; return; }
+        if (_panelAbierto == null || NoSeCierranConClicFuera.Contains(_panelAbierto)) { _clicFueraContado = false; return; }
 
         bool clic = Nativo.BotonIzquierdoPulsado() || Nativo.HuboClicIzquierdo();
         if (!clic) { _clicFueraContado = false; return; }
@@ -896,6 +910,13 @@ public partial class MainWindow
             if (bajo != IntPtr.Zero && bajo != _self && Nativo.EsNuestra(bajo)) return;
             Log.Info($"clic fuera del panel {_panelAbierto}: se cierra");
             CerrarPanel();
+            // «…y la nube vuelva a su estado». Cerrar el panel devuelve el ancho de la
+            // isla, pero si estaba DESPLEGADA se quedaba desplegada: el ratón ya no está
+            // encima —acabas de pulsar en otro sitio—, así que nadie iba a recogerla hasta
+            // que volvieras a pasar por encima y salir. Se recoge aquí, y solo si el ratón
+            // sigue fuera: si lo has movido encima de la isla entre el clic y esto, lo que
+            // toca es dejarla abierta.
+            if (_expandida && !Isla.IsMouseOver) Expandir(false);
         }
         catch { }
     }
