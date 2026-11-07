@@ -1,5 +1,7 @@
 ﻿# NubeBar
 
+*[Read this in English](README.en.md)*
+
 Una barra para Windows 11 con la forma y el genio de la Dynamic Island del iPhone:
 una nube negra que vive arriba del todo, se expande cuando le pasas el ratón por
 encima y despliega paneles desde dentro de sí misma. Sustituye a la barra de tareas
@@ -263,8 +265,10 @@ páginas:
 | **Inicio** | el menú Inicio propio y su buscador |
 | **Sistema** | arranque, notificaciones y diagnóstico |
 
-Y está en **español e inglés**: con el sistema en español lo ves en español, y en
-cualquier otro idioma, en inglés.
+Y está en **español e inglés**. La primera vez que lo abres te pregunta cuál
+quieres, y se puede cambiar luego en **Ajustes → Apariencia → Idioma**. Si cierras
+esa ventana sin elegir, manda lo que diga Windows: español con el sistema en
+español, inglés en cualquier otro caso.
 
 | Apariencia | Módulos |
 |---|---|
@@ -373,8 +377,9 @@ la isla se adapta sola. Las claves que no reconoce se conservan tal cual.
 | `Tema.EnviarColorAlWallpaper` | `false` | Manda tu acento a Wallpaper Engine como `schemecolor` |
 | `Tema.BordeAcento` | `true` | Filo de 1 px y halo suave del color de acento |
 
-En una instalación nueva el tema que entra es **Nube** (coral, naranja y azul nube
-sobre azul profundo). Si ya tienes `config.json`, tu tema no se toca.
+En una instalación nueva entra el tema **Profesional** (azul sobre azul profundo).
+Si ya tienes `config.json`, tu tema no se toca. Los nueve temas de serie están en
+**Ajustes → Apariencia**.
 
 #### Roles de color
 
@@ -404,7 +409,7 @@ solo cuando hace de letra.
 | Clave | Por defecto | Qué hace |
 |---|---|---|
 | `Animaciones.Nivel` | `"auto"` | `"auto"` (sigue a Windows), `"completo"`, `"equilibrado"` (las acorta un 40 % y quita el rebote), `"reducido"` (sin movimiento, pero con fundidos muy cortos) o `"desactivado"` (sin nada: ni movimiento ni fundidos) |
-| `Animaciones.Robot` | `"primera-vez"` | Cuándo se ve la escena de entrada: `"primera-vez"`, `"cada-inicio"`, `"al-cambiar-tema"` o `"nunca"`. La escena todavía no está implementada |
+| `Animaciones.Robot` | `"primera-vez"` | Cuándo se ve la escena de entrada: `"primera-vez"`, `"cada-inicio"`, `"al-cambiar-tema"` o `"nunca"` |
 
 Con `"auto"` se lee **Accesibilidad → Efectos visuales → Efectos de animación** de
 Windows: quien ya ha pedido menos movimiento ahí no tiene que volver a pedirlo aquí.
@@ -450,9 +455,10 @@ Listas de nombres; el orden es el orden en que salen.
 }
 ```
 
-Disponibles: `inicio`, `apps`, `fijadas`, `reloj`, `fecha`, `cpu`, `ram`, `bateria`,
-`musica`, `musica-caratula`, `musica-barras`, `bandeja`, `control`, `escritorios`,
-`wallpaper`, `wallpaper-titulo`, `iconos`, `separador`.
+Disponibles, los veinticinco: `inicio`, `apps`, `fijadas`, `reloj`, `fecha`, `cpu`,
+`ram`, `bateria`, `pila`, `bandeja`, `control`, `red`, `volumen`, `teclado`,
+`escritorios`, `monitores`, `notificaciones`, `nube`, `musica`, `musica-caratula`,
+`musica-barras`, `wallpaper`, `wallpaper-titulo`, `iconos`, `separador`.
 
 La lista sale del registro de widgets, así que es la misma en el config, en
 **Ajustes → Módulos** y en el log. `musica-caratula` y `musica-barras` son la carátula
