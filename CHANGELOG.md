@@ -6,6 +6,31 @@ construidos por el workflow de Release a partir de la etiqueta.
 
 ---
 
+## v1.0.1
+
+### Arreglado
+
+- **El pulso de audio se quedaba con la forma del tema anterior.** Con Cyberpunk, que va a
+  radio 0, la isla es un rectángulo — pero al sonar música el filo que late salía
+  redondeado y asomaba por las cuatro esquinas.
+
+  El filo se creaba copiando el radio de la isla, y se crea **una sola vez y tarde**: la
+  primera que suena algo. Bastaba con haber tenido música en un tema redondo para que
+  naciera con aquel radio y se quedara con él. Ahora va atado al de la isla, que no es un
+  apaño para que se refresque: la forma del pulso no es una decisión suya, es la de la
+  isla, y copiarla era dejar que dos copias de lo mismo se contradijeran.
+
+  Los colores del pulso tenían el mismo fallo, menos visible: nacían con los del tema de
+  aquel momento. Ahora se refrescan al cambiar de tema.
+
+### Y la casa, más ordenada
+
+- `ARCHITECTURE.md`: el programa explicado por partes, en inglés. Qué es cada pieza, dónde
+  vive y por qué está hecha así, con una tabla final que es el mapa del repositorio.
+- Fuera los documentos de fase, que eran hojas de ruta de cosas ya hechas.
+
+---
+
 ## v1.0.0 — la primera pública
 
 NubeBar sale de casa. Es la misma barra que llevaba meses funcionando en una sola
