@@ -566,6 +566,9 @@ public partial class MainWindow : Window
         // suelta del config: es lo que permite que Videojuegos y Cyberpunk vayan a radio 0 y
         // que Sakura vaya a 25.
         Isla.CornerRadius = new CornerRadius(pintura.Radio(Piezas.Isla));
+        // El filo del pulso de audio sigue el radio solo (va atado), pero sus colores no
+        // tienen a qué atarse: se refrescan aquí, que es donde el tema acaba de cambiar.
+        RefrescarColoresDelPulso();
         // ---------- La letra sale del tema ----------
         //
         // Leía `Tema.Fuente` del config, o sea una sola letra para todo y elegida aparte. Pero

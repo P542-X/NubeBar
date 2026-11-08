@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -71,23 +71,56 @@ public partial class MainWindow
         _pulso.Tick += (_, _) => PasoDelPulso();
     }
 
+    // ---------- Por qué el radio va ATADO y no copiado ----------
+    //
+    // Esto ponía `CornerRadius = Isla.CornerRadius`, o sea una foto del radio en el
+    // momento de crear el filo. Y el pulso se monta tarde y una sola vez: la primera vez
+    // que suena algo. Cambiar de tema después le cambia la forma a la isla y no al pulso.
+    //
+    // Lo contó el usuario con Cyberpunk, que va a radio 0: «el tema tiene los bordes
+    // rectangulares, que está bien; el problema es que cuando se escucha música el bombeo
+    // es redondeado y se sale de la zona rectangular». Justo eso: una isla cuadrada con un
+    // filo de radio 23 heredado del tema anterior, asomando por las cuatro esquinas.
+    //
+    // Atado con un Binding no puede quedarse viejo. Y no es un apaño: dice lo que de
+    // verdad pasa, que la forma del pulso NO es una decisión suya, es la de la isla.
+    // Copiarla era afirmar dos veces lo mismo y dejar que se contradijeran.
     Border CrearFilo(Color color)
     {
         var filo = new Border
         {
             BorderBrush = new SolidColorBrush(color),
             BorderThickness = new Thickness(1.2),
-            CornerRadius = Isla.CornerRadius,
             Margin = new Thickness(-10, 0, -10, 0),   // justo el padding de la isla
             Background = null,
             IsHitTestVisible = false,
             Opacity = 0,
             RenderTransform = new TranslateTransform()
         };
+        filo.SetBinding(Border.CornerRadiusProperty,
+                        new System.Windows.Data.Binding(nameof(Border.CornerRadius)) { Source = Isla });
         Grid.SetRow(filo, 0);
         Grid.SetRowSpan(filo, 2);
         Cuerpo.Children.Add(filo);
         return filo;
+    }
+
+    // ---------- Y los colores, que se copiaban igual ----------
+    //
+    // Mismo fallo y menos visible: los dos filos nacen con el color que el tema tuviera en
+    // ese momento, así que al cambiar de tema el pulso seguía latiendo con los colores del
+    // anterior. El radio se arregla con un Binding porque es una propiedad de dependencia;
+    // estos salen de los roles resueltos y no hay nada a lo que atarlos, así que se
+    // refrescan desde donde se aplica el tema (ver AplicarTema).
+    internal void RefrescarColoresDelPulso()
+    {
+        if (_filoFrio == null && _filoCalido == null) return;   // aún no ha sonado nada
+        try
+        {
+            if (_filoFrio != null) _filoFrio.BorderBrush = new SolidColorBrush(_roles.ColorDe("pulso.frio"));
+            if (_filoCalido != null) _filoCalido.BorderBrush = new SolidColorBrush(_roles.ColorDe("pulso.calido"));
+        }
+        catch (Exception ex) { Log.Error("refrescar los colores del pulso de audio", ex); }
     }
 
     // ---------- Arranque y parada ----------
