@@ -205,7 +205,7 @@ internal static class EditorModulos
                 if (d == null) continue;     // los desconocidos van por su lado (`Desconocidos`)
                 res.Add(new Ficha(id, d.Nombre, d.Glifo, d.Categoria,
                                   true, zona, i, z.EstaOculto(id),
-                                  d.Repetible, z.CuantosHay(id), d.PuedeNoVerse));
+                                  d.Repetible, z.CuantosHay(id), d.Avisos));
             }
         }
 
@@ -216,7 +216,7 @@ internal static class EditorModulos
             var d = RegistroWidgets.Buscar(id)?.Descriptor;
             if (d == null) continue;
             res.Add(new Ficha(id, d.Nombre, d.Glifo, d.Categoria,
-                              false, "", -1, false, d.Repetible, 0, d.PuedeNoVerse));
+                              false, "", -1, false, d.Repetible, 0, d.Avisos));
         }
         return res;
     }

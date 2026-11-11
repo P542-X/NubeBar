@@ -36,6 +36,12 @@ public partial class MainWindow : Window
     // Pinceles fijos: cuando cambia el tema se anima su color, y todo lo que los usa cambia suave
     readonly SolidColorBrush _fondo = new(DeSerie.Fondo), _texto = new(DeSerie.Texto),
                              _acento = new(DeSerie.Acento), _hover = new(DeSerie.SuperficieAlta);
+    // El fondo de la ISLA, aparte de `_fondo`. Son el mismo color en los dos modos de
+    // siempre, y por eso esto no existía; se separan porque en notch la isla va opaca y
+    // `_fondo` lo usan además el dock, el menú de una app y la tarjeta de la barra
+    // vertical. Esas tres son otras superficies, viven en otras ventanas, y no tienen por
+    // qué volverse opacas porque la muesca lo necesite.
+    readonly SolidColorBrush _fondoIsla = new(DeSerie.Fondo);
     // El acento "legible" es el mismo color corregido para que se lea sobre el
     // fondo. Se usa en TEXTO; para bordes y barras sigue valiendo el de verdad.
     readonly SolidColorBrush _acentoLegible = new(DeSerie.AcentoTinta);
@@ -94,7 +100,25 @@ public partial class MainWindow : Window
     // escala aquí por el mismo motivo que en Kf.
     static Duration Ms(double ms) => new(TimeSpan.FromMilliseconds(Animacion.Escalar(ms)));
 
-    bool EsIsla => _cfg.Barra.Modo.Equals("isla", StringComparison.OrdinalIgnoreCase);
+    // Isla Y notch: la notch es una isla con otra silueta. El por qué de que esto no sea
+    // `== "isla"` está escrito en `PanelNube.EsIsla`, que es donde vive la decisión.
+    bool EsIsla => PanelNube.EsIsla(_cfg.Barra.Modo);
+    bool EsNotch => PanelNube.EsNotch(_cfg.Barra.Modo);
+
+    // ---------- Y por qué la notch va opaca ----------
+    //
+    // Una muesca translúcida no finge hardware: se le ve el escritorio a través y deja de
+    // leerse como un recorte del marco para parecer una tarjeta apoyada en el borde.
+    //
+    // Y va opaca SIN inventarse un color. La primera versión de esto escribía
+    // `Aplanar(fondo, Colors.Black)`, y la prueba de la fase 0 la tumbó en el acto —«ningún
+    // color escrito a mano en la interfaz»— con razón: ese negro no lo había elegido ningún
+    // tema. `Roles.FondoOpaco` es el mismo fondo del tema sin su alfa, ya resuelto con el
+    // wallpaper aplicado, y existe desde el rediseño para medir contraste. Es lo que hacía
+    // falta: el rosa de Sakura sale rosa sólido.
+    //
+    // Un modo no puede quitarle el color a un tema. Lo que le quita aquí es la transparencia.
+    Color FondoDeLaIsla(Color fondo) => EsNotch ? _roles.FondoOpaco : fondo;
     // Lo consulta medio proyecto. Pasa por PosicionEfectiva para que los bordes
     // laterales (que cuelgan de la franja de arriba) no se tomen por "abajo".
     bool Arriba => ArribaEfectivo;
@@ -155,7 +179,7 @@ public partial class MainWindow : Window
 
         InitializeComponent();
         Resources["Hover"] = _hover;
-        Isla.Background = _fondo;
+        Isla.Background = _fondoIsla;
         Foreground = _texto;
         // Mientras un panel se dibuja como tarjeta, el recorte se rehace con cada
         // medida nueva: así la tarjeta crece y se pliega pegada a la animación
@@ -545,6 +569,7 @@ public partial class MainWindow : Window
         catch (Exception ex) { Log.Error("montar la barra de desplazamiento", ex); }
 
         AnimarColor(_fondo, fondo);
+        AnimarColor(_fondoIsla, FondoDeLaIsla(fondo));
         AnimarColor(_texto, texto);
         AnimarColor(_acento, acento);
         AnimarColor(_acentoLegible, _cAcentoLegible);
@@ -565,7 +590,14 @@ public partial class MainWindow : Window
         // El radio sale del tema (o de lo que el usuario haya puesto encima), no de una clave
         // suelta del config: es lo que permite que Videojuegos y Cyberpunk vayan a radio 0 y
         // que Sakura vaya a 25.
-        Isla.CornerRadius = new CornerRadius(pintura.Radio(Piezas.Isla));
+        //
+        // Y CUÁLES de las cuatro esquinas lo llevan lo dice el modo: la notch solo redondea
+        // el lado que da a la pantalla (`PanelNube.Esquinas`). El filo del pulso de audio va
+        // ATADO a esta propiedad con un Binding, así que la silueta de la muesca le llega
+        // sola y no hay que acordarse de nada — que es justo lo que arregló la v1.0.1.
+        var esquinas = PanelNube.Esquinas(_cfg.Barra.Modo, PosicionEfectiva,
+                                          pintura.Radio(Piezas.Isla));
+        Isla.CornerRadius = new CornerRadius(esquinas.AI, esquinas.AD, esquinas.BD, esquinas.BI);
         // El filo del pulso de audio sigue el radio solo (va atado), pero sus colores no
         // tienen a qué atarse: se refrescan aquí, que es donde el tema acaba de cambiar.
         RefrescarColoresDelPulso();
@@ -692,6 +724,15 @@ public partial class MainWindow : Window
 
             _expandida = false;
             FijarLados(!EsIsla);
+            // ---------- Lo ancho que es una muesca en reposo ----------
+            //
+            // `MinWidth` es el suelo de la isla recogida, y en isla son los 120 del XAML: una
+            // pastilla pequeña, que es lo que se quiere. Una notch de 120 no parece una
+            // muesca, parece una pastilla pegada al techo — la del MacBook es ancha y baja.
+            //
+            // Solo se nota con el centro casi vacío, porque en cuanto hay módulos manda el
+            // contenido y esto no pinta nada. Y ese es justo el caso en el que hace falta.
+            Isla.MinWidth = EsNotch ? 160 : 120;
             // En modo isla el ancho siempre va fijado a mano (ver AnimarAncho); en modo barra, automático
             Isla.Width = EsIsla ? MedirAncho() : double.NaN;
 

@@ -1244,13 +1244,14 @@ public sealed partial class VentanaAjustes : Window
         public const int Pantallas = 0xE740;    // FullScreen
         public const int Mover = 0xE70F;        // Edit
         public const int Nube = 0xE753;         // Cloud
+        public const int Medios = 0xE8D6;       // MusicInfo
 
         // Todos, para poder comprobarlos de una vez.
         public static readonly int[] Todos =
         {
             Ajustes, Forma, Color, Imagen, Presentacion, Zonas, Biblioteca, Apps,
             Teclado, Inicio, Perfil, Sonido, Buscar, Info, Restaurar, Guardar,
-            Pantallas, Mover, Nube,
+            Pantallas, Mover, Nube, Medios,
         };
     }
 
@@ -1291,6 +1292,7 @@ public sealed partial class VentanaAjustes : Window
         if (Hay("atajo", "tecla", "combinaci")) return Ico.Teclado;
         if (Hay("inicio", "menú", "menu", "arranque", "saludo")) return Ico.Inicio;
         if (Hay("perfil")) return Ico.Perfil;
+        if (Hay("música", "musica", "canción", "cancion", "spotify")) return Ico.Medios;
         if (Hay("sonido", "audio", "volumen")) return Ico.Sonido;
         if (Hay("buscar", "búsqueda", "busqueda", "buscador")) return Ico.Buscar;
         if (Hay("estado", "diagnóstico", "diagnostico", "aviso", "notificaci")) return Ico.Info;
@@ -1924,14 +1926,19 @@ public sealed partial class VentanaAjustes : Window
         p.Grupo("Forma", IconoDeGrupo("Forma"));
         // La geometría se escribe en Paneles[principal], que es la autoridad desde B5.
         // Las claves equivalentes de "Barra" ya no se leen: se derivan al cargar.
-        p.Mas(Opciones("Modo", new[] { "isla", "barra" }, _arbol.TextoDelPanel(Principal, "Modo", "isla"),
+        // La lista sale de `PanelNube.Modos` y no escrita aquí: es la misma de la que come
+        // la validación de los perfiles, así que un modo nuevo aparece en el desplegable sin
+        // que haya que acordarse de este sitio.
+        p.Mas(Opciones("Modo", PanelNube.Modos, _arbol.TextoDelPanel(Principal, "Modo", "isla"),
                                 v => _arbol.PonerDelPanel(Principal, "Modo", v)));
         p.Mas(Opciones("Posición", PanelNube.Posiciones, _arbol.TextoDelPanel(Principal, "Posicion", "arriba"),
                                 v => _arbol.PonerDelPanel(Principal, "Posicion", v)));
         // Los cuatro bordes valen en los dos modos, pero no significan lo mismo, y eso
         // no se adivina de un desplegable con cuatro palabras.
         var pista = Rotulo("En «izquierda» y «derecha», el modo barra se vuelve una barra vertical " +
-                           "con las zonas apiladas; el modo isla solo se ancla a ese lado.");
+                           "con las zonas apiladas; el modo isla solo se ancla a ese lado, y la " +
+                           "notch se dibuja arriba —una muesca sale del borde de la cámara, no " +
+                           "de un lado—.");
         pista.TextWrapping = TextWrapping.Wrap;
         pista.Opacity = 0.55;
         pista.Margin = new Thickness(0, 0, 0, 4);
@@ -1948,6 +1955,11 @@ public sealed partial class VentanaAjustes : Window
         // De serie apagado, en los dos modos y en los cuatro bordes (la nube flota).
         // Tocarlo lo convierte en una elección tuya y manda sobre el defecto, en los dos
         // sentidos: ver PanelNube.ReservarEspacio, que es un tri-estado y no un bool.
+        p.Pista("La notch es la isla con otra silueta: pegada al borde sin margen, redondeada " +
+                "solo por el lado que da a la pantalla y con el fondo opaco, como la muesca de " +
+                "un MacBook. Hace todo lo que hace la isla —se centra, se abre al pasar el " +
+                "ratón, los paneles salen de dentro— y el radio sigue siendo el del tema: con " +
+                "Cyberpunk, que va a radio 0, la muesca sale rectangular.");
         p.Mas(Interruptor("Reservar espacio en pantalla, como la barra de tareas",
                           _arbol.BanderaDelPanel(Principal, "ReservarEspacio", PanelNube.ReservaPorDefecto),
                           v => _arbol.PonerDelPanel(Principal, "ReservarEspacio", v)));
@@ -3730,6 +3742,32 @@ public sealed partial class VentanaAjustes : Window
         pistaClima.Opacity = 0.55;
         p.Mas(pistaClima);
 
+        // ---------- La música ----------
+        //
+        // Va pegada al clima y en esta página por el mismo motivo que él, dicho arriba:
+        // «Módulos» es qué se ve en la barra, y esto es la OTRA parte de NubeBar que sale a un
+        // servidor de alguien. Quien quiera saber qué hace el programa con su equipo tiene las
+        // dos cosas en la misma pantalla, y no una aquí y otra escondida en otra pestaña.
+        p.Grupo("Música", IconoDeGrupo("Música"));
+
+        p.Mas(Interruptor("Solo cuando reproduce Spotify",
+                          _arbol.Bandera("Musica", "SoloSpotify", false),
+                          v => _arbol.Poner("Musica", "SoloSpotify", v)));
+        p.Pista("Apagado —como viene— los módulos de música enseñan lo que suene, venga de " +
+                "Spotify, del navegador o de un reproductor. Encendido, se callan con todo lo " +
+                "que no sea Spotify. Ojo: Spotify EN EL NAVEGADOR no cuenta, porque Windows lo " +
+                "anuncia como el navegador y no como Spotify.");
+
+        p.Pista("Y de este equipo no sale nada por la música: lo que se enseña viene de la " +
+                "sesión de medios de Windows, que es local. No hay cuenta que conectar ni " +
+                "servicio al que preguntar.");
+
+        // ---------- Aquí NO hay nada más, y es a propósito ----------
+        //
+        // Esta tarjeta tuvo un interruptor para buscar la letra de las canciones en internet
+        // (LRCLIB) y, antes de eso, un bloque entero para iniciar sesión en Spotify. Las dos
+        // se fueron; el motivo de cada una está escrito en `MainWindow.Spotify.cs`, que es
+        // donde vivía el código, y no aquí, que es solo la pantalla.
         p.Grupo("Archivos", IconoDeGrupo("Archivos"));
         p.Mas(BotonPlano("Abrir la carpeta del config", () =>
             Process.Start(new ProcessStartInfo(Config.Carpeta) { UseShellExecute = true })?.Dispose(), false));

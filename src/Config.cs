@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
@@ -351,7 +351,26 @@ public class PanelNube
 {
     public string Id { get; set; } = "principal";
     public bool Activo { get; set; } = true;
-    public string Modo { get; set; } = "isla";          // "isla" (flotante) | "barra" (de lado a lado)
+    // ---------- Los tres modos ----------
+    //
+    //   isla   — flotante y centrada, con margen por los cuatro lados
+    //   barra  — de lado a lado (y VERTICAL de verdad si va en un lateral)
+    //   notch  — pegada al borde sin margen, redondeada solo por el lado que da a la
+    //            pantalla y con el fondo opaco: la muesca del MacBook. En todo lo demás
+    //            es una ISLA —se centra, se expande al pasar el ratón, su ancho lo mide
+    //            ella— y de eso no se encarga ningún caso nuevo, se encarga `EsIsla`.
+    public string Modo { get; set; } = "isla";
+
+    public static readonly string[] Modos = { "isla", "barra", "notch" };
+
+    // Los modos en los que la nube es una ISLA. Es `Modos` menos la barra, calculado y no
+    // escrito aparte: dos listas que dicen lo mismo acaban discrepando, y el día que alguien
+    // añada un cuarto modo esta se actualiza sola. La usan los widgets que solo existen en la
+    // isla (ver `DescriptorWidget.SoloEnModos`).
+    public static readonly string[] ModosDeIsla = Modos.Where(EsIsla).ToArray();
+
+    public static bool ModoValido(string? m) =>
+        m != null && Modos.Any(x => x.Equals(m, StringComparison.OrdinalIgnoreCase));
 
     // Los cuatro bordes, válidos los cuatro en los dos modos. Lo que cambia no es si
     // valen, sino qué significan:
@@ -423,6 +442,26 @@ public class PanelNube
     public static bool EsBarra(string? modo) =>
         modo != null && modo.Equals("barra", StringComparison.OrdinalIgnoreCase);
 
+    public static bool EsNotch(string? modo) =>
+        modo != null && modo.Equals("notch", StringComparison.OrdinalIgnoreCase);
+
+    // ---------- Por qué esto es `!EsBarra` y no `== "isla"` ----------
+    //
+    // La notch ES una isla: flota encima de las ventanas, se centra, se expande al pasar
+    // el ratón, abre sus paneles en el cajón y su ancho lo fija ella a mano. Lo único que
+    // cambia es la silueta y que va pegada al borde.
+    //
+    // `MainWindow.EsIsla` preguntaba `Modo == "isla"`, y con un tercer modo eso habría
+    // dejado a la notch sin ser ninguna de las dos cosas: los diecisiete sitios que
+    // preguntan `EsIsla` —el ancho fijado a mano, la alineación centrada, `Expandir`, la
+    // edición, el margen— se habrían ido todos por la rama de la barra, que es justo la
+    // que no vale. Preguntando por el negativo, la notch hereda los diecisiete y no hay
+    // que ir a buscarlos.
+    //
+    // La regla, por si aparece un cuarto modo: lo que no se estira de lado a lado es una
+    // isla.
+    public static bool EsIsla(string? modo) => !EsBarra(modo);
+
     // **La pregunta de B6.** Una barra pegada a un lateral es una barra VERTICAL: la
     // ventana es una columna de alto completo, las zonas se apilan y los paneles salen
     // flotando al lado. Una ISLA pegada a un lateral sigue siendo horizontal y solo
@@ -438,6 +477,58 @@ public class PanelNube
     // arriba abajo, así que la respuesta da igual y se queda en "sí".
     public static bool CuelgaDeArriba(string? posicion) =>
         BordeEfectivo(posicion) != "abajo";
+
+    // ---------- El borde, con el modo delante ----------
+    //
+    // Una notch pegada a un lateral no es una notch. La muesca sale del borde donde está
+    // la cámara, y lo que una isla hace en un lateral es ANCLARSE a ese lado (B5), que es
+    // otra cosa y no se parece. En vez de dejar el caso raro suelto por ahí para que cada
+    // sitio lo resuelva a su manera, se normaliza aquí: una notch en un lateral se dibuja
+    // arriba.
+    //
+    // La sobrecarga sin modo se queda, y no por compatibilidad: la llaman los lectores que
+    // no tienen el modo a mano y a los que la distinción no les cambia nada (la appbar
+    // recibe el borde ya resuelto, `--diagd6` solo lo imprime).
+    public static string BordeEfectivo(string? modo, string? posicion)
+    {
+        var borde = BordeEfectivo(posicion);
+        return EsNotch(modo) && EsLateral(borde) ? "arriba" : borde;
+    }
+
+    public static bool CuelgaDeArriba(string? modo, string? posicion) =>
+        BordeEfectivo(modo, posicion) != "abajo";
+
+    // ---------- Las cuatro esquinas ----------
+    //
+    // La isla y la barra llevan el mismo radio en las cuatro. La notch solo en las dos que
+    // dan a la pantalla, y es eso —no el color ni el tamaño— lo que la hace leerse como un
+    // recorte del marco en vez de como una tarjeta apoyada en el borde.
+    //
+    // El radio sigue saliendo del TEMA y no de un número escrito aquí, que es la regla de
+    // `Forma.cs`: Cyberpunk va a 0 y su notch es un rectángulo limpio, Sakura va a 25 y la
+    // suya es una gota. Lo que la notch decide es CUÁLES de las cuatro, no cuánto.
+    //
+    // En el orden de WPF: arriba-izquierda, arriba-derecha, abajo-derecha, abajo-izquierda.
+    public static (double AI, double AD, double BD, double BI) Esquinas(
+        string? modo, string? posicion, double radio)
+    {
+        if (!EsNotch(modo)) return (radio, radio, radio, radio);
+        return CuelgaDeArriba(modo, posicion)
+            ? (0, 0, radio, radio)      // cuelga de arriba: se redondea por abajo
+            : (radio, radio, 0, 0);     // sube desde abajo: se redondea por arriba
+    }
+
+    // ---------- Y el margen ----------
+    //
+    // La isla flota: su margen la separa del borde de la pantalla. La notch no flota, finge
+    // ser el marco, y un hueco de ocho píxeles entre el borde y la muesca la delata del
+    // todo. Así que en notch el margen del lado pegado es cero, pase lo que ponga el
+    // config.
+    //
+    // Está aquí y no en `ColocarCajon` por lo de siempre: es una decisión, se prueba sin
+    // abrir ventana, y hay UN sitio donde está escrita.
+    public static double MargenEfectivo(string? modo, double margen) =>
+        EsNotch(modo) ? 0 : margen;
 
     // El borde de la appbar (ABE_LEFT=0, ABE_TOP=1, ABE_RIGHT=2, ABE_BOTTOM=3). Es el
     // mismo número que usa Windows, y aquí sale del borde del panel y del modo: una
@@ -603,6 +694,33 @@ public sealed class OpcionesHypr
 // Cero es «sin resolver». Las coordenadas 0,0 caen en el Golfo de Guinea, a 500 km de la
 // costa, donde no vive nadie; el centinela honrado —`double?`— habría metido dos nulls en el
 // JSON de todo el mundo para distinguir un caso que no existe.
+// ---------- Lo que suena, y su letra ----------
+//
+// Las tres vienen apagadas o vacías a propósito, y es el mismo trato que `OpcionesClima`:
+// de este equipo no sale NADA hasta que el usuario lo encienda, y lo que sale está escrito
+// al lado del interruptor que lo enciende.
+//
+// De este equipo no sale NADA por la música: todo lo que se enseña viene de la sesión de
+// medios de Windows, que es local.
+//
+// Aquí hubo dos claves más y las dos se fueron: `ClientId`, para iniciar sesión en la API de
+// Spotify, y `Letra`, para buscar la letra de las canciones en internet. El por qué de cada
+// una está en `MainWindow.Spotify.cs`.
+//
+// Las claves que un día existieron y ya no se leen no hacen daño: `ConfigArbol` conserva lo
+// que no entiende, así que a quien las tuviera puestas no se le rompe nada ni se le reescribe
+// el fichero por la espalda.
+public sealed class OpcionesMusica
+{
+    // ¿Solo cuando reproduce Spotify, o lo que suene venga de donde venga? De serie, lo que
+    // suene: es lo que ya hacen los módulos de música que existen, y cambiarles el
+    // comportamiento a quien los tenga puestos no es cosa de una opción nueva.
+    //
+    // No necesita cuenta ni red: quien reproduce lo dice la propia sesión de medios
+    // (`Musica.EsSpotify`).
+    public bool SoloSpotify { get; set; }
+}
+
 public sealed class OpcionesClima
 {
     public bool Activo { get; set; }                     // apagado de serie, a propósito
@@ -648,6 +766,7 @@ public class Config
     public Fondo Fondo { get; set; } = new();
     public OpcionesHypr NubeHypr { get; set; } = new();
     public OpcionesClima Clima { get; set; } = new();
+    public OpcionesMusica Musica { get; set; } = new();
     public OpcionesNeon Neon { get; set; } = new();
     public OpcionesLaterales Laterales { get; set; } = new();
     public OpcionesMonitores Monitores { get; set; } = new();
@@ -996,11 +1115,29 @@ public class Config
                 Ocultos = c.Modulos.Ocultos
             };
 
+            // Un modo que no conocemos no puede quedarse puesto: media geometría pregunta
+            // por él, y la respuesta sería «no es barra», o sea isla, sin que eso lo haya
+            // decidido nadie ni salga en ningún sitio. Mismo trato que la visibilidad de
+            // arriba: se cae en el de serie y se apunta por qué.
+            if (!PanelNube.ModoValido(p.Modo))
+            {
+                Log.Info($"modo \"{p.Modo}\" desconocido: se usa isla");
+                p.Modo = "isla";
+            }
+
             // Y ahora al revés que antes: Barra se deriva del panel.
             c.Barra.Modo = p.Modo;
-            c.Barra.Posicion = p.Posicion;
+            // Estas dos pasan por la función del modo, que es donde está escrito qué hace la
+            // notch: ni margen (finge ser el marco, y un hueco de ocho píxeles la delata) ni
+            // bordes laterales (la muesca sale de donde está la cámara). Así los quince
+            // lectores de `Barra.Margen` y los sesenta de `Barra.Posicion` reciben la
+            // respuesta ya resuelta, en vez de un caso nuevo cada uno.
+            //
+            // Lo que el usuario escribió sigue intacto en `Paneles[0]`: volver a isla le
+            // devuelve su margen, porque esto es una vista derivada y no se escribe nunca.
+            c.Barra.Posicion = PanelNube.BordeEfectivo(p.Modo, p.Posicion);
             c.Barra.Alto = p.Grosor;
-            c.Barra.Margen = p.Margen;
+            c.Barra.Margen = PanelNube.MargenEfectivo(p.Modo, p.Margen);
             // Barra.ReservarEspacio es un bool de toda la vida y lo leen otros sitios:
             // aquí se le da la respuesta YA RESUELTA, con el defecto de la orientación
             // aplicado si el usuario no ha elegido.

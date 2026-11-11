@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -37,7 +38,57 @@ public sealed record DescriptorWidget(
     //
     // Lo enseña la biblioteca al lado del botón de añadir, y lo usa `--diagmodulos` para
     // no contar como fallo un hueco que el widget había anunciado.
-    string? PuedeNoVerse = null);
+    string? PuedeNoVerse = null,
+
+    // ---------- En qué modos existe este widget ----------
+    //
+    // Null —lo normal— es «en los tres». Una lista significa que fuera de esos modos el
+    // widget no se monta.
+    //
+    // Hacía falta para el módulo de Spotify, que vive de la isla: la letra se lee en una
+    // línea que crece y se encoge con la isla, y en modo barra esa línea o se estira de
+    // punta a punta de la pantalla o se pierde en metro y medio de nada. En vertical no
+    // hay ni sitio para una línea de texto.
+    //
+    // Y es un campo del DESCRIPTOR, no un `if` dentro del widget, por una razón que ya
+    // costó un lío entero: puesto y sin aparecer, «lo he añadido y no se ve» significa
+    // dos cosas muy distintas —está roto, o aquí no existe— y no hay manera de saber
+    // cuál. Estando en la ficha, la biblioteca lo dice ANTES de que lo añadas y
+    // `--diagmodulos` no lo cuenta como hueco. Es el mismo razonamiento que
+    // `PuedeNoVerse`, aplicado a algo que se sabe sin montar nada.
+    string[]? SoloEnModos = null)
+{
+    // ¿Existe este widget con la barra puesta así? Se pregunta con el modo del config tal
+    // cual, sin normalizar: la comparación va sin distinguir mayúsculas como todo lo que
+    // sale de un fichero que escribe una persona.
+    public bool ExisteEn(string? modo) =>
+        SoloEnModos == null ||
+        SoloEnModos.Any(m => m.Equals(modo ?? "", StringComparison.OrdinalIgnoreCase));
+
+    // Y la frase que explica por qué no está, para la biblioteca y para el log. Sale de la
+    // misma lista, así que no puede contradecirla.
+    public string? SoloEnTexto => SoloEnModos == null
+        ? null
+        : "solo en modo " + string.Join(" y ", SoloEnModos);
+
+    // ---------- Todo lo que hay que decirle al usuario sobre cuándo NO lo verá ----------
+    //
+    // El límite de modo y el aviso del propio widget contestan la MISMA pregunta —«lo he
+    // puesto y no aparece»— así que se contestan juntos y por un solo sitio. Si estuvieran
+    // separados habría que acordarse de enseñar los dos en la biblioteca, en el editor, en
+    // Ajustes y en `--diagmodulos`, y el día que alguien se olvide de uno vuelve el lío.
+    //
+    // Es esto lo que leen esos cuatro, no `PuedeNoVerse`.
+    public string? Avisos
+    {
+        get
+        {
+            var trozos = new[] { SoloEnTexto, PuedeNoVerse }
+                         .Where(t => !string.IsNullOrWhiteSpace(t)).ToArray();
+            return trozos.Length == 0 ? null : string.Join("; ", trozos);
+        }
+    }
+}
 
 // Lo que un widget puede pedirle a la isla que lo aloja.
 //

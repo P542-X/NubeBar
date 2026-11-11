@@ -17,7 +17,9 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
 ## Qué hace
 
 **La barra**
-- Modo *isla* (flotando, centrada) o modo *barra* (de lado a lado), arriba o abajo.
+- Modo *isla* (flotando, centrada), modo *barra* (de lado a lado) o modo *notch*
+  (pegada al borde, redondeada solo por abajo y con el fondo opaco, como la muesca
+  de un MacBook), arriba o abajo.
 - Esconde la barra de tareas de Windows, la principal y las secundarias, y las
   devuelve intactas al cerrarse.
 - **Flota o se queda su sitio, tú eliges.** De serie la nube flota y las ventanas
@@ -25,11 +27,12 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
   como a la barra de tareas y las ventanas maximizadas llegan solo hasta donde
   empieza la nube — una appbar de verdad, y vale igual en modo isla que en modo
   barra.
-- **Veinticinco módulos** colocables en tres zonas (izquierda, centro, derecha):
+- **Veintiséis módulos** colocables en tres zonas (izquierda, centro, derecha):
   `inicio`, `apps`, `fijadas`, `reloj`, `fecha`, `cpu`, `ram`, `bateria`, `pila`,
   `bandeja`, `control`, `red`, `volumen`, `teclado`, `escritorios`, `monitores`,
-  `notificaciones`, `musica` (o solo su carátula, o solo sus barras), `wallpaper`
-  (o solo el título del fondo), `iconos`, `nube`, `separador`. Se eligen y se
+  `notificaciones`, `musica` (o solo su carátula, o solo sus barras), `spotify`,
+  `wallpaper` (o solo el título del fondo), `iconos`, `nube`,
+  `separador`. Se eligen y se
   ordenan arrastrando en **Ajustes → Módulos**, y los que no quieras ver se
   guardan en la biblioteca en vez de borrarse.
 - Borde y halo del color de acento, con animaciones de muelle a la velocidad de
@@ -40,6 +43,14 @@ Recogida solo enseña el reloj. Al acercar el ratón se abre:
   sitio con un muelle.
 - La isla **toma la forma de lo que enseña**: con un panel estrecho se queda
   recogida en vez de estirarse de lado a lado.
+
+**La música**
+- **Lo que suena, en la isla**: carátula, canción y artista, y al pulsar un panel con
+  la carátula, el avance y los tiempos. Sale de la sesión de medios de Windows, así
+  que funciona con Spotify, con el navegador y con cualquier reproductor, sin
+  configurar nada: ni cuenta, ni claves, ni permisos.
+- Y opcionalmente **solo cuando reproduce Spotify**, si lo que suene en el navegador
+  no te interesa.
 
 **Las apps**
 - Carrusel con las ventanas abiertas, agrupadas por programa, con rueda para
@@ -419,7 +430,7 @@ Windows: quien ya ha pedido menos movimiento ahí no tiene que volver a pedirlo 
 
 | Clave | Por defecto | Qué hace |
 |---|---|---|
-| `Barra.Modo` | `"isla"` | `"isla"` (flotante) o `"barra"` (de lado a lado) |
+| `Barra.Modo` | `"isla"` | `"isla"` (flotante), `"barra"` (de lado a lado) o `"notch"` (pegada al borde, como la muesca de un MacBook) |
 | `Barra.Posicion` | `"arriba"` | `"arriba"` o `"abajo"` |
 | `Barra.Alto` | `38` | Alto de la fila de módulos |
 | `Barra.Margen` | `8` | Separación con el borde de la pantalla |
@@ -456,14 +467,20 @@ Listas de nombres; el orden es el orden en que salen.
 }
 ```
 
-Disponibles, los veinticinco: `inicio`, `apps`, `fijadas`, `reloj`, `fecha`, `cpu`,
+Disponibles, los veintiséis: `inicio`, `apps`, `fijadas`, `reloj`, `fecha`, `cpu`,
 `ram`, `bateria`, `pila`, `bandeja`, `control`, `red`, `volumen`, `teclado`,
 `escritorios`, `monitores`, `notificaciones`, `nube`, `musica`, `musica-caratula`,
-`musica-barras`, `wallpaper`, `wallpaper-titulo`, `iconos`, `separador`.
+`musica-barras`, `spotify`, `wallpaper`, `wallpaper-titulo`, `iconos`, `separador`.
 
 La lista sale del registro de widgets, así que es la misma en el config, en
 **Ajustes → Módulos** y en el log. `musica-caratula` y `musica-barras` son la carátula
 y las barras por separado, para quien no quiera las dos juntas.
+
+`spotify` **solo existe en modo isla y en modo notch**, y no es un olvido: vive del
+ancho elástico de la isla, con el título recortado contra un tope. En una barra de lado
+a lado eso se estira de punta a punta de la pantalla, y en una barra vertical no hay
+sitio para una línea de texto. Puesto en modo barra no se dibuja, y la biblioteca de
+widgets lo dice antes de que lo añadas.
 
 Hay además una clave `Paneles`, y desde B5 es **la autoridad** de la geometría de la
 nube: borde, modo, grosor, margen, visibilidad, en qué monitores sale y si reserva
@@ -481,6 +498,46 @@ izquierda y la derecha solo al desplegarse. Por eso ahí viven las apps: `fijada
 abiertas ahora mismo). Están a un clic sin acercar el ratón, y no se mueven de
 sitio al desplegarse la isla, porque el centro es la única zona que no se desplaza.
 Si prefieres la isla pequeña en reposo, muévelos a la izquierda en Ajustes > Módulos.
+
+### Música
+
+| Clave | Por defecto | Qué hace |
+|---|---|---|
+| `Musica.SoloSpotify` | `false` | Los módulos de música se callan con todo lo que no sea Spotify |
+
+La canción, el artista, la carátula, el avance y la duración salen de la **sesión de
+medios de Windows**, que es la misma de la que viven los módulos `musica` de siempre.
+No hace falta cuenta, ni clave, ni permisos, y **no sale nada de tu equipo**: Spotify,
+el navegador y cualquier reproductor la alimentan igual.
+
+Una cosa que parece un fallo y no lo es: **Spotify en el navegador no cuenta** como
+Spotify para `Musica.SoloSpotify`. Windows lo anuncia como el navegador, porque el
+navegador es quien reproduce.
+
+<details>
+<summary><b>Dos cosas que esto tuvo y ya no tiene</b></summary>
+
+Las dos se construyeron y las dos se retiraron. Se cuenta aquí para no volver a
+recorrer el mismo camino:
+
+**La API de Spotify**, con inicio de sesión por OAuth, que añadía el nombre del álbum,
+la carátula a 640 px y el corazón de «Me gusta». Spotify dejó de aceptar URL de retorno
+por HTTP en loopback —`http://127.0.0.1:PUERTO`— para aplicaciones registradas desde
+abril de 2025, aunque su propia documentación siga diciendo que valen. Lo que quedaba
+era servirla por HTTPS con un certificado autofirmado, que le pone al usuario una
+pantalla roja de «este sitio no es seguro» en medio del proceso, o un esquema propio
+del tipo `nubebar://` que su documentación de la Web API no contempla. Tres adornos no
+valen eso.
+
+**La letra sincronizada**, desde [LRCLIB](https://lrclib.net). Funcionaba —traía la
+letra y seguía el verso al milisegundo— pero se quitó porque no quedaba bien: el verso
+vivía en una línea de la isla que crece y se encoge con cada palabra, así que la barra
+respiraba al ritmo de la letra. Eso no se arregla afinando el ancho; la forma buena
+pide una superficie de alto fijo que no mueva la isla, y eso es otro trabajo.
+
+Si alguna de las dos vuelve, que vuelva sabiendo esto.
+
+</details>
 
 ### Menú Inicio
 

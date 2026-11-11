@@ -365,6 +365,10 @@ public static class Textos
         ["No opina"] = "No opinion",
         ["isla"] = "island",
         ["barra"] = "bar",
+        // «notch» se queda igual: es la palabra que se usa en inglés y la que la gente busca.
+        // No se traduce como «muesca» porque nadie llamaría a esto «notch bar» en español y en
+        // inglés no hay otra forma de decirlo.
+        ["notch"] = "notch",
         ["auto"] = "auto",
         ["completo"] = "full",
         ["equilibrado"] = "balanced",
@@ -774,8 +778,16 @@ public static class Textos
         ["La batería dibujada, con su nivel y el rayo al cargar"] =
             "The drawn battery, with its level and a bolt while charging",
         ["Música"] = "Music",
+        ["Lo que suena"] = "Now playing",
+        ["La canción y su carátula; al pulsar, el avance"] =
+            "The track and its cover art; click for the progress",
+        ["sin nada sonando no ocupa sitio"] = "with nothing playing it takes up no room",
         ["Separador"] = "Separator",
         ["Una rayita para separar grupos de widgets"] = "A thin line to separate groups of widgets",
+
+        // ---------- Lo que suena, y su letra ----------
+        ["No hay nada sonando."] = "Nothing is playing.",
+        ["No hay nada sonando en Spotify."] = "Nothing is playing on Spotify.",
 
         // ---------- Estilos ----------
         ["Nube (estilo)"] = "Nube",
@@ -804,6 +816,32 @@ public static class Textos
         ["Forma"] = "Shape",
         ["Clima"] = "Weather",
         ["Archivos"] = "Files",
+
+        // ---------- Ajustes → Sistema → Música ----------
+        ["Solo cuando reproduce Spotify"] = "Only when Spotify is playing",
+        ["Apagado —como viene— los módulos de música enseñan lo que suene, venga de Spotify, del navegador o de un reproductor. Encendido, se callan con todo lo que no sea Spotify. Ojo: Spotify EN EL NAVEGADOR no cuenta, porque Windows lo anuncia como el navegador y no como Spotify."] =
+            "Off — as it ships — the music modules show whatever is playing, be it Spotify, " +
+            "the browser or a media player. On, they stay quiet for anything that isn't " +
+            "Spotify. Note: Spotify IN THE BROWSER does not count, because Windows announces " +
+            "it as the browser and not as Spotify.",
+        ["Y de este equipo no sale nada por la música: lo que se enseña viene de la sesión de medios de Windows, que es local. No hay cuenta que conectar ni servicio al que preguntar."] =
+            "And nothing leaves your machine because of music: what you see comes from the " +
+            "Windows media session, which is local. There is no account to connect and no " +
+            "service to ask.",
+
+        // ---------- Ajustes → Apariencia → Forma: la notch ----------
+        ["La notch es la isla con otra silueta: pegada al borde sin margen, redondeada solo por el lado que da a la pantalla y con el fondo opaco, como la muesca de un MacBook. Hace todo lo que hace la isla —se centra, se abre al pasar el ratón, los paneles salen de dentro— y el radio sigue siendo el del tema: con Cyberpunk, que va a radio 0, la muesca sale rectangular."] =
+            "The notch is the island with a different silhouette: flush against the edge with " +
+            "no margin, rounded only on the side facing the screen, and with an opaque " +
+            "background, like a MacBook's notch. It does everything the island does — it " +
+            "centres itself, it opens when the pointer reaches it, panels grow out of it " +
+            "— and the corner radius still comes from the theme: with Cyberpunk, which " +
+            "goes to radius 0, the notch comes out rectangular.",
+        ["En «izquierda» y «derecha», el modo barra se vuelve una barra vertical con las zonas apiladas; el modo isla solo se ancla a ese lado, y la notch se dibuja arriba —una muesca sale del borde de la cámara, no de un lado—."] =
+            "On «left» and «right», bar mode becomes a vertical bar " +
+            "with the zones stacked; island mode just anchors to that side, and the notch is " +
+            "drawn at the top — a notch comes out of the camera's edge, not out of a " +
+            "side.",
         ["Arranque"] = "Startup",
         ["Bandeja del sistema"] = "System tray",
         ["Barra de tareas de Windows"] = "Windows taskbar",

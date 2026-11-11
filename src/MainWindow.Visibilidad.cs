@@ -65,7 +65,12 @@ public partial class MainWindow : Window
     // cambia según el modo no es si el borde vale, sino qué significa: una ISLA en un
     // lateral se ancla a ese lado y sigue siendo horizontal (B5); una BARRA en un
     // lateral es vertical de verdad (ver MainWindow.Vertical.cs).
-    public string PosicionEfectiva => PanelNube.BordeEfectivo(PanelPrincipal.Posicion);
+    // Lleva el MODO delante desde que existe la notch: una muesca en un lateral se dibuja
+    // arriba, porque anclarse a un lado es lo que hace una ISLA y no se parece en nada a una
+    // muesca. Se normaliza aquí y no en cada sitio porque este es el embudo de los cuatro
+    // bordes: lo que salga de aquí es lo que ve el resto del programa.
+    public string PosicionEfectiva =>
+        PanelNube.BordeEfectivo(PanelPrincipal.Modo, PanelPrincipal.Posicion);
 
     // Dónde se pega la isla dentro de su franja. Solo tiene sentido en horizontal: en
     // vertical la barra se estira de arriba abajo y la pega ColocarBarraVertical.
@@ -78,7 +83,8 @@ public partial class MainWindow : Window
         return EsIsla ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
     }
 
-    bool ArribaEfectivo => PanelNube.CuelgaDeArriba(PanelPrincipal.Posicion);
+    bool ArribaEfectivo =>
+        PanelNube.CuelgaDeArriba(PanelPrincipal.Modo, PanelPrincipal.Posicion);
 
     // ¿Le pedimos a Windows que nos guarde la franja? Lo dice el interruptor y ya:
     // `Barra.ReservarEspacio` viene resuelto de la carga, con el defecto aplicado si no

@@ -26,9 +26,29 @@ drawn inside a window that is bigger than it, and that is what lets it grow, sli
 away, and open panels out of itself without any of it being a new window that
 Windows has to manage.
 
-`MainWindow` is split across 62 `MainWindow.*.cs` files — one per
+`MainWindow` is split across 63 `MainWindow.*.cs` files — one per
 subject: `MainWindow.Apps.cs`, `MainWindow.Paneles.cs`, `MainWindow.Red.cs`. They
 are all the same class. The split is for reading, not for structure.
+
+### Three modes, two of which are the same thing
+
+`Paneles[0].Modo` is `isla`, `barra` or `notch`. The notch is the island with a
+different silhouette: flush against the edge with no margin, rounded only on the side
+facing the screen, opaque background.
+
+The one decision that makes it cheap is worth knowing before you touch any of it:
+**`EsIsla` is `!EsBarra`, not `== "isla"`**. Seventeen places ask `EsIsla` — the
+hand-set width, the centred alignment, `Expandir`, editing, the margin — and with the
+obvious spelling the notch would have fallen through all seventeen into the bar's
+branch, silently, producing an edge-to-edge bar where a notch was asked for. Asked by
+the negative, the notch inherits all seventeen and there is nothing to go and find.
+
+What the notch actually changes lives in `PanelNube` as pure functions —
+`Esquinas` (which of the four corners take the theme's radius), `MargenEfectivo`,
+`BordeEfectivo(modo, posicion)` — so all of it is fixed by tests without opening a
+window. The radius itself still comes from the **theme**, which is the rule in
+`Forma.cs`: with Cyberpunk at radius 0 the notch is a clean rectangle, and that is not
+a bug, that is Cyberpunk.
 
 ---
 
@@ -187,6 +207,48 @@ This is the part that is mostly P/Invoke, and the part most likely to surprise:
 
 ---
 
+## What's playing
+
+One source, and it needs nothing: `Musica.cs` reads title, artist, playing state,
+position, length, thumbnail and which app is playing from
+`GlobalSystemMediaTransportControlsSessionManager`. Spotify feeds it like any other
+player, so the `spotify` module works on a fresh install with no account, no key and no
+network.
+
+### The two layers that aren't there
+
+Both were built on top of this one and both were pulled. They are written down because
+they will be asked for again, and because what they leave behind is the interesting
+part.
+
+**Spotify's Web API**, signed into with OAuth, adding album name, 640 px cover art and
+Liked Songs. Spotify stopped accepting HTTP loopback redirect URIs —
+`http://127.0.0.1:PORT` — for apps registered after April 2025, while their
+documentation still says loopback is allowed. What remained was HTTPS on loopback with
+a self-signed certificate, which puts a browser security warning in front of the user
+mid-flow, or a private-use URI scheme their Web API docs don't cover. Three cosmetic
+additions don't justify either.
+
+**Synced lyrics** from LRCLIB. These worked, and were pulled for a design reason worth
+keeping: the sung line lived in a strip of the island that grows and shrinks with every
+word, so the bar breathed in time with the lyrics. A bar that moves while you read it
+is not a bar you can read. Tuning the width doesn't fix that — the shape is wrong, and
+the right shape (a fixed-height surface that never moves the island) is a different
+piece of work.
+
+Two things survived, and they are the reason this section exists at all:
+
+- **`EsSpotify` moved down into `Musica.cs`.** Knowing *who* is playing never needed an
+  account: it's a string the media session already hands us. When the top layer came
+  off, nothing below it noticed — which is how you find out the layering was right.
+- **A widget can declare which modes it exists in.** `spotify` lives off the island's
+  elastic width, so it is limited to `isla` and `notch`
+  (`DescriptorWidget.SoloEnModos`). The limit is in the *descriptor* and not in an `if`
+  inside the widget, for the same reason `PuedeNoVerse` exists: placed and absent, "I
+  added it and it doesn't show" means two very different things and there is no way to
+  tell which. In the ficha, the library says it before you add it and `--diagmodulos`
+  doesn't count it as a broken gap.
+
 ## NubeHypr
 
 A window arranger in the style of the Linux tiling managers, built into the bar.
@@ -288,6 +350,7 @@ The file name is the map:
 | `Tema*.cs`, `Roles.cs`, `Catalogo.cs`, `Paleta.cs` | theming |
 | `Nativo.cs`, `Monitores.cs`, `AppBar.cs` | talking to Windows |
 | `Config.cs`, `ConfigArbol.cs`, `Esquema.cs` | configuration |
+| `Musica.cs`, `MainWindow.Spotify.cs` | what's playing |
 
 Everything is under `src/`. The project file, the fonts, the stock themes and the
 installer script stay at the root.

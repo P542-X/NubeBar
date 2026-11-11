@@ -979,6 +979,16 @@ public partial class MainWindow
                     ("isla",  "abajo",     "isla anclada abajo"),
                     ("isla",  "izquierda", "isla anclada a la izquierda, horizontal"),
                     ("isla",  "derecha",   "isla anclada a la derecha, horizontal"),
+                    // Los dos de la notch van aquí y no en el barrido de temas porque lo que
+                    // cambia es la SILUETA, y una silueta solo se comprueba mirándola: que las
+                    // dos esquinas de arriba estén rectas, que no haya aire entre el borde de
+                    // la pantalla y la muesca, y que el fondo sea opaco. Nada de eso se mide
+                    // con un número.
+                    //
+                    // Y no están los laterales: una notch pedida en un lateral se dibuja
+                    // arriba, así que serían dos fotos de la de arriba con otro nombre.
+                    ("notch", "arriba",    "notch pegada al borde de arriba"),
+                    ("notch", "abajo",     "notch abajo, la silueta del revés"),
                     ("barra", "arriba",    "barra de lado a lado, arriba"),
                     ("barra", "abajo",     "barra de lado a lado, abajo"),
                     ("barra", "izquierda", "barra vertical a la izquierda"),

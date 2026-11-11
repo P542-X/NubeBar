@@ -542,7 +542,15 @@ public partial class MainWindow
     // detrás de una barra que no se ve es gasto puro.
     internal void PonerFiloDeLaIsla(Pintura pintura, bool bordeAcento)
     {
-        Isla.BorderThickness = new Thickness(bordeAcento ? pintura.Tema.Medida(Medidas.GrosorFilo, 1) : 0);
+        double grosorFilo = bordeAcento ? pintura.Tema.Medida(Medidas.GrosorFilo, 1) : 0;
+        // En notch, el lado pegado al borde de la pantalla NO lleva filo. La muesca sale del
+        // marco; una raya de 1 px cruzando por arriba dice lo contrario —que es una tarjeta
+        // apoyada en el borde— y deshace de un detalle el efecto entero. Solo lo ve quien
+        // tenga el filo encendido, que de serie está apagado.
+        Isla.BorderThickness = EsNotch
+            ? (Arriba ? new Thickness(grosorFilo, 0, grosorFilo, grosorFilo)
+                      : new Thickness(grosorFilo, grosorFilo, grosorFilo, 0))
+            : new Thickness(grosorFilo);
         if (!bordeAcento) { Isla.BorderBrush = null; return; }
 
         var filo = pintura.R("isla.filo");

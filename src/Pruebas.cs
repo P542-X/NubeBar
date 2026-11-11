@@ -313,6 +313,10 @@ public static partial class Pruebas
             // (Pruebas.Monitores.cs).
             CorrerMonitores();
 
+            // Lo que suena: quién reproduce y en qué modos existe el módulo
+            // (Pruebas.Musica.cs).
+            CorrerMusica();
+
             // C5.9: la superficie de Inicio
             PanelRaizOpaca();
             InicioColgadoDeSuBoton();
@@ -2755,6 +2759,13 @@ public static partial class Pruebas
               "restaurar, el de recargar");
         Igual(VentanaAjustes.Ico.Sonido, VentanaAjustes.IconoDeGrupo("Reacción al sonido"),
               "el sonido, el de volumen");
+        Igual(VentanaAjustes.Ico.Medios, VentanaAjustes.IconoDeGrupo("Música"),
+              "la música, el de medios y no el de volumen");
+        // Y al revés, que es la mitad que importa: la tarjeta del sonido NO se lleva el icono
+        // de música. Son dos cosas distintas —cómo reacciona la barra al sonido, y qué suena—
+        // y con la regla puesta en el otro orden las dos acabarían con el mismo icono.
+        Igual(VentanaAjustes.Ico.Sonido, VentanaAjustes.IconoDeGrupo("Volumen y salida"),
+              "el volumen sigue siendo el de volumen");
 
         // Las mayúsculas y los acentos no cambian la elección
         Igual(VentanaAjustes.IconoDeGrupo("FORMA"), VentanaAjustes.IconoDeGrupo("forma"),

@@ -74,9 +74,10 @@ public partial class MainWindow : Window, IAnfitrionWidget
 
         void R(string id, string nombre, string desc, string glifo, CategoriaWidget cat,
                Func<MainWindow, UIElement> crear, string zona = "Derecha", bool repetible = false,
-               string? puedeNoVerse = null)
+               string? puedeNoVerse = null, string[]? soloEnModos = null)
             => RegistroWidgets.Registrar(new WidgetDeCasa(
-                   new DescriptorWidget(id, nombre, desc, glifo, cat, zona, repetible, puedeNoVerse),
+                   new DescriptorWidget(id, nombre, desc, glifo, cat, zona, repetible, puedeNoVerse,
+                                        soloEnModos),
                    crear));
 
         // ---------- Reloj ----------
@@ -203,6 +204,19 @@ public partial class MainWindow : Window, IAnfitrionWidget
         R("musica-barras", "Música: barras", "Solo las barras que bailan con el sonido", "", CategoriaWidget.Medios,
           i => i.ModuloBarras(),
           puedeNoVerse: "las barras solo se dibujan mientras suena algo");
+
+        // ---------- El de la isla ----------
+        //
+        // `soloEnModos` no es un capricho: vive del ancho elástico de la isla, con el título
+        // recortado contra un tope. En una barra de lado a lado eso se estira de punta a
+        // punta de la pantalla, y en vertical no hay sitio para una línea de texto. Antes de
+        // limitarlo, lo que pasaba era que lo ponías en una barra, salía raro y nada lo
+        // explicaba; ahora la biblioteca lo dice ANTES de que lo añadas.
+        R("spotify", "Lo que suena", "La canción y su carátula; al pulsar, el avance",
+          char.ConvertFromUtf32(Lateral.Glifos.Medios), CategoriaWidget.Medios,
+          i => i.ModuloSpotify(), zona: "Centro",
+          puedeNoVerse: "sin nada sonando no ocupa sitio",
+          soloEnModos: PanelNube.ModosDeIsla);
 
         // ---------- Aspecto ----------
         R("wallpaper", "Wallpaper", "Pausa, silencio y ocultar iconos de Wallpaper Engine", "", CategoriaWidget.Aspecto,
@@ -754,6 +768,19 @@ public partial class MainWindow : Window, IAnfitrionWidget
         FallosDeMontaje.Remove(id);
         var w = RegistroWidgets.Buscar(id);
         if (w == null) return ModuloDesconocido(id);
+
+        // ---------- Un widget que en este modo no existe ----------
+        //
+        // No es un fallo y no deja hueco: se devuelve recogido, que mide cero. Y no es una
+        // sorpresa que haya que explicar aquí, porque la ficha ya lo decía en la biblioteca
+        // antes de que lo añadieras (`DescriptorWidget.Avisos`). Al log va igualmente: «lo
+        // puse y no está» tiene que tener respuesta en algún sitio que se pueda leer.
+        if (!w.Descriptor.ExisteEn(_cfg.Barra.Modo))
+        {
+            Log.Info($"widget \"{id}\": {w.Descriptor.SoloEnTexto}, y la nube está en " +
+                     $"modo {_cfg.Barra.Modo}");
+            return new Border { Visibility = Visibility.Collapsed };
+        }
 
         try { return w.Crear(this); }
         catch (Exception ex)

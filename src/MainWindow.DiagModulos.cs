@@ -186,7 +186,7 @@ public partial class MainWindow
             // nada, por mucho que el modelo diga que el módulo está puesto.
             if (sale)
             {
-                string? avisado = RegistroWidgets.Buscar(id)?.Descriptor.PuedeNoVerse;
+                string? avisado = RegistroWidgets.Buscar(id)?.Descriptor.Avisos;
                 if (TieneTamano(id))
                     Apunta($"   ok   «{id}» ocupa sitio en pantalla");
                 else if (avisado != null)

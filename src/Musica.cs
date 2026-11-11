@@ -27,6 +27,22 @@ public static class Musica
     static GlobalSystemMediaTransportControlsSessionManager? _gestor;
     static bool _intentado;
 
+    // ================= ¿Lo que suena es Spotify? =================
+    //
+    // La sesión dice quién reproduce en `SourceAppUserModelId`. Para la aplicación de
+    // escritorio es `Spotify.exe`; para la de la Microsoft Store, un identificador largo que
+    // empieza por `SpotifyAB.SpotifyMusic`. Las dos llevan «spotify» dentro, así que se mira
+    // por ahí en vez de escribir las dos cadenas y quedarse corto con la tercera.
+    //
+    // Y el navegador NO cuenta: `open.spotify.com` en Edge se anuncia como `msedge.exe`,
+    // porque quien reproduce es el navegador. Que Spotify en el navegador no entre es
+    // correcto y conviene que esté escrito, porque parece un fallo.
+    //
+    // Vivía en `Spotify.cs`, que era el fichero de su API. Esa API ya no está y esto sí:
+    // no necesita cuenta, ni permiso, ni red — es una cadena que ya tenemos en la mano.
+    public static bool EsSpotify(string? appId) =>
+        appId != null && appId.Contains("spotify", StringComparison.OrdinalIgnoreCase);
+
     // La carátula se cachea por título: decodificarla en cada tick sería absurdo
     static string _claveCaratula = "";
     static BitmapImage? _caratula;

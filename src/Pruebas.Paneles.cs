@@ -34,6 +34,7 @@ public static partial class Pruebas
         LaBarraDeScrollEsLaNuestra();
         ElHaloDelPanelLateralNoVaEnLoRecortado();
         LaReservaNoDependeDelModo();
+        LaNotchEsUnaIsla();
         LaIslaCreceEnseguidaYEncogeConCalma();
         LoQueSeCentraMidePar();
         ElCirculoDelDeslizadorNoSeSale();
@@ -311,6 +312,76 @@ public static partial class Pruebas
             Vale(!MainWindow.HayQueReajustarElAncho(ancho, pedido),
                  $"en el filo ({ancho:0} -> {pedido:0}) la isla se queda quieta");
         }
+    }
+
+    // ================= La notch es una isla =================
+    //
+    // ---------- Qué se fija aquí, y por qué por el negativo ----------
+    //
+    // La notch entró sin escribir un solo caso nuevo en los diecisiete sitios que preguntan
+    // `EsIsla`, y eso se sostiene en UNA decisión: `EsIsla` es `!EsBarra`. El día que alguien
+    // la vuelva a escribir como `== "isla"` —que es lo natural de leer y lo que estaba— la
+    // notch se queda sin ancho fijado a mano, sin centrarse, sin `Expandir` y sin margen de
+    // isla. Y no da ningún error: sale una barra de lado a lado donde se pidió una muesca.
+    //
+    // De ahí que la primera comprobación sea que la notch ES una isla, y no que "isla" lo es.
+    static void LaNotchEsUnaIsla()
+    {
+        Grupo("notch");
+
+        Igual(true, PanelNube.EsIsla("isla"), "la isla es una isla");
+        Igual(true, PanelNube.EsIsla("notch"), "y la notch TAMBIÉN: hereda los diecisiete sitios");
+        Igual(false, PanelNube.EsIsla("barra"), "la barra no");
+        Igual(false, PanelNube.EsBarra("notch"), "y una notch no es una barra");
+        Igual(false, PanelNube.EsVertical("notch", "izquierda"),
+              "una notch no se pone vertical ni pedida en un lateral");
+
+        // Los tres modos se reconocen, con mayúsculas, como el resto de los valores del config
+        foreach (var m in PanelNube.Modos)
+            Vale(PanelNube.ModoValido(m.ToUpperInvariant()), $"«{m}» se reconoce en mayúsculas");
+        Igual(false, PanelNube.ModoValido("muesca"), "lo que no es un modo no cuela");
+        Igual(false, PanelNube.ModoValido(null), "ni null");
+        Igual(3, PanelNube.Modos.Length, "y son tres");
+
+        // ---------- El borde ----------
+        //
+        // Una muesca en un lateral se dibuja arriba. En isla y en barra el lateral se respeta,
+        // porque allí significa algo: anclarse a ese lado, o barra vertical.
+        Igual("arriba", PanelNube.BordeEfectivo("notch", "izquierda"), "notch a la izquierda: arriba");
+        Igual("arriba", PanelNube.BordeEfectivo("notch", "derecha"), "notch a la derecha: arriba");
+        Igual("abajo", PanelNube.BordeEfectivo("notch", "abajo"), "notch abajo: abajo, que es el espejo");
+        Igual("izquierda", PanelNube.BordeEfectivo("isla", "izquierda"), "la isla sí se ancla al lado");
+        Igual("izquierda", PanelNube.BordeEfectivo("barra", "izquierda"), "y la barra se pone vertical");
+        Igual(false, PanelNube.CuelgaDeArriba("notch", "abajo"), "y la de abajo no cuelga de arriba");
+        Igual(true, PanelNube.CuelgaDeArriba("notch", "izquierda"), "la del lateral sí, porque está arriba");
+
+        // ---------- Las cuatro esquinas ----------
+        //
+        // Lo que la hace leerse como un recorte del marco. En el orden de WPF:
+        // arriba-izquierda, arriba-derecha, abajo-derecha, abajo-izquierda.
+        Igual((20.0, 20.0, 20.0, 20.0), PanelNube.Esquinas("isla", "arriba", 20),
+              "la isla redondea las cuatro");
+        Igual((20.0, 20.0, 20.0, 20.0), PanelNube.Esquinas("barra", "arriba", 20),
+              "y la barra también");
+        Igual((0.0, 0.0, 20.0, 20.0), PanelNube.Esquinas("notch", "arriba", 20),
+              "la notch de arriba se redondea solo por abajo");
+        Igual((20.0, 20.0, 0.0, 0.0), PanelNube.Esquinas("notch", "abajo", 20),
+              "y la de abajo, al contrario");
+        Igual((0.0, 0.0, 20.0, 20.0), PanelNube.Esquinas("notch", "derecha", 20),
+              "y una pedida en un lateral se redondea como la de arriba, porque ES la de arriba");
+
+        // El radio sigue saliendo del TEMA, que es la regla de Forma.cs: una muesca
+        // rectangular no es un fallo, es Cyberpunk.
+        Igual((0.0, 0.0, 0.0, 0.0), PanelNube.Esquinas("notch", "arriba", 0),
+              "con el tema a radio 0, la muesca es un rectángulo");
+
+        // ---------- Y el margen ----------
+        //
+        // La isla flota y el margen la separa del borde. La notch finge ser el marco, y ocho
+        // píxeles de aire entre el borde y la muesca la delatan del todo.
+        Igual(0.0, PanelNube.MargenEfectivo("notch", 8), "la notch no flota: margen 0");
+        Igual(8.0, PanelNube.MargenEfectivo("isla", 8), "la isla sí, y se queda el que tenga");
+        Igual(8.0, PanelNube.MargenEfectivo("barra", 8), "y la barra igual");
     }
 
     // ================= Reservar espacio: una elección, no un modo =================

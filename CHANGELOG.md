@@ -6,6 +6,78 @@ construidos por el workflow de Release a partir de la etiqueta.
 
 ---
 
+## v1.1.0
+
+### Añadido
+
+- **Modo notch.** Un tercer modo de nube, además de isla y barra: pegada al borde sin
+  margen, redondeada solo por el lado que da a la pantalla y con el fondo opaco, como la
+  muesca de un MacBook. Hace todo lo que hace la isla —se centra, se abre al pasar el ratón,
+  los paneles salen de dentro— porque **es** una isla: lo único que cambia es la silueta.
+
+  El radio sigue saliendo del tema, que es la regla de `Forma.cs`. Con Cyberpunk, que va a
+  radio 0, la muesca sale rectangular, y eso no es un fallo: es Cyberpunk.
+
+  Lo que lo ha hecho barato cabe en una línea: `EsIsla` ha pasado de preguntar
+  `Modo == "isla"` a preguntar `!EsBarra`. Con la forma de antes, los diecisiete sitios que
+  preguntan `EsIsla` —el ancho fijado a mano, la alineación centrada, `Expandir`, la
+  edición, el margen— se habrían ido todos por la rama de la barra sin dar un solo error, y
+  habría salido una barra de lado a lado donde se pidió una muesca. Preguntando por el
+  negativo, la notch hereda los diecisiete.
+
+- **Lo que suena, en la isla.** Un módulo nuevo, `spotify`: carátula, canción y artista, y
+  al pulsarlo un panel con la carátula, el avance y los tiempos.
+
+  Funciona sin configurar nada y **sin que salga nada de tu equipo**: todo viene de la
+  sesión de medios de Windows, la misma de la que viven los módulos `musica` de siempre. Así
+  que vale para Spotify, para el navegador y para cualquier reproductor. Y con
+  `Musica.SoloSpotify` se calla con todo lo que no sea Spotify, que tampoco necesita cuenta:
+  quién reproduce lo dice la propia sesión.
+
+  **Solo existe en modo isla y notch**, y lo dice la biblioteca antes de que lo añadas: vive
+  del ancho elástico de la isla, y en una barra de lado a lado el título se estira de punta
+  a punta de la pantalla.
+
+- **Y dos capas que se construyeron y se quitaron**, antes de publicar ninguna de las dos.
+  Se apuntan porque las dos se van a volver a pedir:
+
+  **La API de Spotify**, con inicio de sesión por OAuth, que añadía el nombre del álbum, la
+  carátula a 640 px y el corazón de «Me gusta». Spotify dejó de aceptar URL de retorno por
+  HTTP en loopback (`http://127.0.0.1:PUERTO`) para aplicaciones registradas desde abril de
+  2025, aunque su documentación siga diciendo que valen. Lo que quedaba era HTTPS en
+  loopback con un certificado autofirmado —con su pantalla roja de aviso en el navegador,
+  delante del usuario— o un esquema propio que su documentación de la Web API no contempla.
+  Tres adornos no valen eso.
+
+  **La letra sincronizada**, desde LRCLIB. Esa funcionaba: traía la letra y seguía el verso
+  al milisegundo sin una consulta más de las que ya se hacían, extrapolando la posición en
+  local entre lecturas de la sesión de medios. Se quitó por cómo quedaba: el verso vivía en
+  una línea de la isla que crece y se encoge con cada palabra, así que la barra respiraba al
+  ritmo de la letra. Una barra que se mueve mientras la lees no se puede leer, y eso no se
+  arregla afinando el ancho — la forma buena pide una superficie de alto fijo que no mueva
+  la isla, y eso es otro trabajo.
+
+  De todo aquello quedan dos cosas, que son la parte que interesa: `EsSpotify` bajó a
+  `Musica.cs` —saber QUIÉN reproduce nunca necesitó cuenta, es una cadena que la sesión de
+  medios ya nos da— y al quitar las capas de arriba no se movió nada de abajo. Que es como
+  se descubre que las capas estaban bien puestas.
+
+### Y la casa, más ordenada
+
+- Un widget puede declarar **en qué modos existe** (`DescriptorWidget.SoloEnModos`), y la
+  biblioteca lo cuenta antes de que lo añadas en vez de dejarte un hueco sin explicación.
+  Es el mismo razonamiento que `PuedeNoVerse`, aplicado a algo que se sabe sin montar nada:
+  las dos frases salen ahora juntas por `Descriptor.Avisos`, que es lo que leen la
+  biblioteca, el editor, Ajustes y `--diagmodulos`.
+- La validación del modo en los perfiles y el desplegable de Ajustes han dejado de llevar la
+  lista de modos escrita a mano: preguntan a `PanelNube.Modos`. Las dos copias se habrían
+  quedado atrás el día de la notch, y el fallo es del silencioso: un perfil con un modo
+  bueno rechazado por un sitio que nadie mira.
+- `--diagpaneles` mide la notch y `--capturas` la fotografía arriba y abajo, que es la única
+  forma de comprobar una silueta.
+
+---
+
 ## v1.0.1
 
 ### Arreglado

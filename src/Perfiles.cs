@@ -257,8 +257,12 @@ public static class Perfiles
                         ? null : "no es una visibilidad conocida";
                 if (clave.Equals("Modo", StringComparison.OrdinalIgnoreCase))
                 {
+                    // Pregunta al modelo en vez de llevar la lista escrita aquí. Esta copia
+                    // se habría quedado atrás el día de la notch, y el fallo es silencioso:
+                    // un perfil con un modo bueno rechazado por un sitio que nadie mira.
                     var m = valor.GetValue<string>();
-                    return m is "isla" or "barra" ? null : "no es isla ni barra";
+                    return PanelNube.ModoValido(m)
+                        ? null : "no es ninguno de " + string.Join(", ", PanelNube.Modos);
                 }
                 if (clave is "Grosor" or "Margen")
                 {

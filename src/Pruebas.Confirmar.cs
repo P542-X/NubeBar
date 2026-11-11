@@ -125,6 +125,10 @@ public static partial class Pruebas
                 "English", "auto",
                 // Palabras que el inglés tomó prestadas o nos prestó a nosotros.
                 "Anime", "Layout", "layout",
+                // Y «notch», que es de las que nos prestó: en español nadie llama «muesca» a
+                // esto, y en inglés no hay otra palabra. Declarada aquí y no traducida a la
+                // ligera, que es de lo que va esta lista.
+                "notch",
             };
 
             int vacias = 0, copiadas = 0;

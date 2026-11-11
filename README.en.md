@@ -17,7 +17,9 @@ Collapsed, it only shows the clock. Move the mouse near it and it opens:
 ## What it does
 
 **The bar**
-- *Island* mode (floating, centred) or *bar* mode (edge to edge), top or bottom.
+- *Island* mode (floating, centred), *bar* mode (edge to edge) or *notch* mode
+  (flush against the edge, rounded only on the side facing the screen and with an
+  opaque background, like a MacBook's notch), top or bottom.
 - Hides the Windows taskbar — the main one and the secondary ones — and gives
   them back untouched when it closes.
 - **It floats, or it keeps its place. Your call.** Out of the box the cloud
@@ -25,11 +27,12 @@ Collapsed, it only shows the clock. Move the mouse near it and it opens:
   keeps its strip the way it does for the taskbar, so maximised windows only
   reach the point where the cloud starts — a real appbar, and it works the same
   in island mode as in bar mode.
-- **Twenty-five modules** you can place across three zones (left, centre,
+- **Twenty-six modules** you can place across three zones (left, centre,
   right): `inicio`, `apps`, `fijadas`, `reloj`, `fecha`, `cpu`, `ram`,
   `bateria`, `pila`, `bandeja`, `control`, `red`, `volumen`, `teclado`,
   `escritorios`, `monitores`, `notificaciones`, `musica` (or just its cover art,
-  or just its bars), `wallpaper` (or just the wallpaper title), `iconos`, `nube`,
+  or just its bars), `spotify`, `wallpaper` (or just the wallpaper title),
+  `iconos`, `nube`,
   `separador`. You pick and reorder them by dragging in **Settings → Modules**,
   and the ones you don't want are kept in the library instead of deleted.
 - Accent-coloured edge and glow, with spring animations running at your
@@ -39,6 +42,14 @@ Collapsed, it only shows the clock. Move the mouse near it and it opens:
   keep hold of it; the moment you move the mouse away, it springs back home.
 - The island **takes the shape of what it is showing**: with a narrow panel it
   stays collapsed instead of stretching edge to edge.
+
+**Music**
+- **What's playing, in the island**: cover art, track and artist, and a click opens
+  a panel with the cover, the progress and the times. It comes from the Windows
+  media session, so it works with Spotify, with the browser and with any media
+  player, with nothing to configure: no account, no keys, no permissions.
+- And optionally **only when Spotify is playing**, if whatever the browser is
+  making noise with isn't what you want to see.
 
 **Apps**
 - A carousel of your open windows, grouped by program, with the scroll wheel to
@@ -436,7 +447,7 @@ again here.
 
 | Key | Default | What it does |
 |---|---|---|
-| `Barra.Modo` | `"isla"` | `"isla"` (floating) or `"barra"` (edge to edge) |
+| `Barra.Modo` | `"isla"` | `"isla"` (floating), `"barra"` (edge to edge) or `"notch"` (flush against the edge, like a MacBook's notch) |
 | `Barra.Posicion` | `"arriba"` | `"arriba"` (top) or `"abajo"` (bottom) |
 | `Barra.Alto` | `38` | Height of the module row |
 | `Barra.Margen` | `8` | Gap to the edge of the screen |
@@ -473,15 +484,21 @@ Lists of names; the order is the order they appear in.
 }
 ```
 
-All twenty-five: `inicio`, `apps`, `fijadas`, `reloj`, `fecha`, `cpu`, `ram`,
+All twenty-six: `inicio`, `apps`, `fijadas`, `reloj`, `fecha`, `cpu`, `ram`,
 `bateria`, `pila`, `bandeja`, `control`, `red`, `volumen`, `teclado`,
 `escritorios`, `monitores`, `notificaciones`, `nube`, `musica`,
-`musica-caratula`, `musica-barras`, `wallpaper`, `wallpaper-titulo`, `iconos`,
-`separador`.
+`musica-caratula`, `musica-barras`, `spotify`, `wallpaper`, `wallpaper-titulo`,
+`iconos`, `separador`.
 
 The list comes from the widget registry, so it is the same in the config, in
 **Settings → Modules** and in the log. `musica-caratula` and `musica-barras` are
 the cover art and the bars separately, for anyone who doesn't want both.
+
+`spotify` **only exists in island mode and in notch mode**, and that is not an
+oversight: it lives off the island's elastic width, with the title trimmed against a
+cap. In an edge-to-edge bar that stretches across the whole screen, and in a vertical
+bar there is no room for a line of text. Put it in bar mode and it is not drawn, and
+the widget library says so before you add it.
 
 There is also a `Paneles` key, and since B5 it is **the authority** on the
 cloud's geometry: edge, mode, thickness, margin, visibility, which monitors it
@@ -500,6 +517,46 @@ now). They are one click away without moving the mouse closer, and they don't
 shift position when the island expands, because the centre is the only zone that
 doesn't move. If you prefer a small island at rest, move them to the left in
 Settings → Modules.
+
+### Music
+
+| Key | Default | What it does |
+|---|---|---|
+| `Musica.SoloSpotify` | `false` | The music modules stay quiet for anything that isn't Spotify |
+
+The track, the artist, the cover art, the progress and the length all come from the
+**Windows media session**, the same one the old `musica` modules live off. No account,
+no key, no permissions, and **nothing leaves your machine**: Spotify, the browser and
+any media player feed it alike.
+
+One thing that looks like a bug and isn't: **Spotify in the browser doesn't count** as
+Spotify for `Musica.SoloSpotify`. Windows announces it as the browser, because the
+browser is what's playing.
+
+<details>
+<summary><b>Two things this had and no longer has</b></summary>
+
+Both were built and both were pulled. Written down here so nobody walks the same road
+twice:
+
+**Spotify's Web API**, with OAuth sign-in, which added the album name, 640 px cover art
+and the Liked Songs heart. Spotify stopped accepting HTTP loopback redirect URLs —
+`http://127.0.0.1:PORT` — for apps registered from April 2025 onwards, even though
+their own documentation still says they are allowed. What was left was serving it over
+HTTPS with a self-signed certificate, which puts a red "this site is not secure" page
+in front of the user mid-flow, or a private-use scheme like `nubebar://` that their Web
+API documentation does not cover. Three cosmetic additions are not worth that.
+
+**Synced lyrics**, from [LRCLIB](https://lrclib.net). They worked — the lyrics arrived
+and the line was followed to the millisecond — but they were pulled because they didn't
+look right: the line lived in a strip of the island that grows and shrinks with every
+word, so the bar breathed in time with the lyrics. That isn't fixed by tuning the
+width; doing it properly needs a fixed-height surface that doesn't move the island, and
+that is a different piece of work.
+
+If either comes back, let it come back knowing this.
+
+</details>
 
 ### Start menu
 

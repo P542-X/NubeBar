@@ -9,11 +9,17 @@ namespace NubeBar;
 // El runner de `--diagpaneles`. Ver DiagPaneles.cs para qué comprueba y por qué.
 public partial class MainWindow
 {
-    // Las cinco colocaciones de la barra. El modo isla va aparte del modo barra porque la
+    // Las seis colocaciones de la barra. El modo isla va aparte del modo barra porque la
     // isla mide distinto —se recoge— y el recorte en tarjeta solo existe ahí.
+    //
+    // La notch entra con una sola fila, y no por ahorrar: su cajón es el de la isla y su
+    // ancho lo mide la isla, así que lo único que puede romperse es el margen cero y la
+    // silueta. Si midiera distinto tendría que estar aquí entera, y ese es el día en que
+    // esta lista crece.
     static readonly (string Modo, string Posicion)[] ColocacionesDeLaBarra =
     {
         ("isla", "arriba"),
+        ("notch", "arriba"),
         ("barra", "arriba"),
         ("barra", "abajo"),
         ("barra", "izquierda"),
