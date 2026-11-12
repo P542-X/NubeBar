@@ -608,9 +608,15 @@ del tema nuevo sobre una concha del viejo. Medido en Sakura: concha `#0F0F16` co
    cada pieza a preguntar por su clave. Mientras tenga alguno, ahí está.
 2. **De Ajustes > Colores**: editar degradados y «Elegir en pantalla» (ver
    para por qué los dos esperan al Estudio y a las fases 1-8).
-3. **El chaflán** de Videojuegos y Cyberpunk es hoy un radio 0, o sea una esquina recta. La
-   esquina CORTADA en diagonal es de la fase 7, y hasta entonces esos dos temas se ven más
-   cuadrados de lo que la maqueta pide.
+3. ~~**El chaflán** de Videojuegos y Cyberpunk es hoy un radio 0, o sea una esquina recta.~~
+   **Cerrado en la v1.1.2, y por la otra punta.** La fase 7 cortó la esquina en diagonal en
+   los paneles y en las tarjetas (`ChaflanSiToca`), pero no en la **isla**, que se viste a
+   mano en `AplicarTema` y solo entiende de radios. O sea que lo que quedaba a la vista todo
+   el día era una isla de cuatro esquinas rectas con paneles cortados colgando de ella: lo
+   peor de las dos formas. Lo zanjó el usuario en una frase —«no quiero que ningún tema tenga
+   forma de rectángulo»— y los dos temas pasan a redondos (isla 20, panel 18, tarjeta 14,
+   botón 10). El chaflán se queda como clave del tema para quien se haga el suyo; la regla
+   está escrita en `NingunTemaEsUnRectangulo`.
 4. **El halo de la isla está apagado a propósito**, y conviene leer esto antes de encenderlo
    en la fase 2. `Isla` tiene `ClipToBounds="True"` —lo necesita: es lo que recorta el cajón
    al crecer— y un `DropShadowEffect` sobre un elemento recortado se recorta con él, al

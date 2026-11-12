@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -2862,9 +2862,9 @@ public static partial class Pruebas
 foreach (var t in TemasDeSerie.Lista)
         {
             var e = Formas.Del(new Pintura(t));
-            // El radio puede ser 0: Videojuegos y Cyberpunk van en chaflán, y eso es una
-            // decisión de la maqueta, no un número que se haya ido de madre.
-            Vale(e.RadioCard >= 0 && e.RadioCard <= 24,
+            // Y no puede ser 0: ningún tema de serie es rectangular (ver
+            // `NingunTemaEsUnRectangulo`), así que un 0 aquí sería un tema mal escrito.
+            Vale(e.RadioCard > 0 && e.RadioCard <= 24,
                  $"«{t.Nombre}»: el radio de tarjeta es razonable ({e.RadioCard})");
             Vale(e.RadioShell >= e.RadioCard,
                  $"«{t.Nombre}»: el contenedor redondea al menos tanto como sus tarjetas");

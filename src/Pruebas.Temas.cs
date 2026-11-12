@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Media;
@@ -26,6 +26,65 @@ public static partial class Pruebas
         ContrasteDeLosNueve();
         AjustesNuncaIlegible();
         MigracionDelTema();
+        NingunTemaEsUnRectangulo();
+    }
+
+
+    // ================= Ningún tema tiene forma de rectángulo =================
+    //
+    // ---------- De dónde sale esto ----------
+    //
+    // «No quiero que ningún tema tenga forma de rectángulo.»
+    //
+    // Videojuegos y Cyberpunk iban a radio 0 en las cuatro piezas y declaraban
+    // `esquinas: chaflan`. La idea era que no fueran rectángulos sino esquinas cortadas en
+    // diagonal, y en los paneles y las tarjetas lo eran: `ChaflanSiToca` los recorta.
+    //
+    // Pero la ISLA no pasa por ahí. Se viste a mano en `AplicarTema` y solo entiende de
+    // radios, así que con radio 0 y sin nadie que le aplicara el chaflán quedaba un
+    // rectángulo de cuatro esquinas rectas — y la isla es lo que tienes delante todo el día.
+    // Era el fallo de siempre en este proyecto: la pieza buena existe y hay una superficie
+    // que no la llama.
+    //
+    // Se resolvió por donde se decide la forma, que es el tema y no el código: los dos pasan
+    // a redondos en `temas-de-serie.json`. El chaflán se queda —es una clave del tema y un
+    // tema de alguien puede pedirlo—, lo que se retira es que dos de los nueve lo llevaran.
+    //
+    // Esta prueba es la frase del usuario, escrita donde no se puede ignorar: cualquier tema
+    // de serie que vuelva a nacer rectangular la rompe antes de salir de aquí.
+    static void NingunTemaEsUnRectangulo()
+    {
+        Grupo("ningún tema es un rectángulo");
+
+        Igual(9, TemasDeSerie.Lista.Count(), "siguen siendo nueve");
+
+        foreach (var t in TemasDeSerie.Lista)
+        {
+            // Las cuatro piezas, no solo la isla: un panel recto colgando de una isla redonda
+            // es la incoherencia que había antes, del derecho en vez de del revés.
+            foreach (var pieza in new[] { Piezas.Isla, Piezas.Panel, Piezas.Tarjeta, Piezas.Boton })
+            {
+                double r = t.Radio(pieza, 0);
+                Vale(r > 0, $"[{t.Nombre}] «{pieza}» no es un rectángulo (radio {r:0.#})");
+            }
+
+            // Y tampoco por la otra puerta: el chaflán deja la esquina recta en todo lo que
+            // NO pasa por `ChaflanSiToca`, que es justamente la isla.
+            Igual(Esquinas.Redondas, t.Esquinas, $"[{t.Nombre}] va en esquinas redondas");
+        }
+
+        // La forma sigue saliendo del tema: que ninguno sea recto no quiere decir que todos
+        // redondeen igual. Si acabaran todos en el mismo número, el selector de temas dejaría
+        // de notarse, que es lo que el rediseño vino a arreglar.
+        int distintos = TemasDeSerie.Lista.Select(t => t.Radio(Piezas.Isla, 0)).Distinct().Count();
+        Vale(distintos >= 4, $"y cada uno redondea lo suyo ({distintos} radios de isla distintos)");
+
+        // Lo que NO se ha tocado: la pieza que dibuja el chaflán sigue entera, porque la
+        // clave del tema sigue existiendo para quien se haga el suyo.
+        var corte = MainWindow.FormaDeChaflan(100, 40, 10);
+        Vale(corte.FillContains(new System.Windows.Point(50, 20)), "el chaflán sigue sabiendo dibujarse");
+        Igual(false, corte.FillContains(new System.Windows.Point(1, 1)),
+              "y sigue cortando la esquina de arriba-izquierda");
     }
 
     // ================= Relleno: leer lo que escribió la maqueta =================
@@ -121,8 +180,8 @@ public static partial class Pruebas
         Vale(pro.Declarado(ClavesBase.FiloPanel)!.EsDegradado, "Profesional: el filo del panel es un degradado");
 
         var juegos = TemasDeSerie.De("videojuegos");
-        Igual(Esquinas.Chaflan, juegos.Esquinas, "Videojuegos va en chaflán");
-        Igual(0.0, juegos.Radio(Piezas.Isla, 99), "y con radio 0");
+        Igual(Esquinas.Redondas, juegos.Esquinas, "Videojuegos va redondo, como los nueve");
+        Igual(20.0, juegos.Radio(Piezas.Isla, 99), "con la isla a radio 20");
         Vale(juegos.Lleva("modo-rgb"), "Videojuegos lleva el modo RGB");
         Igual("Rajdhani", juegos.Fuente, "con la letra Rajdhani");
 

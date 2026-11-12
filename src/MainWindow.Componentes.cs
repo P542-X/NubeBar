@@ -41,8 +41,8 @@ public partial class MainWindow
     // Si cada panel elige sus números, cada panel mide distinto. Estos son los de todos.
     //
     // Y desde el rediseño salen del TEMA, no de un ajuste aparte: la forma es un valor del
-    // tema igual que lo son los colores, así que Videojuegos va en chaflán y a radio 0 y
-    // Sakura a 25 sin que nadie tenga que elegir dos cosas que en realidad son una.
+    // tema igual que lo son los colores, así que Oficina va a 12 y Sakura a 25 sin que nadie
+    // tenga que elegir dos cosas que en realidad son una.
     //
     // Se calcula una vez por tema aplicado y no en cada pregunta: `Formas.Del` mira
     // decoraciones y resuelve colores, y esto se pide tres veces por tarjeta.
@@ -476,10 +476,20 @@ public partial class MainWindow
 
     // ================= El chaflán =================
     //
-    // Videojuegos y Cyberpunk declaran `esquinas: chaflan`: la esquina CORTADA en diagonal,
-    // no la esquina recta. Hasta ahora se aproximaba poniéndoles radio 0, que es otra cosa —
-    // un rectángulo a secas es lo que hace cualquier programa que no ha decidido nada, y el
-    // chaflán es una decisión que se ve.
+    // La esquina CORTADA en diagonal, no la esquina recta. Un tema la pide con
+    // `esquinas: chaflan`, y entonces sus superficies se recortan en vez de redondearse.
+    //
+    // ---------- Hoy no la lleva ningún tema de serie, y sigue aquí ----------
+    //
+    // La llevaban Videojuegos y Cyberpunk, que además iban a radio 0. El usuario lo zanjó en
+    // una frase —«no quiero que ningún tema tenga forma de rectángulo»— y los dos pasaron a
+    // redondos: el chaflán se aplicaba a los paneles y a las tarjetas pero NO a la isla, que
+    // se viste a mano y solo entiende de radios, así que lo que se veía todo el día era una
+    // isla de cuatro esquinas rectas con paneles cortados colgando de ella.
+    //
+    // Esto no se borra: `esquinas: chaflan` sigue siendo una clave del tema y un tema de
+    // alguien puede pedirla. Lo que se ha retirado es la decisión de que dos de los nueve la
+    // llevaran, no la posibilidad.
     //
     // ---------- Por qué un Clip y no un Border con forma ----------
     //

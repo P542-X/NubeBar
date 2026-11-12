@@ -682,13 +682,13 @@ public static partial class Pruebas
 
         // ---------- Pero los radios SÍ salen del tema ----------
         //
-        // Es la mitad que de verdad cambia: Videojuegos y Cyberpunk van a 0 porque van en
-        // chaflán, y Sakura va redonda. Un selector de temas en el que todos redondean igual
-        // es un selector que no se nota.
+        // Es la mitad que de verdad cambia: Oficina apenas se curva, Sakura va bien redonda.
+        // Un selector de temas en el que todos redondean igual es un selector que no se nota.
+        // Lo que ya no hay es ninguno a cero: ver `NingunTemaEsUnRectangulo`.
         Igual(14.0, profesional.RadioCard, "Profesional: el radio de tarjeta es el suyo");
         Igual(20.0, profesional.RadioShell, "y el de la concha");
-        Igual(0.0, Formas.Del(new Pintura(TemasDeSerie.De("videojuegos"))).RadioShell,
-              "Videojuegos va a radio 0: es de chaflán");
+        Igual(12.0, Formas.Del(new Pintura(TemasDeSerie.De("oficina"))).RadioShell,
+              "Oficina redondea poco, que es lo suyo");
         Igual(24.0, Formas.Del(new Pintura(TemasDeSerie.De("sakura"))).RadioShell,
               "y Sakura, bien redonda");
 
@@ -731,23 +731,28 @@ public static partial class Pruebas
         // ---------- Ninguna forma puede dejar una superficie sin forma ----------
         //
         // Un relleno a cero no es «más sobrio», es una tarjeta rota; y un filo de grosor cero
-        // deja dos tarjetas pegadas sin línea entre ellas. El radio SÍ puede ser 0: el chaflán
-        // de Videojuegos y Cyberpunk es una decisión de la maqueta, no una tarjeta rota.
+        // deja dos tarjetas pegadas sin línea entre ellas. El radio tampoco: desde que ningún
+        // tema de serie es rectangular, un 0 aquí es un tema mal escrito.
         foreach (var t in TemasDeSerie.Lista)
         {
             var f = Formas.Del(new Pintura(t));
             Vale(f.Dentro >= 8, $"[{t.Nombre}] el texto no se pega al filo");
             Vale(f.Hueco > 0, $"[{t.Nombre}] las tarjetas no se tocan");
             Vale(f.GrosorFilo > 0, $"[{t.Nombre}] el filo se ve");
-            Vale(f.RadioCard >= 0 && f.RadioShell >= 0, $"[{t.Nombre}] los radios no son negativos");
+            Vale(f.RadioCard > 0 && f.RadioShell > 0, $"[{t.Nombre}] ninguna superficie es un rectángulo");
         }
 
         // ---------- Y el usuario manda sobre el radio del tema ----------
+        //
+        // El 7 no es un número cualquiera: tiene que NO ser el del tema. Esto se escribió con
+        // un 18 cuando Videojuegos iba a 0, y el día que el tema pasó a 18 la prueba dejó de
+        // comprobar nada —el valor del usuario y el del tema eran el mismo— y además falló.
+        // Una prueba de «manda A sobre B» con A igual a B no es una prueba.
         var conRadio = new Pintura(TemasDeSerie.De("videojuegos"), null,
-                                   new Dictionary<string, double> { ["panel"] = 18 });
-        Igual(18.0, Formas.Del(conRadio).RadioShell,
+                                   new Dictionary<string, double> { ["panel"] = 7 });
+        Igual(7.0, Formas.Del(conRadio).RadioShell,
               "el radio que pone el usuario manda sobre el del tema");
-        Igual(0.0, Formas.Del(new Pintura(TemasDeSerie.De("videojuegos"))).RadioShell,
+        Igual(18.0, Formas.Del(new Pintura(TemasDeSerie.De("videojuegos"))).RadioShell,
               "y no se pega al tema de al lado");
     }
 

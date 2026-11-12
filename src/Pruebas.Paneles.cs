@@ -374,10 +374,11 @@ public static partial class Pruebas
         Igual((0.0, 0.0, 20.0, 20.0), PanelNube.Esquinas("notch", "derecha", 20),
               "y una pedida en un lateral se redondea como la de arriba, porque ES la de arriba");
 
-        // El radio sigue saliendo del TEMA, que es la regla de Forma.cs: una muesca
-        // rectangular no es un fallo, es Cyberpunk.
+        // El radio sigue saliendo del TEMA, que es la regla de Forma.cs. Con un 0 la muesca
+        // sale rectangular, y eso ya no lo pide ningún tema de serie —ninguno es rectangular—
+        // pero la función tiene que contestar igual: un tema de alguien puede pedirlo.
         Igual((0.0, 0.0, 0.0, 0.0), PanelNube.Esquinas("notch", "arriba", 0),
-              "con el tema a radio 0, la muesca es un rectángulo");
+              "con un tema a radio 0, la muesca es un rectángulo");
 
         // ---------- Y el margen ----------
         //
@@ -439,9 +440,10 @@ public static partial class Pruebas
         Vale(comoEstaba.FillContains(new Point(2, 38)),
              "con un radio solo —el de arriba-izquierda— la esquina de abajo salía cuadrada");
 
-        // Un tema a radio 0 da un rectángulo limpio, y eso no es un fallo: es Cyberpunk.
+        // Radio 0 en las cuatro: rectángulo entero. Ningún tema de serie lo pide ya, pero la
+        // forma tiene que saber dibujarlo.
         var cero = MainWindow.FormaRedondeada(r, new CornerRadius(0));
-        Vale(cero.FillContains(new Point(0.5, 0.5)), "con el tema a radio 0, la esquina está dentro");
+        Vale(cero.FillContains(new Point(0.5, 0.5)), "con un radio 0, la esquina está dentro");
         Vale(cero.FillContains(new Point(599.5, 39.5)), "y la de la otra punta también");
 
         // Y un radio imposible se topa a la mitad del lado corto en vez de dar la vuelta.

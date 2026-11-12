@@ -47,8 +47,8 @@ What the notch actually changes lives in `PanelNube` as pure functions —
 `Esquinas` (which of the four corners take the theme's radius), `MargenEfectivo`,
 `BordeEfectivo(modo, posicion)` — so all of it is fixed by tests without opening a
 window. The radius itself still comes from the **theme**, which is the rule in
-`Forma.cs`: with Cyberpunk at radius 0 the notch is a clean rectangle, and that is not
-a bug, that is Cyberpunk.
+`Forma.cs`: Oficina at 12 barely curves, Sakura at 25 is a droplet. What the notch
+decides is *which* of the four corners, never how much.
 
 One thing has to carry those four radii and is easy to miss: **the drawer's clip**. While a
 panel is open the silhouette is drawn by `Isla.Clip`, not by the `CornerRadius`, and a clip

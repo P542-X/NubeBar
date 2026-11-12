@@ -6,6 +6,37 @@ construidos por el workflow de Release a partir de la etiqueta.
 
 ---
 
+## v1.1.2
+
+### Cambiado
+
+- **Ningún tema tiene ya forma de rectángulo.** Videojuegos y Cyberpunk iban a radio 0 en
+  las cuatro piezas y declaraban `esquinas: chaflan`, que es la esquina cortada en diagonal.
+  La intención era que no fueran rectángulos sino algo más anguloso, y en los **paneles** y
+  en las **tarjetas** lo eran: `ChaflanSiToca` los recorta.
+
+  Pero la **isla** no pasa por ahí. Se viste a mano en `AplicarTema` y solo entiende de
+  radios, así que con radio 0 y sin nadie que le aplicara el chaflán quedaban cuatro esquinas
+  rectas — y la isla es lo que tienes delante todo el día. El resultado era lo peor de las dos
+  cosas: una barra rectangular con paneles cortados en diagonal colgando de ella.
+
+  Era el fallo de siempre en este proyecto: la pieza buena existe y hay una superficie que no
+  la llama. Estaba apuntado desde la fase 0 (`docs/REDISENO-VISUAL.md`, pendiente 3) como algo
+  que arreglaría la fase 7, y la fase 7 lo arregló en todas partes menos donde se ve.
+
+  Se cierra por donde se decide la forma, que es el **tema** y no el código: los dos pasan a
+  esquinas redondas, con la isla a 20, el panel a 18, la tarjeta a 14 y el botón a 10. El
+  chaflán no se borra —`esquinas: chaflan` sigue siendo una clave del tema y un tema tuyo
+  puede pedirla—; lo que se retira es que dos de los nueve la llevaran.
+
+  La regla queda escrita como prueba (`NingunTemaEsUnRectangulo`): las cuatro piezas de los
+  nueve temas con radio mayor que cero y esquinas redondas. Un tema de serie que vuelva a
+  nacer rectangular no sale de la batería. Y se comprueba también lo contrario, que es lo que
+  el rediseño vino a arreglar: que no redondeen todos igual, o el selector de temas deja de
+  notarse.
+
+---
+
 ## v1.1.1
 
 ### Arreglado

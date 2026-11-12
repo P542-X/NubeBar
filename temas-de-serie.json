@@ -107,12 +107,12 @@
       "fuente": "Rajdhani",
       "fuente-titulos": "Rajdhani",
       "radios": {
-        "isla": 0,
-        "panel": 0,
-        "tarjeta": 0,
-        "boton": 0
+        "isla": 20,
+        "panel": 18,
+        "tarjeta": 14,
+        "boton": 10
       },
-      "esquinas": "chaflan",
+      "esquinas": "redondas",
       "decoraciones": [
         "halo",
         "destello-filo",
@@ -188,12 +188,12 @@
       "fuente": "Rajdhani",
       "fuente-titulos": "Orbitron",
       "radios": {
-        "isla": 0,
-        "panel": 0,
-        "tarjeta": 0,
-        "boton": 0
+        "isla": 20,
+        "panel": 18,
+        "tarjeta": 14,
+        "boton": 10
       },
-      "esquinas": "chaflan",
+      "esquinas": "redondas",
       "decoraciones": [
         "halo",
         "destello-filo",

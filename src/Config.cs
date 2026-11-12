@@ -35,8 +35,8 @@ public class Tema
     //
     // Pieza (`isla`, `panel`, `tarjeta`, `boton`) → radio, solo lo que el usuario ha tocado.
     // Mismo mecanismo que `Colores` y por el mismo motivo: el radio es un valor del tema
-    // —Profesional la quiere en 23 y Videojuegos en 0, en chaflán— y lo que el usuario cambia
-    // va encima, no en lugar de.
+    // —Profesional la quiere en 23 y Oficina en 12— y lo que el usuario cambia va encima, no
+    // en lugar de.
     //
     // Antes era `Tema.Radio`, un número para todo. La migración v4→v5 lo pasó aquí si estaba
     // cambiado; si valía 20 (el de serie de entonces) no se arrastra, porque nadie lo eligió.
@@ -71,7 +71,7 @@ public class Tema
 
     // `Tema.Estilo` —«normal», «nube» o «neon»— ya no existe aquí. Los tres estilos se
     // retiraron con el rediseño (decisión A): la forma es un valor del TEMA, no un ajuste
-    // aparte, así que Videojuegos va en chaflán y Sakura redonda sin que haya que acertar
+    // aparte, así que Oficina va casi recta y Sakura bien redonda sin que haya que acertar
     // dos veces para que una cosa cuadre. Ver `Forma.cs`.
     //
     // En el fichero de quien la tenga, la clave sigue ahí y no molesta: la misma regla que
@@ -505,8 +505,13 @@ public class PanelNube
     // recorte del marco en vez de como una tarjeta apoyada en el borde.
     //
     // El radio sigue saliendo del TEMA y no de un número escrito aquí, que es la regla de
-    // `Forma.cs`: Cyberpunk va a 0 y su notch es un rectángulo limpio, Sakura va a 25 y la
-    // suya es una gota. Lo que la notch decide es CUÁLES de las cuatro, no cuánto.
+    // `Forma.cs`: Oficina va a 12 y su notch apenas se curva, Sakura va a 25 y la suya es una
+    // gota. Lo que la notch decide es CUÁLES de las cuatro, no cuánto.
+    //
+    // Que la función aguante un radio 0 —y devuelva entonces un rectángulo— no es un caso que
+    // tenga hoy ningún tema: desde que ninguno es rectangular (ver `temas-de-serie.json`), el
+    // 0 solo puede venir de un tema de alguien. Se sostiene porque es una función pura y
+    // negarse a un número válido sería inventarse una regla aquí abajo.
     //
     // En el orden de WPF: arriba-izquierda, arriba-derecha, abajo-derecha, abajo-izquierda.
     public static (double AI, double AD, double BD, double BI) Esquinas(
