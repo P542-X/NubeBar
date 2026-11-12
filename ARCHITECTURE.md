@@ -50,6 +50,13 @@ window. The radius itself still comes from the **theme**, which is the rule in
 `Forma.cs`: with Cyberpunk at radius 0 the notch is a clean rectangle, and that is not
 a bug, that is Cyberpunk.
 
+One thing has to carry those four radii and is easy to miss: **the drawer's clip**. While a
+panel is open the silhouette is drawn by `Isla.Clip`, not by the `CornerRadius`, and a clip
+built from a single radius turns the notch into a rectangle the moment you open anything —
+silently, because the island and the bar have the same radius on all four corners and never
+notice. The silhouette is `SiluetaDelCajon`, a pure function, so it is fixed by tests
+without opening a window.
+
 ---
 
 ## Configuration

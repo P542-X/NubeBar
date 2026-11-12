@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Linq;
+using System.Windows;
+using System.Windows.Media;
 
 namespace NubeBar;
 
@@ -35,6 +37,8 @@ public static partial class Pruebas
         ElHaloDelPanelLateralNoVaEnLoRecortado();
         LaReservaNoDependeDelModo();
         LaNotchEsUnaIsla();
+        LaNotchNoPierdeSusEsquinasAlAbrirUnPanel();
+        ElPulsoDeAudioNoMueveLoQueEstasLeyendo();
         LaIslaCreceEnseguidaYEncogeConCalma();
         LoQueSeCentraMidePar();
         ElCirculoDelDeslizadorNoSeSale();
@@ -382,6 +386,150 @@ public static partial class Pruebas
         Igual(0.0, PanelNube.MargenEfectivo("notch", 8), "la notch no flota: margen 0");
         Igual(8.0, PanelNube.MargenEfectivo("isla", 8), "la isla sí, y se queda el que tenga");
         Igual(8.0, PanelNube.MargenEfectivo("barra", 8), "y la barra igual");
+    }
+
+    // ================= Y el recorte tiene que llevarlas también =================
+    //
+    // ---------- De dónde sale esto ----------
+    //
+    // «Cuando activamos el modo notch y desplegamos un panel, los bordes se vuelven
+    // rectangulares.»
+    //
+    // Las esquinas estaban bien decididas (`PanelNube.Esquinas`, arriba) y bien puestas en el
+    // Border (`Isla.CornerRadius`). Lo que no las llevaba era el RECORTE del cajón, que se
+    // construía con `RectangleGeometry(rect, radio, radio)`: un solo radio para las cuatro, y
+    // el que se le pasaba era `CornerRadius.TopLeft`, que en una notch colgando de arriba vale
+    // CERO. Así que al abrir un panel el recorte pasaba a ser un rectángulo, y el recorte
+    // manda sobre el `CornerRadius` del Border.
+    //
+    // Por eso solo se veía con el panel abierto: en reposo no hay recorte.
+    static void LaNotchNoPierdeSusEsquinasAlAbrirUnPanel()
+    {
+        Grupo("notch: el recorte del cajón");
+
+        var r = new Rect(0, 0, 600, 40);
+        const double radio = 20;
+
+        // Con las cuatro al radio del tema —isla y barra— las cuatro esquinas quedan fuera.
+        var isla = MainWindow.FormaRedondeada(r, new CornerRadius(radio));
+        Igual(false, isla.FillContains(new Point(2, 2)), "isla: arriba-izquierda queda fuera de la forma");
+        Igual(false, isla.FillContains(new Point(598, 2)), "isla: y arriba-derecha");
+        Igual(false, isla.FillContains(new Point(2, 38)), "isla: y abajo-izquierda");
+        Vale(isla.FillContains(new Point(300, 20)), "y el centro sí está dentro, no vaya a ser");
+
+        // La notch colgando de arriba: arriba a escuadra —es el filo de la pantalla— y abajo
+        // redondo. Es lo que la hace leerse como un recorte del marco.
+        var e = PanelNube.Esquinas("notch", "arriba", radio);
+        var notch = MainWindow.FormaRedondeada(r, new CornerRadius(e.AI, e.AD, e.BD, e.BI));
+        Vale(notch.FillContains(new Point(0.5, 0.5)), "notch: arriba-izquierda SÍ es parte de la forma");
+        Vale(notch.FillContains(new Point(599.5, 0.5)), "notch: y arriba-derecha");
+        Igual(false, notch.FillContains(new Point(2, 38)), "notch: y las de abajo siguen redondas");
+        Igual(false, notch.FillContains(new Point(598, 38)), "notch: las dos");
+
+        // Y la de abajo, al revés, que es el espejo.
+        var ab = PanelNube.Esquinas("notch", "abajo", radio);
+        var abajo = MainWindow.FormaRedondeada(r, new CornerRadius(ab.AI, ab.AD, ab.BD, ab.BI));
+        Vale(abajo.FillContains(new Point(0.5, 39.5)), "notch de abajo: abajo-izquierda es parte de la forma");
+        Igual(false, abajo.FillContains(new Point(2, 2)), "notch de abajo: y arriba queda redondo");
+
+        // ---------- Lo que fallaba, escrito ----------
+        //
+        // Con un radio solo, y encima el de arriba-izquierda, la notch perdía las DOS de abajo.
+        var comoEstaba = new RectangleGeometry(r, e.AI, e.AI);
+        Vale(comoEstaba.FillContains(new Point(2, 38)),
+             "con un radio solo —el de arriba-izquierda— la esquina de abajo salía cuadrada");
+
+        // Un tema a radio 0 da un rectángulo limpio, y eso no es un fallo: es Cyberpunk.
+        var cero = MainWindow.FormaRedondeada(r, new CornerRadius(0));
+        Vale(cero.FillContains(new Point(0.5, 0.5)), "con el tema a radio 0, la esquina está dentro");
+        Vale(cero.FillContains(new Point(599.5, 39.5)), "y la de la otra punta también");
+
+        // Y un radio imposible se topa a la mitad del lado corto en vez de dar la vuelta.
+        var gordo = MainWindow.FormaRedondeada(r, new CornerRadius(500)).Bounds;
+        Vale(Math.Abs(gordo.Width - r.Width) < 0.01 && Math.Abs(gordo.Height - r.Height) < 0.01,
+             "un radio imposible no saca la forma de su rectángulo");
+
+        // ---------- Y ahora la silueta de verdad, con el panel abierto ----------
+        //
+        // Lo de arriba fija la forma; esto fija que el recorte la USE, que es donde estaba el
+        // fallo. La isla mide 300 de alto porque hay un panel desplegado, y la tarjeta cuelga
+        // del icono que lo abrió (x=100, ancho 200).
+        var conPanel = MainWindow.SiluetaDelCajon(600, 300, 40, arriba: true,
+                                                  new CornerRadius(e.AI, e.AD, e.BD, e.BI), 100, 200);
+        Vale(conPanel.FillContains(new Point(0.5, 0.5)),
+             "notch con un panel abierto: la esquina de arriba sigue a escuadra");
+        Vale(conPanel.FillContains(new Point(599.5, 0.5)), "y la otra de arriba también");
+        Igual(false, conPanel.FillContains(new Point(2, 38)),
+              "y la de abajo de la fila sigue redonda, donde la tarjeta no tapa");
+        Vale(conPanel.FillContains(new Point(200, 250)), "la tarjeta cuelga y es parte de la silueta");
+        Igual(false, conPanel.FillContains(new Point(50, 100)),
+              "y a su lado no hay isla: el cajón solo se ve por donde cuelga la tarjeta");
+
+        // La misma, en isla: ahí las cuatro son redondas también con el panel abierto.
+        var islaConPanel = MainWindow.SiluetaDelCajon(600, 300, 40, arriba: true,
+                                                      new CornerRadius(radio), 100, 200);
+        Igual(false, islaConPanel.FillContains(new Point(0.5, 0.5)),
+              "isla con un panel abierto: la esquina de arriba sigue redonda");
+
+        // Y sin panel —el cajón a cero— la silueta es la fila y nada más.
+        var recogida = MainWindow.SiluetaDelCajon(600, 40, 40, arriba: true,
+                                                  new CornerRadius(e.AI, e.AD, e.BD, e.BI), 100, 200);
+        Vale(recogida.FillContains(new Point(0.5, 0.5)), "recogida: arriba a escuadra");
+        Igual(false, recogida.FillContains(new Point(2, 38)), "recogida: y abajo redondo");
+    }
+
+    // ================= Y la música no puede mover lo que estás leyendo =================
+    //
+    // ---------- De dónde sale esto ----------
+    //
+    // «Cuando hay música sonando y se abre un panel se cortan por abajo los iconos, porque
+    // la música lo que hace es mover el panel y la nube.»
+    //
+    // El pulso de audio achata la isla un 2,2 % con el golpe. La escala iba en `Cuerpo`, que
+    // con un panel abierto mide la isla ENTERA, y el origen de la escala es su centro: la fila
+    // de los módulos, que está en una punta, se iba cuatro píxeles para abajo y se salía del
+    // recorte —que no se mueve, porque un Clip se aplica antes del RenderTransform—. De ahí
+    // los iconos cortados al ritmo de la canción.
+    //
+    // Esto NO era del modo notch: pasaba en los tres. Con la nube abajo se cortan por arriba,
+    // que es el mismo fallo del revés.
+    //
+    // Lo que se fija aquí es la regla: lo que se escala tiene que ser la fila de módulos y
+    // nada más, para que el alto del panel no entre en la cuenta.
+    static void ElPulsoDeAudioNoMueveLoQueEstasLeyendo()
+    {
+        Grupo("pulso de audio");
+
+        const double barra = 40;
+        double esc = MainWindow.EscalaYdelPulso(1);          // a tope de golpe
+
+        Vale(esc < 1 && esc > 0.9, "el pulso achata, y poco: la escala vertical se queda cerca de 1");
+        Igual(1.0, MainWindow.EscalaYdelPulso(0), "en silencio no achata nada");
+        Vale(MainWindow.EscalaXdelPulso(1) > 1, "y ensancha a la vez, que es la «presión»");
+
+        // Lo que se escala ahora: la fila. No se sale ni a tope de golpe.
+        Igual(0.0, MainWindow.SeSaleDelRecorte(barra, barra, esc),
+              "escalando la fila de módulos no se sale un solo píxel del recorte");
+        Igual(0.0, MainWindow.SeSaleDelRecorte(barra, barra, MainWindow.EscalaYdelPulso(0.5)),
+              "ni a medio golpe");
+
+        // Y pase lo que pase con el panel: la fila mide lo que mide, y el cajón no entra en
+        // la cuenta. Es toda la diferencia entre el fallo y el arreglo.
+        foreach (var altoDelPanel in new[] { 0.0, 120, 300, 520, 900 })
+            Igual(0.0, MainWindow.SeSaleDelRecorte(barra, barra, esc),
+                  $"con un panel de {altoDelPanel:0} px, la fila sigue sin salirse");
+
+        // Y lo de antes: escalando algo del alto de la isla ENTERA, se sale. Y cuanto más
+        // alto el panel, más — que es exactamente lo que se veía.
+        double con400 = MainWindow.SeSaleDelRecorte(400, barra, esc);
+        double con800 = MainWindow.SeSaleDelRecorte(800, barra, esc);
+        Vale(con400 > 3, $"escalando la isla entera con un panel de 400 px se salían {con400:0.0} px de icono");
+        Vale(con800 > con400, "y con un panel más alto, más todavía");
+
+        // Con la isla RECOGIDA el cajón mide 0, así que las dos cosas son la misma y el efecto
+        // de siempre no cambia. Es lo que hace que el arreglo no se cobre nada.
+        Igual(0.0, MainWindow.SeSaleDelRecorte(barra, barra, esc),
+              "y con la isla recogida da igual qué se escale: el cajón mide 0");
     }
 
     // ================= Reservar espacio: una elección, no un modo =================

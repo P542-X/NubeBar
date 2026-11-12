@@ -14,7 +14,9 @@ namespace NubeBar;
 // música concreta: vale para Spotify, para un vídeo o para el sonido de un juego) y
 // con él se mueven tres cosas a la vez:
 //
-//   · la isla se comprime un pelín, como si el sonido le hiciera presión;
+//   · la fila de los módulos se comprime un pelín, como si el sonido le hiciera
+//     presión (la fila y no la isla entera: con un panel abierto, achatar la isla
+//     entera mueve el panel y lo saca del recorte — ver `MontarPulsoAudio`);
 //   · el halo del acento crece, que es lo que de verdad se ve de lejos;
 //   · y dos filos de color, uno frío y uno cálido, se separan hacia los lados:
 //     aberración cromática. Suave, de adorno, no un karaoke.
@@ -26,6 +28,33 @@ public partial class MainWindow
 {
     const double PulsoMs = 40;              // 25 veces por segundo, de sobra para un adorno
     const int TicksParaDormir = 50;         // 2 s sin sonido y se para
+
+    // Cuánto se ensancha y cuánto se achata a tope de nivel. Salen de aquí y no de dos
+    // números escritos dentro de `Aplicar` para que la prueba use los de verdad: una copia
+    // en la prueba se queda vieja el día que se afine el efecto y deja de comprobar nada.
+    const double PulsoEnsancha = 0.016, PulsoAchata = 0.022;
+
+    internal static double EscalaXdelPulso(double n) => 1 + PulsoEnsancha * n;
+    internal static double EscalaYdelPulso(double n) => 1 - PulsoAchata * n;
+
+    // ---------- Lo que se sale del recorte ----------
+    //
+    // Función pura, y existe para poder fijar sin abrir ventana el fallo de arriba: dado un
+    // elemento de alto `altoQueSeEscala` que arranca en el filo de la isla y lleva dentro la
+    // fila de módulos ocupando [0, barra], cuánto baja el filo de abajo de esa fila por
+    // debajo de `barra` al escalar el elemento desde su centro.
+    //
+    // El recorte del cajón dice que la fila acaba en `barra`, así que todo lo que esto
+    // devuelva de más de cero son píxeles de icono cortados.
+    //
+    // Con `altoQueSeEscala = barra` —`Contenido`, lo que se escala ahora— sale 0 pase lo que
+    // pase. Con el alto de la isla entera —`Cuerpo`, lo de antes— crece con el panel.
+    internal static double SeSaleDelRecorte(double altoQueSeEscala, double barra, double escalaY)
+    {
+        double centro = altoQueSeEscala / 2;
+        double abajo = centro + (barra - centro) * escalaY;
+        return Math.Max(0, abajo - barra);
+    }
 
     DispatcherTimer? _pulso;
     ScaleTransform? _pulsoEscala;
@@ -42,14 +71,38 @@ public partial class MainWindow
     {
         if (!PulsoPedido || _pulso != null) return;
 
-        // La escala va en Cuerpo y no en Isla: la isla ya tiene su alto y su ancho
-        // animados, y su RenderTransform lo usan el arrastre y el deslizar para
-        // esconderse. Cuerpo está libre, y escalarlo no mueve ni un píxel de layout.
-        if (Cuerpo.RenderTransform is not ScaleTransform)
+        // La escala no va en Isla: la isla ya tiene su alto y su ancho animados, y su
+        // RenderTransform lo usan el arrastre y el deslizar para esconderse.
+        //
+        // ---------- Y va en Contenido, no en Cuerpo ----------
+        //
+        // Estaba en `Cuerpo`, que es el Grid de DOS filas: la de los módulos y el cajón. Con
+        // la isla recogida las dos cosas son la misma —el cajón mide 0— y por eso el efecto
+        // nació bien y se midió bien: «décimas de píxel».
+        //
+        // Con un panel abierto, no. `Cuerpo` pasa a medir lo que mide la isla entera (400 px
+        // y más), el origen de la escala es su CENTRO, y la fila de los módulos está arriba
+        // del todo, lejísimos de ese centro. Con una isla de 400 y una fila de 40, el
+        // ScaleY de 0,978 baja la fila de y=0 a y=4,4 y su filo de abajo de 40 a 43,5 — o
+        // sea 3,5 px FUERA del recorte, que sigue diciendo que la fila acaba en 40. Y el
+        // recorte no se mueve con la escala porque es un Clip, que se aplica antes del
+        // RenderTransform. Resultado: los iconos de la isla cortados por abajo al ritmo de
+        // la música. Es lo que contó el usuario en modo notch, y pasa en los tres modos —
+        // con la nube abajo se cortan por arriba, que es el mismo fallo del revés.
+        //
+        // Puesto en `Contenido`, la escala se la come la fila de los módulos y nada más: mide
+        // lo que mide la fila, su centro es el centro de la fila, y el panel no se entera. Con
+        // la isla recogida el efecto sale EXACTAMENTE el de antes (Cuerpo era la fila), y con
+        // un panel abierto la isla sigue respirando sin mover lo que estás leyendo — que es la
+        // misma regla por la que se cayó la letra sincronizada.
+        //
+        // Los dos filos de color se quedan en `Cuerpo` a propósito: su trabajo es seguir el
+        // contorno de la isla, y escalándolos se les iba justo por fuera del recorte.
+        if (Contenido.RenderTransform is not ScaleTransform)
         {
             _pulsoEscala = new ScaleTransform(1, 1);
-            Cuerpo.RenderTransformOrigin = new Point(0.5, 0.5);
-            Cuerpo.RenderTransform = _pulsoEscala;
+            Contenido.RenderTransformOrigin = new Point(0.5, 0.5);
+            Contenido.RenderTransform = _pulsoEscala;
         }
 
         // Los filos van DENTRO de Cuerpo, con el margen negativo que cancela el
@@ -177,8 +230,8 @@ public partial class MainWindow
         // recogida y sin embargo es lo que la hace parecer viva.
         if (_pulsoEscala != null)
         {
-            _pulsoEscala.ScaleX = 1 + 0.016 * n;
-            _pulsoEscala.ScaleY = 1 - 0.022 * n;
+            _pulsoEscala.ScaleX = EscalaXdelPulso(n);
+            _pulsoEscala.ScaleY = EscalaYdelPulso(n);
         }
 
         // El halo. Solo el radio: la opacidad la animan el expandirse y el destello

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -243,6 +243,97 @@ public partial class MainWindow
         return XdeTarjetaPura(Isla.ActualWidth, _tarjetaAncho, centro, Isla.BorderThickness.Left);
     }
 
+    // ---------- La silueta, con las cuatro esquinas que toque ----------
+    //
+    // El recorte del cajón se dibujaba con `RectangleGeometry(rect, radio, radio)`, o sea
+    // UN radio para las cuatro esquinas, y el radio que se le pasaba era `CornerRadius.TopLeft`.
+    //
+    // Con la isla y con la barra da igual: las cuatro llevan el mismo. Pero la notch lleva dos
+    // a cero y dos al radio del tema (`PanelNube.Esquinas`), y colgando de arriba —que es lo
+    // normal— la que vale cero es justo arriba-izquierda. Así que el recorte salía con radio 0
+    // en las cuatro: un rectángulo. Y como el recorte MANDA sobre el `CornerRadius` del Border,
+    // la muesca perdía sus esquinas redondas en cuanto se abría un panel, y solo entonces
+    // —en reposo no hay recorte y se ve bien, que es lo que lo hacía raro de contar.
+    //
+    // `RectangleGeometry` no sabe de cuatro radios distintos, así que la fila se dibuja a mano:
+    // cuatro lados y cuatro arcos, y la esquina que vale cero sale como vértice seco. Es una
+    // función pura y se comprueba sin abrir ventana (`FillContains`).
+    //
+    // En el orden de WPF: arriba-izquierda, arriba-derecha, abajo-derecha, abajo-izquierda.
+    internal static Geometry FormaRedondeada(Rect r, CornerRadius c)
+    {
+        // Ningún radio puede pasar de la mitad del lado más corto: con uno mayor los arcos se
+        // cruzan y la figura sale del revés. Es el mismo tope que se pone el chaflán.
+        double tope = Math.Min(r.Width, r.Height) / 2;
+        double Cabe(double x) => Math.Clamp(x, 0, Math.Max(0, tope));
+        double ai = Cabe(c.TopLeft), ad = Cabe(c.TopRight),
+               bd = Cabe(c.BottomRight), bi = Cabe(c.BottomLeft);
+
+        if (ai <= 0 && ad <= 0 && bd <= 0 && bi <= 0)
+        {
+            var seco = new RectangleGeometry(r);
+            seco.Freeze();
+            return seco;
+        }
+
+        var f = new PathFigure { StartPoint = new Point(r.Left + ai, r.Top), IsClosed = true, IsFilled = true };
+        void Arco(Point hasta, double radio)
+        {
+            if (radio > 0)
+                f.Segments.Add(new ArcSegment(hasta, new Size(radio, radio), 0,
+                                              false, SweepDirection.Clockwise, true));
+        }
+        f.Segments.Add(new LineSegment(new Point(r.Right - ad, r.Top), true));
+        Arco(new Point(r.Right, r.Top + ad), ad);
+        f.Segments.Add(new LineSegment(new Point(r.Right, r.Bottom - bd), true));
+        Arco(new Point(r.Right - bd, r.Bottom), bd);
+        f.Segments.Add(new LineSegment(new Point(r.Left + bi, r.Bottom), true));
+        Arco(new Point(r.Left, r.Bottom - bi), bi);
+        f.Segments.Add(new LineSegment(new Point(r.Left, r.Top + ai), true));
+        Arco(new Point(r.Left + ai, r.Top), ai);
+
+        var g = new PathGeometry();
+        g.Figures.Add(f);
+        g.Freeze();
+        return g;
+    }
+
+    // ---------- La silueta entera: la fila y la tarjeta que le cuelga ----------
+    //
+    // Función pura, y lo es para que la forma de la isla con un panel abierto se pueda
+    // comprobar sin abrir ninguna ventana — que es justo lo que no se podía cuando la notch
+    // perdía sus esquinas al desplegar un panel. Lo que queda fuera es lo único que de verdad
+    // necesita el árbol visual: dónde cae el ancla y cuánto mide su contenido.
+    internal static Geometry SiluetaDelCajon(double ancho, double alto, double barra, bool arriba,
+                                             CornerRadius esquinas, double xTarjeta, double anchoTarjeta)
+    {
+        // El radio que sirve para medir: el mayor de los cuatro. La isla y la barra llevan el
+        // mismo en todas; la notch lleva dos a cero, y para saber cuánto se tiene que meter la
+        // tarjeta en la fila hace falta el que NO es cero.
+        double radio = Math.Max(Math.Max(esquinas.TopLeft, esquinas.TopRight),
+                                Math.Max(esquinas.BottomRight, esquinas.BottomLeft));
+        barra = Math.Min(barra, alto);
+        double cajon = Math.Max(0, alto - barra);
+
+        // La fila de siempre, con las esquinas que de verdad tiene la isla
+        var fila = FormaRedondeada(new Rect(0, arriba ? 0 : cajon, ancho, barra), esquinas);
+        if (cajon < 1) return fila;                          // aún no ha crecido: solo la fila
+
+        double w = Math.Min(anchoTarjeta, ancho);
+
+        // Lo que la tarjeta se mete en la fila. Nunca menos que su propio radio: si no, sus
+        // esquinas de arriba se quedan fuera de la fila y la unión deja dos muescas justo
+        // donde tiene que parecer que la tarjeta nace de la isla.
+        double solape = Math.Min(barra, Math.Max(RadioTarjeta, radio));
+        var tarjeta = new RectangleGeometry(
+            new Rect(xTarjeta, arriba ? barra - solape : 0, w, cajon + solape),
+            RadioTarjeta, RadioTarjeta);
+
+        var union = new CombinedGeometry(GeometryCombineMode.Union, fila, tarjeta);
+        union.Freeze();                                      // se rehace en cada fotograma
+        return union;
+    }
+
     void AplicarRecorteDelCajon()
     {
         if (_tarjetaAncla == null) { Isla.Clip = null; return; }
@@ -251,16 +342,19 @@ public partial class MainWindow
             double ancho = Isla.ActualWidth, alto = Isla.ActualHeight;
             if (ancho <= 0 || alto <= 0) return;
 
-            double radio = Isla.CornerRadius.TopLeft;
             double barra = Math.Min(_cfg.Barra.Alto, alto);
             double cajon = Math.Max(0, alto - barra);
-
-            // La barra de siempre, con sus esquinas de siempre
-            var fila = new RectangleGeometry(new Rect(0, Arriba ? 0 : cajon, ancho, barra), radio, radio);
-            if (cajon < 1) { Isla.Clip = fila; return; }     // aún no ha crecido: solo la barra
-
             double w = Math.Min(_tarjetaAncho, ancho);
             double x = XdeTarjeta();
+
+            // La silueta la dibuja `SiluetaDelCajon`, que es pura y se comprueba sin abrir
+            // ventana. Aquí solo queda lo que necesita el árbol visual de verdad: decirle al
+            // contenido que mida lo que mide su tarjeta.
+            if (cajon < 1)                               // aún no ha crecido: solo la fila
+            {
+                Isla.Clip = SiluetaDelCajon(ancho, alto, barra, Arriba, Isla.CornerRadius, x, w);
+                return;
+            }
 
             // El contenido viaja con su tarjeta: el cajón empieza después del filo y
             // del padding de la isla, así que lo que se le pone de margen es el resto.
@@ -303,17 +397,7 @@ public partial class MainWindow
                     _tarjetaContenido.Width = wDentro;
             }
 
-            // Lo que la tarjeta se mete en la barra. Nunca menos que su propio radio:
-            // si no, sus esquinas de arriba se quedan fuera de la fila y la unión deja
-            // dos muescas justo donde tiene que parecer que la tarjeta nace de la isla.
-            double solape = Math.Min(barra, Math.Max(RadioTarjeta, radio));
-            var tarjeta = new RectangleGeometry(
-                new Rect(x, Arriba ? barra - solape : 0, w, cajon + solape),
-                RadioTarjeta, RadioTarjeta);
-
-            var union = new CombinedGeometry(GeometryCombineMode.Union, fila, tarjeta);
-            union.Freeze();                                  // se rehace en cada fotograma
-            Isla.Clip = union;
+            Isla.Clip = SiluetaDelCajon(ancho, alto, barra, Arriba, Isla.CornerRadius, x, w);
         }
         catch (Exception ex) { Log.Error("recortar el cajón", ex); }
     }

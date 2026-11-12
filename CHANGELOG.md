@@ -6,6 +6,50 @@ construidos por el workflow de Release a partir de la etiqueta.
 
 ---
 
+## v1.1.1
+
+### Arreglado
+
+- **La notch perdía sus esquinas al desplegar un panel.** En reposo la muesca se veía bien;
+  al abrir cualquier panel anclado a un icono, la isla entera pasaba a ser un rectángulo.
+
+  Las esquinas estaban bien decididas (`PanelNube.Esquinas`: la notch redondea solo las dos
+  que dan a la pantalla) y bien puestas en la isla. Lo que no las llevaba era el **recorte**
+  del cajón, que es lo que dibuja la silueta mientras hay un panel abierto: se construía con
+  `RectangleGeometry(rect, radio, radio)` —un radio solo para las cuatro esquinas— y el radio
+  que se le pasaba era el de arriba-izquierda, que en una notch colgando de arriba vale
+  **cero**. Así que el recorte salía a escuadra, y el recorte manda sobre el `CornerRadius`
+  de la isla.
+
+  Por eso solo se veía con el panel abierto: en reposo no hay recorte. La isla y la barra no
+  se enteraron nunca porque sus cuatro esquinas llevan el mismo radio.
+
+  La fila se dibuja ahora a mano —cuatro lados y cuatro arcos, y la esquina que vale cero
+  sale como vértice seco—, y la silueta entera ha pasado a ser una función pura
+  (`SiluetaDelCajon`), así que la forma de la isla con un panel abierto se comprueba sin
+  abrir ninguna ventana. Volviendo a meter el fallo a propósito, la prueba lo caza.
+
+- **La música cortaba los iconos de la isla por abajo.** Con un panel abierto y algo
+  sonando, los iconos de la fila de módulos se recortaban al ritmo de la canción.
+
+  El pulso de audio achata la isla un 2,2 % con cada golpe, y la escala iba en `Cuerpo`, que
+  es el Grid de dos filas: la de los módulos y el cajón. Con la isla recogida las dos cosas
+  son la misma —el cajón mide 0— y el efecto son décimas de píxel, que es como nació y como
+  se midió. Con un panel abierto, `Cuerpo` pasa a medir la isla **entera**, y como el origen
+  de la escala es su centro, la fila de módulos —que está en una punta— se va cuatro píxeles
+  para abajo. El recorte no la sigue, porque un `Clip` se aplica antes del `RenderTransform`:
+  con una isla de 400 px y una fila de 40, el filo de abajo de la fila acaba 3,5 px fuera de
+  lo que el recorte deja ver.
+
+  No era del modo notch: pasaba en los tres, y con la nube abajo se cortaban por arriba, que
+  es el mismo fallo del revés.
+
+  Ahora la escala va en la fila de módulos y nada más. Con la isla recogida el efecto sale
+  exactamente el de antes; con un panel abierto la isla sigue respirando sin mover lo que
+  estás leyendo — que es la misma regla por la que se cayó la letra sincronizada.
+
+---
+
 ## v1.1.0
 
 ### Añadido
